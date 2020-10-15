@@ -45,13 +45,15 @@ CBaseCombatWeapon::CBaseCombatWeapon()
 	// Constructor must call this
 	// CONSTRUCT_PREDICTABLE( CBaseCombatWeapon );
 
-	// Some default values.  There should be set in the particular weapon classes
+	// Some default values.  These should be set in the particular weapon classes
 	m_fMinRange1		= 65;
 	m_fMinRange2		= 65;
 	m_fMaxRange1		= 1024;
 	m_fMaxRange2		= 1024;
+	m_fJamChance		= 0.01;
 
 	m_bReloadsSingly	= false;
+	m_bCanJam			= false;
 
 	// Defaults to zero
 	m_nViewModelIndex	= 0;
@@ -297,6 +299,14 @@ const char *CBaseCombatWeapon::GetAnimPrefix( void ) const
 const char *CBaseCombatWeapon::GetPrintName( void ) const
 {
 	return GetWpnData().szPrintName;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+float CBaseCombatWeapon::GetCycleTime( void ) const
+{
+	return GetWpnData().flCycleTime;
 }
 
 //-----------------------------------------------------------------------------
@@ -741,7 +751,7 @@ void CBaseCombatWeapon::MakeTracer( const Vector &vecTracerSrc, const trace_t &t
 	switch ( iTracerType )
 	{
 	case TRACER_LINE:
-		UTIL_Tracer( vNewSrc, tr.endpos, iEntIndex, iAttachment, 0.0f, true, pszTracerName );
+		UTIL_Tracer( vNewSrc, tr.endpos, iEntIndex, iAttachment, 0.0f, false, pszTracerName );
 		break;
 
 	case TRACER_LINE_AND_WHIZ:
@@ -1696,6 +1706,7 @@ const WeaponProficiencyInfo_t *CBaseCombatWeapon::GetProficiencyValues()
 		{ 1.0, 1.0	},
 		{ 1.0, 1.0	},
 		{ 1.0, 1.0	},
+		{ 1.0, 1.0	},
 	};
 
 	// This is also defined in basehlcombatweapon_shared, which has different (the intended) values. 
@@ -1710,7 +1721,7 @@ const WeaponProficiencyInfo_t *CBaseCombatWeapon::GetProficiencyValues()
 //-----------------------------------------------------------------------------
 float CBaseCombatWeapon::GetFireRate( void )
 {
-	return 0;
+	return GetCycleTime();
 }
 
 //-----------------------------------------------------------------------------

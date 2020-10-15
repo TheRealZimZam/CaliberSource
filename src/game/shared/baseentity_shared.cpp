@@ -2233,7 +2233,7 @@ void CBaseEntity::TraceBleed( float flDamage, const Vector &vecDir, trace_t *ptr
 		cCount = 4;
 	}
 
-	float flTraceDist = (bitsDamageType & DMG_AIRBOAT) ? 384 : 172;
+	float flTraceDist = (bitsDamageType & DMG_AIRBOAT) ? 384 : 172;	//NOTENOTE; Well this seems lame, shouldnt this get the velocity/force of the bullet?? (impulse ammodef)
 	for ( i = 0 ; i < cCount ; i++ )
 	{
 		vecTraceDir = vecDir * -1;// trace in the opposite direction the shot came from (the direction the shot is going)

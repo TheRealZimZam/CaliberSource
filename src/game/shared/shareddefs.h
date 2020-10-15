@@ -108,8 +108,8 @@ public:
 
 #define WEAPON_NOCLIP			-1	// clip sizes set to this tell the weapon it doesn't use a clip
 
-#define	MAX_AMMO_TYPES	32		// ???
-#define MAX_AMMO_SLOTS  32		// not really slots
+#define	MAX_AMMO_TYPES	64		// 32
+#define MAX_AMMO_SLOTS  64		// not really slots
 
 #define HUD_PRINTNOTIFY		1
 #define HUD_PRINTCONSOLE	2
@@ -195,7 +195,7 @@ public:
 #define SKILL_EASY		1
 #define SKILL_MEDIUM	2
 #define SKILL_HARD		3
-
+#define SKILL_VERYHARD	4
 
 // Weapon flags
 // -----------------------------------------
@@ -232,15 +232,16 @@ public:
 // Muzzle flash definitions (for the flags field of the "MuzzleFlash" DispatchEffect)
 enum
 {
-	MUZZLEFLASH_AR2				= 0,
-	MUZZLEFLASH_SHOTGUN,
-	MUZZLEFLASH_SMG1,
-	MUZZLEFLASH_SMG2,
-	MUZZLEFLASH_PISTOL,
-	MUZZLEFLASH_COMBINE,
-	MUZZLEFLASH_357,
-	MUZZLEFLASH_RPG,
-	MUZZLEFLASH_COMBINE_TURRET,
+	MUZZLEFLASH_AR2				= 0,	//Large Rifle/HMG
+	MUZZLEFLASH_SHOTGUN,				//Shotgun
+	MUZZLEFLASH_SMG1,					//Small Rifle/SMG
+	MUZZLEFLASH_SMG2,					//Silenced SMG
+	MUZZLEFLASH_PISTOL,					//Pistol
+	MUZZLEFLASH_COMBINE,				//Caseless Rifle
+	MUZZLEFLASH_357,					//Big Pistol/Revolver
+	MUZZLEFLASH_RPG,					//Rawket lawnchair
+	MUZZLEFLASH_COMBINE_TURRET,			//Minigun turret
+	MUZZLEFLASH_FLAREGUN,				//Flaregun
 
 	MUZZLEFLASH_FIRSTPERSON		= 0x100,
 };
@@ -448,6 +449,7 @@ enum
 	BLOOD_COLOR_RED = 0,
 	BLOOD_COLOR_YELLOW,
 	BLOOD_COLOR_GREEN,
+	BLOOD_COLOR_BLUE,
 	BLOOD_COLOR_MECH,
 
 #if defined( HL2_EPISODIC )
@@ -586,7 +588,7 @@ struct FireBulletsInfo_t
 		m_iShots = 1;
 		m_vecSpread.Init( 0, 0, 0 );
 		m_flDistance = 8192;
-		m_iTracerFreq = 4;
+		m_iTracerFreq = 3;
 		m_iDamage = 0;
 		m_iPlayerDamage = 0;
 		m_pAttacker = NULL;

@@ -850,6 +850,7 @@ void UTIL_BloodDecalTrace( trace_t *pTrace, int bloodColor )
 {
 	if ( UTIL_ShouldShowBlood( bloodColor ) )
 	{
+		//TODO; Shouldnt this be a switch with all possibilites??
 		if ( bloodColor == BLOOD_COLOR_RED )
 		{
 			UTIL_DecalTrace( pTrace, "Blood" );

@@ -12,6 +12,7 @@
 
 static const char *g_ProficiencyNames[] = 
 {
+	"Very Poor",
 	"Poor",
 	"Average",
 	"Good",

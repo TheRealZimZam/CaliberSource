@@ -46,7 +46,7 @@ int CSingleplayRules::Damage_GetTimeBased( void )
 //-----------------------------------------------------------------------------
 int	CSingleplayRules::Damage_GetShouldGibCorpse( void )
 {
-	int iDamage = ( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_SONIC | DMG_CLUB );
+	int iDamage = ( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_CLUB ); //DMG_SONIC
 	return iDamage;
 }
 

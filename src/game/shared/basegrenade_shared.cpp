@@ -178,14 +178,27 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 
 	UTIL_DecalTrace( pTrace, "Scorch" );
 
-	EmitSound( "BaseGrenade.Explode" );
-
 	SetThink( &CBaseGrenade::SUB_Remove );
 	SetTouch( NULL );
 	SetSolid( SOLID_NONE );
 	
 	AddEffects( EF_NODRAW );
 	SetAbsVelocity( vec3_origin );
+
+	if ( GetWaterLevel() == 0 )
+	{
+		if ( random->RandomInt( 0, 1 ) == 1 )
+		{
+			EmitSound( "BaseGrenade.Explode" );
+
+			int sparkCount = random->RandomInt(1,2);
+			QAngle angles;
+			VectorAngles( pTrace->plane.normal, angles );
+
+			for ( int i = 0; i < sparkCount; i++ )
+				Create( "spark_shower", GetAbsOrigin(), angles, NULL );
+		}
+	}
 
 #if HL2_EPISODIC
 	// Because the grenade is zipped out of the world instantly, the EXPLOSION sound that it makes for
@@ -272,7 +285,7 @@ void CBaseGrenade::DetonateUse( CBaseEntity *pActivator, CBaseEntity *pCaller, U
 void CBaseGrenade::PreDetonate( void )
 {
 #if !defined( CLIENT_DLL )
-	CSoundEnt::InsertSound ( SOUND_DANGER, GetAbsOrigin(), 400, 1.5, this );
+	CSoundEnt::InsertSound ( SOUND_DANGER, GetAbsOrigin(), 400, 0.5, this );
 #endif
 
 	SetThink( &CBaseGrenade::Detonate );
@@ -448,6 +461,10 @@ void CBaseGrenade::SlideTouch( CBaseEntity *pOther )
 void CBaseGrenade ::BounceSound( void )
 {
 	// Doesn't need to do anything anymore! Physics makes the sound.
+#if 0
+	const char *pszBounceSound = ( m_iszBounceSound == NULL_STRING ) ? "BaseGrenade.BounceSound" : STRING( m_iszBounceSound );
+	EmitSound( pszBounceSound );
+#endif
 }
 
 void CBaseGrenade ::TumbleThink( void )

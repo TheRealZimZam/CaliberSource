@@ -3793,7 +3793,8 @@ void CGameMovement::CheckFalling( void )
 
 		if ( player->GetWaterLevel() > 0 )
 		{
-			// They landed in water.
+			// Landed in water, scale the damage
+
 		}
 		else
 		{

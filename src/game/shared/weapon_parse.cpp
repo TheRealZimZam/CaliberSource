@@ -33,7 +33,8 @@ const char *pWeaponSoundCategories[ NUM_SHOOT_SOUND_TYPES ] =
 	"special1",
 	"special2",
 	"special3",
-	"taunt"
+	"taunt",
+	"deploy"
 };
 #else
 extern const char *pWeaponSoundCategories[ NUM_SHOOT_SOUND_TYPES ];
@@ -311,6 +312,7 @@ FileWeaponInfo_t::FileWeaponInfo_t()
 	szAnimationPrefix[0] = 0;
 	iSlot = 0;
 	iPosition = 0;
+	flCycleTime = 0;
 	iMaxClip1 = 0;
 	iMaxClip2 = 0;
 	iDefaultClip1 = 0;
@@ -370,10 +372,11 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 		iSlot = pKeyValuesData->GetInt( "bucket_360", iSlot );
 		iPosition = pKeyValuesData->GetInt( "bucket_position_360", iPosition );
 	}
-	iMaxClip1 = pKeyValuesData->GetInt( "clip_size", WEAPON_NOCLIP );					// Max primary clips gun can hold (assume they don't use clips by default)
-	iMaxClip2 = pKeyValuesData->GetInt( "clip2_size", WEAPON_NOCLIP );					// Max secondary clips gun can hold (assume they don't use clips by default)
-	iDefaultClip1 = pKeyValuesData->GetInt( "default_clip", iMaxClip1 );		// amount of primary ammo placed in the primary clip when it's picked up
-	iDefaultClip2 = pKeyValuesData->GetInt( "default_clip2", iMaxClip2 );		// amount of secondary ammo placed in the secondary clip when it's picked up
+	flCycleTime = pKeyValuesData->GetFloat( "cycle_time", flCycleTime );			// How long it takes to fire a boolet
+	iMaxClip1 = pKeyValuesData->GetInt( "clip_size", WEAPON_NOCLIP );				// Max primary clips gun can hold (assume they don't use clips by default)
+	iMaxClip2 = pKeyValuesData->GetInt( "clip2_size", WEAPON_NOCLIP );				// Max secondary clips gun can hold (assume they don't use clips by default)
+	iDefaultClip1 = pKeyValuesData->GetInt( "default_clip", iMaxClip1 );			// amount of primary ammo placed in the primary clip when it's picked up
+	iDefaultClip2 = pKeyValuesData->GetInt( "default_clip2", iMaxClip2 );			// amount of secondary ammo placed in the secondary clip when it's picked up
 	iWeight = pKeyValuesData->GetInt( "weight", 0 );
 
 	iRumbleEffect = pKeyValuesData->GetInt( "rumble", -1 );

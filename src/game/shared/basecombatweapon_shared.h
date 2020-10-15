@@ -112,7 +112,8 @@ namespace vgui2
 #define VECTOR_CONE_10DEGREES		Vector( 0.08716, 0.08716, 0.08716 )
 #define VECTOR_CONE_12DEGREES		Vector( 0.10461, 0.10461, 0.10461 )
 #define VECTOR_CONE_15DEGREES		Vector( 0.13053, 0.13053, 0.13053 )
-// Anything above 15 cant hit the broad side of a barn
+// Anything above 15 cant hit the broad side of a barn, only use for huge amounts of projectiles,
+// Something like canister/grape shot with at least 20 projectiles.
 #define VECTOR_CONE_20DEGREES		Vector( 0.17365, 0.17365, 0.17365 )
 #define VECTOR_CONE_25DEGREES		Vector( 0.21727, 0.21727, 0.21727 )
 
@@ -233,6 +234,7 @@ public:
 	// Weapon firing
 	virtual void			PrimaryAttack( void );						// do "+ATTACK"
 	virtual void			SecondaryAttack( void ) { return; }			// do "+ATTACK2"
+	virtual void			TertiaryAttack( void ) { return; }			// do "+ATTACK3" - mainly for switching firing modes
 
 	// Firing animations
 	virtual Activity		GetPrimaryAttackActivity( void );
@@ -300,6 +302,7 @@ public:
 	virtual const char		*GetViewModel( int viewmodelindex = 0 ) const;
 	virtual const char		*GetWorldModel( void ) const;
 	virtual const char		*GetAnimPrefix( void ) const;
+	virtual float			GetCycleTime( void ) const;
 	virtual int				GetMaxClip1( void ) const;
 	virtual int				GetMaxClip2( void ) const;
 	virtual int				GetDefaultClip1( void ) const;
@@ -519,14 +522,16 @@ public:
 	CNetworkVar( int, m_iSecondaryAmmoType );	// "secondary" ammo index into the ammo info array
 	CNetworkVar( int, m_iClip1 );				// number of shots left in the primary weapon clip, -1 it not used
 	CNetworkVar( int, m_iClip2 );				// number of shots left in the secondary weapon clip, -1 it not used
-	bool					m_bFiresUnderwater;		// true if this weapon can fire underwater
-	bool					m_bAltFiresUnderwater;		// true if this weapon can fire underwater
+	bool					m_bFiresUnderwater;		// True if this weapon can fire underwater
+	bool					m_bAltFiresUnderwater;	// True if this weapon can fire underwater
+	bool					m_bReloadsSingly;		// Tryuey if this weapon reloads 1 round at a time
+	bool					m_bCanJam;				// True if this weapon can jam
 	float					m_fMinRange1;			// What's the closest this weapon can be used?
 	float					m_fMinRange2;			// What's the closest this weapon can be used?
 	float					m_fMaxRange1;			// What's the furthest this weapon can be used?
 	float					m_fMaxRange2;			// What's the furthest this weapon can be used?
-	bool					m_bReloadsSingly;		// Tryue if this weapon reloads 1 round at a time
 	float					m_fFireDuration;		// The amount of time that the weapon has sustained firing
+	float					m_fJamChance;			// The chance to jam after each shot
 	int						m_iSubType;
 
 	float					m_flUnlockTime;

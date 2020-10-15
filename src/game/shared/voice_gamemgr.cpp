@@ -101,7 +101,7 @@ CVoiceGameMgr::CVoiceGameMgr()
 {
 	m_UpdateInterval = 0;
 	m_nMaxPlayers = 0;
-	m_iProximityDistance = -1;
+	m_iProximityDistance = 10;	//-1
 }
 
 
@@ -223,7 +223,7 @@ void CVoiceGameMgr::UpdateMasks()
 
 		CPlayerBitVec gameRulesMask;
 		CPlayerBitVec ProximityMask;
-		bool		bProximity = false;
+		bool		bProximity = false;	//shouldnt this be a convar??
 		if( g_PlayerModEnable[iClient] )
 		{
 			// Build a mask of who they can hear based on the game rules.

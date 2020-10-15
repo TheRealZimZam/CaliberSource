@@ -213,9 +213,9 @@ public:
 		{
 			iLevel = 1;
 		}
-		else if ( iLevel > 3 )
+		else if ( iLevel > 4 )
 		{
-			iLevel = 3; 
+			iLevel = 4; 
 		}
 
 		g_iSkillLevel = iLevel;
@@ -233,7 +233,7 @@ public:
 	virtual bool IsDeathmatch( void ) = 0;//is this a deathmatch game?
 	virtual bool IsTeamplay( void ) { return FALSE; };// is this deathmatch game being played with team rules?
 	virtual bool IsCoOp( void ) = 0;// is this a coop game?
-	virtual const char *GetGameDescription( void ) { return "Half-Life 2"; }  // this is the game name that gets seen in the server browser
+	virtual const char *GetGameDescription( void ) { return "Caliber"; }  // this is the game name that gets seen in the server browser
 	
 // Client connection/disconnection
 	virtual bool ClientConnected( edict_t *pEntity, const char *pszName, const char *pszAddress, char *reject, int maxrejectlen ) = 0;// a client just connected to the server (player hasn't spawned yet)

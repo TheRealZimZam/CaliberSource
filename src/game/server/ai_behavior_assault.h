@@ -1,6 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Combat behaviors for AIs in an aggressive-attack mode.
+//			Lots of flanking and shots out of cover.
 //
 //=============================================================================//
 

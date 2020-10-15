@@ -20,28 +20,37 @@
 // Armor given by a battery
 #define MAX_NORMAL_BATTERY	100
 
-// Ammo counts given by ammo items
-// CHANGE: This should (almost) always equal the magazine size for the weapon
-#define SIZE_AMMO_PISTOL			24
-#define SIZE_AMMO_PISTOL_LARGE		96
-#define SIZE_AMMO_SMG1				45
-#define SIZE_AMMO_SMG1_LARGE		250
-//#define SIZE_AMMO_AR1				30
+// Ammo counts given by ammo items - Large variations are NEAR full-resupply
+// NOTENOTE: This should (almost) always be a multiplier of the magazine size for the weapon;
+// Also, this is very closely linked to balance. Because of this, it might be prudent to link this to the convars, 
+// but im not sureabout the perf/function impact of that. For now, It'll stay hardcoded, cause'
+// im pretty sure nobody is going to be making mods for (this) a mod anytime soon.
+#define SIZE_AMMO_PISTOL			26	// Default Pistol clips come in a bundle
+#define SIZE_AMMO_PISTOL_SMALL		13	// Here for posterity
+#define SIZE_AMMO_PISTOL_LARGE		104
+#define SIZE_AMMO_SMG1				50
+#define SIZE_AMMO_SMG1_LARGE		200
+#define SIZE_AMMO_SMG2				60
+#define SIZE_AMMO_SMG2_LARGE		180
+#define SIZE_AMMO_AR1				30
+#define SIZE_AMMO_AR1_LARGE			120
 #define SIZE_AMMO_AR2				25
 #define SIZE_AMMO_AR2_LARGE			100
+
 #define SIZE_AMMO_RPG_ROUND			1
-// Direct grenade
-#define	SIZE_AMMO_AR2_ALTFIRE		1
-// Arc grenade
-#define SIZE_AMMO_SMG1_GRENADE		1
-// Should scrapgun be one shell at a time like the smg1grenade, or in a small clip like thing (4)?
-//#define SIZE_AMMO_SCRAPGUN		1
-// Both shotguns use the same ammo, so average out their magazine size
-#define SIZE_AMMO_BUCKSHOT			6
-//#define SIZE_AMMO_BUCKSHOT_MAG			7
-#define SIZE_AMMO_357				6
-#define SIZE_AMMO_357_LARGE			18
-#define SIZE_AMMO_CROSSBOW			4
+#define	SIZE_AMMO_AR2_ALTFIRE		1	// Direct grenade
+#define SIZE_AMMO_SMG1_GRENADE		1	// Arc grenade
+
+#define SIZE_AMMO_SNIPER			4	// Comes in a clip like the PTRS, but is loaded seperately
+#define SIZE_AMMO_357				7
+#define SIZE_AMMO_357_LARGE			28
+// Both shotguns use the same ammo, so average out their magazine size (better solution L8R)
+#define SIZE_AMMO_BUCKSHOT			5
+#define SIZE_AMMO_BUCKSHOT_MAG		7
+#define SIZE_AMMO_BUCKSHOT_LARGE	16
+#define SIZE_AMMO_CROSSBOW			1
+#define SIZE_AMMO_FLAMER			100	// One tank
+#define SIZE_AMMO_PROJECTOR			200	// A full burst
 
 #define SF_ITEM_START_CONSTRAINED	0x00000001
 

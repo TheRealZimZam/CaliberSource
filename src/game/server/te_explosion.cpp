@@ -114,7 +114,10 @@ void TE_Explosion( IRecipientFilter& filter, float delay,
 	const Vector* pos, int modelindex, float scale, int framerate, int flags, int radius, int magnitude, const Vector* normal, unsigned char materialType )
 {
 	g_TEExplosion.m_vecOrigin		= *pos;
-	g_TEExplosion.m_nModelIndex		= modelindex;	
+	g_TEExplosion.m_nModelIndex		= modelindex;
+	//Clamping for anything that isnt env_explode
+	if ( scale > 20 )
+		scale = 20;	//max is 50, but anything bigger than this needs to use the mega-bomb fx
 	g_TEExplosion.m_fScale			= scale;
 	g_TEExplosion.m_nFrameRate		= framerate;
 	g_TEExplosion.m_nFlags			= flags;

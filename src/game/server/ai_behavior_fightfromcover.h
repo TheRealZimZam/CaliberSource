@@ -1,7 +1,6 @@
 //========== Copyright © 2009, Valve Corporation, All rights reserved. ========
 //
-// Purpose: General cover searching and advancing.
-//		
+// Purpose: 
 //
 //=============================================================================
 

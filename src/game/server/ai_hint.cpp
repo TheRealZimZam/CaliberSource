@@ -42,9 +42,16 @@ CHintCriteria::CHintCriteria( void )
 //-----------------------------------------------------------------------------
 CHintCriteria::~CHintCriteria( void )
 {
+	m_iFirstHintType = HINT_NONE;
+	m_iLastHintType = HINT_NONE;
+	m_strGroup		= NULL_STRING;
+	m_strGenericType = NULL_STRING;
+	m_iFlags = 0;
 	m_zoneInclude.Purge();
 	m_zoneExclude.Purge();
 	m_HintTypes.Purge();
+	m_pfnFilter = NULL;
+	m_pFilterContext = NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -96,7 +103,7 @@ bool CHintCriteria::MatchesSingleHintType() const
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-bool CHintCriteria::MatchesHintType( int hintType ) const
+bool CHintCriteria::MatchesHintType( int hintType, string_t iszGenericType ) const
 {
 	int c = m_HintTypes.Count();
  	for ( int i = 0; i < c; ++i )
@@ -119,6 +126,11 @@ bool CHintCriteria::MatchesHintType( int hintType ) const
 			// This search is for a range of hint types.
 			if( hintType < GetFirstHintType() || hintType > GetLastHintType() )
 				return false;
+
+			if ( hintType == HINT_GENERIC && iszGenericType != m_strGenericType )
+			{
+				return false;
+			}
 		}
 
 		return true;

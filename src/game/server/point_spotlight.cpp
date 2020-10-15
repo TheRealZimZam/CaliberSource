@@ -2,6 +2,8 @@
 //
 // Purpose: 
 //
+// TODO; Alternate textures shouldnt be a spawnflag-allow them to be configured
+// on a per entity basis if possible
 //===========================================================================//
 
 #include "cbase.h"
@@ -14,6 +16,7 @@
 // Spawnflags
 #define SF_SPOTLIGHT_START_LIGHT_ON			0x1
 #define SF_SPOTLIGHT_NO_DYNAMIC_LIGHT		0x2
+#define SF_SPOTLIGHT_ALT_SPRITE				0x4
 
 
 //-----------------------------------------------------------------------------
@@ -46,6 +49,8 @@ private:
 	// ------------------------------
 	void InputLightOn( inputdata_t &inputdata );
 	void InputLightOff( inputdata_t &inputdata );
+	void InputSetColor( inputdata_t &inputdata );
+	void InputForceUpdate( inputdata_t &inputdata );
 
 	// Creates the efficient spotlight 
 	void CreateEfficientSpotlight();
@@ -59,6 +64,7 @@ private:
 	Vector	m_vSpotlightTargetPos;
 	Vector	m_vSpotlightCurrentPos;
 	Vector	m_vSpotlightDir;
+	bool	m_bSpotlightAltSprite;
 	int		m_nHaloSprite;
 	CHandle<CBeam>			m_hSpotlight;
 	CHandle<CSpotlightEnd>	m_hSpotlightTarget;
@@ -80,6 +86,7 @@ BEGIN_DATADESC( CPointSpotlight )
 	DEFINE_FIELD( m_bEfficientSpotlight,	FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_vSpotlightTargetPos,	FIELD_POSITION_VECTOR ),
 	DEFINE_FIELD( m_vSpotlightCurrentPos,	FIELD_POSITION_VECTOR ),
+	DEFINE_FIELD( m_bSpotlightAltSprite,	FIELD_BOOLEAN ),
 
 	// Robin: Don't Save, recreated after restore/transition
 	//DEFINE_FIELD( m_hSpotlight,			FIELD_EHANDLE ),
@@ -96,6 +103,9 @@ BEGIN_DATADESC( CPointSpotlight )
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_VOID,		"LightOn",		InputLightOn ),
 	DEFINE_INPUTFUNC( FIELD_VOID,		"LightOff",		InputLightOff ),
+	DEFINE_INPUTFUNC( FIELD_COLOR32,	"SetColor",		InputSetColor ),
+	DEFINE_INPUTFUNC( FIELD_VOID,		"ForceUpdate",	InputForceUpdate ),
+
 	DEFINE_OUTPUT( m_OnOn, "OnLightOn" ),
 	DEFINE_OUTPUT( m_OnOff, "OnLightOff" ),
 
@@ -130,6 +140,8 @@ void CPointSpotlight::Precache(void)
 
 	// Sprites.
 	m_nHaloSprite = PrecacheModel("sprites/light_glow03.vmt");
+	//!!! should there be an if here? precaching both might be unnessecary
+	PrecacheModel( "sprites/glow_test01.vmt" );
 	PrecacheModel( "sprites/glow_test02.vmt" );
 }
 
@@ -348,7 +360,16 @@ void CPointSpotlight::SpotlightCreate(void)
 	}
 
 	//m_hSpotlight = CBeam::BeamCreate( "sprites/spotlight.vmt", m_flSpotlightGoalWidth );
-	m_hSpotlight = CBeam::BeamCreate( "sprites/glow_test02.vmt", m_flSpotlightGoalWidth );
+	if ( FBitSet (m_spawnflags, SF_SPOTLIGHT_ALT_SPRITE) )
+	{
+		//Soft/Misty spotlight
+		m_hSpotlight = CBeam::BeamCreate( "sprites/glow_test01.vmt", m_flSpotlightGoalWidth );
+	}
+	else
+	{
+		//Hard spotlight
+		m_hSpotlight = CBeam::BeamCreate( "sprites/glow_test02.vmt", m_flSpotlightGoalWidth );
+	}
 	// Set the temporary spawnflag on the beam so it doesn't save (we'll recreate it on restore)
 	m_hSpotlight->SetHDRColorScale( m_flHDRColorScale );
 	m_hSpotlight->AddSpawnFlags( SF_BEAM_TEMPORARY );
@@ -508,4 +529,24 @@ void CPointSpotlight::InputLightOff( inputdata_t &inputdata )
 			SpotlightDestroy();
 		}
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Set the beam's color
+//-----------------------------------------------------------------------------
+void CPointSpotlight::InputSetColor( inputdata_t &inputdata )
+{
+	if ( m_hSpotlight )
+	{
+		color32 clr = inputdata.value.Color32();
+		m_hSpotlight->SetColor( clr.r, clr.g, clr.b );
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Force update the spotlight
+//-----------------------------------------------------------------------------
+void CPointSpotlight::InputForceUpdate( inputdata_t &inputdata )
+{
+	SpotlightUpdate();
 }

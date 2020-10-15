@@ -40,4 +40,4 @@ void ExplosionCreate( const Vector &center, const QAngle &angles,
 					 const EHANDLE *ignoredEntity, Class_T ignoredClass,
 					 float flExplosionForce = 0.0f, bool bSurfaceOnly = false, bool bSilent = false, int iCustomDamageType = -1 );
 
-#endif			//EXPLODE_H
+#endif	//EXPLODE_H

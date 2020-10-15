@@ -1,13 +1,11 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Generic NPC - purely for scripted sequence work.
 //
 // $NoKeywords: $
 //
 //=============================================================================//
-//=========================================================
-// Generic NPC - purely for scripted sequence work.
-//=========================================================
+
 #include "cbase.h"
 #include "npcevent.h"
 #include "ai_basenpc.h"
@@ -44,6 +42,7 @@ public:
 };
 
 LINK_ENTITY_TO_CLASS( monster_generic, CGenericNPC );
+LINK_ENTITY_TO_CLASS( npc_generic, CGenericNPC );
 
 //=========================================================
 // Classify - indicates this NPC's place in the 

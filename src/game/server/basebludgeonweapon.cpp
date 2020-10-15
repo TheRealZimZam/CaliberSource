@@ -1,9 +1,11 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose:		The class from which all bludgeon melee
+//				weapons are derived. 
 //
+// $Workfile:     $
+// $Date:         $
 // $NoKeywords: $
-//
 //=============================================================================//
 
 #include "cbase.h"
@@ -71,7 +73,7 @@ int CBaseHLBludgeonWeapon::CapabilitiesGet()
 
 int CBaseHLBludgeonWeapon::WeaponMeleeAttack1Condition( float flDot, float flDist )
 {
-	if (flDist > 64)
+	if (flDist > m_fMaxRange1)
 	{
 		return COND_TOO_FAR_TO_ATTACK;
 	}
@@ -140,7 +142,7 @@ void CBaseHLBludgeonWeapon::Hit( trace_t &traceHit, Activity nHitActivity, bool 
 	AddViewKick();
 
 	//Make sound for the AI
-	CSoundEnt::InsertSound( SOUND_BULLET_IMPACT, traceHit.endpos, 400, 0.2f, pPlayer );
+	CSoundEnt::InsertSound( SOUND_BULLET_IMPACT, traceHit.endpos, 300, 0.2f, pPlayer );
 
 	// This isn't great, but it's something for when the crowbar hits.
 	pPlayer->RumbleEffect( RUMBLE_AR2, 0, RUMBLE_FLAG_RESTART );

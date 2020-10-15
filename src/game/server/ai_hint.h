@@ -59,6 +59,8 @@ enum Hint_e
 	HINT_WORLD_INHIBIT_COMBINE_MINES,
 	HINT_WORLD_VISUALLY_INTERESTING_STEALTH,
 
+	HINT_GENERIC,
+
 	HINT_TACTICAL_COVER_MED	= 100,
 	HINT_TACTICAL_COVER_LOW,
 	HINT_TACTICAL_SPAWN,
@@ -121,6 +123,8 @@ const char *GetHintTypeDescription( CAI_Hint *pHint );
 // CHintCriteria
 //-----------------------------------------------------------------------------
 
+typedef bool (*HintSearchFilterFunc_t)( void *pContext, CAI_Hint *pCandidate );
+
 class CHintCriteria
 {
 public:
@@ -135,9 +139,16 @@ public:
 	void		SetGroup( string_t group );
 	string_t	GetGroup( void )	const	{ return m_strGroup;	}
 
+
+	void		SetFilterFunc( HintSearchFilterFunc_t pfnFilter, void *pContext = NULL )	{ m_pfnFilter = pfnFilter; m_pFilterContext = pContext; }
+	bool		PassesFilter( CAI_Hint *pCandidate ) const { return ( m_pfnFilter ) ? (*m_pfnFilter)( m_pFilterContext, pCandidate ) : true; }
+
+	void		SetGenericType( string_t genericType )	{ m_strGenericType = genericType; }
+	string_t	GetGenericType( void ) const	{ return m_strGenericType; }
+
 	int			GetFirstHintType( void ) const	{ return m_iFirstHintType; }
 	int			GetLastHintType( void ) const	{ return m_iLastHintType; }
-	bool		MatchesHintType( int hintType ) const;
+	bool		MatchesHintType( int hintType, string_t iszGenericType = NULL_STRING ) const;
 	bool		MatchesSingleHintType() const;
 
 	bool		HasIncludeZones( void )	const	{ return ( m_zoneInclude.Count() != 0 ); }
@@ -174,9 +185,13 @@ private:
 	int			m_iFirstHintType;
 	int			m_iLastHintType;
 	string_t	m_strGroup;
+	string_t	m_strGenericType;
 	
 	zoneList_t	m_zoneInclude;
 	zoneList_t	m_zoneExclude;
+
+	HintSearchFilterFunc_t m_pfnFilter;
+	void * m_pFilterContext;
 };
 
 class CAI_Node;

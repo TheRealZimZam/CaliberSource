@@ -233,7 +233,7 @@ public:
 
 	virtual void			OnPlayerKilledOther( CBaseEntity *pVictim, const CTakeDamageInfo &info ) {}
 
-		// utility function to calc damage force
+	// utility function to calc damage force
 	Vector					CalcDamageForceVector( const CTakeDamageInfo &info );
 
 	virtual int				BloodColor();
@@ -243,6 +243,7 @@ public:
 	virtual void			CorpseFade( void );	// Called instead of GibNPC() when gibs are disabled
 	virtual bool			HasHumanGibs( void );
 	virtual bool			HasAlienGibs( void );
+	virtual bool			HasMechGibs( void );
 	virtual bool			ShouldGib( const CTakeDamageInfo &info ) { return false; }	// Always ragdoll, unless specified by the leaf class
 
 	float GetDamageAccumulator() { return m_flDamageAccumulator; }

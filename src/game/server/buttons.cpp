@@ -95,6 +95,11 @@ void CBaseButton::Precache( void )
 		PrecacheScriptSound(m_ls.sUnlockedSound.ToCStr());
 	}
 
+	if (HasSpawnFlags( SF_BUTTON_SPARK_IF_OFF ))
+	{
+		PrecacheScriptSound( "DoSpark" );
+	}
+
 	// get sentence group names, for doors which are directly 'touched' to open
 
 	switch (m_bLockedSentence)

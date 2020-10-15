@@ -2,7 +2,7 @@
 //
 // Purpose: Volumetric dust motes.
 //
-// $NoKeywords: $
+// TODO; Allow texture changes for func_dustcloud
 //=============================================================================//
 
 #include "cbase.h"

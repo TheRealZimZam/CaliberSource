@@ -20,14 +20,15 @@
 
 extern CBaseEntity *CreateRagGib( const char *szModel, const Vector &vecOrigin, const QAngle &vecAngles, const Vector &vecForce, float flFadeTime = 0.0, bool bShouldIgnite = false );
 
-#define GERMAN_GIB_COUNT		4
-#define	HUMAN_GIB_COUNT			6
+#define	HUMAN_GIB_COUNT			5
 #define ALIEN_GIB_COUNT			4
+#define GERMAN_GIB_COUNT		4
 
 enum GibType_e
 {
 	GIB_HUMAN,
 	GIB_ALIEN,
+	GIB_MECH,
 };
 
 class CGib : public CBaseAnimating,

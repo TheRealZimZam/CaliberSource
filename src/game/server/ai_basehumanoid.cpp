@@ -1,6 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:
+// Purpose: Humanoid baseclass - this doesnt contain any proper ai, all that still
+// needs to be defined in the subclass - this is for utility functions and very basic
+// states applicable to ALL human npcs like falling/jumping, heavydamage, sneakattacks, etc.
 //
 //=============================================================================//
 
@@ -32,7 +34,6 @@
 bool CAI_BaseHumanoid::HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* sourceEnt)
 {
 #ifdef HL2_DLL
-	// Annoying to ifdef this out. Copy it into all the HL2 specific humanoid NPC's instead?
 	if ( interactionType == g_interactionBarnacleVictimDangle )
 	{
 		// Force choosing of a new schedule
@@ -104,6 +105,13 @@ void CAI_BaseHumanoid::BuildScheduleTestBits( )
 			ClearCustomInterruptCondition( COND_CAN_RANGE_ATTACK1 );
 		}
 	}
+
+#if 0
+	if ( !IsCurSchedule( SCHED_BURNING_RUN ) && !IsCurSchedule( SCHED_BURNING_STAND ) )
+	{
+		SetCustomInterruptCondition( COND_ON_FIRE );
+	}
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -166,7 +174,18 @@ bool CAI_BaseHumanoid::OnMoveBlocked( AIMoveResult_t *pResult )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-#define SNEAK_ATTACK_DIST	360.0f // 30 feet
+bool CAI_BaseHumanoid::ShouldGib( const CTakeDamageInfo &info )
+{
+	if ( info.GetDamageType() & DMG_NEVERGIB )
+		 return false;
+
+	if ( ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) && m_iHealth < GIB_HEALTH_VALUE ) || ( info.GetDamageType() & DMG_ALWAYSGIB ) )
+		 return true;
+
+	return false;
+}
+
+#define SNEAK_ATTACK_DIST	144.0f // 16 feet -- orig; 360.0f
 void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
 	bool bSneakAttacked = false;
@@ -175,7 +194,7 @@ void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 	{
 		if ( info.GetAttacker() && info.GetAttacker()->IsPlayer() && info.GetAttacker() != GetEnemy() && !IsInAScript() )
 		{
-			// Shot in the head by a player I've never seen. In this case the player 
+			// Shot/Thwapped in the head by a player I've never seen. In this case the player 
 			// has gotten the drop on this enemy and such an attack is always lethal (at close range)
 			bSneakAttacked = true;
 
@@ -210,6 +229,25 @@ void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 	}
 
 	BaseClass::TraceAttack( info, vecDir, ptr );
+}
+
+int CAI_BaseHumanoid::OnTakeDamage_Alive( const CTakeDamageInfo &info )
+{
+	// If I just got blasted and I should be knocked down, get KO'd!
+	// NOTE; Whether or not a npc can get knocked down depends on that npcs selectsched,
+	// If a bit of logic isnt in there, that npc wont get absolutelyBLOODYDES-TROY-EDED
+	if ( m_NPCState != NPC_STATE_SCRIPT && m_NPCState != NPC_STATE_PRONE && !m_bKnockedDown )
+	{
+		bool bKnockdownDamage = (info.GetDamage() >= (GetMaxHealth() / 2) );
+		if ( bKnockdownDamage || (info.GetDamageType() & (DMG_BLAST|DMG_ALWAYSGIB) && IsHeavyDamage( info )) ) 
+		{
+			// Get blasted!
+			m_bKnockedDown = true;
+			SetCondition( COND_KNOCKED_DOWN );
+		}
+	}
+
+	return BaseClass::OnTakeDamage_Alive( info );
 }
 
 //-----------------------------------------------------------------------------
@@ -333,3 +371,4 @@ void CAI_BaseHumanoid::RunTask( const Task_t *pTask )
 		BaseClass::RunTask( pTask );
 	}
 }
+

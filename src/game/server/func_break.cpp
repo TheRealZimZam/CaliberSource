@@ -60,20 +60,26 @@ extern Vector		g_vecAttackDir;
 		"item_flare_round",			// 10
 		"item_box_flare_rounds",	// 11
 		"item_rpg_round",			// 12
-		"unused (item_smg1_grenade) 13",// 13
+		"item_smg1_grenade",		// 13
 		"item_box_sniper_rounds",	// 14
-		"unused (weapon_iceaxe) 15",			// 15
+		"weapon_iceaxe",			// 15
 		"weapon_stunstick",			// 16
-		"unused (weapon_ar1) 17",	// 17
+		"weapon_ar1",				// 17
 		"weapon_ar2",				// 18
-		"unused (weapon_hmg1) 19",				// 19
+		"weapon_hmg1",				// 19
 		"weapon_rpg",				// 20
 		"weapon_smg1",				// 21
-		"unused (weapon_smg2) 22",	// 22
-		"unused (weapon_slam) 23",	// 23
+		"weapon_smg2",				// 22
+		"weapon_slam",				// 23
 		"weapon_shotgun",			// 24
-		"unused (weapon_molotov) 25",// 25
+		"weapon_molotov",			// 25
 		"item_dynamic_resupply",	// 26
+		"weapon_supershotgun",		// 27
+		"weapon_flamethrower",		// 28
+		"weapon_mitcl",				// 29
+		"weapon_lightrpg",			// 30
+		"weapon_flaregun",			// 31
+		"item_ammo_flamethrower",	// 32
 	};
 #else
 	// Half-Life 1 spawn objects!
@@ -465,19 +471,25 @@ void CBreakable::Precache( void )
 #else
 
 	case matComputer:
-		pGibName = "ComputerGibs";
+		pGibName = "ComputerChunks";
+		break;
+
+	case matCeilingTile:
+		pGibName = "CeilingTile";
 		break;
 
 	case matCinderBlock:
 		pGibName = "ConcreteChunks";
 		break;
+		
+	case matFlesh:
+		pGibName = "FleshGibs";
+		break;
 #endif
 
-#if HL2_EPISODIC 
 	case matNone:
 		pGibName = "";
 		break;
-#endif
 
 	default:
 		Warning("%s (%s) at (%.3f %.3f %.3f) using obsolete or unknown material type.\n", GetClassname(), GetDebugName(), GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z );
@@ -788,8 +800,12 @@ void CBreakable::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir,
 			}
 			break;
 			
+			case matMetal:
 			case matUnbreakableGlass:
-				g_pEffects->Ricochet( ptr->endpos, (vecDir*-1.0f) );
+				if ( info.GetDamageType() & DMG_BULLET )
+				{
+					g_pEffects->Ricochet( ptr->endpos, (vecDir*-1.0f) );
+				}
 			break;
 		}
 	}
@@ -999,13 +1015,19 @@ void CBreakable::Die( void )
 		cFlag = BREAK_WOOD;
 		break;
 
-	case matComputer:
-		soundname = "Breakable.Computer";
+	case matMetal:
+		soundname = "Breakable.Metal";
 		cFlag = BREAK_METAL;
 		break;
 
-	case matMetal:
-		soundname = "Breakable.Metal";
+	case matRocks:
+	case matCinderBlock:
+		soundname = "Breakable.Concrete";
+		cFlag = BREAK_CONCRETE;
+		break;
+
+	case matComputer:
+		soundname = "Breakable.Computer";
 		cFlag = BREAK_METAL;
 		break;
 
@@ -1013,12 +1035,6 @@ void CBreakable::Die( void )
 	case matWeb:
 		soundname = "Breakable.Flesh";
 		cFlag = BREAK_FLESH;
-		break;
-
-	case matRocks:
-	case matCinderBlock:
-		soundname = "Breakable.Concrete";
-		cFlag = BREAK_CONCRETE;
 		break;
 
 	case matCeilingTile:
@@ -1290,10 +1306,10 @@ void CPushable::Spawn( void )
 		CreateVPhysics();
 	}
 
-#ifdef HL1_DLL
+//#ifdef HL1_DLL
 	// Force HL1 Pushables to stay axially aligned.
 	VPhysicsGetObject()->SetInertia( Vector( 1e30, 1e30, 1e30 ) );
-#endif//HL1_DLL
+//#endif
 }
 
 

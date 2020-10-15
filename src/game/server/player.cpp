@@ -2,6 +2,7 @@
 //
 // Purpose: Functions dealing with the player.
 //
+// Todo; Kick/dropkick attack
 //===========================================================================//
 
 #include "cbase.h"
@@ -6006,7 +6007,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 			else
 			{
 				Vector forward = UTIL_YawToVector( EyeAngles().y );
-				Create("NPC_human_grunt", GetLocalOrigin() + forward * 128, GetLocalAngles());
+				Create("npc_combine_s", GetLocalOrigin() + forward * 128, GetLocalAngles());	//NPC_human_grunt
 			}
 			break;
 		}
@@ -6032,42 +6033,65 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		EquipSuit();
 
 		// EV-RY-THIIINNGGGG!
-		GiveAmmo( 255,	"Pistol");
 		GiveAmmo( 255,	"AR2");
 		GiveAmmo( 5,	"AR2AltFire");
+		GiveAmmo( 255,	"Pistol");
 		GiveAmmo( 255,	"SMG1");
-		GiveAmmo( 255,	"Buckshot");
-		GiveAmmo( 5,	"smg1_grenade");
-		GiveAmmo( 5,	"rpg_round");
-		GiveAmmo( 5,	"grenade");
+		GiveAmmo( 255,	"HMG");
 		GiveAmmo( 32,	"357" );
+		GiveAmmo( 255,	"Buckshot");
+		GiveAmmo( 5,	"SMG1_Grenade");
+		GiveAmmo( 5,	"RPG_Round");
+		GiveAmmo( 24,	"SniperRound");
 		GiveAmmo( 16,	"XBowBolt" );
+		GiveAmmo( 10,	"FlareRound" );
+		GiveAmmo( 5,	"Grenade");
+		GiveAmmo( 5,	"StunGrenade");
+		GiveAmmo( 5,	"Slam");
+		GiveAmmo( 5,	"Molotov");
+		GiveAmmo( 5,	"Brickbat");
 #ifdef HL2_EPISODIC
 		GiveAmmo( 5,	"Hopwire" );
-#endif		
-		GiveNamedItem( "weapon_smg1" );
+#endif	
+		GiveNamedItem( "weapon_357" );
+//		GiveNamedItem( "weapon_alyxgun" );
+//		GiveNamedItem( "weapon_ar1" );
+		GiveNamedItem( "weapon_ar2" );
+		GiveNamedItem( "weapon_binoculars" );
+		GiveNamedItem( "weapon_brickbat" );
+		GiveNamedItem( "weapon_bugbait" );
+//		GiveNamedItem( "weapon_cguard" );
+		GiveNamedItem( "weapon_crossbow" );
+		GiveNamedItem( "weapon_crowbar" );
+		GiveNamedItem( "weapon_flameprojector" );
+		GiveNamedItem( "weapon_flamethrower" );
 		GiveNamedItem( "weapon_flaregun" );
 		GiveNamedItem( "weapon_frag" );
-		GiveNamedItem( "weapon_stun" );
-//		GiveNamedItem( "weapon_slam" );
-		GiveNamedItem( "weapon_crowbar" );
-		GiveNamedItem( "weapon_swing" );
-		GiveNamedItem( "weapon_stab" );
-		GiveNamedItem( "weapon_pistol" );
-		GiveNamedItem( "weapon_ar2" );
-		GiveNamedItem( "weapon_smg2" );
-		GiveNamedItem( "weapon_shotgun" );
-		GiveNamedItem( "weapon_supershotgun" );
+//		GiveNamedItem( "weapon_gauss" );
+//!		GiveNamedItem( "weapon_gpistol" );	//Super-secrit
+		GiveNamedItem( "weapon_hmg1" );
+//		GiveNamedItem( "weapon_irifle" );
+		GiveNamedItem( "weapon_lightrpg" );
+//		GiveNamedItem( "weapon_mitcl" );
+		GiveNamedItem( "weapon_molotov" );
 		GiveNamedItem( "weapon_physcannon" );
-		GiveNamedItem( "weapon_bugbait" );
+//		GiveNamedItem( "weapon_physgun" );
+		GiveNamedItem( "weapon_pistol" );
+//		GiveNamedItem( "weapon_revolver" );
 		GiveNamedItem( "weapon_rpg" );
 //		GiveNamedItem( "weapon_scrapgun" );
-		GiveNamedItem( "weapon_mitcl" );
-		GiveNamedItem( "weapon_lightrpg" );
-		GiveNamedItem( "weapon_357" );
-		GiveNamedItem( "weapon_crossbow" );
-		GiveNamedItem( "weapon_flameprojector" );
+		GiveNamedItem( "weapon_shotgun" );
+		GiveNamedItem( "weapon_slam" );
+		GiveNamedItem( "weapon_smg1" );
+		GiveNamedItem( "weapon_smg2" );
+//!		GiveNamedItem( "weapon_sniperrifle" );	//TBA
+		GiveNamedItem( "weapon_stab" );
+		GiveNamedItem( "weapon_stun" );
+//		GiveNamedItem( "weapon_stunstick" );
+		GiveNamedItem( "weapon_supershotgun" );
+		GiveNamedItem( "weapon_swing" );
 #ifdef HL2_EPISODIC
+		GiveNamedItem( "weapon_hopwire" );
 		// GiveNamedItem( "weapon_magnade" );
 #endif
 		if ( GetHealth() < 100 )
@@ -6095,6 +6119,22 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 				pNPC->ReportAIState();
 		}
 		break;
+#if 0
+	case 105:// player makes no sound for NPCs to hear.
+		{
+			if ( m_fNoPlayerSound )
+			{
+				Msg( "Player is audible\n" );
+				m_fNoPlayerSound = false;
+			}
+			else
+			{
+				Msg( "Player is silent\n" );
+				m_fNoPlayerSound = true;
+			}
+		}
+		break;
+#endif
 
 	case 106:
 		// Give me the classname and targetname of this entity.

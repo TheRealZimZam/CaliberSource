@@ -814,6 +814,7 @@ bool CBaseAnimating::BecomeRagdollOnClient( const Vector &force )
 		//If we're here, then we can vanish safely
 		SetThink( &CBaseEntity::SUB_Remove );
 
+#if 0
 		// Remove our flame entity if it's attached to us
 		CEntityFlame *pFireChild = dynamic_cast<CEntityFlame *>( GetEffectEntity() );
 		if ( pFireChild )
@@ -821,7 +822,7 @@ bool CBaseAnimating::BecomeRagdollOnClient( const Vector &force )
 			pFireChild->SetThink( &CBaseEntity::SUB_Remove );
 			pFireChild->SetNextThink( gpGlobals->curtime + 0.1f );
 		}
-
+#endif
 		return true;
 	}
 	return false;

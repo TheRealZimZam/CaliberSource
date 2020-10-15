@@ -265,8 +265,8 @@ bool CAI_FearBehavior::CanSelectSchedule()
 	if( pEnemy == NULL )
 		return false;
 
-	//if( !HasCondition(COND_SEE_PLAYER) )
-	//	return false;
+//	if( !HasCondition(COND_SEE_PLAYER) )
+//		return false;
 
 	if( !ai_enable_fear_behavior.GetBool() )
 		return false;
@@ -274,8 +274,8 @@ bool CAI_FearBehavior::CanSelectSchedule()
 	if( GetOuter()->IRelationType(pEnemy) != D_FR )
 		return false;
 
-	if( !pEnemy->ClassMatches("npc_hunter") )
-		return false;
+//!	if( !pEnemy->ClassMatches("npc_hunter") )
+//!		return false;
 
 	return true;
 }

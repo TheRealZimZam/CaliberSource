@@ -108,10 +108,10 @@ void CAI_BlendedMotor::MoveStart()
 	m_bDeceleratingToGoal = false;
 }
 
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-
 void CAI_BlendedMotor::ResetGoalSequence( void )
 {
 
@@ -131,10 +131,10 @@ void CAI_BlendedMotor::ResetGoalSequence( void )
 	Assert( m_nGoalSequence != ACT_INVALID );
 }
 
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-
 
 void CAI_BlendedMotor::MoveStop()
 { 
@@ -233,7 +233,6 @@ float CAI_BlendedMotor::GetMoveScriptDist( float &flNewSpeed )
 //-----------------------------------------------------------------------------
 // Purpose: return the total time that the move script covers
 //-----------------------------------------------------------------------------
-
 float CAI_BlendedMotor::GetMoveScriptTotalTime()
 {
 	float flDist = GetNavigator()->GetArrivalDistance();
@@ -255,7 +254,6 @@ float CAI_BlendedMotor::GetMoveScriptTotalTime()
 //-----------------------------------------------------------------------------
 // Purpose: for the MoveInterval, interpolate desired angle
 //-----------------------------------------------------------------------------
-
 float CAI_BlendedMotor::GetMoveScriptYaw( void )
 {
 	int i;
@@ -282,10 +280,10 @@ float CAI_BlendedMotor::GetMoveScriptYaw( void )
 	return flNewYaw;
 }
 
+
 //-----------------------------------------------------------------------------
 // Purpose: blend in the "idle" or "arrival" animation depending on speed
 //-----------------------------------------------------------------------------
-
 void CAI_BlendedMotor::SetMoveScriptAnim( float flNewSpeed )
 {
 	AI_PROFILE_SCOPE(CAI_BlendedMotor_SetMoveScriptAnim);
@@ -497,12 +495,9 @@ int CAI_BlendedMotor::GetInteriorSequence( int fromSequence )
 }
 
 
-
-
 //-----------------------------------------------------------------------------
 // Purpose: Move the npc to the next location on its route.
 //-----------------------------------------------------------------------------
-
 AIMotorMoveResult_t CAI_BlendedMotor::MoveGroundExecute( const AILocalMoveGoal_t &move, AIMoveTrace_t *pTraceResult )
 {
 	AI_PROFILE_SCOPE(CAI_BlendedMotor_MoveGroundExecute);
@@ -565,8 +560,6 @@ AIMotorMoveResult_t CAI_BlendedMotor::MoveGroundExecute( const AILocalMoveGoal_t
 	return result;
 
 }
-
-
 
 
 AIMotorMoveResult_t CAI_BlendedMotor::MoveFlyExecute( const AILocalMoveGoal_t &move, AIMoveTrace_t *pTraceResult )
@@ -656,14 +649,13 @@ AIMotorMoveResult_t CAI_BlendedMotor::MoveFlyExecute( const AILocalMoveGoal_t &m
 }
 
 
-
-
 float CAI_BlendedMotor::OverrideMaxYawSpeed( Activity activity )
 {
 	// Don't do this is we're locked
 	if ( IsYawLocked() )
 		return 0.0f;
 
+#if 0
 	switch( activity )
 	{
 	case ACT_TURN_LEFT:
@@ -678,9 +670,9 @@ float CAI_BlendedMotor::OverrideMaxYawSpeed( Activity activity )
 		return 45; // too fast?
 		break;
 	}
+#endif
 	return -1;
 }
-
 
 
 void CAI_BlendedMotor::UpdateYaw( int speed )
@@ -692,7 +684,6 @@ void CAI_BlendedMotor::UpdateYaw( int speed )
 	GetOuter()->UpdateTurnGesture( );
 	BaseClass::UpdateYaw( speed );
 }
-
 
 
 void CAI_BlendedMotor::RecalculateYawSpeed() 
@@ -710,9 +701,7 @@ void CAI_BlendedMotor::RecalculateYawSpeed()
 	SetYawSpeed( CalcYawSpeed() ); 
 }
 
-
 //-------------------------------------
-
 
 void CAI_BlendedMotor::MoveClimbStart(  const Vector &climbDest, const Vector &climbDir, float climbDist, float yaw )
 {
@@ -729,9 +718,7 @@ void CAI_BlendedMotor::MoveClimbStart(  const Vector &climbDest, const Vector &c
 	BaseClass::MoveClimbStart( climbDest, climbDir, climbDist, yaw );
 }
 
-
 //-------------------------------------
-
 
 void CAI_BlendedMotor::MoveJumpStart( const Vector &velocity )
 {
@@ -793,7 +780,6 @@ void CAI_BlendedMotor::BuildMoveScript( const AILocalMoveGoal_t &move, AIMoveTra
 
 
 #define YAWSPEED	150
-
 
 void CAI_BlendedMotor::BuildTurnScript( const AILocalMoveGoal_t &move  )
 {
@@ -881,7 +867,6 @@ void CAI_BlendedMotor::BuildTurnScript( const AILocalMoveGoal_t &move  )
 	}
 	//-------------------------
 }
-
 
 
 int CAI_BlendedMotor::BuildTurnScript( int i, int j )
@@ -1638,146 +1623,145 @@ void CAI_BlendedMotor::MaintainTurnActivity( void )
 	}
 }
 
+
+ConVar scene_turn( "scene_turn", "0" );
 ConVar scene_flatturn( "scene_flatturn", "1" );
 
 bool CAI_BlendedMotor::AddTurnGesture( float flYD )
 {
-
-	// some funky bug with human turn gestures, disable for now
-	return false;
-
-	// try using a turn gesture
-	Activity activity = ACT_INVALID;
-	float weight = 1.0;
-	float turnCompletion = 1.0;
-
-	if (m_flNextTurnGesture > gpGlobals->curtime)
+	if ( scene_turn.GetBool() )
 	{
-		/*
-		if ( GetOuter()->m_debugOverlays & OVERLAY_NPC_SELECTED_BIT )
+		// try using a turn gesture
+		Activity activity = ACT_INVALID;
+		float weight = 1.0;
+		float turnCompletion = 1.0;
+
+		if (m_flNextTurnGesture > gpGlobals->curtime)
 		{
-			Msg( "%.1f : [ %.2f ]\n", flYD, m_flNextTurnAct - gpGlobals->curtime );
-		}
-		*/
-		return false;
-	}
-
-	if ( GetOuter()->IsMoving() || GetOuter()->IsCrouching() )
-	{
-		return false;
-	}
-
-	if (fabs( flYD ) < 15)
-	{
-		return false;
-	}
-	else if (flYD < -45)
-	{
-		activity = ACT_GESTURE_TURN_RIGHT90;
-		weight = flYD / -90;
-		turnCompletion = 0.36;
-	}
-	else if (flYD < 0)
-	{
-		activity = ACT_GESTURE_TURN_RIGHT45;
-		weight = flYD / -45;
-		turnCompletion = 0.4;
-	}
-	else if (flYD <= 45)
-	{
-		activity = ACT_GESTURE_TURN_LEFT45;
-		weight = flYD / 45;
-		turnCompletion = 0.4;
-	}
-	else
-	{
-		activity = ACT_GESTURE_TURN_LEFT90;
-		weight = flYD / 90;
-		turnCompletion = 0.36;
-	}
-
-	int seq = SelectWeightedSequence( activity );
-
-	if (scene_flatturn.GetBool() && GetOuter()->IsCurSchedule( SCHED_SCENE_GENERIC ))
-	{
-		Activity flatactivity = activity;
-
-		if (activity == ACT_GESTURE_TURN_RIGHT90)
-		{
-			flatactivity = ACT_GESTURE_TURN_RIGHT90_FLAT;
-		}
-		else if (activity == ACT_GESTURE_TURN_RIGHT45)
-		{
-			flatactivity = ACT_GESTURE_TURN_RIGHT45_FLAT;
-		}
-		else if (activity == ACT_GESTURE_TURN_LEFT90)
-		{
-			flatactivity = ACT_GESTURE_TURN_LEFT90_FLAT;
-		}
-		else if (activity == ACT_GESTURE_TURN_LEFT45)
-		{
-			flatactivity = ACT_GESTURE_TURN_LEFT45_FLAT;
-		}
-
-		if (flatactivity != activity)
-		{
-			int newseq = SelectWeightedSequence( flatactivity );
-			if (newseq != ACTIVITY_NOT_AVAILABLE)
-			{
-				seq = newseq;
-			}
-		}
-	}
-
-	if (seq != ACTIVITY_NOT_AVAILABLE)
-	{
-		int iLayer = GetOuter()->AddGestureSequence( seq );
-		if (iLayer != -1)
-		{
-			GetOuter()->SetLayerPriority( iLayer, 100 );
-			// vary the playback a bit
-			SetLayerPlaybackRate( iLayer, 1.0 );
-			float actualDuration = GetOuter()->GetLayerDuration( iLayer );
-
-			float rate = random->RandomFloat( 0.5, 1.1 );
-			float diff = fabs( flYD );
-			float speed = (diff / (turnCompletion * actualDuration / rate)) * 0.1;
-
-			speed = clamp( speed, 15, 35 );
-			speed = min( speed, diff );
-
-			actualDuration = (diff / (turnCompletion * speed)) * 0.1 ;
-
-			GetOuter()->SetLayerDuration( iLayer, actualDuration );
-
-			SetLayerWeight( iLayer, weight );
-
-			SetYawSpeed( speed );
-
-			Remember( bits_MEMORY_TURNING );
-
-			// don't overlap the turn portion of the gestures, and don't play them too often
-			m_flNextTurnGesture = gpGlobals->curtime + max( turnCompletion * actualDuration, 0.3 );
-
 			/*
 			if ( GetOuter()->m_debugOverlays & OVERLAY_NPC_SELECTED_BIT )
 			{
-				Msg( "%.1f : %.2f %.2f : %.2f (%.2f)\n", flYD, weight, speed, actualDuration, turnCompletion * actualDuration );
+				Msg( "%.1f : [ %.2f ]\n", flYD, m_flNextTurnAct - gpGlobals->curtime );
 			}
 			*/
-			return true;
+			return false;
+		}
+
+		if ( GetOuter()->IsMoving() || GetOuter()->IsCrouching() )
+		{
+			return false;
+		}
+
+		if (fabs( flYD ) < 15)
+		{
+			return false;
+		}
+		else if (flYD < -45)
+		{
+			activity = ACT_GESTURE_TURN_RIGHT90;
+			weight = flYD / -90;
+			turnCompletion = 0.36;
+		}
+		else if (flYD < 0)
+		{
+			activity = ACT_GESTURE_TURN_RIGHT45;
+			weight = flYD / -45;
+			turnCompletion = 0.4;
+		}
+		else if (flYD <= 45)
+		{
+			activity = ACT_GESTURE_TURN_LEFT45;
+			weight = flYD / 45;
+			turnCompletion = 0.4;
 		}
 		else
 		{
-			return false;
+			activity = ACT_GESTURE_TURN_LEFT90;
+			weight = flYD / 90;
+			turnCompletion = 0.36;
+		}
+
+		int seq = SelectWeightedSequence( activity );
+
+		if (scene_flatturn.GetBool() && GetOuter()->IsCurSchedule( SCHED_SCENE_GENERIC ))
+		{
+			Activity flatactivity = activity;
+
+			if (activity == ACT_GESTURE_TURN_RIGHT90)
+			{
+				flatactivity = ACT_GESTURE_TURN_RIGHT90_FLAT;
+			}
+			else if (activity == ACT_GESTURE_TURN_RIGHT45)
+			{
+				flatactivity = ACT_GESTURE_TURN_RIGHT45_FLAT;
+			}
+			else if (activity == ACT_GESTURE_TURN_LEFT90)
+			{
+				flatactivity = ACT_GESTURE_TURN_LEFT90_FLAT;
+			}
+			else if (activity == ACT_GESTURE_TURN_LEFT45)
+			{
+				flatactivity = ACT_GESTURE_TURN_LEFT45_FLAT;
+			}
+
+			if (flatactivity != activity)
+			{
+				int newseq = SelectWeightedSequence( flatactivity );
+				if (newseq != ACTIVITY_NOT_AVAILABLE)
+				{
+					seq = newseq;
+				}
+			}
+		}
+
+		if (seq != ACTIVITY_NOT_AVAILABLE)
+		{
+			int iLayer = GetOuter()->AddGestureSequence( seq );
+			if (iLayer != -1)
+			{
+				GetOuter()->SetLayerPriority( iLayer, 100 );
+				// vary the playback a bit
+				SetLayerPlaybackRate( iLayer, 1.0 );
+				float actualDuration = GetOuter()->GetLayerDuration( iLayer );
+
+				float rate = random->RandomFloat( 0.5, 1.1 );
+				float diff = fabs( flYD );
+				float speed = (diff / (turnCompletion * actualDuration / rate)) * 0.1;
+
+				speed = clamp( speed, 15, 35 );
+				speed = min( speed, diff );
+
+				actualDuration = (diff / (turnCompletion * speed)) * 0.1 ;
+
+				GetOuter()->SetLayerDuration( iLayer, actualDuration );
+
+				SetLayerWeight( iLayer, weight );
+
+				SetYawSpeed( speed );
+
+				Remember( bits_MEMORY_TURNING );
+
+				// don't overlap the turn portion of the gestures, and don't play them too often
+				m_flNextTurnGesture = gpGlobals->curtime + max( turnCompletion * actualDuration, 0.3 );
+
+				/*
+				if ( GetOuter()->m_debugOverlays & OVERLAY_NPC_SELECTED_BIT )
+				{
+					Msg( "%.1f : %.2f %.2f : %.2f (%.2f)\n", flYD, weight, speed, actualDuration, turnCompletion * actualDuration );
+				}
+				*/
+				return true;
+			}
+			else
+			{
+				return false;
+			}
 		}
 	}
 	return false;
 }
 
-
 //-------------------------------------
-
 
 
 #if 0

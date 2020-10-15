@@ -172,7 +172,7 @@ void UTIL_ColorStringToLinearFloatColor( Vector &color, const char *pString )
 //
 bool CEnvProjectedTexture::KeyValue( const char *szKeyName, const char *szValue )
 {
-if ( FStrEq( szKeyName, "lightcolor" ) )
+	if ( FStrEq( szKeyName, "lightcolor" ) )
 	{
 		Vector tmp;
 		UTIL_ColorStringToLinearFloatColor( tmp, szValue );

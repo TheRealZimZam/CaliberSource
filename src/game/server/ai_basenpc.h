@@ -1189,6 +1189,7 @@ public:
 	virtual void		FearSound( void )				 			{ return; };
 	virtual void		LostEnemySound( void ) 						{ return; };
 	virtual void		FoundEnemySound( void ) 					{ return; };
+	virtual void		TauntSound( void ) 							{ return; };
 	virtual void		BarnacleDeathSound( void )					{ CTakeDamageInfo info;	PainSound( info ); }
 
 	virtual void		SpeakSentence( int sentenceType ) 			{ return; };
@@ -2004,6 +2005,7 @@ private:
 	bool	m_bCrouchDesired;
 	bool	m_bForceCrouch;
 	bool	m_bIsCrouching;
+//	float	m_flNextCrouchTime;
 	//-----------------------------------------------------
 
 	//-----------------------------------------------------

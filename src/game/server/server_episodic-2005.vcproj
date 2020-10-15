@@ -3520,14 +3520,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\episodic\ai_behavior_alyx_injured.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\episodic\ai_behavior_alyx_injured.h"
-					>
-				</File>
-				<File
 					RelativePath=".\hl2\ai_behavior_functank.cpp"
 					>
 				</File>
@@ -3541,6 +3533,14 @@
 				</File>
 				<File
 					RelativePath=".\hl2\ai_behavior_holster.h"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\ai_behavior_injured.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\episodic\ai_behavior_injured.h"
 					>
 				</File>
 				<File
@@ -3812,11 +3812,27 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\grenade_satchel.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\grenade_satchel.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\grenade_spit.cpp"
 					>
 				</File>
 				<File
 					RelativePath=".\hl2\grenade_spit.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\grenade_tripmine.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\grenade_tripmine.h"
 					>
 				</File>
 				<File
@@ -3932,10 +3948,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\monster_dummy.cpp"
-					>
-				</File>
-				<File
 					RelativePath=".\episodic\npc_advisor.cpp"
 					>
 				</File>
@@ -3961,6 +3973,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\npc_antliongrub.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\npc_antliongrub.h"
 					>
 				</File>
 				<File
@@ -4009,10 +4025,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\npc_blob.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\npc_boston.cpp"
 					>
 				</File>
 				<File
@@ -4073,6 +4085,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\npc_combines.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\npc_conscript.cpp"
 					>
 				</File>
 				<File
@@ -4228,14 +4244,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\npc_talker.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\npc_talker.h"
-					>
-				</File>
-				<File
 					RelativePath=".\hl2\npc_turret_ceiling.cpp"
 					>
 				</File>
@@ -4248,11 +4256,11 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\npc_vortigaunt_episodic.cpp"
+					RelativePath=".\hl2\npc_vortigaunt.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\npc_vortigaunt_episodic.h"
+					RelativePath=".\hl2\npc_vortigaunt.h"
 					>
 				</File>
 				<File
@@ -4412,7 +4420,19 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\weapon_flaregun.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_flaregun.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\weapon_frag.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_hmg.cpp"
 					>
 				</File>
 				<File
@@ -4440,11 +4460,15 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_smg1.cpp"
+					RelativePath=".\hl2\weapon_slam.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_smg2.cpp"
+					RelativePath=".\hl2\weapon_slam.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_smg.cpp"
 					>
 				</File>
 				<File
@@ -4495,6 +4519,14 @@
 						>
 					</File>
 					<File
+						RelativePath=".\hl2\grenade_brickbat.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\hl2\grenade_brickbat.h"
+						>
+					</File>
+					<File
 						RelativePath=".\hl2\grenade_homer.cpp"
 						>
 					</File>
@@ -4511,7 +4543,23 @@
 						>
 					</File>
 					<File
+						RelativePath=".\hl2\npc_assassin.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\hl2\npc_assassin.h"
+						>
+					</File>
+					<File
 						RelativePath=".\hl2\npc_missiledefense.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\npc_talker.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\npc_talker.h"
 						>
 					</File>
 					<File
@@ -4519,15 +4567,15 @@
 						>
 					</File>
 					<File
+						RelativePath=".\hl2\weapon_brickbat.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\hl2\weapon_brickbat.h"
+						>
+					</File>
+					<File
 						RelativePath=".\hl2\weapon_cguard.cpp"
-						>
-					</File>
-					<File
-						RelativePath=".\hl2\weapon_flaregun.cpp"
-						>
-					</File>
-					<File
-						RelativePath=".\hl2\weapon_flaregun.h"
 						>
 					</File>
 				</Filter>

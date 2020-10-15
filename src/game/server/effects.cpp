@@ -1231,6 +1231,23 @@ void CC_BloodSpray( const CCommand &args )
 
 static ConCommand bloodspray( "bloodspray", CC_BloodSpray, "blood", FCVAR_CHEAT );
 
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void UTIL_GibSpray( const Vector &pos, const Vector &dir, int color, int amount, int flags )
+{
+	if( color == DONT_BLEED )
+		return;
+
+	CEffectData	data;
+
+	data.m_vOrigin = pos;
+	data.m_vNormal = dir;
+	data.m_flScale = (float)amount;
+	data.m_nColor = color;
+
+	DispatchEffect( "Gib", data );
+}
 
 //-----------------------------------------------------------------------------
 //
@@ -2298,6 +2315,7 @@ void EffectsPrecache( void *pUser )
 	CBaseEntity::PrecacheScriptSound( "Underwater.BulletImpact" );
 
 	CBaseEntity::PrecacheScriptSound( "FX_RicochetSound.Ricochet" );
+	CBaseEntity::PrecacheScriptSound( "FX_RicochetSound.HMGRicochet" );
 
 	CBaseEntity::PrecacheScriptSound( "Physics.WaterSplash" );
 	CBaseEntity::PrecacheScriptSound( "BaseExplosionEffect.Sound" );

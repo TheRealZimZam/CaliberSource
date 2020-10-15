@@ -2,7 +2,7 @@
 //
 // Purpose: Implements an explosion entity and a support spark shower entity.
 //
-// $NoKeywords: $
+// Todo; Radius override for dlights
 //=============================================================================//
 
 #include "cbase.h"
@@ -50,7 +50,8 @@ void CShower::Spawn( void )
 	SetAbsVelocity( vecNewVelocity );
 
 	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
-	SetGravity( UTIL_ScaleForGravity( 400 ) ); // fall a bit more slowly than normal
+	SetGravity(0.5);
+//	SetGravity( UTIL_ScaleForGravity( 400 ) ); // fall a bit more slowly than normal
 	SetNextThink( gpGlobals->curtime + 0.1f );
 	SetSolid( SOLID_NONE );
 	UTIL_SetSize(this, vec3_origin, vec3_origin );
@@ -184,15 +185,9 @@ void CEnvExplosion::Spawn( void )
 	AddEffects( EF_NODRAW );
 
 	SetMoveType( MOVETYPE_NONE );
-	/*
-	if ( m_iMagnitude > 250 )
-	{
-		m_iMagnitude = 250;
-	}
-	*/
 
 	float flSpriteScale;
-	flSpriteScale = ( m_iMagnitude - 50) * 0.6;
+	flSpriteScale = m_iMagnitude * .03;	//( m_iMagnitude - 50) * 0.6;
 
 	// Control the clamping of the fireball sprite
 	if( m_spawnflags & SF_ENVEXPLOSION_NOCLAMPMIN )
@@ -205,25 +200,25 @@ void CEnvExplosion::Spawn( void )
 	}
 	else
 	{
-		if ( flSpriteScale < 10 )
+		if ( flSpriteScale < 5 )
 		{
-			flSpriteScale = 10;
+			flSpriteScale = 5;	//10
 		}
 	}
 
 	if( m_spawnflags & SF_ENVEXPLOSION_NOCLAMPMAX )
 	{
-		// We may need to adjust this to suit designers' needs.
-		if ( flSpriteScale > 200 )
+		// A ludicrous cap, just for the memeshs
+		if ( flSpriteScale > 50 )
 		{
-			flSpriteScale = 200;
+			flSpriteScale = 50;	//Max before errors
 		}
 	}
 	else
 	{
-		if ( flSpriteScale > 50 )
+		if ( flSpriteScale > 15 )
 		{
-			flSpriteScale = 50;
+			flSpriteScale = 15;	//Max that looks good
 		}
 	}
 
@@ -242,6 +237,9 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 	SetModelName( NULL_STRING );//invisible
 	SetSolid( SOLID_NONE );// intangible
 
+	// recalc absorigin
+//	Relink();
+	
 	Vector vecSpot = GetAbsOrigin() + Vector( 0 , 0 , 8 );
 	UTIL_TraceLine( vecSpot, vecSpot + Vector( 0, 0, -40 ), (MASK_SOLID_BRUSHONLY | MASK_WATER), this, COLLISION_GROUP_NONE, &tr );
 	
@@ -313,7 +311,8 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 	te->Explosion( filter, 0.0,
 		&vecExplodeOrigin, 
 		( m_sFireballSprite < 1 ) ? g_sModelIndexFireball : m_sFireballSprite,
-		!( m_spawnflags & SF_ENVEXPLOSION_NOFIREBALL ) ? ( m_spriteScale / 10.0 ) : 0.0,
+//		!( m_spawnflags & SF_ENVEXPLOSION_NOFIREBALL ) ? ( m_spriteScale / 10.0 ) : 0.0,
+		!( m_spawnflags & SF_ENVEXPLOSION_NOFIREBALL ) ? m_spriteScale : 0.0,
 		15,
 		nFlags,
 		iRadius,
@@ -352,12 +351,13 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 	SetNextThink( gpGlobals->curtime + 0.3 );
 
 	// Only do these effects if we're not submerged
-	if ( UTIL_PointContents( GetAbsOrigin() ) & CONTENTS_WATER )
+//	if ( !UTIL_PointContents( GetAbsOrigin() ) & CONTENTS_WATER )
+	if ( GetWaterLevel() == 0 )
 	{
 		// draw sparks
 		if ( !( m_spawnflags & SF_ENVEXPLOSION_NOSPARKS ) )
 		{
-			int sparkCount = random->RandomInt(0,3);
+			int sparkCount = random->RandomInt(1,3);
 
 			for ( int i = 0; i < sparkCount; i++ )
 			{
@@ -367,6 +367,7 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 			}
 		}
 	}
+
 }
 
 

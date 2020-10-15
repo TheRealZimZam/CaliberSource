@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Half life port
 //
 // $NoKeywords: $
 //
@@ -370,6 +370,9 @@ void CNPCSimpleTalker::AlertFriends( CBaseEntity *pKiller )
 						// FIXME: need to check CanSpeakConcept?
 						pTalkNPC->Speak( TLK_BETRAYED );
 					}
+#if 0
+					pNPC->SetSchedule( SCHED_TALKER_BETRAYED );
+#endif
 				}
 				else
 				{
@@ -799,11 +802,13 @@ int CNPCSimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		{
 			// only if not dead or dying!
 			CNPCSimpleTalker *pTalkNPC = (CNPCSimpleTalker *)pFriend;
-
+#if 0
 			if (pTalkNPC && pTalkNPC->IsOkToCombatSpeak())
 			{
 				pTalkNPC->Speak( TLK_NOSHOOT );
 			}
+#endif
+			pTalkNPC->SetSchedule( SCHED_TALKER_IDLE_STOP_SHOOTING );
 		}
 	}
 	return BaseClass::OnTakeDamage_Alive( subInfo );
@@ -856,12 +861,7 @@ int CNPCSimpleTalker::SelectNonCombatSpeechSchedule()
 // Output : Returns true on success, false on failure.
 //-----------------------------------------------------------------------------
 bool CNPCSimpleTalker::CanSayHello( void )
-{
-#ifndef HL1_DLL
-	if ( Classify() == CLASS_PLAYER_ALLY_VITAL )
-		return false;
-#endif
-	
+{	
 	if ( GetSpeechFilter() && GetSpeechFilter()->NeverSayHello() )
 		return false;
 

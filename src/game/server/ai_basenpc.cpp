@@ -1,7 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
-//
+// TODO's; Reduce aim-twitching(delay switching targets)
 //=============================================================================//
 
 #include "cbase.h"
@@ -196,8 +196,8 @@ ConVar	ai_spread_defocused_cone_multiplier( "ai_spread_defocused_cone_multiplier
 ConVar	ai_spread_cone_focus_time( "ai_spread_cone_focus_time","0.6" );
 ConVar	ai_spread_pattern_focus_time( "ai_spread_pattern_focus_time","0.8" );
 
-ConVar	ai_reaction_delay_idle( "ai_reaction_delay_idle","0.3" );
-ConVar	ai_reaction_delay_alert( "ai_reaction_delay_alert", "0.1" );
+ConVar	ai_reaction_delay_idle( "ai_reaction_delay_idle", "0.5" );
+ConVar	ai_reaction_delay_alert( "ai_reaction_delay_alert", "0.3" );
 
 ConVar ai_strong_optimizations( "ai_strong_optimizations", ( IsX360() ) ? "1" : "0" );
 bool AIStrongOpt( void )
@@ -389,8 +389,6 @@ void CAI_BaseNPC::ClearAllSchedules(void)
 	}
 }
 
-// ==============================================================================
-
 //-----------------------------------------------------------------------------
 // Purpose:
 // Input  :
@@ -519,11 +517,11 @@ void CAI_BaseNPC::CleanupOnDeath( CBaseEntity *pCulprit, bool bFireDeathOutput )
 		// Remove from squad if in one
 		if (m_pSquad)
 		{
-			// If I'm in idle it means that I didn't see who killed me
+			// If I'm in alert it means that I didn't see who killed me
 			// and my squad is still in idle state. Tell squad we have
 			// an enemy to wake them up and put the enemy position at
 			// my death position
-			if ( m_NPCState == NPC_STATE_IDLE && pCulprit)
+			if ( m_NPCState == NPC_STATE_ALERT && pCulprit)		//This was NPC_STATE_IDLE, But it should really be alert to preserve stealth kills so silent weapons can function
 			{
 				// If we already have some danger memory, don't do this cheat
 				if ( GetEnemies()->GetDangerMemory() == NULL )
@@ -638,6 +636,7 @@ void CAI_BaseNPC::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bo
 {
 	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
 
+	//This is kinda (really) GAY
 #ifdef HL2_EPISODIC
 	if ( AI_IsSinglePlayer() )
 	{
@@ -721,7 +720,7 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 	// REVISIT: Combine soldiers shoot each other a lot and then talk about it
 	// this improves that case a bunch, but it seems kind of harsh.
-	if ( !m_pSquad || !m_pSquad->SquadIsMember( info.GetAttacker() ) )
+	if ( !m_pSquad->SquadIsMember( info.GetAttacker() ) )	//!m_pSquad ||
 	{
 		PainSound( info );// "Ouch!"
 	}
@@ -903,7 +902,7 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 //=========================================================
 int CAI_BaseNPC::OnTakeDamage_Dying( const CTakeDamageInfo &info )
 {
-	if ( info.GetDamageType() & DMG_PLASMA )
+	if ( info.GetDamageType() & DMG_PLASMA )	//Shouldnt gib damage also be here?
 	{
 		if ( m_takedamage != DAMAGE_EVENTS_ONLY )
 		{
@@ -1030,6 +1029,7 @@ bool CAI_BaseNPC::IsLightDamage( const CTakeDamageInfo &info )
 
 bool CAI_BaseNPC::IsHeavyDamage( const CTakeDamageInfo &info )
 {
+	//TODO; Any damage that is equal to or more than a quarter of my health
 	return ( info.GetDamage() >  20 );
 }
 
@@ -4577,11 +4577,17 @@ void CAI_BaseNPC::NotifyPushMove()
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::CanFlinch( void )
 {
-//	if ( IsCurSchedule( SCHED_BIG_FLINCH ) )
-//		return false;
+	if ( IsCurSchedule( SCHED_BIG_FLINCH ) )
+		return false;
 
 	if ( m_flNextFlinchTime >= gpGlobals->curtime )
 		return false;
+	
+	if ( IsActiveDynamicInteraction() )
+		return false;
+
+//	if ( HasCondition(COND_PHYSICS_DAMAGE) )
+//		return false;
 
 	return true;
 }
@@ -4611,15 +4617,15 @@ void CAI_BaseNPC::CheckFlinches( void )
 			ClearCondition( COND_HEAVY_DAMAGE );
 		}
 #endif
-		// ^ why would you NOT want that?!?!
-		if ( !HasInterruptCondition(COND_HEAVY_DAMAGE) )
+		//!!! Big Flinches can stun-lock enemies
+		if ( !HasInterruptCondition( COND_HEAVY_DAMAGE ) )
 		{
 			// If we have taken heavy damage, but the current schedule doesn't 
 			// break on that, resort to just playing a gesture flinch.
 			PlayFlinchGesture();
 		}
-
 		// Otherwise, do nothing. The heavy damage will interrupt our schedule and we'll flinch.
+
 	}
 	else if ( HasCondition( COND_LIGHT_DAMAGE ) )
 	{
@@ -4732,7 +4738,7 @@ void CAI_BaseNPC::GatherConditions( void )
 			CheckTarget( GetTarget() );
 		}
 
-		CheckAmmo();
+		CheckAmmo();	//There's nothing in this??
 
 		CheckFlinches();
 
@@ -4776,6 +4782,17 @@ void CAI_BaseNPC::PrescheduleThink( void )
 			// Throw away the request
 			m_iDesiredWeaponState = DESIREDWEAPONSTATE_IGNORE;
 		}
+	}
+
+	// Im on fire!!! Yeouch!
+	//FIXME; This might be better in gatherconditions???
+	if( IsOnFire() )
+	{
+		SetCondition( COND_ON_FIRE );
+	}
+	else
+	{
+		ClearCondition( COND_ON_FIRE );
 	}
 }
 
@@ -5649,13 +5666,13 @@ void CAI_BaseNPC::GatherEnemyConditions( CBaseEntity *pEnemy )
 		// If it's not an NPC, assume it can't see me
 		if ( pEnemy->MyCombatCharacterPointer() && pEnemy->MyCombatCharacterPointer()->FInViewCone ( this ) )
 		{
-			SetCondition ( COND_ENEMY_FACING_ME );
-			ClearCondition ( COND_BEHIND_ENEMY );
+			SetCondition( COND_ENEMY_FACING_ME );
+			ClearCondition( COND_BEHIND_ENEMY );
 		}
 		else
 		{
 			ClearCondition( COND_ENEMY_FACING_ME );
-			SetCondition ( COND_BEHIND_ENEMY );
+			SetCondition( COND_BEHIND_ENEMY );
 		}
 	}
 	else if ( (!HasCondition(COND_ENEMY_OCCLUDED) && !HasCondition(COND_SEE_ENEMY)) && ( flDistToEnemy <= 256 ) )
@@ -5916,6 +5933,7 @@ Activity CAI_BaseNPC::NPC_TranslateActivity( Activity eNewActivity )
 {
 	Assert( eNewActivity != ACT_INVALID );
 
+#if 0
 	if (eNewActivity == ACT_RANGE_ATTACK1)
 	{
 		if ( IsCrouching() )
@@ -5934,13 +5952,13 @@ Activity CAI_BaseNPC::NPC_TranslateActivity( Activity eNewActivity )
 	{
 		if ( IsCrouching() )
 		{
-			eNewActivity = ACT_CROUCHIDLE;
+			eNewActivity = ACT_COVER_LOW; //ACT_CROUCHIDLE
 		}
 	}
 	// ====
 	// HACK : LEIPZIG 06 -	The underlying problem is that the AR2 and SMG1 cannot map IDLE_ANGRY to a crouched equivalent automatically
-	//						which causes the character to pop up and down in their idle state of firing while crouched. -- jdw
-	else if ( eNewActivity == ACT_IDLE_ANGRY_SMG1 )
+	//						which causes the current anims to pop up and down in their idle state of firing while crouched. -- jdw
+	else if ( eNewActivity == ACT_IDLE_ANGRY ) //ACT_IDLE_ANGRY_SMG1
 	{
 		if ( IsCrouching() )
 		{
@@ -5948,6 +5966,42 @@ Activity CAI_BaseNPC::NPC_TranslateActivity( Activity eNewActivity )
 		}
 	}
 	// ====
+#endif
+
+	switch ( eNewActivity )
+	{
+		case ACT_RANGE_ATTACK1:
+			if (IsCrouching())
+			{
+				eNewActivity = ACT_RANGE_ATTACK1_LOW;
+			}
+		break;
+
+		case ACT_RELOAD:
+			if (IsCrouching())
+			{
+				eNewActivity = ACT_RELOAD_LOW;
+			}
+		break;
+
+		case ACT_IDLE:
+			if (IsCrouching())
+			{
+				eNewActivity = ACT_COVER_LOW; //ACT_CROUCHIDLE
+			}
+		break;
+
+		case ACT_IDLE_ANGRY:
+			if ( IsCrouching() )
+			{
+	// ====
+	// HACK : LEIPZIG 06 -	The underlying problem is that the AR2 and SMG1 cannot map IDLE_ANGRY to a crouched equivalent automatically
+	//						which causes the current anims to pop up and down in their idle state of firing while crouched. -- jdw
+				eNewActivity = ACT_RANGE_AIM_LOW;
+	// ====
+			}
+		break;
+	}
 
 	if (CapabilitiesGet() & bits_CAP_DUCK)
 	{
@@ -8223,13 +8277,19 @@ void CAI_BaseNPC::HandleAnimEvent( animevent_t *pEvent )
 		}
 		break;
 
+	case NPC_EVENT_BODYDROP:
+		if ( GetFlags() & FL_ONGROUND )
+		{
+			EmitSound( "AI_BaseNPC.BodyDrop" );
+		}
+		break;
+
 	case NPC_EVENT_SWISHSOUND:
 		{
 			// NO NPC may use this anim event unless that npc's precache precaches this sound!!!
 			EmitSound( "AI_BaseNPC.SwishSound" );
 			break;
 		}
-
 
 	case NPC_EVENT_180TURN:
 		{
@@ -8477,6 +8537,14 @@ void CAI_BaseNPC::HandleAnimEvent( animevent_t *pEvent )
 				if ( GetFlags() & FL_ONGROUND )
 				{
 					EmitSound( "AI_BaseNPC.BodyDrop_Heavy" );
+				}
+				return;
+			}
+			else if ( pEvent->event == AE_NPC_BODYDROP )
+			{
+				if ( GetFlags() & FL_ONGROUND )
+				{
+					EmitSound( "AI_BaseNPC.BodyDrop" );
 				}
 				return;
 			}
@@ -9502,7 +9570,6 @@ Vector CAI_BaseNPC::GetShootEnemyDir( const Vector &shootOrigin, bool bNoisy )
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::CollectShotStats( const Vector &vecShootOrigin, const Vector &vecShootDir )
 {
-#ifdef HL2_DLL
 	if( ai_shot_stats.GetBool() != 0 && GetEnemy()->IsPlayer() )
 	{
 		int iterations = ai_shot_stats_term.GetInt();
@@ -9540,7 +9607,6 @@ void CAI_BaseNPC::CollectShotStats( const Vector &vecShootOrigin, const Vector &
 	{
 		m_LastShootAccuracy = -1;
 	}
-#endif
 }
 
 #ifdef HL2_DLL
@@ -10885,7 +10951,13 @@ void CAI_BaseNPC::Precache( void )
 	PrecacheScriptSound( "AI_BaseNPC.SwishSound" );
 	PrecacheScriptSound( "AI_BaseNPC.BodyDrop_Heavy" );
 	PrecacheScriptSound( "AI_BaseNPC.BodyDrop_Light" );
+	PrecacheScriptSound( "AI_BaseNPC.BodyDrop" );
 	PrecacheScriptSound( "AI_BaseNPC.SentenceStop" );
+
+//#ifdef HL1_DLL
+	engine->PrecacheModel( "models/agibs.mdl" );
+	engine->PrecacheModel( "models/hgibs.mdl" );
+//#endif
 
 	BaseClass::Precache();
 }
@@ -14021,8 +14093,15 @@ bool CAI_BaseNPC::IsCrouchedActivity( Activity activity )
 		case ACT_RELOAD_LOW:
 		case ACT_COVER_LOW:
 		case ACT_COVER_PISTOL_LOW:
+		case ACT_COVER_RIFLE_LOW:
 		case ACT_COVER_SMG1_LOW:
+		case ACT_RELOAD_PISTOL_LOW:
 		case ACT_RELOAD_SMG1_LOW:
+		case ACT_RANGE_AIM_LOW:
+		case ACT_RANGE_AIM_SMG1_LOW:
+		case ACT_RANGE_AIM_PISTOL_LOW:
+		case ACT_RANGE_ATTACK1_LOW:
+		case ACT_RANGE_ATTACK2_LOW:
 			return true;
 	}
 
@@ -14076,7 +14155,8 @@ bool CAI_BaseNPC::ShouldProbeCollideAgainstEntity( CBaseEntity *pEntity )
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::Crouch( void )
 { 
-	m_bIsCrouching = true; 
+	m_bIsCrouching = true;
+
 	return true;
 }
 
@@ -14105,7 +14185,7 @@ bool CAI_BaseNPC::Stand( void )
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::DesireCrouch( void )		
-{ 
+{
 	m_bCrouchDesired = true; 
 }
 

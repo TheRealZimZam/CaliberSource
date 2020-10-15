@@ -196,6 +196,34 @@ void CAI_BaseNPC::SetSchedule( CAI_Schedule *pNewSchedule )
 
 	ADD_DEBUG_HISTORY( HISTORY_AI_DECISIONS, UTIL_VarArgs("%s(%d): Schedule: %s (time: %.2f)\n", GetDebugName(), entindex(), pNewSchedule->GetName(), gpGlobals->curtime ) );
 
+#if 0
+	if ( FClassnameIs( this, "npc_barney" ) )
+	{
+		const Task_t *pTask = GetTask();
+		
+		if ( pTask )
+		{
+			const char *pName = NULL;
+
+			if ( GetCurSchedule() )
+			{
+				pName = GetCurSchedule()->GetName();
+			}
+			else
+			{
+				pName = "No Schedule";
+			}
+			
+			if ( !pName )
+			{
+				pName = "Unknown";
+			}
+
+			DevMsg( 2, "%s: picked schedule %s\n", GetClassname(), pName );
+		}
+	}
+#endif// 0
+
 #ifdef AI_MONITOR_FOR_OSCILLATION
 	if( m_bSelected )
 	{
@@ -1018,7 +1046,7 @@ float CAI_BaseNPC::CalcReasonableFacing( bool bIgnoreOriginalFacing )
 {
 	float flReasonableYaw;
 
-	if( !bIgnoreOriginalFacing && !HasMemory( bits_MEMORY_MOVED_FROM_SPAWN ) && !HasCondition( COND_SEE_ENEMY) )
+	if( !bIgnoreOriginalFacing && !HasMemory( bits_MEMORY_MOVED_FROM_SPAWN ) && !HasCondition( COND_SEE_ENEMY ) )
 	{
 		flReasonableYaw = m_flOriginalYaw;
 	}
@@ -1490,7 +1518,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 	case TASK_FIND_FAR_NODE_COVER_FROM_ENEMY:
 	case TASK_FIND_NODE_COVER_FROM_ENEMY:
 	case TASK_FIND_COVER_FROM_ENEMY:
-		{	
+		{
 			bool 	bNodeCover 		= ( task != TASK_FIND_COVER_FROM_ENEMY );
 			float 	flMinDistance 	= ( task == TASK_FIND_FAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : 0.0;
 			float 	flMaxDistance 	= ( task == TASK_FIND_NEAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : FLT_MAX;
@@ -1524,7 +1552,6 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 				TaskFail(FAIL_NO_COVER);
 			}
 		}
-
 		break;
 
 	case TASK_FIND_COVER_FROM_BEST_SOUND:
@@ -4195,7 +4222,7 @@ void CAI_BaseNPC::EndTaskOverlay()
 // the NPC is facing and determines whether or not to
 // select one of the 180 turn animations.
 //=========================================================
-void CAI_BaseNPC::SetTurnActivity ( void )
+void CAI_BaseNPC::SetTurnActivity( void )
 {
 	if ( IsCrouching() )
 	{
@@ -4234,6 +4261,12 @@ void CAI_BaseNPC::SetTurnActivity ( void )
 	{
 		Remember( bits_MEMORY_TURNING );
 		SetIdealActivity( ACT_180_LEFT );
+		return;
+	}
+	if( fabs( flYD ) <= -160 && SelectWeightedSequence ( ACT_180_RIGHT ) != ACTIVITY_NOT_AVAILABLE )
+	{
+		Remember( bits_MEMORY_TURNING );
+		SetIdealActivity( ACT_180_RIGHT );
 		return;
 	}
 
@@ -4436,7 +4469,7 @@ int CAI_BaseNPC::SelectIdleSchedule()
 	{
 		return SCHED_ALERT_FACE_BESTSOUND;
 	}
-	
+
 	// no valid route!
 	if (GetNavigator()->GetGoalType() == GOALTYPE_NONE)
 		return SCHED_IDLE_STAND;
@@ -4459,12 +4492,35 @@ int CAI_BaseNPC::SelectAlertSchedule()
 		return nSched;
 
 	// Scan around for new enemies
-	if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
-		return SCHED_ALERT_SCAN;
-
-	if( IsPlayerAlly() && HasCondition(COND_HEAR_COMBAT) )
+	if ( HasCondition( COND_ENEMY_DEAD ) )
 	{
-		return SCHED_ALERT_REACT_TO_COMBAT_SOUND;
+		if ( SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
+			return SCHED_VICTORY_DANCE;
+
+//!		return SCHED_ALERT_SCAN;
+	}
+
+#if 0
+	if ( IsPlayerAlly() )
+	{
+		if ( HasCondition( COND_HEAR_COMBAT ) )	//|| HasCondition ( COND_HEAR_BULLET_IMPACT )
+			return SCHED_ALERT_REACT_TO_COMBAT_SOUND;	//Currently (8/9/2020) a clone of ALERT_FACE_BESTSOUND
+	}
+#endif
+
+	if ( HasCondition(COND_LIGHT_DAMAGE) ||
+		 HasCondition(COND_HEAVY_DAMAGE) )
+	{
+		if ( fabs( GetMotor()->DeltaIdealYaw() ) < (1.0 - m_flFieldOfView) * 60 ) // roughly in the correct direction
+		{
+			return SCHED_TAKE_COVER_FROM_ORIGIN;
+		}
+		else if ( SelectWeightedSequence( ACT_SMALL_FLINCH ) != ACTIVITY_NOT_AVAILABLE )
+		{
+			return SCHED_ALERT_SMALL_FLINCH;
+		}
+		// Not facing the correct dir, and I have no flinch animation
+		return SCHED_ALERT_FACE;
 	}
 
 	if ( HasCondition ( COND_HEAR_DANGER ) ||
@@ -4477,7 +4533,9 @@ int CAI_BaseNPC::SelectAlertSchedule()
 	}
 
 	if ( gpGlobals->curtime - GetEnemies()->LastTimeSeen( AI_UNKNOWN_ENEMY ) < TIME_CARE_ABOUT_DAMAGE )
+	{
 		return SCHED_ALERT_FACE;
+	}
 
 	return SCHED_ALERT_STAND;
 }
@@ -4491,20 +4549,20 @@ int CAI_BaseNPC::SelectCombatSchedule()
 	if ( m_hForcedInteractionPartner )
 		return SelectInteractionSchedule();
 
+	if ( HasCondition( COND_NEW_ENEMY ) && gpGlobals->curtime - GetEnemies()->FirstTimeSeen(GetEnemy()) < 2.0 )
+	{
+		return SCHED_WAKE_ANGRY;
+	}
+
 	int nSched = SelectFlinchSchedule();
 	if ( nSched != SCHED_NONE )
 		return nSched;
 
-	if ( HasCondition(COND_NEW_ENEMY) && gpGlobals->curtime - GetEnemies()->FirstTimeSeen(GetEnemy()) < 2.0 )
-	{
-		return SCHED_WAKE_ANGRY;
-	}
-	
 	if ( HasCondition( COND_ENEMY_DEAD ) )
 	{
-		// clear the current (dead) enemy and try to find another.
+		// Clear the current (dead) enemy and try to find another.
 		SetEnemy( NULL );
-		 
+
 		if ( ChooseEnemy() )
 		{
 			ClearCondition( COND_ENEMY_DEAD );
@@ -4514,10 +4572,17 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		SetState( NPC_STATE_ALERT );
 		return SelectSchedule();
 	}
-	
+#if 0
+	if ( ( HasCondition(COND_LIGHT_DAMAGE) || HasCondition(COND_HEAVY_DAMAGE) ) && !HasMemory( bits_MEMORY_FLINCHED) && SelectWeightedSequence( ACT_SMALL_FLINCH ) != ACTIVITY_NOT_AVAILABLE )
+	{
+		return SCHED_SMALL_FLINCH;
+	}
+#endif
+
 	// If I'm scared of this enemy run away
 	if ( IRelationType( GetEnemy() ) == D_FR )
 	{
+		AI_EnemyInfo_t *pMemory = GetEnemies()->Find( GetEnemy() );
 		if (HasCondition( COND_SEE_ENEMY )	|| 
 			HasCondition( COND_LIGHT_DAMAGE )|| 
 			HasCondition( COND_HEAVY_DAMAGE ))
@@ -4526,26 +4591,31 @@ int CAI_BaseNPC::SelectCombatSchedule()
 			//ClearCommandGoal();
 			return SCHED_RUN_FROM_ENEMY;
 		}
-
 		// If I've seen the enemy recently, cower. Ignore the time for unforgettable enemies.
-		AI_EnemyInfo_t *pMemory = GetEnemies()->Find( GetEnemy() );
-		if ( (pMemory && pMemory->bUnforgettable) || (GetEnemyLastTimeSeen() > (gpGlobals->curtime - 5.0)) )
+		else if ( (pMemory && pMemory->bUnforgettable) || (GetEnemyLastTimeSeen() > (gpGlobals->curtime - 5.0)) )
 		{
 			// If we're facing him, just look ready. Otherwise, face him.
 			if ( FInAimCone( GetEnemy()->EyePosition() ) )
 				return SCHED_COMBAT_STAND;
-
+		}
+		else
+		{
 			return SCHED_FEAR_FACE;
 		}
 	}
 
 	// Check if need to reload
-	if ( HasCondition( COND_LOW_PRIMARY_AMMO ) || HasCondition( COND_NO_PRIMARY_AMMO ) )
+	if ( HasCondition( COND_NO_PRIMARY_AMMO ) )
 	{
-		return SCHED_HIDE_AND_RELOAD;
+#if 0
+		//If you cant see the enemy (and he cant see you), dont bother moving and just reload on the spot
+		if ( HasCondition( COND_SEE_ENEMY ) )
+			return SCHED_HIDE_AND_RELOAD;
+#endif
+		return SCHED_RELOAD;
 	}
 
-	// Can we see the enemy?
+	// Can I see the enemy?
 	if ( !HasCondition(COND_SEE_ENEMY) )
 	{
 		// enemy is unseen, but not occluded!
@@ -4574,16 +4644,21 @@ int CAI_BaseNPC::SelectCombatSchedule()
 
 	if ( GetShotRegulator()->IsInRestInterval() )
 	{
-		if ( HasCondition(COND_CAN_RANGE_ATTACK1) )
+		// If I could still shoot the target, keep looking tacticool-otherwise do a combat idle animation
+		if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
 			return SCHED_COMBAT_FACE;
 	}
 
-	// we can see the enemy
+	// I can see the enemy
 	if ( HasCondition(COND_CAN_RANGE_ATTACK1) )
 	{
+#if 0
 		if ( !UseAttackSquadSlots() || OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 			return SCHED_RANGE_ATTACK1;
 		return SCHED_COMBAT_FACE;
+#endif
+		//^^ This shouldnt be present in basenpc, leave this for the childclasses to decide
+		return SCHED_RANGE_ATTACK1;
 	}
 
 	if ( HasCondition(COND_CAN_RANGE_ATTACK2) )
@@ -4600,15 +4675,15 @@ int CAI_BaseNPC::SelectCombatSchedule()
 
 	if ( !HasCondition(COND_CAN_RANGE_ATTACK1) && !HasCondition(COND_CAN_MELEE_ATTACK1) )
 	{
-		// if we can see enemy but can't use either attack type, we must need to get closer to enemy
+		// if I can see enemy but can't use either attack type, I must need to get closer to enemy
 		if ( GetActiveWeapon() )
 			return SCHED_MOVE_TO_WEAPON_RANGE;
 
-		// If we have an innate attack and we're too far (or occluded) then get line of sight
+		// If I have an innate attack and I'm too far (or occluded) then get line of sight
 		if ( HasCondition( COND_TOO_FAR_TO_ATTACK ) && ( CapabilitiesGet() & (bits_CAP_INNATE_RANGE_ATTACK1|bits_CAP_INNATE_RANGE_ATTACK2)) )
 			return SCHED_MOVE_TO_WEAPON_RANGE;
 
-		// if we can see enemy but can't use either attack type, we must need to get closer to enemy
+		// if I can see the enemy but can't use either attack type, I must need to get closer to enemy
 		if ( CapabilitiesGet() & (bits_CAP_INNATE_MELEE_ATTACK1|bits_CAP_INNATE_MELEE_ATTACK2) )
 			return SCHED_CHASE_ENEMY;
 		else
@@ -4655,6 +4730,7 @@ int CAI_BaseNPC::SelectScriptSchedule()
 	return SCHED_IDLE_STAND;
 }
 
+ConVar ai_full_gesture_flinch( "ai_full_gesture_flinch", "0" );
 //-----------------------------------------------------------------------------
 // Purpose: Select a gesture to play in response to damage we've taken
 // Output : int
@@ -4666,21 +4742,18 @@ void CAI_BaseNPC::PlayFlinchGesture()
 
 	Activity iFlinchActivity = ACT_INVALID;
 
-//	( 0.5f, 1.0f )
-	float flNextFlinch = random->RandomFloat( 0.2f, 0.5f );
+	float flNextFlinch = 0.2f;	//Exactly 2 thonks
 
 	// If I haven't flinched for a while, play the big flinch gesture
-	if ( !HasMemory(bits_MEMORY_FLINCHED) )
+	if ( !HasMemory( bits_MEMORY_FLINCHED ) )
 	{
 		iFlinchActivity = GetFlinchActivity( true, true );
-
 		if ( HaveSequenceForActivity( iFlinchActivity ) )
 		{
 			RestartGesture( iFlinchActivity );
 		}
 
 		Remember(bits_MEMORY_FLINCHED);
-
 	}
 	else
 	{
@@ -4688,17 +4761,21 @@ void CAI_BaseNPC::PlayFlinchGesture()
 		if ( HaveSequenceForActivity( iFlinchActivity ) )
 		{
 			RestartGesture( iFlinchActivity );
+		//	AddGesture( iFlinchActivity );
 		}
 	}
 
 	if ( iFlinchActivity != ACT_INVALID )
 	{
-		//Get the duration of the flinch and delay the next one by that (plus a bit more)
-		int iSequence = GetLayerSequence( FindGestureLayer( iFlinchActivity ) );
-
-		if ( iSequence != ACT_INVALID )
+		// Get the duration of the flinch and delay the next one by that (plus a bit more)
+		if ( ai_full_gesture_flinch.GetBool() )
 		{
-			flNextFlinch += SequenceDuration( iSequence );
+			int iSequence = GetLayerSequence( FindGestureLayer( iFlinchActivity ) );
+
+			if ( iSequence != ACT_INVALID )
+			{
+				flNextFlinch += SequenceDuration( iSequence );
+			}
 		}
 
 		m_flNextFlinchTime = gpGlobals->curtime + flNextFlinch;
@@ -4711,7 +4788,7 @@ void CAI_BaseNPC::PlayFlinchGesture()
 //-----------------------------------------------------------------------------
 int CAI_BaseNPC::SelectFlinchSchedule()
 {
-	if ( !HasCondition(COND_HEAVY_DAMAGE) )
+	if ( !HasCondition( COND_HEAVY_DAMAGE ) )
 		return SCHED_NONE;
 
 	// If we've flinched recently, don't do it again. A gesture flinch will be played instead.
@@ -4731,7 +4808,7 @@ int CAI_BaseNPC::SelectFlinchSchedule()
 		return SCHED_BIG_FLINCH;
 
 	/*
-	// Not used anymore, because gesture flinches are played instead for heavy damage
+	// Not used anymore, because gesture flinches are played instead for light damage
 	// taken shortly after we've already flinched full.
 	//
 	iFlinchActivity = GetFlinchActivity( false, false );

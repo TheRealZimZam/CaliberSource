@@ -397,7 +397,11 @@ int CBaseCombatWeapon::WeaponRangeAttack2Condition( float flDot, float flDist )
 	// currently disabled
 	return COND_NONE;
 
-	if ( m_bReloadsSingly )
+ 	if ( UsesSecondaryAmmo() && !HasSecondaryAmmo() )
+ 	{
+ 		return COND_NO_SECONDARY_AMMO;
+ 	}
+	else if ( m_bReloadsSingly )
 	{
 		if (m_iClip2 <=0)
 		{

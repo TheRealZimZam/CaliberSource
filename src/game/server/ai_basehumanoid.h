@@ -1,6 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:
+// Purpose: Humanoid baseclass - this doesnt contain any proper ai, all that still
+// needs to be defined in the subclass - this is for utility functions and very basic
+// states applicable to ALL human npcs like falling/jumping, heavydamage, sneakattacks, etc.
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -33,7 +35,10 @@ public:
 	bool OnMoveBlocked( AIMoveResult_t *pResult );
 
 	// Damage
+	virtual bool ShouldGib( const CTakeDamageInfo &info );
 	void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
+	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	bool IsKnockedDown() { return m_bKnockedDown; }
 
 	// Various start tasks
 	virtual	void StartTaskRangeAttack1( const Task_t *pTask );
@@ -43,6 +48,10 @@ public:
 
 	// Purpose: check ammo
 	virtual void CheckAmmo( void );
+
+private:
+	bool		m_bKnockedDown;		//Has enough damage been done in one attack in order to knock me down?
+
 };
 
 //-----------------------------------------------------------------------------

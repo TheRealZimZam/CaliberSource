@@ -2,6 +2,9 @@
 //
 // Purpose: Combat behaviors for AIs in a relatively self-preservationist mode.
 //			Lots of cover taking and attempted shots out of cover.
+// TODO's: Add compatibility with HINT_TACTICAL_COVER_MED (currently only supports LOW)
+// Possibily also incorporate HINT_TACTICAL_ENEMY_DISADVANTAGED, say, encourage more shooting
+// when the player is near such a hint (use a modifer on the base values, like x2, etc.)
 //
 //=============================================================================//
 

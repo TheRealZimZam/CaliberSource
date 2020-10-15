@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		Deal with weapon being out
+// Purpose:	Its raining men!
 //
 // $Workfile:     $
 // $Date:         $

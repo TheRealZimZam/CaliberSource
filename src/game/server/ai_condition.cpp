@@ -1,6 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose:		The default shared conditions
+//
 //
 //=============================================================================//
 
@@ -54,6 +55,8 @@ void	CAI_BaseNPC::InitDefaultConditionSR(void)
 	ADD_CONDITION_TO_SR( COND_HEAVY_DAMAGE );
 	ADD_CONDITION_TO_SR( COND_PHYSICS_DAMAGE );
 	ADD_CONDITION_TO_SR( COND_REPEATED_DAMAGE );
+	ADD_CONDITION_TO_SR( COND_ON_FIRE );
+	ADD_CONDITION_TO_SR( COND_KNOCKED_DOWN );
 	ADD_CONDITION_TO_SR( COND_CAN_RANGE_ATTACK1 );
 	ADD_CONDITION_TO_SR( COND_CAN_RANGE_ATTACK2 );
 	ADD_CONDITION_TO_SR( COND_CAN_MELEE_ATTACK1 );

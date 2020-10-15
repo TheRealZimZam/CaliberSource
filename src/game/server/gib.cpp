@@ -2,8 +2,7 @@
 //
 // Purpose:		A gib is a chunk of a body, or a piece of wood/metal/rocks/etc.
 //
-// $Workfile:     $
-// $Date:         $
+// TODO's; Fix random gibs, fix fade time of rnd gibs (gib limit), optimize
 // $NoKeywords: $
 //===========================================================================//
 
@@ -166,6 +165,7 @@ void CGib::SpawnHeadGib( CBaseEntity *pVictim )
 		pGib->SetAbsVelocity( vecNewVelocity );
 	}
 	pGib->LimitVelocity();
+//	UTIL_Relink( pGib );
 }
 
 
@@ -235,7 +235,12 @@ void CGib::InitGib( CBaseEntity *pVictim, float fMinVelocity, float fMaxVelocity
 		SetBloodColor( pVictim->BloodColor() );
 		
 		AdjustVelocityBasedOnHealth( pVictim->m_iHealth, vecNewVelocity );
+		SetAbsVelocity( vecNewVelocity );
 
+		SetSolid( SOLID_BBOX );
+		SetCollisionBounds( vec3_origin, vec3_origin );
+		SetCollisionGroup( COLLISION_GROUP_DEBRIS );
+#if 0
 		// Attempt to be physical if we can
 		if ( VPhysicsInitNormal( SOLID_BBOX, 0, false ) )
 		{
@@ -255,8 +260,9 @@ void CGib::InitGib( CBaseEntity *pVictim, float fMinVelocity, float fMaxVelocity
 		}
 	
 		SetCollisionGroup( COLLISION_GROUP_DEBRIS );
+#endif
 	}
-
+//	Relink();
 	LimitVelocity();
 }
 
@@ -292,6 +298,7 @@ void CGib::SpawnSpecificGibs(	CBaseEntity*	pVictim,
 // Purpose : Spawn random gibs of the given gib type
 // Input   :
 // Output  :
+// TODO; Lifetime should be based on graphics settings (model quality)
 //------------------------------------------------------------------------------
 void CGib::SpawnRandomGibs( CBaseEntity *pVictim, int cGibs, GibType_e eGibType )
 {
@@ -312,14 +319,21 @@ void CGib::SpawnRandomGibs( CBaseEntity *pVictim, int cGibs, GibType_e eGibType 
 			{
 			case GIB_HUMAN:
 				// human pieces
-				pGib->Spawn( "models/gibs/hgibs.mdl" );
+				pGib->Spawn( "models/gibs/hgibs.mdl", 20 );
 				pGib->m_nBody = random->RandomInt(1,HUMAN_GIB_COUNT-1);// start at one to avoid throwing random amounts of skulls (0th gib)
 				break;
 			case GIB_ALIEN:
 				// alien pieces
-				pGib->Spawn( "models/gibs/agibs.mdl" );
+				pGib->Spawn( "models/gibs/agibs.mdl", 20 );
 				pGib->m_nBody = random->RandomInt(0,ALIEN_GIB_COUNT-1);
 				break;
+#ifdef HL2_DLL
+			case GIB_MECH:
+				// machine pieces
+				pGib->Spawn( "models/gibs/mgibs.mdl", 20 );
+				pGib->m_nBody = random->RandomInt(0,GERMAN_GIB_COUNT-1);
+				break;
+#endif
 			}
 		}
 		pGib->InitGib( pVictim, 300, 400);
@@ -349,6 +363,7 @@ void CGib::WaitTillLand ( void )
 			AddSolidFlags( FSOLID_NOT_SOLID );
 		}
 		SetLocalAngularVelocity( vec3_angle );
+//		Relink();
 
 		SetNextThink( gpGlobals->curtime + m_lifeTime );
 		SetThink ( &CGib::SUB_FadeOut );
@@ -382,7 +397,9 @@ void CGib::WaitTillLand ( void )
 		{
 			// ok, start stinkin!
 			// FIXME: It's too easy to fill up the sound queue with all these meat sounds
+			// Couldnt you just put a return here so it only plays once?
 			// CSoundEnt::InsertSound ( SOUND_MEAT, GetAbsOrigin(), 384, 25 );
+			// return true;
 		}
 	}
 	else
@@ -498,7 +515,7 @@ CBasePlayer *CGib::HasPhysicsAttacker( float dt )
 //
 // Gib bounces on the ground or wall, sponges some blood down, too!
 //
-void CGib::BounceGibTouch ( CBaseEntity *pOther )
+void CGib::BounceGibTouch( CBaseEntity *pOther )
 {
 	Vector	vecSpot;
 	trace_t	tr;
@@ -507,9 +524,7 @@ void CGib::BounceGibTouch ( CBaseEntity *pOther )
 
 	if ( pPhysics )
 		 return;
-	
-	//if ( random->RandomInt(0,1) )
-	//	return;// don't bleed everytime
+
 	if (GetFlags() & FL_ONGROUND)
 	{
 		SetAbsVelocity( GetAbsVelocity() * 0.9 );
@@ -550,7 +565,7 @@ void CGib::BounceGibTouch ( CBaseEntity *pOther )
 //
 // Sticky gib puts blood on the wall and stays put. 
 //
-void CGib::StickyGibTouch ( CBaseEntity *pOther )
+void CGib::StickyGibTouch( CBaseEntity *pOther )
 {
 	Vector	vecSpot;
 	trace_t tr;

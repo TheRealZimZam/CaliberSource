@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:
+// Purpose: The only thing that doesnt shoot the player (most of the time)
 //
 //=============================================================================//
 
@@ -277,6 +277,8 @@ public:
 	int			ObjectCaps( void ) { return UsableNPCObjectCaps(BaseClass::ObjectCaps()); }
 	void		TalkInit( void );				
 
+	bool IsPlayerAlly( CBasePlayer *pPlayer = NULL );
+
 	//---------------------------------
 	// Behavior
 	//---------------------------------
@@ -300,6 +302,7 @@ public:
 	// Combat
 	//---------------------------------
 	void		OnKilledNPC( CBaseCombatCharacter *pKilled );
+	Disposition_t	IRelationType ( CBaseEntity *pTarget );
 
 	//---------------------------------
 	// Damage handling

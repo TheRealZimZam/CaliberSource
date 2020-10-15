@@ -43,6 +43,8 @@
 
 
 
+// NPCs and grates do not prevent fire from travelling
+#define	MASK_FIRE_SOLID	 ( MASK_SOLID & (~(CONTENTS_MONSTER|CONTENTS_GRATE)) )
 
 #define	FIRE_HEIGHT				256.0f
 #define FIRE_SCALE_FROM_SIZE(firesize)		(firesize * (1/FIRE_HEIGHT))
@@ -613,7 +615,8 @@ void CFire::Precache( void )
 	if ( m_nFireType == FIRE_NATURAL )
 	{
 		UTIL_PrecacheOther("_firesmoke");
-		
+
+#ifdef HL2_EPISODIC
 		if ( m_spawnflags & SF_FIRE_SMOKELESS )
 		{
 			PrecacheParticleSystem( "env_fire_tiny" );
@@ -628,6 +631,7 @@ void CFire::Precache( void )
 			PrecacheParticleSystem( "env_fire_medium_smoke" );
 			PrecacheParticleSystem( "env_fire_large_smoke" );
 		}
+#endif
 	}
 
 	if ( m_nFireType == FIRE_PLASMA )
@@ -748,7 +752,7 @@ void CFire::Spawn( void )
 int CFire::UpdateTransmitState()
 {
 	// Don't want to be FL_EDICT_DONTSEND because our fire entity may make us transmit.
-	return SetTransmitState( FL_EDICT_ALWAYS );
+	return SetTransmitState( FL_EDICT_ALWAYS );		//FL_EDICT_PVSCHECK
 }
 
 //-----------------------------------------------------------------------------

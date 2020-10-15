@@ -73,6 +73,7 @@ void CAI_BaseNPC::InitDefaultScheduleSR(void)
 	ADD_DEF_SCHEDULE( "SCHED_ALERT_SCAN",					SCHED_ALERT_SCAN);
 	ADD_DEF_SCHEDULE( "SCHED_ALERT_STAND",					SCHED_ALERT_STAND);
 	ADD_DEF_SCHEDULE( "SCHED_ALERT_WALK",					SCHED_ALERT_WALK);
+	ADD_DEF_SCHEDULE( "SCHED_ALERT_SMALL_FLINCH",			SCHED_ALERT_SMALL_FLINCH);
 	ADD_DEF_SCHEDULE( "SCHED_INVESTIGATE_SOUND",			SCHED_INVESTIGATE_SOUND);
 	ADD_DEF_SCHEDULE( "SCHED_COMBAT_FACE",					SCHED_COMBAT_FACE);
 	ADD_DEF_SCHEDULE( "SCHED_COMBAT_SWEEP",					SCHED_COMBAT_SWEEP);
@@ -103,6 +104,7 @@ void CAI_BaseNPC::InitDefaultScheduleSR(void)
 	ADD_DEF_SCHEDULE( "SCHED_PRE_FAIL_ESTABLISH_LINE_OF_FIRE", SCHED_PRE_FAIL_ESTABLISH_LINE_OF_FIRE);
 	ADD_DEF_SCHEDULE( "SCHED_FAIL_ESTABLISH_LINE_OF_FIRE",	SCHED_FAIL_ESTABLISH_LINE_OF_FIRE);
 	ADD_DEF_SCHEDULE( "SCHED_COWER",						SCHED_COWER);
+	ADD_DEF_SCHEDULE( "SCHED_KNOCKDOWN",					SCHED_KNOCKDOWN);
 	ADD_DEF_SCHEDULE( "SCHED_MELEE_ATTACK1",				SCHED_MELEE_ATTACK1);
 	ADD_DEF_SCHEDULE( "SCHED_MELEE_ATTACK2",				SCHED_MELEE_ATTACK2);
 	ADD_DEF_SCHEDULE( "SCHED_RANGE_ATTACK1",				SCHED_RANGE_ATTACK1);
@@ -146,9 +148,9 @@ void CAI_BaseNPC::InitDefaultScheduleSR(void)
 	ADD_DEF_SCHEDULE( "SCHED_NPC_FREEZE",					SCHED_NPC_FREEZE);
 
 	ADD_DEF_SCHEDULE( "SCHED_FLINCH_PHYSICS",			SCHED_FLINCH_PHYSICS);
-
 	ADD_DEF_SCHEDULE( "SCHED_RUN_FROM_ENEMY_MOB",		SCHED_RUN_FROM_ENEMY_MOB );
-
+	ADD_DEF_SCHEDULE( "SCHED_BURNING_RUN",				SCHED_BURNING_RUN );
+	ADD_DEF_SCHEDULE( "SCHED_BURNING_STAND",			SCHED_BURNING_STAND );
 	ADD_DEF_SCHEDULE( "SCHED_DUCK_DODGE",				SCHED_DUCK_DODGE );
 
 	ADD_DEF_SCHEDULE( "SCHED_INTERACTION_MOVE_TO_PARTNER",				SCHED_INTERACTION_MOVE_TO_PARTNER );
@@ -170,6 +172,7 @@ bool CAI_BaseNPC::LoadDefaultSchedules(void)
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_ALERT_SCAN);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_ALERT_STAND);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_ALERT_WALK);
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_ALERT_SMALL_FLINCH);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_INVESTIGATE_SOUND);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_COMBAT_FACE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_COMBAT_SWEEP);
@@ -200,6 +203,7 @@ bool CAI_BaseNPC::LoadDefaultSchedules(void)
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_PRE_FAIL_ESTABLISH_LINE_OF_FIRE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_FAIL_ESTABLISH_LINE_OF_FIRE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_COWER);
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_KNOCKDOWN);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_MELEE_ATTACK1);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_MELEE_ATTACK2);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_RANGE_ATTACK1);
@@ -241,6 +245,8 @@ bool CAI_BaseNPC::LoadDefaultSchedules(void)
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_DROPSHIP_DUSTOFF);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_FLINCH_PHYSICS);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_RUN_FROM_ENEMY_MOB );
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_BURNING_RUN);
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_BURNING_STAND);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_DUCK_DODGE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_NPC_FREEZE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_INTERACTION_MOVE_TO_PARTNER);
@@ -336,6 +342,7 @@ int CAI_BaseNPC::TranslateSchedule( int scheduleType )
 		break;
 
 	case SCHED_ALERT_FACE:
+	case SCHED_ALERT_SMALL_FLINCH:
 		{
 			// FIXME: default AI can pick this when in idle state
 			// Assert( m_NPCState == NPC_STATE_ALERT );
@@ -510,9 +517,9 @@ AI_DEFINE_SCHEDULE
 	"		TASK_WAIT_PVS			0"
 	""
 	"	Interrupts"
-	"		COND_CAN_RANGE_ATTACK1 "
-	"		COND_CAN_RANGE_ATTACK2 "
-	"		COND_CAN_MELEE_ATTACK1 "
+	"		COND_CAN_RANGE_ATTACK1"
+	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_CAN_MELEE_ATTACK1"
 	"		COND_CAN_MELEE_ATTACK2"
 	"		COND_GIVE_WAY"
 );
@@ -530,9 +537,9 @@ AI_DEFINE_SCHEDULE
 	"		TASK_WAIT_PVS			0"
 	""
 	"	Interrupts"
-	"		COND_CAN_RANGE_ATTACK1 "
-	"		COND_CAN_RANGE_ATTACK2 "
-	"		COND_CAN_MELEE_ATTACK1 "
+	"		COND_CAN_RANGE_ATTACK1"
+	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_CAN_MELEE_ATTACK1"
 	"		COND_CAN_MELEE_ATTACK2"
 	"		COND_GIVE_WAY"
  );
@@ -620,7 +627,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_STOP_MOVING				0"
 	"		TASK_FACE_TARGET				0"
 	"		TASK_WEAPON_PICKUP				0"
-	"		TASK_WAIT						1"// Don't move before done standing up
+	"		TASK_WAIT						0.5"// Don't move before done standing up
 	""
 	"	Interrupts"
 	"		COND_HEAR_DANGER"
@@ -731,7 +738,7 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING			0"
-	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
+	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"	//FIXME; Hook to unique
 	"		TASK_WAIT_INDEFINITE		0"
 	""
 	"	Interrupts"
@@ -748,7 +755,7 @@ AI_DEFINE_SCHEDULE
 // that node because they think the group member that was
 // previously interrupted is still using that node to active
 // idle.
-///=========================================================
+//=========================================================
 //AI_DEFINE_SCHEDULE
 //	Idle_Stand
 //
@@ -788,10 +795,9 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING		0"
-	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_IDLE "
 	"		TASK_SOUND_WAKE			0"
+	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_IDLE"
 	"		TASK_FACE_IDEAL			0"
-	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_IDLE "
 	""
 	"	Interrupts"
 );
@@ -817,7 +823,25 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
-//  > AlertFace	best sound
+//  > AlertSmallFlinch
+//	shot but didn't see attacker, flinch then face
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_ALERT_SMALL_FLINCH,
+
+	"	Tasks"
+	"		TASK_STOP_MOVING			0"
+	"		TASK_REMEMBER				MEMORY:FLINCHED"
+	"		TASK_SMALL_FLINCH			0"
+	"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_ALERT_FACE"
+	""
+	"	Interrupts"
+);
+
+//=========================================================
+//  > AlertFace
+// Face the closest sound
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -840,6 +864,8 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
+//  > AlertReact
+// React to the closest sound
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -853,14 +879,15 @@ AI_DEFINE_SCHEDULE
 
 
 //=========================================================
-//  > Alert_Scan
+//  > AlertScan
+// Scan the area for enemies
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
 	SCHED_ALERT_SCAN,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
+//	"		TASK_STOP_MOVING		0"
 	"		TASK_WAIT				0.5"
 	"		TASK_TURN_LEFT			180"
 	"		TASK_WAIT				0.5"
@@ -868,10 +895,19 @@ AI_DEFINE_SCHEDULE
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
+	"		COND_HEAVY_DAMAGE"
+	"		COND_PROVOKED"
+	"		COND_HEAR_COMBAT"
+	"		COND_HEAR_WORLD"
+	"		COND_HEAR_PLAYER"
+	"		COND_HEAR_DANGER"
+	"		COND_HEAR_BULLET_IMPACT"
+	"		COND_GIVE_WAY"
 );
 
 //=========================================================
 //  > AlertStand
+// Stand but more agitated
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -879,9 +915,10 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING			0"
-	"		TASK_FACE_REASONABLE		0"
-	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
-	"		TASK_WAIT					20"
+	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"	//FIXME; Hook to unique
+//	"		TASK_FACE_REASONABLE		0"
+	"		TASK_WAIT					15"
+	"		TASK_WAIT_RANDOM			5"
 	"		TASK_SUGGEST_STATE			STATE:IDLE"
 	""
 	"	Interrupts"
@@ -902,9 +939,9 @@ AI_DEFINE_SCHEDULE
 );
 
 
-
 //=========================================================
-// > AlertWAlk
+// > AlertWalk
+// Walk but more agitated
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -945,6 +982,7 @@ AI_DEFINE_SCHEDULE
 //	"		TASK_SET_TOLERANCE_DISTANCE		32"
 	"		TASK_GET_PATH_TO_BESTSOUND		0"
 	"		TASK_FACE_IDEAL					0"
+	"		TASK_WAIT						0.2"
 	"		TASK_RUN_PATH					0"
 	"		TASK_WAIT_FOR_MOVEMENT			0"
 	"		TASK_STOP_MOVING				0"
@@ -974,7 +1012,7 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING			0"
-	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
+	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE_ANGRY"
 	"		TASK_WAIT_INDEFINITE		0"
 	""
 	"	Interrupts"
@@ -1045,9 +1083,10 @@ AI_DEFINE_SCHEDULE
 	SCHED_COMBAT_SWEEP,
 
 	"	Tasks"
-	"		TASK_TURN_LEFT		45"
+	"		TASK_WAIT			1"
+	"		TASK_TURN_LEFT		90"
 	"		TASK_WAIT			2"
-	"		TASK_TURN_RIGHT		45"
+	"		TASK_TURN_RIGHT		180"
 	"		TASK_WAIT			2"
 	""
 	"	Interrupts"
@@ -1084,6 +1123,8 @@ AI_DEFINE_SCHEDULE
 	"		COND_CAN_MELEE_ATTACK2"
 	"		COND_ENEMY_DEAD"
 	"		COND_NEW_ENEMY"
+	"		COND_LIGHT_DAMAGE"
+	"		COND_HEAVY_DAMAGE"
 	"		COND_HEAR_DANGER"
 );
 
@@ -1135,6 +1176,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_RELOAD"
 	""
 	"	Interrupts"
+//	"		COND_HEAVY_DAMAGE"
 	"		COND_HEAR_DANGER"
 );
 
@@ -1150,6 +1192,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_RELOAD				0"
 	""
 	"	Interrupts"
+//	"		COND_HEAVY_DAMAGE"
 	"		COND_HEAR_DANGER"
 );
 
@@ -1253,7 +1296,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_GET_CHASE_PATH_TO_ENEMY	300"
 	"		TASK_RUN_PATH					0"
 	"		TASK_WAIT_FOR_MOVEMENT			0"
-	"		TASK_FACE_ENEMY			0"
+	"		TASK_FACE_ENEMY					0"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -1268,6 +1311,7 @@ AI_DEFINE_SCHEDULE
 	"		COND_LOST_ENEMY"
 	"		COND_BETTER_WEAPON_AVAILABLE"
 	"		COND_HEAR_DANGER"
+	"		COND_HEAVY_DAMAGE"
 );
 
 //=========================================================
@@ -1347,10 +1391,10 @@ AI_DEFINE_SCHEDULE
 	"		COND_CAN_MELEE_ATTACK1"
 	"		COND_CAN_RANGE_ATTACK2"
 	"		COND_CAN_MELEE_ATTACK2"
-	"		COND_HEAR_DANGER"
-	"		COND_BETTER_WEAPON_AVAILABLE"
 	"		COND_LIGHT_DAMAGE"
 	"		COND_HEAVY_DAMAGE"
+	"		COND_HEAR_DANGER"
+	"		COND_BETTER_WEAPON_AVAILABLE"
 );
 
 //=========================================================
@@ -1378,7 +1422,6 @@ AI_DEFINE_SCHEDULE
 	SCHED_BACK_AWAY_FROM_ENEMY,
 
 	"	Tasks"
-			// If I can't back away from the enemy try to get behind him
 	"		TASK_STOP_MOVING							0"
 //	"		TASK_SET_TOLERANCE_DISTANCE					24"
 	"		TASK_STORE_ENEMY_POSITION_IN_SAVEPOSITION	0"
@@ -1396,30 +1439,31 @@ AI_DEFINE_SCHEDULE
 
 //=========================================================
 // > SmallFlinch
-//	played when heavy damage is taken recently after taking damage
+//	played when low damage is taken
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
 	SCHED_SMALL_FLINCH,
 
 	"	Tasks"
-	"		 TASK_REMEMBER				MEMORY:FLINCHED "
+	"		 TASK_REMEMBER				MEMORY:FLINCHED"
 	"		 TASK_STOP_MOVING			0"
 	"		 TASK_SMALL_FLINCH			0"
 	""
 	"	Interrupts"
+	"		COND_HEAVY_DAMAGE"
 );
 
 //=========================================================
 // > BigFlinch
-//	played when heavy damage is taken for the first time in a while
+//	played when heavy damage is taken
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
 	SCHED_BIG_FLINCH,
 
 	"	Tasks"
-	"		 TASK_REMEMBER				MEMORY:FLINCHED "
+	"		 TASK_REMEMBER				MEMORY:FLINCHED"
 	"		 TASK_STOP_MOVING			0"
 	"		 TASK_BIG_FLINCH			0"
 	""
@@ -1449,7 +1493,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_DIE,
 
 	"	Tasks"
-	"		 TASK_STOP_MOVING		0				 "
+	"		 TASK_STOP_MOVING		0			 "
 	"		 TASK_SOUND_DIE			0			 "
 	"		 TASK_DIE				0			 "
 	""
@@ -1458,7 +1502,7 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
-// > Die
+// > DieRagdoll
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -1486,6 +1530,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_WAIT				0"
 	""
 	"	Interrupts"
+//	"		COND_NEW_ENEMY"
 );
 
 //=========================================================
@@ -1522,7 +1567,7 @@ AI_DEFINE_SCHEDULE
 	"		 TASK_PLAY_SCRIPT_POST_IDLE			0"
 	""
 	"	Interrupts"
-	"		COND_LIGHT_DAMAGE "
+	"		COND_LIGHT_DAMAGE"
 	"		COND_HEAVY_DAMAGE"
 );
 
@@ -1641,8 +1686,8 @@ AI_DEFINE_SCHEDULE
 //=========================================================
 // > Cower
 //
-//		This is what is usually done when attempts
-//		to escape danger fail.
+// This is what is usually done when attempts
+// to escape danger fail.
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -1657,9 +1702,26 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
+// > Knocked-down
+//
+// Idle on the floor
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_KNOCKDOWN,
+
+	"	Tasks"
+	"		TASK_STOP_MOVING				0"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE_PRONE"
+	"		TASK_WAIT_INDEFINITE			0"
+	""
+	"	Interrupts"
+);
+
+//=========================================================
 // > TakeCoverFromOrigin
 //
-//			move away from where you're currently standing.
+// move away from where you're currently standing.
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -1737,7 +1799,7 @@ AI_DEFINE_SCHEDULE
 	"	Tasks"
 	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAIL_TAKE_COVER"
 	"		TASK_STOP_MOVING				0"
-	"		TASK_WAIT						0.2"
+//	"		TASK_WAIT						0.2"
 //	"		TASK_SET_TOLERANCE_DISTANCE		24"
 	"		TASK_FIND_COVER_FROM_ENEMY		0"
 	"		TASK_RUN_PATH					0"
@@ -1745,7 +1807,6 @@ AI_DEFINE_SCHEDULE
 	"		TASK_REMEMBER					MEMORY:INCOVER"
 	"		TASK_FACE_ENEMY					0"
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"	// Translated to cover
-	"		TASK_WAIT						1"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -1807,6 +1868,12 @@ AI_DEFINE_SCHEDULE
 	"		COND_ENEMY_DEAD"
 );
 
+//=========================================================
+// > RunFromEnemyMob
+//
+//	Back away from an enemy mob (most likely a melee enemy,
+//  such as zombies or headcrabs)
+//=========================================================
 AI_DEFINE_SCHEDULE
 (
 	SCHED_RUN_FROM_ENEMY_MOB,
@@ -1826,9 +1893,8 @@ AI_DEFINE_SCHEDULE
 //=========================================================
 // > Fear_Face
 //
-// Face an enemy that I'm scared of, until I see it.  Used
-// after I run to cover from a feared enemy
-// UNDONE: Add a special ACT_IDLE_FEAR
+// Face the position/enemy I'm scared of, until I see it.
+// Used after I run to cover from a feared enemy
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -1836,7 +1902,7 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		 TASK_STOP_MOVING			0"
-	"		 TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
+	"		 TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE_FEAR"	//FIXME; Hook to unique??
 	"		 TASK_FACE_ENEMY			0"
 	""
 	"	Interrupts"
@@ -2314,6 +2380,35 @@ AI_DEFINE_SCHEDULE
 	"		COND_HEAR_COMBAT"
 	"		COND_HEAR_BULLET_IMPACT"
 	
+);
+
+//=========================================================
+// > SCHED_BURNING_RUN
+// Stand or run around on fire
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_BURNING_RUN,
+
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_BURNING_STAND"
+	"		TASK_SET_TOLERANCE_DISTANCE		24"
+	"		TASK_GET_PATH_TO_RANDOM_NODE	300"
+	"		TASK_RUN_PATH_TIMED				4"
+	""
+	"	Interrupts"
+);
+
+AI_DEFINE_SCHEDULE
+(
+	SCHED_BURNING_STAND,
+
+	"	Tasks"
+	"		TASK_STOP_MOVING				0"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE_ON_FIRE"
+	"		TASK_WAIT						8"	//If you arent dead after eight seconds then you must be immortal
+	""
+	"	Interrupts"
 );
 
 //=========================================================

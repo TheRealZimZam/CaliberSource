@@ -1,14 +1,14 @@
 //========== Copyright © 2009, Valve Corporation, All rights reserved. ========
 //
-// Purpose: General cover searching and advancing.
-//	Currently unused
+// Purpose: Fight from cover
 //
 //=============================================================================
 
 #include "cbase.h"
 
-#include "ai_behavior_fightfromcover.h"
 #include "ai_hint.h"
+#include "ai_node.h"
+#include "ai_behavior_fightfromcover.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"

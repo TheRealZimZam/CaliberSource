@@ -940,16 +940,27 @@ void CC_Player_PhysSwap( void )
 
 			const char *strWeaponName = pWeapon->GetName();
 
-			// If current weapon is frag or stun, change it back
+			// If current weapon is a grenade, change it back
+			//TODO; This needs to grab the bucket value to make sure its any grenade
 			if ( !Q_stricmp( strWeaponName, "weapon_frag" ) )
 			{
 			//	PhysCannonForceDrop( pWeapon, NULL );
 				pPlayer->SelectLastItem();
+				DevMsg( "Switching to previous weapon.\n");
 			}
-			// If it isnt, change to frag or stun (frag has priority)
+			// If it isnt, change to grenade (frag has priority)
 			else
 			{
+				//TODO; This needs to grab the bucket value, rather than be a hardcoded priority!
+				DevMsg( "Attempting to switch to highest-priority consumable.\n");
+				//FRAG (Default grenade)
 				pPlayer->SelectItem( "weapon_frag" );
+				//MOLOTOV (Starting grenade)
+
+				//STUN (Police grenade)
+
+				//SMOKE (Smoke grenade)
+
 			}
 		}
 	}

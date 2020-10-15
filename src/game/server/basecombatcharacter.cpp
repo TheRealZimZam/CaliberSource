@@ -220,8 +220,10 @@ bool CBaseCombatCharacter::HasHumanGibs( void )
 {
 #if defined( HL2_DLL )
 	Class_T myClass = Classify();
+	//NOTENOTE; Combine alien units (eg. strider, assassin) should have their own gibs
 	if ( myClass == CLASS_CITIZEN_PASSIVE   ||
 		 myClass == CLASS_CITIZEN_REBEL		||
+		 myClass == CLASS_PLAYER_ALLY		||
 		 myClass == CLASS_COMBINE			||
 		 myClass == CLASS_CONSCRIPT			||
 		 myClass == CLASS_METROPOLICE		||
@@ -255,7 +257,9 @@ bool CBaseCombatCharacter::HasAlienGibs( void )
 {
 #if defined( HL2_DLL )
 	Class_T myClass = Classify();
-	if ( myClass == CLASS_BARNACLE		 || 
+	if ( myClass == CLASS_BARNACLE		 ||
+		 myClass == CLASS_BULLSQUID		 ||
+		 myClass == CLASS_HOUNDEYE		 ||
 		 myClass == CLASS_STALKER		 ||
 		 myClass == CLASS_ZOMBIE		 ||
 		 myClass == CLASS_VORTIGAUNT	 ||
@@ -279,6 +283,19 @@ bool CBaseCombatCharacter::HasAlienGibs( void )
 	return false;
 }
 
+bool CBaseCombatCharacter::HasMechGibs( void )
+{
+	Class_T myClass = Classify();
+	if ( myClass == CLASS_SCANNER		 ||
+		 myClass == CLASS_MANHACK		 ||
+		 myClass == CLASS_COMBINE_HUNTER ||
+		 myClass == CLASS_COMBINE_GUNSHIP )
+	{
+		 return true;
+	}
+
+	return false;
+}
 
 void CBaseCombatCharacter::CorpseFade( void )
 {
@@ -817,12 +834,41 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 	bool		gibbed = false;
 
 	EmitSound( "BaseCombatCharacter.CorpseGib" );
+	CSoundEnt::InsertSound( SOUND_MEAT, GetAbsOrigin(), 256, 25, this );
 
-	// only humans throw skulls !!!UNDONE - eventually NPCs will have their own sets of gibs
+	//Create a big explosion of blood
+#if 0
+	CEffectData	data;
+	
+	data.m_vOrigin = WorldSpaceCenter();
+	data.m_vNormal = data.m_vOrigin - info.GetDamagePosition();
+	VectorNormalize( data.m_vNormal );
+	
+	data.m_flScale = RemapVal( m_iHealth, 0, -500, 1, 3 );
+	data.m_flScale = clamp( data.m_flScale, 1, 3 );
+	data.m_nColor = BloodColor();
+
+	// Big blood splat
+	DispatchEffect( "Gib", data );
+#endif
+
+	Vector vecDamageDir = WorldSpaceCenter() - info.GetDamagePosition();
+	VectorNormalize( vecDamageDir );
+
+	// More damage = more blood
+	int Amount = info.GetDamage() * 0.3;
+	if ( Amount > 10 )
+	{
+		Amount = 10;
+	}
+
+	UTIL_BloodSpray( WorldSpaceCenter(), vecDamageDir, BloodColor(), Amount, FX_BLOODSPRAY_CLOUD | FX_BLOODSPRAY_GORE );
+
+	// Throw the gibs
 	if ( HasHumanGibs() )
 	{
-		CGib::SpawnHeadGib( this );
-		CGib::SpawnRandomGibs( this, 4, GIB_HUMAN );	// throw some human gibs.
+		CGib::SpawnHeadGib( this );											// Chuck out a skull
+		CGib::SpawnRandomGibs( this, random->RandomInt(3,4), GIB_HUMAN );	// Then throw some general gibs
 		gibbed = true;
 	}
 	else if ( HasAlienGibs() )
@@ -830,6 +876,13 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 		CGib::SpawnRandomGibs( this, 4, GIB_ALIEN );	// Throw alien gibs
 		gibbed = true;
 	}
+#ifdef HL2_DLL
+//	else if ( HasMechGibs() )
+//	{
+//		CGib::SpawnRandomGibs( this, 4, GIB_MECH );		// Throw general machine gibs
+//		gibbed = true;
+//	}
+#endif
 
 	return gibbed;
 }
@@ -837,6 +890,7 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 //=========================================================
 // GetDeathActivity - determines the best type of death
 // anim to play.
+// TODO; Add left and right
 //=========================================================
 Activity CBaseCombatCharacter::GetDeathActivity ( void )
 {
@@ -876,6 +930,10 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 		// try to pick a region-specific death.
 	case HITGROUP_HEAD:
 		deathActivity = ACT_DIE_HEADSHOT;
+		break;
+
+	case HITGROUP_CHEST:
+		deathActivity = ACT_DIE_CHESTSHOT;
 		break;
 
 	case HITGROUP_STOMACH:
@@ -1457,7 +1515,7 @@ bool CBaseCombatCharacter::BecomeRagdoll( const CTakeDamageInfo &info, const Vec
 
 		EmitSound_t ep;
 		ep.m_nChannel = CHAN_STATIC;
-		ep.m_pSoundName = "NPC_MetroPolice.HitByVehicle";
+		ep.m_pSoundName = "BaseCombatCharacter.HitByVehicle";
 		ep.m_flVolume = 1.0f;
 		ep.m_SoundLevel = SNDLVL_NORM;
 		ep.m_pOrigin = &soundOrigin;
@@ -1595,7 +1653,13 @@ void CBaseCombatCharacter::Event_Killed( const CTakeDamageInfo &info )
 			}
 		}
 #endif
-
+#if 0
+		// Tell my killer that he got me!
+		if( info.GetAttacker() )
+		{
+			g_EventQueue.AddEvent( info.GetAttacker(), "KilledNPC", 0.3, this, this );
+		}
+#endif
 		if ( !bRagdollCreated && ( info.GetDamageType() & DMG_REMOVENORAGDOLL ) == 0 )
 		{
 			BecomeRagdoll( info, forceVector );
@@ -1999,16 +2063,6 @@ void CBaseCombatCharacter::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 	// If gun doesn't use clips, just give ammo
 	if (pWeapon->GetMaxClip1() == -1)
 	{
-#ifdef HL2_DLL
-		if( FStrEq(STRING(gpGlobals->mapname), "d3_c17_09") && FClassnameIs(pWeapon, "weapon_rpg") && pWeapon->NameMatches("player_spawn_items") )
-		{
-			// !!!HACK - Don't give any ammo with the spawn equipment RPG in d3_c17_09. This is a chapter
-			// start and the map is way to easy if you start with 3 RPG rounds. It's fine if a player conserves
-			// them and uses them here, but it's not OK to start with enough ammo to bypass the snipers completely.
-			GiveAmmo( 0, pWeapon->m_iPrimaryAmmoType); 
-		}
-		else
-#endif // HL2_DLL
 		GiveAmmo(pWeapon->GetDefaultClip1(), pWeapon->m_iPrimaryAmmoType); 
 	}
 	// If default ammo given is greater than clip
@@ -2923,7 +2977,7 @@ float CBaseCombatCharacter::CalculatePhysicsStressDamage( vphysics_objectstress_
 void CBaseCombatCharacter::ApplyStressDamage( IPhysicsObject *pPhysics, bool bRequireLargeObject )
 {
 #ifdef HL2_DLL
-	if( Classify() == CLASS_PLAYER_ALLY || Classify() == CLASS_PLAYER_ALLY_VITAL )
+	if( Classify() == CLASS_PLAYER_ALLY_VITAL )
 	{
 		// Bypass stress completely for allies and vitals.
 		if( hl2_episodic.GetBool() )

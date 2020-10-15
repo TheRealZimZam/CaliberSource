@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Its raining men!
 //
 //=============================================================================//
 
@@ -94,10 +94,8 @@ void CRopeAnchor::RemoveThink()
 	SetNextThink( gpGlobals->curtime );
 }
 
-//=========================================================
-//=========================================================
 
-
+//=============================================================================//
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -378,7 +376,6 @@ void CAI_RappelBehavior::CutZipline()
 //-----------------------------------------------------------------------------
 void CAI_RappelBehavior::CreateZipline()
 {
-#if 1
 	if( !m_hLine )
 	{
 		int attachment = GetOuter()->LookupAttachment( "zipline" );
@@ -399,7 +396,6 @@ void CAI_RappelBehavior::CreateZipline()
 			m_hLine.Set( pBeam );
 		}
 	}
-#endif
 }
 
 

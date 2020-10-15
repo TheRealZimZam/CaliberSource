@@ -469,7 +469,7 @@ void CAI_StandoffBehavior::GatherConditions()
 int CAI_StandoffBehavior::SelectScheduleUpdateWeapon( void )
 {
 	// Check if need to reload
-	if ( HasCondition ( COND_NO_PRIMARY_AMMO ) || HasCondition ( COND_LOW_PRIMARY_AMMO ))
+	if ( HasCondition ( COND_NO_PRIMARY_AMMO ) || HasCondition ( COND_LOW_PRIMARY_AMMO ) )
 	{
 		StandoffMsg( "Out of ammo, reloading\n" );
 		if ( m_params.fCoverOnReload )
@@ -1210,7 +1210,7 @@ AI_StandoffParams_t g_StandoffParamsByAgression[] =
 	{ 	AIHCR_MOVE_ON_COVER,	true,			true, 			2.0, 			5.0, 			2, 			5, 			50,			false, 	20		},	// AGGR_LOW
 	{ 	AIHCR_MOVE_ON_COVER,	true,			true, 			0.6, 			2.5, 			3, 			6, 			25,			false, 	10		},	// AGGR_MEDIUM
 	{ 	AIHCR_MOVE_ON_COVER,	true,			true, 			0.2, 			1.5, 			5, 			8, 			10,			false, 	10		},	// AGGR_HIGH
-	{ 	AIHCR_MOVE_ON_COVER,	false,			true, 			0, 				0, 				100,		100, 		0,			false, 	5		},	// AGGR_VERY_HIGH
+	{ 	AIHCR_MOVE_IMMEDIATE,	false,			true, 			0, 				0, 				100,		100, 		0,			false, 	5		},	// AGGR_VERY_HIGH
 };
 
 // AI_DEFAULT_STANDOFF_PARAMS = { AIHCR_MOVE_ON_COVER, true, 1.5, 2.5, 1, 3, 25, 0 };

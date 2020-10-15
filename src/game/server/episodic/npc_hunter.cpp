@@ -2867,12 +2867,10 @@ int CNPC_Hunter::SelectCombatSchedule()
 			{
 				return SCHED_HUNTER_CHARGE_ENEMY;
 			}
-/*
 			else
 			{
 				return SCHED_HUNTER_SIDESTEP;
 			}
-*/
 		}
 
 		// Try to be a flanker.

@@ -2,7 +2,7 @@
 //
 // Purpose:		Bat - breaking eggs
 //
-// TODO's; Add model-changing system, optimize
+// TODO's; Add model-changing support, optimize
 // $NoKeywords: $
 //=============================================================================//
 
@@ -41,7 +41,7 @@ PRECACHE_WEAPON_REGISTER( weapon_swing );
 acttable_t CWeaponSwing::m_acttable[] = 
 {
 	{ ACT_MELEE_ATTACK1,	ACT_MELEE_ATTACK_SWING, true },
-	{ ACT_IDLE,				ACT_IDLE_ANGRY_MELEE,	false },
+	{ ACT_IDLE,				ACT_IDLE_MELEE,			false },
 	{ ACT_IDLE_ANGRY,		ACT_IDLE_ANGRY_MELEE,	false },
 };
 

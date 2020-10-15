@@ -30,10 +30,12 @@ public:
 	void	Precache( void );
 	virtual void Equip( CBaseCombatCharacter *pOwner );
 
+	void	PrimaryAttack( void );
 	void	SecondaryAttack( void );
 	void	DelayedAttack( void );
 
 	const char *GetTracerType( void ) { return "AR2Tracer"; }
+//	void	DoMuzzleFlash( int vAttachment );
 
 	void	AddViewKick( void );
 
@@ -44,8 +46,9 @@ public:
 
 	int		GetMinBurst( void ) { return 2; }
 	int		GetMaxBurst( void ) { return 5; }
+	virtual float	GetMinRestTime();
+	virtual float	GetMaxRestTime();
 	float	GetFireRate( void );
-//	float	GetFireRate( void ) { return 0.125f; }
 
 	bool	CanHolster( void );
 	bool	Reload( void );
@@ -56,14 +59,6 @@ public:
 	
 	void	DoImpactEffect( trace_t &tr, int nDamageType );
 
-//	virtual const Vector& GetBulletSpread( void )
-//	{
-//		static Vector cone;
-//		
-//		cone = VECTOR_CONE_3DEGREES;
-//
-//		return cone;
-//	}
 	virtual const Vector& GetBulletSpread( void )
 	{
 		static Vector cone;

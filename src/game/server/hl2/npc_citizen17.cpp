@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: The downtrodden citizens of City 17.
-// Todo's: Flinching, Limping, Gibbing, and Friendly Fire responses
-//
+// Todo's: Fix weapon pickup (currently only goes for rpg???), fix healing/ammo supplying, 
+// Weapon priority/rating script, Optimize
 //=============================================================================//
 
 #include "cbase.h"
@@ -51,18 +51,19 @@ extern ConVar sk_healthvial;
 const int MAX_PLAYER_SQUAD = 4;
 
 ConVar	sk_citizen_health				( "sk_citizen_health",					"0");
-ConVar	sk_citizen_leader_health		( "sk_citizen_leader_health",			"0");
-ConVar	sk_citizen_heal_player			( "sk_citizen_heal_player",				"25");
-ConVar	sk_citizen_heal_player_delay	( "sk_citizen_heal_player_delay",		"25");
-ConVar	sk_citizen_giveammo_player_delay( "sk_citizen_giveammo_player_delay",	"10");
-ConVar	sk_citizen_heal_player_min_pct	( "sk_citizen_heal_player_min_pct",		"0.60");
+ConVar	sk_citizen_rebel_health			( "sk_citizen_rebel_health",			"0");
+ConVar	sk_citizen_heal_player			( "sk_citizen_heal_player",				"40");	//Maximum health to heal
+ConVar	sk_citizen_heal_player_delay	( "sk_citizen_heal_player_delay",		"20");	//Delay between each heal (for each medic)
+ConVar	sk_citizen_giveammo_player_delay( "sk_citizen_giveammo_player_delay",	"15");
+ConVar	sk_citizen_heal_player_min_pct	( "sk_citizen_heal_player_min_pct",		"0.60");	//Health level to start considering healing
 ConVar	sk_citizen_heal_player_min_forced( "sk_citizen_heal_player_min_forced",		"10.0");
-ConVar	sk_citizen_heal_ally			( "sk_citizen_heal_ally",				"30");
-ConVar	sk_citizen_heal_ally_delay		( "sk_citizen_heal_ally_delay",			"20");
-ConVar	sk_citizen_heal_ally_min_pct	( "sk_citizen_heal_ally_min_pct",		"0.90");
+ConVar	sk_citizen_heal_ally			( "sk_citizen_heal_ally",				"30");	//Maximum health to heal
+ConVar	sk_citizen_heal_ally_delay		( "sk_citizen_heal_ally_delay",			"20");	//Delay between each heal (for each medic)
+ConVar	sk_citizen_heal_ally_min_pct	( "sk_citizen_heal_ally_min_pct",		"0.80");	//Health level to start considering healing
 ConVar	sk_citizen_player_stare_time	( "sk_citizen_player_stare_time",		"1.0" );
 ConVar  sk_citizen_player_stare_dist	( "sk_citizen_player_stare_dist",		"72" );
 ConVar	sk_citizen_stare_heal_time		( "sk_citizen_stare_heal_time",			"5" );
+ConVar	sk_citizen_headshot_multiplier	( "sk_citizen_headshot_multiplier",		"3.5" );
 
 ConVar	g_ai_citizen_show_enemy( "g_ai_citizen_show_enemy", "0" );
 
@@ -71,24 +72,24 @@ ConVar	npc_citizen_squad_marker( "npc_citizen_squad_marker", "0" );
 ConVar	npc_citizen_explosive_resist( "npc_citizen_explosive_resist", "1" );
 
 ConVar	npc_citizen_auto_player_squad( "npc_citizen_auto_player_squad", "1" );
-ConVar	npc_citizen_auto_player_squad_allow_use( "npc_citizen_auto_player_squad_allow_use", "0" );
+ConVar	npc_citizen_auto_player_squad_allow_use( "npc_citizen_auto_player_squad_allow_use", "1" );
 
 
 ConVar	npc_citizen_dont_precache_all( "npc_citizen_dont_precache_all", "0" );
 
 
 ConVar  npc_citizen_medic_emit_sound("npc_citizen_medic_emit_sound", "1" );
-// #ifdef HL2_EPISODIC -- Removed for mod
+#ifdef HL2_EPISODIC
 // todo: bake these into pound constants (for now they're not just for tuning purposes)
-ConVar  npc_citizen_heal_chuck_medkit("npc_citizen_heal_chuck_medkit" , "1" , FCVAR_ARCHIVE, "Set to 1 to use new experimental healthkit-throwing medic.");
-ConVar npc_citizen_medic_throw_style( "npc_citizen_medic_throw_style", "1", FCVAR_ARCHIVE, "Set to 0 for a lobbier trajectory" );
-ConVar npc_citizen_medic_throw_speed( "npc_citizen_medic_throw_speed", "650" );
+ConVar  npc_citizen_heal_chuck_medkit("npc_citizen_heal_chuck_medkit" , "0" , FCVAR_ARCHIVE, "Set to 1 to use new experimental healthkit-throwing medic.");
+ConVar	npc_citizen_medic_throw_style( "npc_citizen_medic_throw_style", "1", FCVAR_ARCHIVE, "Set to 0 for a lobbier trajectory" );
+ConVar	npc_citizen_medic_throw_speed( "npc_citizen_medic_throw_speed", "650" );
 ConVar	sk_citizen_heal_toss_player_delay("sk_citizen_heal_toss_player_delay", "26", FCVAR_NONE, "how long between throwing healthkits" );
 
 
  #define MEDIC_THROW_SPEED npc_citizen_medic_throw_speed.GetFloat()
  #define USE_EXPERIMENTAL_MEDIC_CODE() (npc_citizen_heal_chuck_medkit.GetBool() )
-// #endif
+#endif
 
 ConVar player_squad_autosummon_time( "player_squad_autosummon_time", "5" );
 ConVar player_squad_autosummon_move_tolerance( "player_squad_autosummon_move_tolerance", "20" );
@@ -106,10 +107,10 @@ enum SquadSlot_T
 
 const float HEAL_MOVE_RANGE = 30*12;
 const float HEAL_TARGET_RANGE = 120; // 10 feet
-// #ifdef HL2_EPISODIC
+#ifdef HL2_EPISODIC
 const float HEAL_TOSS_TARGET_RANGE = 480; // 40 feet when we are throwing medkits 
 const float HEAL_TARGET_RANGE_Z = 72; // a second check that Gordon isn't too far above us -- 6 feet
-// #endif
+#endif
 
 // player must be at least this distance away from an enemy before we fire an RPG at him
 const float RPG_SAFE_DISTANCE = CMissile::EXPLOSION_RADIUS + 64.0;
@@ -281,6 +282,7 @@ static const char *g_ppszModelLocs[] =
 	"Group01",
 	"Group01",
 	"Group02",
+	"Group03%s",	//!FIXME; Hook to criminal unique
 	"Group03%s",
 };
 
@@ -300,6 +302,9 @@ int	ACT_CIT_STARTLED;		// Startled by sneaky scanner
 //---------------------------------------------------------
 
 LINK_ENTITY_TO_CLASS( npc_citizen, CNPC_Citizen );
+LINK_ENTITY_TO_CLASS( npc_factoryworker, CNPC_Citizen );
+LINK_ENTITY_TO_CLASS( npc_mobster, CNPC_Citizen );
+LINK_ENTITY_TO_CLASS( npc_hobo, CNPC_Citizen );
 
 //---------------------------------------------------------
 
@@ -323,7 +328,7 @@ BEGIN_DATADESC( CNPC_Citizen )
 	DEFINE_KEYFIELD(	m_iAmmoAmount, 				FIELD_INTEGER,	"ammoamount" ),
 	DEFINE_FIELD( 		m_bRPGAvoidPlayer, 			FIELD_BOOLEAN ),
 	DEFINE_FIELD( 		m_bShouldPatrol, 			FIELD_BOOLEAN ),
-	DEFINE_FIELD( 		m_fIsLeader, 				FIELD_BOOLEAN ),
+	DEFINE_FIELD( 		m_fIsRebel, 				FIELD_BOOLEAN ),
 	DEFINE_FIELD( 		m_iszOriginalSquad, 		FIELD_STRING ),
 	DEFINE_FIELD( 		m_flTimeJoinedPlayerSquad,	FIELD_TIME ),
 	DEFINE_FIELD( 		m_bWasInPlayerSquad, FIELD_BOOLEAN ),
@@ -357,9 +362,9 @@ BEGIN_DATADESC( CNPC_Citizen )
 	DEFINE_INPUTFUNC( FIELD_VOID,	"SetAmmoResupplierOff",	InputSetAmmoResupplierOff ),
 	DEFINE_INPUTFUNC( FIELD_VOID,	"SpeakIdleResponse", InputSpeakIdleResponse ),
 
-//#if HL2_EPISODIC
+#ifdef HL2_EPISODIC
 	DEFINE_INPUTFUNC( FIELD_VOID,   "ThrowHealthKit", InputForceHealthKitToss ),
-//#endif
+#endif
 
 	DEFINE_USEFUNC( CommanderUse ),
 	DEFINE_USEFUNC( SimpleUse ),
@@ -394,6 +399,7 @@ void CNPC_Citizen::Precache()
 	else
 		PrecacheModel( STRING( GetModelName() ) );
 
+	// This is extremely hacky
 	if ( NameMatches( "matt" ) )
 		PrecacheModel( "models/props_canal/mattpipe.mdl" );
 
@@ -402,6 +408,8 @@ void CNPC_Citizen::Precache()
 	PrecacheScriptSound( "NPC_Citizen.FootstepLeft" );
 	PrecacheScriptSound( "NPC_Citizen.FootstepRight" );
 	PrecacheScriptSound( "NPC_Citizen.Die" );
+	PrecacheScriptSound( "NPC_Citizen.DieIWHBYD" );
+	PrecacheScriptSound( "NPC_Citizen.OnFireScream" );
 
 	PrecacheInstancedScene( "scenes/Expressions/CitizenIdle.vcd" );
 	PrecacheInstancedScene( "scenes/Expressions/CitizenAlert_loop.vcd" );
@@ -480,18 +488,17 @@ void CNPC_Citizen::Spawn()
 	if ( IsAmmoResupplier() )
 		m_nSkin = 2;
 
-	m_flFieldOfView = 0.2;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
+	m_flFieldOfView = 0.5;	//*120
 	m_bRPGAvoidPlayer = false;
 	m_bShouldPatrol = false;
 
-//	m_iHealth = sk_citizen_health.GetFloat();
-	// NuHealth - "Leader" citizens (anybody who picks up a supershotgun or is flagged as one in hammer) have more health
-//	if( IsLeader() )
-	if( HasSpawnFlags(SF_CITIZEN_LEADER) )
+	// NuHealth - "Leader" citizens (anybody who picks up a supershotgun, rpg, or is flagged as one in hammer) have more health
+	if( HasSpawnFlags( SF_CITIZEN_LEADER ) || m_Type == CT_REBEL )
 	{
 		// Stronger, tougher.
-		m_fIsLeader = true;
-		m_iHealth = sk_citizen_leader_health.GetFloat();
+		m_fIsRebel = true;
+		m_iHealth = sk_citizen_rebel_health.GetFloat();
+		CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 	}
 	else
 	{
@@ -525,6 +532,9 @@ void CNPC_Citizen::Spawn()
 	m_iszOriginalSquad = m_SquadName;
 
 	m_flNextHealthSearchTime = gpGlobals->curtime;
+
+	// Basic Capabilities are defined in the base AI
+	CapabilitiesAdd( bits_CAP_OPEN_DOORS | bits_CAP_DUCK | bits_CAP_SQUAD );
 
 	CWeaponRPG *pRPG = dynamic_cast<CWeaponRPG*>(GetActiveWeapon());
 	if ( pRPG )
@@ -567,7 +577,7 @@ void CNPC_Citizen::PostNPCInit()
 	}
 	else
 	{
-		if ( ( m_spawnflags & SF_CITIZEN_FOLLOW ) && AI_IsSinglePlayer() )
+		if ( ( m_spawnflags & SF_CITIZEN_FOLLOW ) )	//&& AI_IsSinglePlayer()
 		{
 			m_FollowBehavior.SetFollowTarget( UTIL_GetLocalPlayer() );
 			m_FollowBehavior.SetParameters( AIF_SIMPLE );
@@ -601,6 +611,7 @@ void CNPC_Citizen::SelectModel()
 
 		PrecacheAllOfType( CT_DOWNTRODDEN );
 		PrecacheAllOfType( CT_REFUGEE );
+		PrecacheAllOfType( CT_CRIMINAL );
 		PrecacheAllOfType( CT_REBEL );
 	}
 
@@ -754,6 +765,9 @@ void CNPC_Citizen::SelectExpressionType()
 	case CT_REFUGEE:
 		m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_SCARED, CIT_EXP_NORMAL );
 		break;
+	case CT_CRIMINAL:
+		m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_SCARED, CIT_EXP_ANGRY );
+		break;
 	case CT_REBEL:
 		m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_SCARED, CIT_EXP_ANGRY );
 		break;
@@ -837,12 +851,10 @@ string_t CNPC_Citizen::GetModelName() const
 //-----------------------------------------------------------------------------
 Class_T	CNPC_Citizen::Classify()
 {
-	if (GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON)
+	if (GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON || GlobalEntity_GetState("citizens_passive") == GLOBAL_ON)
 		return CLASS_CITIZEN_PASSIVE;
 
-	if (GlobalEntity_GetState("citizens_passive") == GLOBAL_ON)
-		return CLASS_CITIZEN_PASSIVE;
-
+	//NOTENOTE; Need a case for CLASS_CITIZEN_REBEL
 	return CLASS_PLAYER_ALLY;
 }
 
@@ -913,7 +925,7 @@ void CNPC_Citizen::GatherConditions()
 {
 	BaseClass::GatherConditions();
 
-	if( IsInPlayerSquad() && hl2_episodic.GetBool() )
+	if( IsInPlayerSquad() )
 	{
 		// Leave the player squad if someone has made me neutral to player.
 		if( IRelationType(UTIL_GetLocalPlayer()) == D_NU )
@@ -982,14 +994,11 @@ void CNPC_Citizen::GatherConditions()
 					ClearCondition( COND_CIT_PLAYERHEALREQUEST );
 				}
 			}
-
-//#ifdef HL2_EPISODIC
 			// Heal if I'm on an assault. The player hasn't had time to stare at me.
 			if( m_AssaultBehavior.IsRunning() && IsMoving() )
 			{
 				SetCondition( COND_CIT_PLAYERHEALREQUEST );
 			}
-// #endif
 		}
 		else
 		{
@@ -1092,6 +1101,11 @@ void CNPC_Citizen::BuildScheduleTestBits()
 		SetCustomInterruptCondition( COND_CIT_START_INSPECTION );
 	}
 
+	if ( !IsCurSchedule( SCHED_BURNING_RUN ) && !IsCurSchedule( SCHED_BURNING_STAND ) && !IsMoving() )
+	{
+		SetCustomInterruptCondition( COND_ON_FIRE );
+	}
+
 	if ( IsMedic() && IsCustomInterruptConditionSet( COND_HEAR_MOVE_AWAY ) )
 	{
 		if( !IsCurSchedule(SCHED_RELOAD, false) )
@@ -1114,7 +1128,7 @@ void CNPC_Citizen::BuildScheduleTestBits()
 		SetCustomInterruptCondition( COND_BETTER_WEAPON_AVAILABLE );
 	}
 
-// #ifdef HL2_EPISODIC
+#ifdef HL2_EPISODIC
 	if( IsMedic() && m_AssaultBehavior.IsRunning() )
 	{
 		if( !IsCurSchedule(SCHED_RELOAD, false) )
@@ -1124,7 +1138,7 @@ void CNPC_Citizen::BuildScheduleTestBits()
 
 		SetCustomInterruptCondition( COND_CIT_COMMANDHEAL );
 	}
-// #else
+#else
 	if( IsMedic() && m_AssaultBehavior.IsRunning() && !IsMoving() )
 	{
 		if( !IsCurSchedule(SCHED_RELOAD, false) )
@@ -1134,7 +1148,7 @@ void CNPC_Citizen::BuildScheduleTestBits()
 
 		SetCustomInterruptCondition( COND_CIT_COMMANDHEAL );
 	}
-//#endif
+#endif
 }
 
 
@@ -1159,22 +1173,12 @@ int CNPC_Citizen::SelectFailSchedule( int failedSchedule, int failedTask, AI_Tas
 	switch( failedSchedule )
 	{
 	case SCHED_NEW_WEAPON:
-		// If failed trying to pick up a weapon, try again in one second. This is because other AI code
+		// If failed trying to pick up a weapon, try again in one seconds. This is because other AI code
 		// has put this off for 10 seconds under the assumption that the citizen would be able to 
 		// pick up the weapon that they found. 
 		m_flNextWeaponSearchTime = gpGlobals->curtime + 1.0f;
 		break;
 
-	case SCHED_ESTABLISH_LINE_OF_FIRE_FALLBACK:
-	case SCHED_MOVE_TO_WEAPON_RANGE:
-		if( !IsMortar( GetEnemy() ) )
-		{
-			if ( GetActiveWeapon() && ( GetActiveWeapon()->CapabilitiesGet() & bits_CAP_WEAPON_RANGE_ATTACK1 ) && random->RandomInt( 0, 1 ) && HasCondition(COND_SEE_ENEMY) && !HasCondition ( COND_NO_PRIMARY_AMMO ) )
-				return TranslateSchedule( SCHED_RANGE_ATTACK1 );
-
-			return SCHED_STANDOFF;
-		}
-		break;
 	}
 
 	return BaseClass::SelectFailSchedule( failedSchedule, failedTask, taskFailCode );
@@ -1193,13 +1197,39 @@ int CNPC_Citizen::SelectSchedule()
 		return SCHED_CITIZEN_SIT_ON_TRAIN;
 	}
 
+	if ( HasCondition( COND_ON_FIRE ) )
+	{
+		//TODO; Speak concept
+		EmitSound( "NPC_Citizen.OnFireScream" );
+		if ( random->RandomInt( 0, 1 ) == 1 )
+		{
+			return SCHED_BURNING_RUN;
+		}
+		else
+		{
+			return SCHED_BURNING_STAND;
+		}
+	}
+
 	CWeaponRPG *pRPG = dynamic_cast<CWeaponRPG*>(GetActiveWeapon());
 	if ( pRPG && pRPG->IsGuiding() )
 	{
 		DevMsg( "Citizen in select schedule but RPG is guiding?\n");
 		pRPG->StopGuiding();
 	}
-	
+
+	// If im at critical health, run away!
+	bool bCriticalHealth = ((float)GetHealth() / (float)GetMaxHealth() < 0.25f);
+	if ( !IsInPlayerSquad() && HasCondition( COND_LIGHT_DAMAGE ) && bCriticalHealth )
+	{
+		//TODO; This needs a counter, stop doing this after 2 or 3 times
+		if ( GetEnemy() != NULL && !(m_Type == CT_REBEL || m_Type == CT_UNIQUE) )
+		{
+			FearSound();
+			return SCHED_CITIZEN_FLEE;
+		}
+	}
+
 	return BaseClass::SelectSchedule();
 }
 
@@ -1211,11 +1241,11 @@ int CNPC_Citizen::SelectSchedulePriorityAction()
 	if ( schedule != SCHED_NONE )
 		return schedule;
 
-	schedule = BaseClass::SelectSchedulePriorityAction();
+	schedule = SelectScheduleRetrieveItem();
 	if ( schedule != SCHED_NONE )
 		return schedule;
 
-	schedule = SelectScheduleRetrieveItem();
+	schedule = BaseClass::SelectSchedulePriorityAction();
 	if ( schedule != SCHED_NONE )
 		return schedule;
 
@@ -1228,8 +1258,7 @@ int CNPC_Citizen::SelectSchedulePriorityAction()
 int CNPC_Citizen::SelectScheduleHeal()
 {
 	// episodic medics may toss the healthkits rather than poke you with them
-// #if HL2_EPISODIC
-
+#if HL2_EPISODIC
 	if ( CanHeal() )
 	{
 		CBaseEntity *pEntity = PlayerInRange( GetLocalOrigin(), HEAL_TOSS_TARGET_RANGE );
@@ -1294,6 +1323,7 @@ int CNPC_Citizen::SelectScheduleHeal()
 	
 	return SCHED_NONE;
 
+#else
 
 	if ( CanHeal() )
 	{
@@ -1341,8 +1371,8 @@ int CNPC_Citizen::SelectScheduleHeal()
 	}
 
 	return SCHED_NONE;
+#endif
 
-// #endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1432,23 +1462,21 @@ int CNPC_Citizen::SelectScheduleManhackCombat()
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-int CNPC_Citizen::SelectScheduleCombat()
+int CNPC_Citizen::SelectCombatSchedule()
 {
 	int schedule = SelectScheduleManhackCombat();
 	if ( schedule != SCHED_NONE )
 		return schedule;
 		
-	return BaseClass::SelectScheduleCombat();
+	return BaseClass::SelectCombatSchedule();
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 bool CNPC_Citizen::ShouldDeferToFollowBehavior()
 {
-#if 0
 	if ( HaveCommandGoal() )
 		return false;
-#endif
 		
 	return BaseClass::ShouldDeferToFollowBehavior();
 }
@@ -1505,10 +1533,10 @@ int CNPC_Citizen::TranslateSchedule( int scheduleType )
 				{
 					return SCHED_CITIZEN_STRIDER_RANGE_ATTACK1_RPG;
 				}
-				else
-				{
-					return SCHED_STANDOFF;
-				}
+//				else
+//				{
+//					return SCHED_STANDOFF;
+//				}
 			}
 			else
 			{
@@ -1602,9 +1630,7 @@ void CNPC_Citizen::StartTask( const Task_t *pTask )
 		break;
 		
 	case TASK_CIT_HEAL:
-//#if HL2_EPISODIC
 	case TASK_CIT_HEAL_TOSS:
-//#endif
 		if ( IsMedic() )
 		{
 			if ( GetTarget() && GetTarget()->IsPlayer() && GetTarget()->m_iMaxHealth == GetTarget()->m_iHealth )
@@ -1622,7 +1648,7 @@ void CNPC_Citizen::StartTask( const Task_t *pTask )
 		}
 		SetIdealActivity( (Activity)ACT_CIT_HEAL );
 		break;
-	
+
 	case TASK_CIT_RPG_AUGER:
 		m_bRPGAvoidPlayer = false;
 		SetWait( 15.0 ); // maximum time auger before giving up
@@ -1734,8 +1760,6 @@ void CNPC_Citizen::RunTask( const Task_t *pTask )
 			}
 			break;
 
-
-//#if HL2_EPISODIC
 		case TASK_CIT_HEAL_TOSS:
 			if ( IsSequenceFinished() )
 			{
@@ -1751,8 +1775,6 @@ void CNPC_Citizen::RunTask( const Task_t *pTask )
 				GetMotor()->SetIdealYawToTargetAndUpdate( GetTarget()->GetAbsOrigin() );
 			}
 			break;
-
-//#endif
 
 		case TASK_CIT_RPG_AUGER:
 			{
@@ -1873,15 +1895,20 @@ Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 
 	if ( activity == ACT_RUN)
 	{
-		if ( m_iHealth <= 20 )
+		if ( m_iHealth <= 20 && HaveSequenceForActivity( ACT_RUN_HURT ) )
 		{
 			// limp!
 			return ACT_RUN_HURT;
 		}
+		else if ( IsOnFire() && HaveSequenceForActivity( ACT_RUN_ON_FIRE ) )
+		{
+			// flail around!
+			return ACT_RUN_ON_FIRE;
+		}
 	}
 	else if ( activity == ACT_WALK)
 	{
-		if ( m_iHealth <= 20 )
+		if ( m_iHealth <= 20 && HaveSequenceForActivity( ACT_WALK_HURT ) )
 		{
 			// limp!
 			return ACT_WALK_HURT;
@@ -1890,12 +1917,14 @@ Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 
 	// !!!HACK - Citizens don't have the required animations for shotguns, 
 	// so trick them into using the rifle counterparts for now (sjb)
+#if 1
 	if ( activity == ACT_RUN_AIM_SHOTGUN )
 		return ACT_RUN_AIM_RIFLE;
 	if ( activity == ACT_WALK_AIM_SHOTGUN )
 		return ACT_WALK_AIM_RIFLE;
 	if ( activity == ACT_IDLE_ANGRY_SHOTGUN )
 		return ACT_IDLE_ANGRY_SMG1;
+#endif
 
 	return BaseClass::NPC_TranslateActivity( activity );
 }
@@ -1922,7 +1951,7 @@ void CNPC_Citizen::HandleAnimEvent( animevent_t *pEvent )
 	else if ( pEvent->event == AE_CITIZEN_HEAL )
 	{
 		// Heal my target (if within range)
-//#if HL2_EPISODIC
+#ifdef HL2_EPISODIC
 		if ( USE_EXPERIMENTAL_MEDIC_CODE() && IsMedic() )
 		{
 			CBaseCombatCharacter *pTarget = dynamic_cast<CBaseCombatCharacter *>( GetTarget() );
@@ -1937,11 +1966,11 @@ void CNPC_Citizen::HandleAnimEvent( animevent_t *pEvent )
 		{
 			Heal();
 		}
-//#else
-//		Heal();
-//#endif
-//		return;
-}
+#else
+		Heal();
+#endif
+		return;
+	}
 
 	switch( pEvent->event )
 	{
@@ -2239,13 +2268,8 @@ bool CNPC_Citizen::ShouldLookForBetterWeapon()
 		{
 			bool bDefer = false;
 
-			if( FClassnameIs( pWeapon, "weapon_ar2" ) )
-			{
-				// Content to keep this weapon forever
-				m_flNextWeaponSearchTime = OTHER_DEFER_SEARCH_TIME;
-				bDefer = true;
-			}
-			else if( FClassnameIs( pWeapon, "weapon_rpg" ) )
+			//TODO; This needs to be offloaded, being hardcoded this way is super-duper stupid
+			if( FClassnameIs( pWeapon, "weapon_ar2" ) || FClassnameIs( pWeapon, "weapon_supershotgun" ) || FClassnameIs( pWeapon, "weapon_rpg" ) )
 			{
 				// Content to keep this weapon forever
 				m_flNextWeaponSearchTime = OTHER_DEFER_SEARCH_TIME;
@@ -2299,15 +2323,21 @@ bool CNPC_Citizen::ShouldLookForBetterWeapon()
 }
 
 //-----------------------------------------------------------------------------
+#define CITIZEN_SCORCH_RATE				7
+#define CITIZEN_SCORCH_MIN_RENDERCOLOR	75
 //-----------------------------------------------------------------------------
 int CNPC_Citizen::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
-	if( (info.GetDamageType() & DMG_BURN) && (info.GetDamageType() & DMG_DIRECT) )
+	if( info.GetDamageType() & DMG_BURN )	//&& (info.GetDamageType() & DMG_DIRECT)
 	{
-#define CITIZEN_SCORCH_RATE		6
-#define CITIZEN_SCORCH_FLOOR	75
-
-		Scorch( CITIZEN_SCORCH_RATE, CITIZEN_SCORCH_FLOOR );
+#if 0
+		// If im not being directly roasted by a fire, let the onfire schedules take care of everything
+		if( IsOnFire() && !(info.GetDamageType() & DMG_DIRECT) )
+		{
+			return 0;
+		}
+#endif
+		Scorch( CITIZEN_SCORCH_RATE, CITIZEN_SCORCH_MIN_RENDERCOLOR );
 	}
 
 	CTakeDamageInfo newInfo = info;
@@ -2348,7 +2378,14 @@ float CNPC_Citizen::GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamag
 	case HITGROUP_HEAD:
 		{
 			// Citizens only take triple headshot damage - Those hats must be made of some very fine cotton
+			#ifndef HL2_DLL
 			return 3.0f;
+			#else
+			if ( !(info.GetDamageType() & DMG_BUCKSHOT) )	//Buckshot really, really, REALLY doesnt need this
+			{
+				return sk_citizen_headshot_multiplier.GetFloat();
+			}
+			#endif
 		}
 	}
 
@@ -2365,10 +2402,10 @@ bool CNPC_Citizen::IsCommandable()
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 bool CNPC_Citizen::IsPlayerAlly( CBasePlayer *pPlayer )											
-{ 
-	if ( Classify() == CLASS_CITIZEN_PASSIVE && GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON )
+{
+	if ( Classify() == CLASS_CITIZEN_PASSIVE && !GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON )
 	{
-		// Robin: Citizens use friendly speech semaphore in trainstation
+		// In the off case that we're classified passive, but precriminal isnt on
 		return true;
 	}
 
@@ -2711,8 +2748,14 @@ void CNPC_Citizen::CommanderUse( CBaseEntity *pActivator, CBaseEntity *pCaller, 
 	
 	if ( pActivator == UTIL_GetLocalPlayer() )
 	{
+		if ( m_afMemory & bits_MEMORY_PROVOKED )
+		{
+			DevMsg( "I'm not following you, you evil person!\n" );
+			return;
+		}
+
 		// Don't say hi after you've been addressed by the player
-		SetSpokeConcept( TLK_HELLO, NULL );	
+		SetSpokeConcept( TLK_HELLO, NULL );
 
 		if ( npc_citizen_auto_player_squad_allow_use.GetBool() )
 		{
@@ -3493,9 +3536,9 @@ bool CNPC_Citizen::ShouldHealTarget( CBaseEntity *pTarget, bool bActiveUse )
 	{
 		Vector toPlayer = ( pTarget->GetAbsOrigin() - GetAbsOrigin() );
 	 	if (( bActiveUse || !HaveCommandGoal() || toPlayer.Length() < HEAL_TARGET_RANGE) 
-// #ifdef HL2_EPISODIC
+#ifdef HL2_EPISODIC
 			&& fabs(toPlayer.z) < HEAL_TARGET_RANGE_Z
-// #endif
+#endif
 			)
 	 	{
 			if ( pTarget->m_iHealth > 0 )
@@ -3563,7 +3606,7 @@ bool CNPC_Citizen::ShouldHealTarget( CBaseEntity *pTarget, bool bActiveUse )
 	return false;
 }
 
-// #ifdef HL2_EPISODIC
+#ifdef HL2_EPISODIC
 //-----------------------------------------------------------------------------
 // Determine if the citizen is in a position to be throwing medkits
 //-----------------------------------------------------------------------------
@@ -3631,7 +3674,7 @@ bool CNPC_Citizen::ShouldHealTossTarget( CBaseEntity *pTarget, bool bActiveUse )
 	
 	return false;
 }
-// #endif
+#endif
 
 
 //-----------------------------------------------------------------------------
@@ -3712,7 +3755,7 @@ void CNPC_Citizen::Heal()
 
 
 
-// #if HL2_EPISODIC
+#ifdef HL2_EPISODIC
 //-----------------------------------------------------------------------------
 // Like Heal(), but tosses a healthkit in front of the player rather than just juicing him up.
 //-----------------------------------------------------------------------------
@@ -3748,7 +3791,7 @@ void CNPC_Citizen::TossHealthKit(CBaseCombatCharacter *pThrowAt, const Vector &o
 			// rotate upwards against gravity
 			float len = VectorLength(tossVelocity);
 			tossVelocity *= (MEDIC_THROW_SPEED / len);
-			tossVelocity.z += 0.57735026918962576450914878050196 * MEDIC_THROW_SPEED;
+			tossVelocity.z += 0.57735026918962576450914878050196 * MEDIC_THROW_SPEED;	//wtf?
 		}
 	}
 
@@ -3791,7 +3834,7 @@ void CNPC_Citizen::InputForceHealthKitToss( inputdata_t &inputdata )
 	TossHealthKit( UTIL_GetLocalPlayer(), Vector(48.0f, 0.0f, 0.0f)  );
 }
 
-// #endif
+#endif
 
 
 
@@ -3799,19 +3842,22 @@ void CNPC_Citizen::InputForceHealthKitToss( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 bool CNPC_Citizen::ShouldLookForHealthItem()
 {
+	//Definitely peeve the player off by taking his not-so-hard won health (if you're hostile/neutral).
+#if 0
 	// Definitely do not take health if not in the player's squad.
 	if( !IsInPlayerSquad() )
 		return false;
-
-	if( gpGlobals->curtime < m_flNextHealthSearchTime )
-		return false;
+#endif
 
 	// I'm fully healthy.
 	if( GetHealth() >= GetMaxHealth() )
 		return false;
 
+	if( gpGlobals->curtime < m_flNextHealthSearchTime )
+		return false;
+
 	// Player is hurt, don't steal his health.
-	if( AI_IsSinglePlayer() && UTIL_GetLocalPlayer()->GetHealth() <= UTIL_GetLocalPlayer()->GetHealth() * 0.75f )
+	if( AI_IsSinglePlayer() && IsPlayerAlly() && UTIL_GetLocalPlayer()->GetHealth() <= UTIL_GetLocalPlayer()->GetHealth() * 0.75f )
 		return false;
 
 	// Wait till you're standing still.
@@ -3895,19 +3941,27 @@ void CNPC_Citizen::InputSpeakIdleResponse( inputdata_t &inputdata )
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-//void CNPC_Citizen::PainSound( const CTakeDamageInfo &info )
-//{
-//	SpeakIfAllowed( TLK_SHOT );
-//}
-//
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
 void CNPC_Citizen::DeathSound( const CTakeDamageInfo &info )
 {
 	// Sentences don't play on dead NPCs
 	SentenceStop();
-
-	EmitSound( "NPC_Citizen.Die" );
+	//Dont do a death scream if you got gibbed
+//	if ( g_pGameRules->Damage_ShouldGibCorpse(info.GetDamageType()) )
+//	{
+		if ( GlobalEntity_GetState("iwhbyd") == GLOBAL_ON && random->RandomInt( 0, 10 ) == 10 )
+		{
+			// IWHBYD
+			EmitSound( "NPC_Citizen.DieIWHBYD" );
+		}
+		else
+		{
+			EmitSound( "NPC_Citizen.Die" );
+		}
+//	}
+//	else
+//	{
+//		EmitSound( "NPC_Citizen.Gib" );
+//	}
 }
 
 //------------------------------------------------------------------------------
@@ -3944,9 +3998,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 	DECLARE_TASK( TASK_CIT_SIT_ON_TRAIN )
 	DECLARE_TASK( TASK_CIT_LEAVE_TRAIN )
 	DECLARE_TASK( TASK_CIT_SPEAK_MOURNING )
-// #if HL2_EPISODIC
 	DECLARE_TASK( TASK_CIT_HEAL_TOSS )
-// #endif
 
 	DECLARE_ACTIVITY( ACT_CIT_HANDSUP )
 	DECLARE_ACTIVITY( ACT_CIT_BLINDED )
@@ -3975,14 +4027,13 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_STOP_MOVING					0"
 		"		TASK_FACE_IDEAL						0"
 //		"		TASK_SAY_HEAL						0"
-//		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
-		"		TASK_CIT_HEAL							0"
 //		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
+		"		TASK_CIT_HEAL							0"
+//		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
 		"	"
 		"	Interrupts"
 	)
 
-// #if HL2_EPISODIC
 	//=========================================================
 	// > SCHED_CITIZEN_HEAL_TOSS
 	// this is for the episodic behavior where the citizen hurls the medkit
@@ -3992,18 +4043,15 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		SCHED_CITIZEN_HEAL_TOSS,
 
 	"	Tasks"
-//  "		TASK_GET_PATH_TO_TARGET				0"
-//  "		TASK_MOVE_TO_TARGET_RANGE			50"
 	"		TASK_STOP_MOVING					0"
 	"		TASK_FACE_IDEAL						0"
 //	"		TASK_SAY_HEAL						0"
-//	"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
-	"		TASK_CIT_HEAL_TOSS							0"
 //	"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
+	"		TASK_CIT_HEAL_TOSS						0"
+//	"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
 	"	"
 	"	Interrupts"
 	)
-// #endif
 
 	//=========================================================
 	// > SCHED_CITIZEN_RANGE_ATTACK1_RPG
@@ -4016,15 +4064,13 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_STOP_MOVING			0"
 		"		TASK_FACE_ENEMY				0"
 		"		TASK_ANNOUNCE_ATTACK		1"	// 1 = primary attack
+		"		TASK_WAIT					1"
 		"		TASK_RANGE_ATTACK1			0"
 		"		TASK_CIT_RPG_AUGER			1"
 		""
 		"	Interrupts"
 	)
 
-	//=========================================================
-	// > SCHED_CITIZEN_RANGE_ATTACK1_RPG
-	//=========================================================
 	DEFINE_SCHEDULE
 	(
 		SCHED_CITIZEN_STRIDER_RANGE_ATTACK1_RPG,
@@ -4065,6 +4111,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		COND_HEAVY_DAMAGE"
 		"		COND_HEAR_DANGER"
 		"		COND_NEW_ENEMY"
+	//	"		COND_BETTER_WEAPON_AVAILABLE"
 	)
 
 	DEFINE_SCHEDULE	
@@ -4082,10 +4129,10 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_SUGGEST_STATE			STATE:IDLE"
 		""
 		"	Interrupts"
+		"		COND_NEW_ENEMY"
 		"		COND_LIGHT_DAMAGE"
 		"		COND_HEAVY_DAMAGE"
 		"		COND_HEAR_DANGER"
-		"		COND_NEW_ENEMY"
 	)
 
 	DEFINE_SCHEDULE	
@@ -4111,6 +4158,48 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_CIT_LEAVE_TRAIN		0"
 		""
 		"	Interrupts"
+	)
+
+	//=========================================================
+	// > Fear Schedules
+	//=========================================================
+	DEFINE_SCHEDULE
+	(
+		SCHED_CITIZEN_FLEE,
+
+		"	Tasks"
+		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_RUN_FROM_ENEMY"
+		"		TASK_STOP_MOVING				0"
+		"		TASK_FIND_NODE_COVER_FROM_ENEMY	0"
+		"		TASK_RUN_PATH					0"
+		"		TASK_WAIT_FOR_MOVEMENT			0"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_CITIZEN_HIDE"
+		""
+		"	Interrupts"
+		"		COND_ENEMY_DEAD"
+		"		COND_HEAR_DANGER"
+	)
+	
+	DEFINE_SCHEDULE
+	(
+		SCHED_CITIZEN_HIDE,
+
+		"	Tasks"
+//		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CITIZEN_FLEE"
+		"		TASK_STOP_MOVING				0"
+		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_COWER"	//TEMP; USE ACT_IDLE_FEAR
+		"		TASK_WAIT						2"
+		"		TASK_WAIT_RANDOM				4"
+		""
+		"	Interrupts"
+//		"		COND_NEW_ENEMY"
+//		"		COND_SEE_ENEMY"
+//		"		COND_SEE_HATE"
+		"		COND_SEE_FEAR"
+//		"		COND_SEE_DISLIKE"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_HEAR_DANGER"
+		"		COND_HEAR_MOVE_AWAY"
 	)
 
 AI_END_CUSTOM_NPC()

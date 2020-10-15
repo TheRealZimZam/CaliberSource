@@ -1,8 +1,11 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+// This class should really be renamed, but eh thats more than 10 seconds of work soooo
+// SCREW THAT SCOOBIEDOO YABBADABBADO
 //
-// Purpose: Default Humanoid AI
+// Purpose: Default Human AI
+// For the most part, squads are not needed as each entity has most of its AI act independently
 //
-// TODO'S; Random-aiming, optimize.
+// TODO'S; Fix weapon pickup, optimize.
 //=============================================================================//
 
 #include "cbase.h"
@@ -27,6 +30,7 @@
 #include "ai_squadslot.h"
 #include "ai_tacticalservices.h"
 #include "ai_interactions.h"
+#include "ammodef.h"
 #include "filesystem.h"
 #include "collisionutils.h"
 #include "grenade_frag.h"
@@ -48,6 +52,9 @@ int AE_COMPANION_PRODUCE_FLARE;
 int AE_COMPANION_LIGHT_FLARE;
 int AE_COMPANION_RELEASE_FLARE;
 
+#define PC_MIN_CROUCH_DISTANCE						384.0
+#define PC_MIN_ENEMY_HEALTH_TO_CROUCH				15
+#define PC_CROUCH_DELAY								5
 #define MAX_TIME_BETWEEN_BARRELS_EXPLODING			5.0f
 #define MAX_TIME_BETWEEN_CONSECUTIVE_PLAYER_KILLS	3.0f
 
@@ -62,7 +69,8 @@ int AE_COMPANION_RELEASE_FLARE;
 
 BEGIN_DATADESC( CNPC_PlayerCompanion )
 
-	DEFINE_FIELD( 	m_bMovingAwayFromPlayer, 	FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bMovingAwayFromPlayer, FIELD_BOOLEAN ),
+//	DEFINE_FIELD( m_flNextCrouchTime, FIELD_TIME ),
 	DEFINE_EMBEDDED( m_SpeechWatch_PlayerLooking ),
 	DEFINE_EMBEDDED( m_FakeOutMortarTimer ),
 
@@ -104,6 +112,7 @@ BEGIN_DATADESC( CNPC_PlayerCompanion )
 	DEFINE_FIELD( m_flReadinessSensitivity,	FIELD_FLOAT ),
 	DEFINE_FIELD( m_bReadinessCapable,		FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flReadinessLockedUntil, FIELD_TIME ),
+	DEFINE_FIELD( m_bFirstEncounter,		FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fLastBarrelExploded,	FIELD_TIME ),
 	DEFINE_FIELD( m_iNumConsecutiveBarrelsExploded, FIELD_INTEGER ),
 	DEFINE_FIELD( m_fLastPlayerKill, FIELD_TIME ),
@@ -208,7 +217,7 @@ void CNPC_PlayerCompanion::Spawn()
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetBloodColor( BLOOD_COLOR_RED );
-	m_flFieldOfView		= 0.02;
+	m_flFieldOfView		= 0.05;	//*175 - Change this for non-vital npcs in their specific classes
 	m_NPCState		= NPC_STATE_NONE;
 
 	CapabilitiesClear();
@@ -217,7 +226,7 @@ void CNPC_PlayerCompanion::Spawn()
 	if ( !HasSpawnFlags( SF_NPC_START_EFFICIENT ) )
 	{
 		CapabilitiesAdd( bits_CAP_ANIMATEDFACE | bits_CAP_TURN_HEAD );
-		CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_AIM_GUN | bits_CAP_MOVE_SHOOT );
+		CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_AIM_GUN );
 		CapabilitiesAdd( bits_CAP_DUCK | bits_CAP_DOORS_GROUP );
 		CapabilitiesAdd( bits_CAP_USE_SHOT_REGULATOR );
 	}
@@ -232,6 +241,7 @@ void CNPC_PlayerCompanion::Spawn()
 	SetReadinessValue( 0.0f );
 	SetReadinessSensitivity( random->RandomFloat( 0.7, 1.3 ) );
 	m_flReadinessLockedUntil = 0.0f;
+	m_bFirstEncounter	= true;	// this is true when the grunt spawns, because he hasn't encountered an enemy yet.
 
 	m_AnnounceAttackTimer.Set( 10, 30 );
 
@@ -239,7 +249,7 @@ void CNPC_PlayerCompanion::Spawn()
 	// We strip this flag because it's been made obsolete by the StartScripting behavior
 	if ( HasSpawnFlags( SF_NPC_ALTCOLLISION ) )
 	{
-		Warning( "NPC %s using alternate collision! -- DISABLED\n", STRING( GetEntityName() ) );
+		Warning( "NPC %s using alternate collision! -- OBSELETE\n", STRING( GetEntityName() ) );
 		RemoveSpawnFlags( SF_NPC_ALTCOLLISION );
 	}
 
@@ -265,7 +275,7 @@ int CNPC_PlayerCompanion::Restore( IRestore &restore )
 	// We strip this flag because it's been made obsolete by the StartScripting behavior
 	if ( HasSpawnFlags( SF_NPC_ALTCOLLISION ) )
 	{
-		Warning( "NPC %s using alternate collision! -- DISABLED\n", STRING( GetEntityName() ) );
+		Warning( "NPC %s using alternate collision! -- OBSELETE\n", STRING( GetEntityName() ) );
 		RemoveSpawnFlags( SF_NPC_ALTCOLLISION );
 	}
 #endif // HL2_EPISODIC
@@ -305,7 +315,7 @@ Disposition_t CNPC_PlayerCompanion::IRelationType( CBaseEntity *pTarget )
 			// is active... that is, not classifying itself as CLASS_NONE
 			if( pTarget->Classify() != CLASS_NONE )
 			{
-				if( !hl2_episodic.GetBool() && IsSafeFromFloorTurret(GetAbsOrigin(), pTarget) )
+				if( IsSafeFromFloorTurret(GetAbsOrigin(), pTarget) )
 				{
 					return D_NU;
 				}
@@ -341,6 +351,64 @@ bool CNPC_PlayerCompanion::IsSilentSquadMember() const
 	}
 
 	return false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: degrees to turn in 0.1 seconds
+//-----------------------------------------------------------------------------
+float CNPC_PlayerCompanion::MaxYawSpeed( void )
+{
+#if 0
+	switch( GetActivity() )
+	{
+	case ACT_WALK:
+	case ACT_TURN_LEFT:
+	case ACT_TURN_RIGHT:
+		return 30;
+		break;
+	case ACT_RUN:
+	case ACT_RUN_HURT:
+		return 15;
+		break;
+	case ACT_WALK_CROUCH:
+	case ACT_RUN_CROUCH:
+	case ACT_COVER_LOW:
+		return 15;
+		break;
+	case ACT_RANGE_ATTACK1:
+	case ACT_RANGE_ATTACK2:
+	case ACT_MELEE_ATTACK1:
+	case ACT_MELEE_ATTACK2:
+		return 30;
+	default:
+		return 45;
+		break;
+	}
+#endif
+	if ( IsMoving() && HasPoseParameter( GetSequence(), m_poseMove_Yaw ) )
+	{
+		return( 25 );
+	}
+	else
+	{
+		switch( GetActivity() )
+		{
+		case ACT_IDLE:
+		case ACT_COVER_LOW:
+			return 30;
+			break;
+		case ACT_TURN_LEFT:
+		case ACT_TURN_RIGHT:
+		case ACT_RANGE_ATTACK1:
+		case ACT_RANGE_ATTACK2:
+		case ACT_MELEE_ATTACK1:
+		case ACT_MELEE_ATTACK2:
+			return 60;
+		default:
+			return 45;
+			break;
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -422,11 +490,9 @@ void CNPC_PlayerCompanion::GatherConditions()
 
 				float mult;
 				
-				if ( lag > 10.0 )
-					mult = 2.0;
-				else if ( lag > 5.0 )
+				if ( lag > 8.0 )
 					mult = 1.5;
-				else if ( lag > 3.0 )
+				else if ( lag > 4.0 )
 					mult = 1.25;
 				else
 					mult = 1.1;
@@ -441,7 +507,7 @@ void CNPC_PlayerCompanion::GatherConditions()
 		}
 	}
 
-	// Update our readiness if we're 
+	// Update our readiness if we're able
 	if ( IsReadinessCapable() )
 	{
 		UpdateReadiness();
@@ -497,6 +563,64 @@ void CNPC_PlayerCompanion::GatherConditions()
 		DoCustomSpeechAI();
 	}
 
+	// If we're supposed to be crouching, crouch
+	if ( CrouchIsDesired() && !HasCondition( COND_HEAVY_DAMAGE ) && !HasCondition( COND_REPEATED_DAMAGE ) )
+	{
+		// See if we can crouch and shoot
+		if (GetEnemy() != NULL)
+		{
+			// Does my enemy have enough health to warrant crouching?
+			if ( GetEnemy()->GetHealth() > PC_MIN_ENEMY_HEALTH_TO_CROUCH )
+			{
+				float dist = (GetLocalOrigin() - GetEnemy()->GetLocalOrigin()).Length();
+				// only crouch if they are relatively far away
+				if (dist > PC_MIN_CROUCH_DISTANCE)
+				{
+					// try crouching
+					Crouch();
+
+					Vector targetPos = GetEnemy()->BodyTarget(GetActiveWeapon()->GetLocalOrigin());
+
+					// if we can't see the enemy crouched, stand up
+					if (!WeaponLOSCondition(GetLocalOrigin(),targetPos,false))
+					{
+						Stand();
+					}
+				}
+			}
+		}
+		// only crouch idle if in a squad
+		else if ( m_pSquad )
+		{
+			// No enemy, crouch anyway
+			Crouch();
+		}
+	}
+	else
+	{
+		// always assume standing
+		Stand();
+	}
+
+	// Check for explosions!
+	if( HasCondition( COND_HEAR_COMBAT ) )
+	{
+		CSound *pSound = GetBestSound(); 
+
+		if ( !IsCrouching() && !IsInAVehicle() )  // For now, don't do these animations while in the vehicle
+		{
+			if( ( pSound->SoundTypeNoContext() & SOUND_COMBAT ) && ( pSound->SoundContext() & SOUND_CONTEXT_EXPLOSION ) )
+			{
+				//TODO; Get a trace to make sure a wall isnt in the way
+				if ( HaveSequenceForActivity( ACT_GESTURE_FLINCH_BLAST ) && !IsPlayingGesture( ACT_GESTURE_FLINCH_BLAST ) )
+				{
+					RestartGesture( ACT_GESTURE_FLINCH_BLAST );
+					GetShotRegulator()->FireNoEarlierThan( gpGlobals->curtime + SequenceDuration( ACT_GESTURE_FLINCH_BLAST ) + 0.5f ); // Stop firing for the duration of the flinch
+				}
+			}
+		}
+	}
+
 	if ( AI_IsSinglePlayer() && hl2_episodic.GetBool() && !GetEnemy() && HasCondition( COND_HEAR_PLAYER ) )
 	{
 		Vector los = ( UTIL_GetLocalPlayer()->EyePosition() - EyePosition() );
@@ -538,7 +662,7 @@ void CNPC_PlayerCompanion::DoCustomSpeechAI( void )
 		m_SpeechWatch_PlayerLooking.Start( 1.0f );
 	}	
 
-	// Mention the player is dead
+	// Mention the player is dead -- Why isnt this in the baseclass???
 	if ( HasCondition( COND_TALKER_PLAYER_DEAD ) )
 	{
 		SpeakIfAllowed( TLK_PLDEAD );
@@ -566,8 +690,9 @@ void CNPC_PlayerCompanion::BuildScheduleTestBits()
 {
 	BaseClass::BuildScheduleTestBits();
 	
-	// Always interrupt to get into the car
+	// Always interrupt to get into the car and being ko'd
 	SetCustomInterruptCondition( COND_PC_BECOMING_PASSENGER );
+	SetCustomInterruptCondition( COND_KNOCKED_DOWN );
 
 	if ( IsCurSchedule(SCHED_RANGE_ATTACK1) )
 	{
@@ -716,15 +841,24 @@ int CNPC_PlayerCompanion::SelectSchedule()
 		}
 	}
 
+	if ( HasCondition( COND_KNOCKED_DOWN ) )
+	{
+		ClearCondition( COND_KNOCKED_DOWN );
+		if ( !IsRunningDynamicInteraction() )
+		{
+			return SCHED_KNOCKDOWN;
+		}
+	}
+
 	int nSched = SelectFlinchSchedule();
 	if ( nSched != SCHED_NONE )
 		return nSched;
 
-	int schedule = SelectScheduleDanger();
+	int schedule = SelectSchedulePriorityAction();
 	if ( schedule != SCHED_NONE )
 		return schedule;
 	
-	schedule = SelectSchedulePriorityAction();
+	schedule = SelectScheduleDanger();
 	if ( schedule != SCHED_NONE )
 		return schedule;
 
@@ -736,13 +870,13 @@ int CNPC_PlayerCompanion::SelectSchedule()
 	{
 		if ( m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT )
 		{
-			schedule = SelectScheduleNonCombat();
+			schedule = SelectNonCombatSchedule();
 			if ( schedule != SCHED_NONE )
 				return schedule;
 		}
 		else if ( m_NPCState == NPC_STATE_COMBAT )
 		{
-			schedule = SelectScheduleCombat();
+			schedule = SelectCombatSchedule();
 			if ( schedule != SCHED_NONE )
 				return schedule;
 		}
@@ -759,7 +893,7 @@ int CNPC_PlayerCompanion::SelectScheduleDanger()
 	if( HasCondition( COND_HEAR_DANGER ) )
 	{
 		CSound *pSound;
-		pSound = GetBestSound( SOUND_DANGER );
+		pSound = GetBestSound();
 
 		ASSERT( pSound != NULL );
 
@@ -797,10 +931,11 @@ int CNPC_PlayerCompanion::SelectScheduleDanger()
 	if ( HasCondition( COND_HEAR_MOVE_AWAY ) )
 		return SCHED_MOVE_AWAY;
 
-	if ( HasCondition( COND_PC_HURTBYFIRE ) )
+	// Being hurt by fire and being on fire is two seperate things m8
+	if ( HasCondition( COND_PC_HURTBYFIRE ) && !HasCondition( COND_ON_FIRE ) )
 	{
 		ClearCondition( COND_PC_HURTBYFIRE );
-		//!!!FIXME; Change to on-fire sched
+		//Move away from the fire ya dunce!
 		return SCHED_MOVE_AWAY;
 	}
 	
@@ -843,7 +978,7 @@ int CNPC_PlayerCompanion::SelectSchedulePlayerPush()
 {
 	if ( HasCondition( COND_PLAYER_PUSHING ) && !IsInAScript() && !IgnorePlayerPushing() )
 	{
-		// Ignore move away before gordon becomes the man
+		// Ignore move away before morgan becomes the man
 		if ( GlobalEntity_GetState("gordon_precriminal") != GLOBAL_ON )
 		{
 			m_bMovingAwayFromPlayer = true;
@@ -869,55 +1004,20 @@ bool CNPC_PlayerCompanion::IgnorePlayerPushing( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-int CNPC_PlayerCompanion::SelectScheduleCombat()
+int CNPC_PlayerCompanion::SelectCombatSchedule()
 {
-	// -----------
-	// Dead Enemy
-	// -----------
-	if ( HasCondition( COND_ENEMY_DEAD ) )
-	{
-		// call base class, all code to handle dead enemies is centralized there.
-		return SCHED_NONE;
-	}
-
-	// Is this first contact with the enemy???
-	CBaseEntity *pEnemy = GetEnemy();
-	bool bFirstContact = false;
-	float flTimeSinceFirstSeen = gpGlobals->curtime - GetEnemies()->FirstTimeSeen( pEnemy );
-	if( flTimeSinceFirstSeen < 3.0f )
-		bFirstContact = true;
-
 	// -----------
 	// New Enemy
 	// -----------
 	if ( HasCondition( COND_NEW_ENEMY ) )
 	{
-		if ( m_pSquad && pEnemy )
+		if ( m_pSquad && GetEnemy() )
 		{
-			if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) && OccupyStrategySlot( SQUAD_SLOT_ATTACK1 ) )
+			// Alert the squad when first going into combat
+			if ( m_bFirstEncounter && OccupyStrategySlot( SQUAD_SLOT_ATTACK1 ) )
 			{
-				// Start suppressing if someone isn't firing already (SLOT_ATTACK1). This means
-				// I'm the guy who spotted the enemy, I should react immediately.
-				return SCHED_RANGE_ATTACK1;
+				return SCHED_PC_SPOT_ENEMY;
 			}
-			else
-			{
-				if( !bFirstContact && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
-				{
-					if( random->RandomInt(0,5) < 2 ) // Two in Five chance
-					{
-						return SCHED_MOVE_TO_WEAPON_RANGE;
-					}
-
-				}
-				return SCHED_TAKE_COVER_FROM_ENEMY;
-			}
-		}
-		// Fix a crash in case of being unarmed (was just ELSE)
-		else if( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
-		{
-			// Dont make any cool moves if not in a squad, just shoot
-			return SCHED_RANGE_ATTACK1;
 		}
 	}
 
@@ -925,7 +1025,6 @@ int CNPC_PlayerCompanion::SelectScheduleCombat()
 	// No Ammo
 	// ---------------------
 	bool bHighHealth = ((float)GetHealth() / (float)GetMaxHealth() > 0.75f);
-//~	bool bLowHealth = ((float)GetHealth() / (float)GetMaxHealth() < 0.25f);
 
 	// Only hide and reload if you're injured, Otherwise just reload on the spot.
 	if ( CanReload() && HasCondition( COND_NO_PRIMARY_AMMO ) && !HasCondition( COND_CAN_MELEE_ATTACK1 ) )
@@ -941,61 +1040,33 @@ int CNPC_PlayerCompanion::SelectScheduleCombat()
 	}
 	
 	// ----------------------
-	// Light Damage
+	// Damage
 	// ----------------------
-	int iPercent = random->RandomInt(0,99);
+	int iPercent = random->RandomInt(0,10);
 
 	if ( HasCondition( COND_LIGHT_DAMAGE ) )
 	{
 		if ( GetEnemy() != NULL )
 		{
 			// only try to take cover if we actually have an enemy!
-			// 40% chance of strafe to cover.
-			// 60% chance of nothing.
-			if( GetEnemy() && iPercent <= 40 )
+			// 40% chance of run to cover.
+			// 60% chance of crouch OR nothing.
+			if( GetEnemy() && iPercent <= 4 )
 			{
-				return SCHED_PC_TAKE_COVER_LIGHT_DAMAGE;
+				return SCHED_TAKE_COVER_FROM_ENEMY;
 			}
+			else if ( !IsCrouching() )
+			{
+				// If my enemy is shooting at me from a distance, crouch for protection
+				if ( iPercent >= 5 && CouldShootIfCrouching( GetEnemy() ) )
+					DesireCrouch();
 
+			}
 		}
 		else
 		{
 			// How am I wounded in combat with no enemy?
 			Assert( GetEnemy() != NULL );
-		}
-	}
-//~	if ( HasCondition( COND_HEAVY_DAMAGE ) && bLowHealth && !HasCondition( COND_CAN_MELEE_ATTACK1 ) )
-//~	{
-//~		return SCHED_TAKE_COVER_FROM_ENEMY;
-//~	}
-
-	// ----------------------
-	// Attacking in a squad
-	// ----------------------
-	// Kick attack?
-	if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
-	{
-		return SCHED_MELEE_ATTACK1;
-	}
-
-	// Can I shoot?
-	if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) && m_pSquad )
-	{
-		// if the enemy has eluded the squad and a squad member has just located the enemy
-		// and the enemy does not see the squad member, issue a call to the squad to waste a 
-		// little time and give the poor bugger a chance to turn.
-		if ( !bFirstContact && !HasCondition( COND_ENEMY_FACING_ME ) )
-		{
-			return SCHED_DUCK_DODGE;
-		}
-		// If the engagement has lasted longer than ten seconds then do some cool moves
-//		if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
-//		{
-//			return SCHED_PC_ADVANCE;
-//		}
-		else
-		{
-			return SCHED_RANGE_ATTACK1;
 		}
 	}
 
@@ -1004,54 +1075,75 @@ int CNPC_PlayerCompanion::SelectScheduleCombat()
 	// ----------------------
 	if ( HasCondition( COND_ENEMY_OCCLUDED ) )
 	{
-		if( GetEnemy() && !(GetEnemy()->GetFlags() & FL_NOTARGET) )
-		{
-			// Give the enemy a chance to come out
-			if( iPercent <= 80 )
-			{
-				return SCHED_PC_ADVANCE;
-			}
-			// Charge in and break the enemy's cover!
-			else
-			{
-				return SCHED_ESTABLISH_LINE_OF_FIRE;
-			}
-		}
-
-		// If I'm a long, long way away, establish a LOF anyway. Once I get there I'll
-		// start respecting the squad slots again.
+		// If I'm a long, long way away, establish a LOF no matter hwhat.
 		float flDistSq = GetEnemy()->WorldSpaceCenter().DistToSqr( WorldSpaceCenter() );
 		if ( flDistSq > Square(3000) )
-			return SCHED_ESTABLISH_LINE_OF_FIRE;
+			return SCHED_MOVE_TO_WEAPON_RANGE;
 
-		// Otherwise tuck in.
+		if( GetEnemy() && !(GetEnemy()->GetFlags() & FL_NOTARGET) )
+		{
+			return SCHED_PC_ESTABLISH_LOF_WAIT;
+		}
+
+		// Fallback case
 		Remember( bits_MEMORY_INCOVER );
 		return SCHED_STANDOFF;
 	}
+	else if ( HasCondition( COND_SEE_ENEMY ) && !HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+	{
+		// Get into range!
+		if ( HasCondition( COND_TOO_FAR_TO_ATTACK ) )
+		{
+			return SCHED_MOVE_TO_WEAPON_RANGE;
+		}
+		return SCHED_PC_ESTABLISH_LOF_WAIT;
+	}
 
+	// The base-class takes care of the rest
 	return SCHED_NONE;
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-int CNPC_PlayerCompanion::SelectScheduleNonCombat()
+int CNPC_PlayerCompanion::SelectNonCombatSchedule()
 {
+	if( HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_HEAVY_DAMAGE ) )
+	{
+		// hide from the enemy only if you dont have a weapon, and/or otherwise cant arm yourself
+		if ( !GetActiveWeapon() && !HasCondition( COND_BETTER_WEAPON_AVAILABLE ) )
+		{
+			// I've been hurt and I cant fight back, Run away!
+			return SCHED_TAKE_COVER_FROM_ORIGIN;
+		}
+	}
+
+	// React to/Investigate nearby sounds
 	if ( !HasCondition( COND_SEE_ENEMY ) )
 	{
 		if ( HasCondition( COND_HEAR_COMBAT ) || HasCondition( COND_HEAR_PLAYER ) )
 		{
 			if ( m_pSquad )
 			{
+				// Investigate the disturbance
 				return SCHED_INVESTIGATE_SOUND;
 			}
-	//		return SCHED_COMBAT_FACE;
+			// Just heard something loud, now im really nervous
+			return SCHED_ALERT_REACT_TO_COMBAT_SOUND;
+		}
+		else if ( HasCondition( COND_HEAR_WORLD ) || HasCondition( COND_HEAR_BULLET_IMPACT ) )
+		{
+			// Just heard something not too loud, pay attention to/comment about it but dont move at all
+			return SCHED_ALERT_FACE_BESTSOUND;
 		}
 	}
 
+#if 0
+	// Scan around for new enemies
 	if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
 	{
 		return SCHED_VICTORY_DANCE;
 	}
+#endif
 
 	return SCHED_NONE;
 }
@@ -1086,17 +1178,14 @@ bool CNPC_PlayerCompanion::ShouldDeferToFollowBehavior()
 	// Even though assault and act busy are placed ahead of the follow behavior in precedence, the below
 	// code is necessary because we call ShouldDeferToFollowBehavior BEFORE we call the generic
 	// BehaviorSelectSchedule, which tries the behaviors in priority order.
-	if ( m_AssaultBehavior.CanSelectSchedule() && hl2_episodic.GetBool() )
+	if ( m_AssaultBehavior.CanSelectSchedule() )
 	{
 		return false;
 	}
 
-	if ( hl2_episodic.GetBool() )
+	if ( m_ActBusyBehavior.CanSelectSchedule() && m_ActBusyBehavior.IsCombatActBusy() )
 	{
-		if ( m_ActBusyBehavior.CanSelectSchedule() && m_ActBusyBehavior.IsCombatActBusy() )
-		{
-			return false;
-		}
+		return false;
 	}
 	
 	return true;
@@ -1162,9 +1251,12 @@ int CNPC_PlayerCompanion::TranslateSchedule( int scheduleType )
 		break;
 
 	case SCHED_COWER:
-		{
-			return SCHED_PC_COWER;
-		}
+		return SCHED_PC_COWER;
+		break;
+
+	case SCHED_KNOCKDOWN:
+		return SCHED_PC_KNOCKDOWN;
+		break;
 
 	case SCHED_TAKE_COVER_FROM_BEST_SOUND:
 		{
@@ -1183,16 +1275,39 @@ int CNPC_PlayerCompanion::TranslateSchedule( int scheduleType )
 		}
 
 	case SCHED_FLEE_FROM_BEST_SOUND:
-		{
-			return SCHED_PC_FLEE_FROM_BEST_SOUND;
-		}
-#if 0
-	case SCHED_ESTABLISH_LINE_OF_FIRE:
-	case SCHED_MOVE_TO_WEAPON_RANGE:
-		if ( IsMortar( GetEnemy() ) )
-			return SCHED_TAKE_COVER_FROM_ENEMY;
+		return SCHED_PC_FLEE_FROM_BEST_SOUND;
 		break;
+
+	case SCHED_COMBAT_FACE:
+		//If I just moved to where I heard/last saw an enemy and found nothing (sound investigation, etc.), maybe crouchidle
+#if 0
+		if( !(m_NPCState == NPC_STATE_COMBAT) && !IsCrouching() )
+		{
+			if( random->RandomInt( 0, 2 ) == 2 )
+			{
+				DesireCrouch();
+			}
+		}
 #endif
+		return SCHED_PC_COMBAT_FACE;
+		break;
+
+	case SCHED_TAKE_COVER_FROM_ENEMY:
+		return SCHED_PC_TAKE_COVER;
+		break;
+
+	case SCHED_ESTABLISH_LINE_OF_FIRE:
+		{
+			if ( IsMortar( GetEnemy() ) )
+			{
+				return SCHED_TAKE_COVER_FROM_ENEMY;
+			}
+			return SCHED_PC_ESTABLISH_LINE_OF_FIRE;
+		}
+
+	case SCHED_MOVE_TO_WEAPON_RANGE:
+		return SCHED_PC_MOVE_TO_WEAPON_RANGE;
+		break;
 
 	case SCHED_CHASE_ENEMY:
 		if ( IsMortar( GetEnemy() ) )
@@ -1207,38 +1322,55 @@ int CNPC_PlayerCompanion::TranslateSchedule( int scheduleType )
 			return SCHED_ESTABLISH_LINE_OF_FIRE;
 		break;
 
+	case SCHED_PC_SPOT_ENEMY:
+		{
+			m_bFirstEncounter = false;	// after first encounter, dont point at the enemy
+			if ( random->RandomInt( 0, 1 ) == 1 && GetActiveWeapon() && SelectWeightedSequence( ACT_ARM ) != ACTIVITY_NOT_AVAILABLE )
+			{
+				return SCHED_PC_SPOT_ENEMY;
+			}
+			return TranslateSchedule( SCHED_COMBAT_FACE );
+		}
+
 	case SCHED_RANGE_ATTACK1:
 		{
 			if ( HasCondition( COND_NO_PRIMARY_AMMO ) )
 			{
 				return TranslateSchedule( SCHED_RELOAD );
 			}
-#if 0
-			if ( IsMortar( GetEnemy() ) )
-				return SCHED_TAKE_COVER_FROM_ENEMY;
-#endif
-			if ( GetShotRegulator()->IsInRestInterval() )
-				return SCHED_STANDOFF;
 
-			if( !OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+			if ( GetShotRegulator()->IsInRestInterval() )
 				return SCHED_STANDOFF;
 
 			return SCHED_PC_RANGE_ATTACK1;
 		}
 
 	case SCHED_FAIL_TAKE_COVER:
-		if ( IsEnemyTurret() )
 		{
-			return SCHED_PC_FAIL_TAKE_COVER_TURRET;
-		}
-		break;
-	case SCHED_RUN_FROM_ENEMY_FALLBACK:
-		{
+			if ( IsEnemyTurret() )
+			{
+				return SCHED_PC_FAIL_TAKE_COVER_TURRET;
+			}
 			if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
 			{
-				return SCHED_RANGE_ATTACK1;
+				return TranslateSchedule( SCHED_RANGE_ATTACK1 );
 			}
-			break;
+		}
+
+	case SCHED_RUN_FROM_ENEMY_FALLBACK:
+		if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+		{
+			return TranslateSchedule( SCHED_RANGE_ATTACK1 );
+		}
+		break;
+
+	case SCHED_VICTORY_DANCE:
+		{
+			if ( m_pSquad && m_pSquad->IsLeader( this ) )
+			{
+				return SCHED_VICTORY_DANCE;
+			}
+			return TranslateSchedule( SCHED_ALERT_FACE );
 		}
 	}
 
@@ -1545,7 +1677,7 @@ Activity CNPC_PlayerCompanion::TranslateActivityReadiness( Activity activity )
 //-----------------------------------------------------------------------------
 Activity CNPC_PlayerCompanion::NPC_TranslateActivity( Activity activity )
 {
-	if ( activity == ACT_COWER )
+	if ( activity == ACT_COWER && IsCrouching() )
 		return ACT_COVER_LOW;
 
 	if ( activity == ACT_RUN && ( IsCurSchedule( SCHED_TAKE_COVER_FROM_BEST_SOUND ) || IsCurSchedule( SCHED_FLEE_FROM_BEST_SOUND ) ) )
@@ -1556,9 +1688,9 @@ Activity CNPC_PlayerCompanion::NPC_TranslateActivity( Activity activity )
 
 	activity = BaseClass::NPC_TranslateActivity( activity );
 
-	if ( activity == ACT_IDLE  )
+	if ( activity == ACT_IDLE )
 	{
-		if ( (m_NPCState == NPC_STATE_COMBAT || m_NPCState == NPC_STATE_ALERT) && gpGlobals->curtime - m_flLastAttackTime < 3)
+		if ( !IsCrouching() && ( m_NPCState == NPC_STATE_COMBAT || m_NPCState == NPC_STATE_ALERT ) && gpGlobals->curtime - m_flLastAttackTime < 3 )
 		{
 			activity = ACT_IDLE_ANGRY;
 		}
@@ -1638,7 +1770,8 @@ void CNPC_PlayerCompanion::HandleAnimEvent( animevent_t *pEvent )
 		if ( GetActiveWeapon() )
 		{
 			GetActiveWeapon()->WeaponSound( RELOAD_NPC );
-			GetActiveWeapon()->m_iClip1 = GetActiveWeapon()->GetMaxClip1(); 
+			GetActiveWeapon()->m_iClip1 = GetActiveWeapon()->GetMaxClip1();
+			GetActiveWeapon()->m_iClip2 = GetActiveWeapon()->GetMaxClip2();
 			ClearCondition(COND_LOW_PRIMARY_AMMO);
 			ClearCondition(COND_NO_PRIMARY_AMMO);
 			ClearCondition(COND_NO_SECONDARY_AMMO);
@@ -1681,6 +1814,7 @@ int CNPC_PlayerCompanion::GetSoundInterests()
 			SOUND_COMBAT			|
 			SOUND_PLAYER			|
 			SOUND_DANGER			|
+			SOUND_PHYSICS_DANGER	|
 			SOUND_BULLET_IMPACT		|
 			SOUND_MOVE_AWAY			|
 			SOUND_READINESS_LOW		|
@@ -1752,15 +1886,17 @@ void CNPC_PlayerCompanion::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 //-----------------------------------------------------------------------------
 bool CNPC_PlayerCompanion::IsReadinessCapable()
 {
-//	if ( GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON )
-//		return false;
+#if 0
+	if ( GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON )
+		return false;
+#endif
 
-//#ifndef HL2_EPISODIC
+#ifndef HL2_EPISODIC
 	// Allow episodic companions to use readiness even if unarmed. This allows for the panicked 
 	// citizens in ep1_c17_05 (sjb)
 	if( !GetActiveWeapon() )
 		return false;
-//#endif
+#endif
 
 	if( GetActiveWeapon() && LookupActivity("ACT_IDLE_AIM_RIFLE_STIMULATED") == ACT_INVALID )
 		return false;
@@ -2409,6 +2545,21 @@ bool CNPC_PlayerCompanion::IsValidEnemy( CBaseEntity *pEnemy )
 		}
 	}
 
+	if ( m_AssaultBehavior.IsRunning() && IsTurret( pEnemy ) )
+	{
+		CBaseCombatCharacter *pBCC = dynamic_cast<CBaseCombatCharacter*>(pEnemy);
+
+		if ( pBCC != NULL && !pBCC->FInViewCone(this) )
+		{
+			// Don't let turrets that can't shoot me distract me from my assault behavior.
+			// This fixes a very specific problem that appeared in Episode 2 map ep2_outland_09
+			// Where npcs wouldn't terminate an assault while standing on an assault point because
+			// they were afraid of a turret that was visible from the assault point, but facing the 
+			// other direction and thus not a threat. 
+			return false;
+		}
+	}
+
 	return BaseClass::IsValidEnemy( pEnemy );
 }
 
@@ -2424,11 +2575,15 @@ bool CNPC_PlayerCompanion::IsLightDamage( const CTakeDamageInfo &info )
 
 bool CNPC_PlayerCompanion::IsHeavyDamage( const CTakeDamageInfo &info )
 {
-	// Normal Humanoids consider all bullet fire heavy damage
-	if ( info.GetDamageType() & (DMG_BULLET | DMG_BUCKSHOT | DMG_SHOCK) )
-		return true;
+	// Any bullets that do more than 6 damage
+	if ( info.GetDamageType() & (DMG_BULLET|DMG_BUCKSHOT|DMG_SHOCK) )
+	{
+		if ( info.GetDamage() >= 6 )
+			return true;
+	}
 
-	return BaseClass::IsHeavyDamage( info );
+	// Any damage that is equal to or more than 15% of my health
+	return ( info.GetDamage() >= (GetMaxHealth() * 0.15f) );
 }
 
 //-----------------------------------------------------------------------------
@@ -2467,12 +2622,18 @@ bool CNPC_PlayerCompanion::ShouldMoveAndShoot( void )
 	if( IsCurSchedule( SCHED_PC_MOVE_TOWARDS_COVER_FROM_BEST_SOUND, false ) )
 		return false;
 
+	if( IsCurSchedule( SCHED_PC_FAKEOUT_MORTAR, false ) )
+		return false;
+
 	return BaseClass::ShouldMoveAndShoot();
 }
 
 //------------------------------------------------------------------------------
+// Shot Regulator
 //------------------------------------------------------------------------------
-#define PC_LARGER_BURST_RANGE	(12.0f * 10.0f) // If an enemy is this close, player companions fire larger continuous bursts.
+#define PC_LARGER_BURST_RANGE	(200.0f) // If an enemy is this close, player companions fire larger continuous bursts. TODO; This should get maxweaponrange and half it
+#define PC_FULL_AUTO_RANGE		(70.0f)	// If an enemy is this close, player companions fire full auto. TODO; This should get maxweaponrange and quarter it
+
 void CNPC_PlayerCompanion::OnUpdateShotRegulator()
 {
 	BaseClass::OnUpdateShotRegulator();
@@ -2481,22 +2642,17 @@ void CNPC_PlayerCompanion::OnUpdateShotRegulator()
 	{
 		if( GetAbsOrigin().DistTo( GetEnemy()->GetAbsOrigin() ) <= PC_LARGER_BURST_RANGE )
 		{
-			if( hl2_episodic.GetBool() )
+			// Longer burst
+			GetShotRegulator()->SetBurstShotsRemaining( GetShotRegulator()->GetBurstShotsRemaining() * 3 );
+			// Shorter Rest interval
+			float flMinInterval, flMaxInterval;
+			GetShotRegulator()->GetRestInterval( &flMinInterval, &flMaxInterval );
+			GetShotRegulator()->SetRestInterval( flMinInterval * 0.6f, flMaxInterval * 0.6f );
+			
+			if( GetAbsOrigin().DistTo( GetEnemy()->GetAbsOrigin() ) <= PC_FULL_AUTO_RANGE )
 			{
-				// Longer burst
-				int longBurst = random->RandomInt( 10, 15 );
-				GetShotRegulator()->SetBurstShotsRemaining( longBurst );
-				GetShotRegulator()->SetRestInterval( 0.1, 0.2 );
-			}
-			else
-			{
-				// Longer burst
-				GetShotRegulator()->SetBurstShotsRemaining( GetShotRegulator()->GetBurstShotsRemaining() * 2 );
-
-				// Shorter Rest interval
-				float flMinInterval, flMaxInterval;
-				GetShotRegulator()->GetRestInterval( &flMinInterval, &flMaxInterval );
-				GetShotRegulator()->SetRestInterval( flMinInterval * 0.6f, flMaxInterval * 0.6f );
+				GetShotRegulator()->SetBurstShotsRemaining( GetShotRegulator()->GetBurstShotsRemaining() * 10 );
+				GetShotRegulator()->SetRestInterval( flMinInterval * 0.3f, flMaxInterval * 0.3f );
 			}
 		}
 	}
@@ -2504,6 +2660,7 @@ void CNPC_PlayerCompanion::OnUpdateShotRegulator()
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+/*
 void CNPC_PlayerCompanion::DecalTrace( trace_t *pTrace, char const *decalName )
 {
 	// Do not decal a player companion's head or face, no matter what.
@@ -2512,7 +2669,7 @@ void CNPC_PlayerCompanion::DecalTrace( trace_t *pTrace, char const *decalName )
 
 	BaseClass::DecalTrace( pTrace, decalName );
 }
-
+*/
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 bool CNPC_PlayerCompanion::FCanCheckAttacks()
@@ -2545,15 +2702,9 @@ Vector CNPC_PlayerCompanion::GetActualShootPosition( const Vector &shootOrigin )
 //------------------------------------------------------------------------------
 WeaponProficiency_t CNPC_PlayerCompanion::CalcWeaponProficiency( CBaseCombatWeapon *pWeapon )
 {
-	if( FClassnameIs( pWeapon, "weapon_ar2" ) )
-	{
-		return WEAPON_PROFICIENCY_GOOD;
-	}
-	
-	// Add a check here to see if its a friendly citizen. If it is, then put it to avg.
+	// Check to see if its a friendly citizen. If it is, then put them up a peg.
 	if( FClassnameIs( pWeapon, "weapon_pistol" ) )
 	{
-	//	return WEAPON_PROFICIENCY_AVERAGE;
 		if (GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON)
 		{
 			return WEAPON_PROFICIENCY_POOR;
@@ -2564,9 +2715,8 @@ WeaponProficiency_t CNPC_PlayerCompanion::CalcWeaponProficiency( CBaseCombatWeap
 		}
 	}
 
-	if( FClassnameIs( pWeapon, "weapon_smg1" ) )
+	if( FClassnameIs( pWeapon, "weapon_smg1" ) || FClassnameIs( pWeapon, "weapon_smg2" ) )
 	{
-	//	return WEAPON_PROFICIENCY_GOOD;
 		if (GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON)
 		{
 			return WEAPON_PROFICIENCY_AVERAGE;
@@ -2583,8 +2733,13 @@ WeaponProficiency_t CNPC_PlayerCompanion::CalcWeaponProficiency( CBaseCombatWeap
 	//		return WEAPON_PROFICIENCY_GOOD;
 	//	}
 
-	return WEAPON_PROFICIENCY_PERFECT;
+	if( FClassnameIs( pWeapon, "weapon_ar2" ) )
+	{
+		//Its not cool to have a cit rob the player of ammo if hes just going to miss all his shots, bump him up to good
+		return WEAPON_PROFICIENCY_GOOD;
+	}
 
+	return BaseClass::CalcWeaponProficiency( pWeapon );
 }
 
 //-----------------------------------------------------------------------------
@@ -3124,6 +3279,7 @@ const float AVOID_TEST_DIST = 18.0f*12.0f;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 #define COMPANION_EPISODIC_AVOID_ENTITY_FLAME_RADIUS	18.0f
+extern ConVar sk_bouncebomb_detonate_radius;
 bool CNPC_PlayerCompanion::OverrideMove( float flInterval )
 {
 	bool overrode = BaseClass::OverrideMove( flInterval );
@@ -3201,7 +3357,7 @@ bool CNPC_PlayerCompanion::OverrideMove( float flInterval )
 					UTIL_TraceLine( WorldSpaceCenter(), pEntity->WorldSpaceCenter(), MASK_BLOCKLOS, pEntity, COLLISION_GROUP_NONE, &tr );
 					if (tr.fraction == 1.0 && !tr.startsolid)
 					{
-						GetLocalNavigator()->AddObstacle( pEntity->GetAbsOrigin(), BOUNCEBOMB_DETONATE_RADIUS * .8, AIMST_AVOID_DANGER );
+						GetLocalNavigator()->AddObstacle( pEntity->GetAbsOrigin(), sk_bouncebomb_detonate_radius.GetFloat() * .8, AIMST_AVOID_DANGER );
 					}
 				}
 			}
@@ -3507,6 +3663,33 @@ void CNPC_PlayerCompanion::UnlockReadiness( void )
 {
 	// Set to the past
 	m_flReadinessLockedUntil = gpGlobals->curtime - 0.1f;
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : &info - 
+// Output : Returns true on success, false on failure.
+//-----------------------------------------------------------------------------
+bool CNPC_PlayerCompanion::ShouldGib( const CTakeDamageInfo &info )
+{
+	// If its no-gib, then dont gib... dummy!
+	if ( info.GetDamageType() & (DMG_NEVERGIB|DMG_DISSOLVE) )
+		return false;
+
+	// If its concussive damage always gib
+	if ( ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) && m_iHealth < GIB_HEALTH_VALUE ) || ( info.GetDamageType() & DMG_ALWAYSGIB ) )
+		return true;
+
+	// If its a direct hit from "burn" (normal explosive) damage
+	if ( info.GetDamageType() & (DMG_BURN) && m_iHealth < -50 )
+		return true;
+
+	// If the last attack did so much damage i'm in the negatives
+	if ( info.GetDamageType() & (DMG_BUCKSHOT) && m_iHealth < -25 )	//!!! FIXME; Temp. Only the shot limb should gib, not the whole body. Return a seperate function
+		return true;
+	
+	return false;
 }
 
 //------------------------------------------------------------------------------
@@ -3944,6 +4127,55 @@ bool CNPC_PlayerCompanion::IsNavigationUrgent( void )
 	return bBase;
 }
 
+#if 0
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+bool CNPC_PlayerCompanion::Stand( void )
+{
+	bool bWasCrouching = IsCrouching();
+	if ( !BaseClass::Stand() )
+		return false;
+
+	if ( bWasCrouching )
+	{
+		m_flNextCrouchTime = gpGlobals->curtime + PC_CROUCH_DELAY;
+		OnUpdateShotRegulator();
+	}
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+bool CNPC_PlayerCompanion::Crouch( void )
+{
+	bool bWasStanding = !IsCrouching();
+	if ( !BaseClass::Crouch() )
+		return false;
+
+	if ( bWasStanding )
+	{
+		OnUpdateShotRegulator();
+	}
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CNPC_PlayerCompanion::DesireCrouch( void )
+{
+	// Ignore crouch desire if we've been crouching recently to reduce oscillation
+	if ( m_flNextCrouchTime > gpGlobals->curtime )
+		return;
+
+	BaseClass::DesireCrouch();
+}
+#endif
+
 //-----------------------------------------------------------------------------
 //
 // Schedules
@@ -3986,9 +4218,9 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"		 TASK_SET_TOLERANCE_DISTANCE		24"
 		"		 TASK_STORE_BESTSOUND_REACTORIGIN_IN_SAVEPOSITION	0"
 		"		 TASK_FIND_COVER_FROM_BEST_SOUND	0"
-		"		 TASK_RUN_PATH_TIMED				1.0"
+		"		 TASK_RUN_PATH_TIMED				3.5" //Maximum of three seconds to take cover
 		"		 TASK_STOP_MOVING					0"
-		"		 TASK_FACE_SAVEPOSITION				0"
+//		"		 TASK_FACE_SAVEPOSITION				0"
 		"		 TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"	// Translated to cover
 		""
 		"	Interrupts"
@@ -3997,7 +4229,7 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 
 	DEFINE_SCHEDULE
 	(
-	SCHED_PC_TAKE_COVER_FROM_BEST_SOUND,
+		SCHED_PC_TAKE_COVER_FROM_BEST_SOUND,
 
 	"	Tasks"
 	"		 TASK_SET_FAIL_SCHEDULE								SCHEDULE:SCHED_FLEE_FROM_BEST_SOUND"
@@ -4016,19 +4248,26 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 	"		COND_PC_SAFE_FROM_MORTAR"
 	)
 
-	DEFINE_SCHEDULE	
+	DEFINE_SCHEDULE
 	(
-		SCHED_PC_COWER,
-		  
+		SCHED_PC_TAKE_COVER,
+
 		"	Tasks"
-		"		TASK_WAIT_RANDOM			0.1"
-		"		TASK_SET_ACTIVITY			ACTIVITY:ACT_COWER"
-		"		TASK_PC_WAITOUT_MORTAR		0"
-		"		TASK_WAIT					0.1"	
-		"		TASK_WAIT_RANDOM			0.5"	
+		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAIL_TAKE_COVER"
+		"		TASK_STOP_MOVING				0"
+		"		TASK_WAIT						0.2"
+		"		TASK_FIND_COVER_FROM_ENEMY		0"
+		"		TASK_RUN_PATH					0"
+		"		TASK_WAIT_FOR_MOVEMENT			0"
+		"		TASK_REMEMBER					MEMORY:INCOVER"
+//		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
 		""
 		"	Interrupts"
-		"		"
+		"		COND_NEW_ENEMY"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_GIVE_WAY"
+		"		COND_HEAR_DANGER"
+		"		COND_HEAR_MOVE_AWAY"
 	)
 
 	//=========================================================
@@ -4041,9 +4280,9 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"	Tasks"
 		"		 TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_COWER"
 		"		 TASK_GET_PATH_AWAY_FROM_BEST_SOUND	600"
-		"		 TASK_RUN_PATH_TIMED				1.5"
+		"		 TASK_RUN_PATH_TIMED				4.0" //Maximum of four seconds to flee
 		"		 TASK_STOP_MOVING					0"
-		"		 TASK_TURN_LEFT						179"
+		"		 TASK_WAIT							0.2"
 		""
 		"	Interrupts"
 //		"		COND_NEW_ENEMY"
@@ -4084,7 +4323,7 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		SCHED_PC_GET_OFF_COMPANION,
 
 		"	Tasks"
-		"		TASK_PC_GET_PATH_OFF_COMPANION				0"
+		"		TASK_PC_GET_PATH_OFF_COMPANION			0"
 		"		TASK_RUN_PATH							0"
 		"		TASK_WAIT_FOR_MOVEMENT					0"
 		""
@@ -4108,8 +4347,8 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"	Interrupts"
 		"		COND_NEW_ENEMY"
 		"		COND_ENEMY_DEAD"
-		"		COND_HEAVY_DAMAGE"
 		"		COND_LIGHT_DAMAGE"
+		"		COND_HEAVY_DAMAGE"
 		"		COND_NO_PRIMARY_AMMO"
 		"		COND_WEAPON_BLOCKED_BY_FRIEND"
 		"		COND_TOO_CLOSE_TO_ATTACK"
@@ -4118,28 +4357,23 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"		COND_HEAR_MOVE_AWAY"
 		""
 	)
-	
+
 	DEFINE_SCHEDULE
 	(
-		SCHED_PC_TAKE_COVER_LIGHT_DAMAGE,
+		SCHED_PC_SPOT_ENEMY,
 
 		"	Tasks"
-		"		 TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FAIL_TAKE_COVER"
-		"		 TASK_STOP_MOVING					0"
-		"		 TASK_WAIT							0.2"
-		"		 TASK_SET_TOLERANCE_DISTANCE		24"
-		"		 TASK_FIND_COVER_FROM_ORIGIN		0"
-		"		 TASK_RUN_PATH						0"
-//		"		 TASK_STRAFE_PATH					0"
-		"		 TASK_WAIT_FOR_MOVEMENT				0"
-		"		 TASK_REMEMBER						MEMORY:INCOVER"
-		"		 TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"	// Translated to cover
+		"		TASK_STOP_MOVING		0"
+		"		TASK_FACE_ENEMY			0"
+		"		TASK_WAIT				0.2"
+		"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
+		"		TASK_PLAY_SEQUENCE_FACE_ENEMY	ACTIVITY:ACT_ARM"
+		"		TASK_WAIT				0.2"
 		""
 		"	Interrupts"
-		"		COND_NEW_ENEMY"
-		"		COND_ENEMY_DEAD"
-		"		COND_NO_PRIMARY_AMMO"
-		"		COND_TOO_CLOSE_TO_ATTACK"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_CAN_MELEE_ATTACK1"
+		"		COND_CAN_MELEE_ATTACK2"
 		"		COND_GIVE_WAY"
 		"		COND_HEAR_DANGER"
 		"		COND_HEAR_MOVE_AWAY"
@@ -4148,34 +4382,165 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 
 	DEFINE_SCHEDULE
 	(
-		SCHED_PC_ADVANCE,
+		SCHED_PC_ESTABLISH_LOF_WAIT,
 
 		"	Tasks"
-		"		 TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE_ANGRY"
-		"		 TASK_WAIT_FACE_ENEMY				1" // give the guy some time to come out on his own
-		"		 TASK_WAIT_FACE_ENEMY_RANDOM		3"
-		"		 TASK_GET_PATH_TO_ENEMY_LOS			0"
-		"		 TASK_SPEAK_SENTENCE				1"
-		"		 TASK_RUN_PATH						0"
-		"		 TASK_WAIT_FOR_MOVEMENT				0"
-		"		 TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE_ANGRY"
-		"		 TASK_SET_SCHEDULE					SCHEDULE:SCHED_COMBAT_FACE"
+		"		TASK_STOP_MOVING					0"
+		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
+		"		TASK_WAIT_FACE_ENEMY				0.2" // give the guy some time to come out on his own
+		"		TASK_WAIT_RANDOM					4" // Wait up to 4 seconds
+		"		TASK_SET_SCHEDULE					SCHEDULE:SCHED_ESTABLISH_LINE_OF_FIRE"
 		""
 		"	Interrupts"
 		"		COND_NEW_ENEMY"
+		"		COND_ENEMY_DEAD"
+		"		COND_LOST_ENEMY"
+		"		COND_LIGHT_DAMAGE"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_CAN_RANGE_ATTACK1"
+		"		COND_CAN_MELEE_ATTACK1"
+		"		COND_CAN_RANGE_ATTACK2"
+		"		COND_CAN_MELEE_ATTACK2"
+		"		COND_GIVE_WAY"
+		"		COND_HEAR_DANGER"
+		"		COND_HEAR_MOVE_AWAY"
+		"		COND_BETTER_WEAPON_AVAILABLE"
+		""
+	)
+
+	DEFINE_SCHEDULE
+	(
+		SCHED_PC_MOVE_TO_WEAPON_RANGE,
+
+		"	Tasks"
+		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY"
+		"		TASK_GET_PATH_TO_RANGE_ENEMY_LKP_LOS		0"
+		"		TASK_RUN_PATH					0"
+		"		TASK_WAIT_FOR_MOVEMENT			0"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
+		""
+		"	Interrupts"
+		"		COND_NEW_ENEMY"
+		"		COND_ENEMY_DEAD"
+		"		COND_LOST_ENEMY"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_CAN_RANGE_ATTACK1"
+		"		COND_CAN_MELEE_ATTACK1"
+		"		COND_CAN_RANGE_ATTACK2"
+		"		COND_CAN_MELEE_ATTACK2"
+		"		COND_HEAR_DANGER"
+	)
+
+	DEFINE_SCHEDULE
+	(
+		SCHED_PC_ESTABLISH_LINE_OF_FIRE,
+
+		"	Tasks"
+		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_ESTABLISH_LINE_OF_FIRE_FALLBACK"
+		"		TASK_GET_PATH_TO_ENEMY_LOS		0"
+		"		TASK_RUN_PATH					0"
+		"		TASK_WAIT_FOR_MOVEMENT			0"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
+		""
+		"	Interrupts"
+		"		COND_NEW_ENEMY"
+		"		COND_ENEMY_DEAD"
+		"		COND_LOST_ENEMY"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_CAN_RANGE_ATTACK1"
+		"		COND_CAN_MELEE_ATTACK1"
+		"		COND_CAN_RANGE_ATTACK2"
+		"		COND_CAN_MELEE_ATTACK2"
+		"		COND_HEAR_DANGER"
+	)
+
+//=============================================================
+//=============================================================
+	DEFINE_SCHEDULE
+	(
+		SCHED_PC_COMBAT_FACE,
+
+		"	Tasks"
+		"		TASK_STOP_MOVING			0"
+		"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
+		"		TASK_FACE_ENEMY				0"
+		"		TASK_WAIT					0.3"
+//		"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_COMBAT_SWEEP"
+		""
+		"	Interrupts"
+//		"		COND_NEW_ENEMY"
+		"		COND_ENEMY_DEAD"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_CAN_MELEE_ATTACK1"
+		"		COND_CAN_MELEE_ATTACK2"
+		"		COND_GIVE_WAY"
+		"		COND_HEAR_DANGER"
+	)
+
+	DEFINE_SCHEDULE	
+	(
+		SCHED_PC_COWER,
+
+		"	Tasks"
+		"		TASK_WAIT					0.2"
+		"		TASK_SET_ACTIVITY			ACTIVITY:ACT_COWER"
+		"		TASK_PC_WAITOUT_MORTAR		0"
+		"		TASK_WAIT					0.2"
+		"		TASK_WAIT_RANDOM			1.0"
+		""
+		"	Interrupts"
+		"		"
+	)
+
+ //---------------------------------------------------------
+ // SCHED_PC_KNOCKDOWN
+ // PC's dont use the loop, just choose a random time to
+ // stay down
+ //---------------------------------------------------------
+	DEFINE_SCHEDULE
+	(
+		SCHED_PC_KNOCKDOWN,
+
+		"	Tasks"
+		"		TASK_STOP_MOVING				0"
+		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE_PRONE"
+		"		TASK_WAIT						1"
+		"		TASK_WAIT_RANDOM				3"
+		""
+		"	Interrupts"
+	)
+
+/*
+ //---------------------------------------------------------
+ // SCHED_PC_IDLE_FACE
+ // Face the nearest coolio thing
+ //---------------------------------------------------------
+	DEFINE_SCHEDULE
+	(
+		SCHED_PC_IDLE_FACE,
+
+		"	Tasks"
+		"		TASK_STOP_MOVING			0"
+		"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
+		"		TASK_FACE_REASONABLE		0"
+		"		TASK_WAIT					0.5"
+		"		TASK_WAIT_RANDOM			2"
+		"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_COMBAT_SWEEP"
+		""
+		"	Interrupts"
+		"		COND_NEW_ENEMY"
+		"		COND_LIGHT_DAMAGE"
+		"		COND_HEAVY_DAMAGE"
 		"		COND_CAN_RANGE_ATTACK1"
 		"		COND_CAN_RANGE_ATTACK2"
 		"		COND_CAN_MELEE_ATTACK1"
 		"		COND_CAN_MELEE_ATTACK2"
-		"		COND_ENEMY_DEAD"
-		"		COND_NO_PRIMARY_AMMO"
-		"		COND_TOO_CLOSE_TO_ATTACK"
-		"		COND_GIVE_WAY"
 		"		COND_HEAR_DANGER"
 		"		COND_HEAR_MOVE_AWAY"
-		""
+		"		COND_BETTER_WEAPON_AVAILABLE"
+		"		COND_IDLE_INTERRUPT"
 	)
-
+*/
 
 AI_END_CUSTOM_NPC()
 

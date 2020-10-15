@@ -15,9 +15,67 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar	sk_healthkit( "sk_healthkit","0" );		
-ConVar	sk_healthvial( "sk_healthvial","0" );		
-ConVar	sk_healthcharger( "sk_healthcharger","0" );		
+ConVar	sk_healthkit( "sk_healthkit","0" );
+ConVar	sk_healthbox( "sk_healthbox","0" );	
+ConVar	sk_healthvial( "sk_healthvial","0" );
+ConVar	sk_healthcharger( "sk_healthcharger","0" );
+
+//-----------------------------------------------------------------------------
+// Big health pack. Heals the player when picked up.
+//-----------------------------------------------------------------------------
+class CHealthBox : public CItem
+{
+public:
+	DECLARE_CLASS( CHealthBox, CItem );
+
+	void Spawn( void )
+	{
+		Precache();
+		SetModel( "models/items/healthbox.mdl" );
+
+		BaseClass::Spawn();
+	}
+
+	void Precache( void )
+	{
+		PrecacheModel("models/items/healthbox.mdl");
+
+		PrecacheScriptSound( "HealthBox.Touch" );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if ( pPlayer->TakeHealth( sk_healthbox.GetFloat(), DMG_GENERIC ) )
+		{
+			CSingleUserRecipientFilter user( pPlayer );
+			user.MakeReliable();
+
+			UserMessageBegin( user, "ItemPickup" );
+				WRITE_STRING( GetClassname() );
+			MessageEnd();
+
+			CPASAttenuationFilter filter( pPlayer, "HealthBox.Touch" );
+			EmitSound( filter, pPlayer->entindex(), "HealthBox.Touch" );
+
+			if ( g_pGameRules->ItemShouldRespawn( this ) )
+			{
+				Respawn();
+			}
+			else
+			{
+				UTIL_Remove(this);	
+			}
+
+		return true;
+	}
+
+	return false;
+	}
+};
+
+LINK_ENTITY_TO_CLASS( item_healthbox, CHealthBox );
+PRECACHE_REGISTER(item_healthbox);
+
 
 //-----------------------------------------------------------------------------
 // Small health kit. Heals the player when picked up.
@@ -27,9 +85,49 @@ class CHealthKit : public CItem
 public:
 	DECLARE_CLASS( CHealthKit, CItem );
 
-	void Spawn( void );
-	void Precache( void );
-	bool MyTouch( CBasePlayer *pPlayer );
+	void Spawn( void )
+	{
+		Precache();
+		SetModel( "models/items/healthkit.mdl" );
+
+		BaseClass::Spawn();
+	}
+
+	void Precache( void )
+	{
+		PrecacheModel("models/items/healthkit.mdl");
+
+		PrecacheScriptSound( "HealthKit.Touch" );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if ( pPlayer->TakeHealth( sk_healthkit.GetFloat(), DMG_GENERIC ) )
+		{
+			CSingleUserRecipientFilter user( pPlayer );
+			user.MakeReliable();
+
+			UserMessageBegin( user, "ItemPickup" );
+				WRITE_STRING( GetClassname() );
+			MessageEnd();
+
+			CPASAttenuationFilter filter( pPlayer, "HealthKit.Touch" );
+			EmitSound( filter, pPlayer->entindex(), "HealthKit.Touch" );
+
+			if ( g_pGameRules->ItemShouldRespawn( this ) )
+			{
+				Respawn();
+			}
+			else
+			{
+				UTIL_Remove(this);	
+			}
+
+		return true;
+	}
+
+	return false;
+	}
 };
 
 LINK_ENTITY_TO_CLASS( item_healthkit, CHealthKit );
@@ -37,66 +135,8 @@ PRECACHE_REGISTER(item_healthkit);
 
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CHealthKit::Spawn( void )
-{
-	Precache();
-	SetModel( "models/items/healthkit.mdl" );
-
-	BaseClass::Spawn();
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CHealthKit::Precache( void )
-{
-	PrecacheModel("models/items/healthkit.mdl");
-
-	PrecacheScriptSound( "HealthKit.Touch" );
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : *pPlayer - 
-// Output : 
-//-----------------------------------------------------------------------------
-bool CHealthKit::MyTouch( CBasePlayer *pPlayer )
-{
-	if ( pPlayer->TakeHealth( sk_healthkit.GetFloat(), DMG_GENERIC ) )
-	{
-		CSingleUserRecipientFilter user( pPlayer );
-		user.MakeReliable();
-
-		UserMessageBegin( user, "ItemPickup" );
-			WRITE_STRING( GetClassname() );
-		MessageEnd();
-
-		CPASAttenuationFilter filter( pPlayer, "HealthKit.Touch" );
-		EmitSound( filter, pPlayer->entindex(), "HealthKit.Touch" );
-
-		if ( g_pGameRules->ItemShouldRespawn( this ) )
-		{
-			Respawn();
-		}
-		else
-		{
-			UTIL_Remove(this);	
-		}
-
-		return true;
-	}
-
-	return false;
-}
-
-//-----------------------------------------------------------------------------
 // Small dynamically dropped health kit
 //-----------------------------------------------------------------------------
-
 class CHealthVial : public CItem
 {
 public:

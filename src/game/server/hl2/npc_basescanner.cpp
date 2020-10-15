@@ -58,6 +58,7 @@ BEGIN_DATADESC( CNPC_BaseScanner )
 END_DATADESC()
 
 ConVar	sk_scanner_dmg_dive( "sk_scanner_dmg_dive","0");
+ConVar	sk_scanner_dmg_deflect( "sk_scanner_dmg_deflect","0.5");
 
 //-----------------------------------------------------------------------------
 // Think contexts
@@ -418,12 +419,33 @@ int CNPC_BaseScanner::OnTakeDamage_Dying( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CNPC_BaseScanner::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
-	if ( info.GetDamageType() & DMG_BULLET)
+	if ( info.GetDamageType() & DMG_BULLET )
 	{
 		g_pEffects->Ricochet(ptr->endpos,ptr->plane.normal);
 	}
 
 	BaseClass::TraceAttack( info, vecDir, ptr );
+}
+
+float CNPC_BaseScanner::GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info )
+{
+	switch( iHitGroup )
+	{
+	// If its not directly through the eye-hole, do less damage
+	case HITGROUP_GENERIC:
+	case HITGROUP_CHEST:
+	case HITGROUP_STOMACH:
+	case HITGROUP_LEFTARM:
+	case HITGROUP_RIGHTARM:
+	case HITGROUP_LEFTLEG:
+	case HITGROUP_RIGHTLEG:
+		if ( info.GetDamageType() & (DMG_BULLET | DMG_SLASH) )
+		{
+			return sk_scanner_dmg_deflect.GetFloat();
+		}
+	}
+
+	return BaseClass::GetHitgroupDamageMultiplier( iHitGroup, info );
 }
 
 //-----------------------------------------------------------------------------

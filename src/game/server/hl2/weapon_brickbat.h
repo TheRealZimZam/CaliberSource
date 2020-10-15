@@ -19,6 +19,11 @@
 #ifndef	WEAPON_BRICKBAT_H
 #define	WEAPON_BRICKBAT_H
 
+#ifdef _WIN32
+#pragma once
+#endif
+
+
 #include "basehlcombatweapon.h"
 
 enum BrickbatAmmo_t
@@ -39,14 +44,6 @@ public:
 
 	DECLARE_SERVERCLASS();
 
-private:
-	bool				m_bNeedDraw;
-	bool				m_bNeedThrow;
-	int					m_iThrowBits;				// Save the current throw bits state
-	float				m_fNextThrowCheck;			// When to check throw ability next
-	Vector				m_vecTossVelocity;
-
-	int					m_nAmmoCount[NUM_BRICKBAT_AMMO_TYPES];			// How much ammo of each type do I own?
 public:
 	int					m_iCurrentAmmoType;
 
@@ -64,7 +61,7 @@ public:
 
 	void				SetPickupTouch( void );
 	void 				BrickbatTouch( CBaseEntity *pOther );	// default weapon touch
-	void				SetObjectCollisionBox( void );
+//	void				SetObjectCollisionBox( void );
 	void				TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );	
 	int					CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
@@ -82,6 +79,15 @@ public:
 	DECLARE_ACTTABLE();
 
 	CWeaponBrickbat(void);
+
+private:
+	bool				m_bNeedDraw;
+	bool				m_bNeedThrow;
+	int					m_iThrowBits;				// Save the current throw bits state
+	float				m_fNextThrowCheck;			// When to check throw ability next
+	Vector				m_vecTossVelocity;
+
+	int					m_nAmmoCount[NUM_BRICKBAT_AMMO_TYPES];			// How much ammo of each type do I own?
 };
 
 #endif	//WEAPON_BRICKBAT_H

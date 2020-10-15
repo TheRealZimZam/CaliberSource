@@ -16,7 +16,8 @@
 
 #include "basegrenade_shared.h"
 
-#define	MAX_AR2_NO_COLLIDE_TIME 0.2
+#define	MAX_AR2_NO_COLLIDE_TIME 0.2		//Time spent before activation - can bounce within this timeframe
+#define	AR2_AIRBURST_DIST 64			//Distance from nearest target to detonate
 
 class SmokeTrail;
 class CWeaponAR2;
@@ -42,6 +43,17 @@ public:
 	CGrenadeAR2(void);
 
 	DECLARE_DATADESC();
+};
+
+//Airburst variant
+class CGrenadeAR2Airburst : public CGrenadeAR2
+{
+public:
+	DECLARE_CLASS( CGrenadeAR2Airburst, CGrenadeAR2 );
+
+	void 		GrenadeAR2Touch( CBaseEntity *pOther );
+	void		GrenadeAR2Think( void );
+
 };
 
 #endif	//GRENADEAR2_H

@@ -47,7 +47,7 @@ enum ScannerInspectAct_t
 // Scanner attack distances
 #define SCANNER_ATTACK_NEAR_DIST		150		// Fly attack min distance
 #define SCANNER_ATTACK_FAR_DIST			300		// Fly attack max distance
-#define SCANNER_ATTACK_RANGE			350		// Attack max distance
+#define SCANNER_ATTACK_RANGE			360		// Attack max distance
 #define	SCANNER_ATTACK_MIN_DELAY		8		// Min time between attacks
 #define	SCANNER_ATTACK_MAX_DELAY		12		// Max time between attacks
 #define	SCANNER_EVADE_TIME				1		// How long to evade after take damage
@@ -80,6 +80,7 @@ public:
 	int				OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	int				OnTakeDamage_Dying( const CTakeDamageInfo &info );
 	void			TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
+	float			GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info );
 	void			Gib(void);
 
 	void			OnStateChange( NPC_STATE eOldState, NPC_STATE eNewState );

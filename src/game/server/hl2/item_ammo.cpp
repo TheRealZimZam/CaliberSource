@@ -35,8 +35,13 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 	return pPlayer->GiveAmmo( flCount, iAmmoType, bSuppressSound );
 }
 
+// Obselete ammo types
+#define SIZE_BOX_SNIPER_ROUNDS 10
+#define SIZE_BOX_FLARE_ROUNDS 5
+
 // ========================================================================
 //	>> BoxSRounds
+// Pistol clip
 // ========================================================================
 class CItem_BoxSRounds : public CItem
 {
@@ -67,11 +72,12 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_box_srounds, CItem_BoxSRounds);
+LINK_ENTITY_TO_CLASS(item_box_srounds, CItem_BoxSRounds);	//OBSELETE - DO NOT USE
 LINK_ENTITY_TO_CLASS(item_ammo_pistol, CItem_BoxSRounds);
 
 // ========================================================================
 //	>> LargeBoxSRounds
+// General pistol ammo (pistol, smg1)
 // ========================================================================
 class CItem_LargeBoxSRounds : public CItem
 {
@@ -90,7 +96,8 @@ public:
 	}
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL_LARGE, "Pistol"))
+		//This seems super-hacky, find a better solution not-so-pronto
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL_LARGE, "Pistol") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1"))
 		{
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
@@ -102,10 +109,11 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS(item_large_box_srounds, CItem_LargeBoxSRounds);
-LINK_ENTITY_TO_CLASS(item_ammo_pistol_large, CItem_LargeBoxSRounds);
+LINK_ENTITY_TO_CLASS(item_ammo_pistol_large, CItem_LargeBoxSRounds);	//OBSELETE - DO NOT USE
 
 // ========================================================================
 //	>> BoxMRounds
+// SMG1 clip
 // ========================================================================
 class CItem_BoxMRounds : public CItem
 {
@@ -135,11 +143,12 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_box_mrounds, CItem_BoxMRounds);
+LINK_ENTITY_TO_CLASS(item_box_mrounds, CItem_BoxMRounds);	//OBSELETE - DO NOT USE
 LINK_ENTITY_TO_CLASS(item_ammo_smg1, CItem_BoxMRounds);
 
 // ========================================================================
 //	>> LargeBoxMRounds
+// Large box of general rifle rounds (smg1, ar1)
 // ========================================================================
 class CItem_LargeBoxMRounds : public CItem
 {
@@ -158,6 +167,7 @@ public:
 	}
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
+		//This seems super-hacky, find a better solution not-so-pronto
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1"))
 		{
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
@@ -170,10 +180,47 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS(item_large_box_mrounds, CItem_LargeBoxMRounds);
-LINK_ENTITY_TO_CLASS(item_ammo_smg1_large, CItem_LargeBoxMRounds);
+LINK_ENTITY_TO_CLASS(item_ammo_smg1_large, CItem_LargeBoxMRounds);	//OBSELETE - DO NOT USE
+
+// ========================================================================
+//	>> HMGBox
+// HMG Clip - inbetween medium and large
+// ========================================================================
+class CItem_HMGBox : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_HMGBox, CItem );
+
+	void Spawn( void )
+	{ 
+		Precache( );
+		SetModel( "models/items/boxmrounds.mdl");
+		BaseClass::Spawn( );
+	}
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxmrounds.mdl");
+	}
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG2, "HMG"))
+		{
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_smg2, CItem_HMGBox);	//OBSELETE - DO NOT USE
+LINK_ENTITY_TO_CLASS(item_ammo_hmg, CItem_HMGBox);
+
 
 // ========================================================================
 //	>> BoxLRounds
+// AR2 Clip
 // ========================================================================
 class CItem_BoxLRounds : public CItem
 {
@@ -203,11 +250,13 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_box_lrounds, CItem_BoxLRounds);
+LINK_ENTITY_TO_CLASS(item_box_lrounds, CItem_BoxLRounds);	//OBSELETE - DO NOT USE
 LINK_ENTITY_TO_CLASS(item_ammo_ar2, CItem_BoxLRounds);
+
 
 // ========================================================================
 //	>> LargeBoxLRounds
+// Box of general large/caseless rounds (ar2, magnum, scrapgun)
 // ========================================================================
 class CItem_LargeBoxLRounds : public CItem
 {
@@ -217,16 +266,17 @@ public:
 	void Spawn( void )
 	{ 
 		Precache( );
-		SetModel( "models/items/combine_rifle_cartridge01.mdl");
+		SetModel( "models/items/357ammobox.mdl");
 		BaseClass::Spawn( );
 	}
 	void Precache( void )
 	{
-		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");
+		PrecacheModel ("models/items/357ammobox.mdl");
 	}
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "AR2"))
+		//This seems super-hacky, find a better solution not-so-pronto
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "AR2") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_357_LARGE, "357") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SNIPER, "SniperRound"))
 		{
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
@@ -238,11 +288,12 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS(item_large_box_lrounds, CItem_LargeBoxLRounds);
-LINK_ENTITY_TO_CLASS(item_ammo_ar2_large, CItem_LargeBoxLRounds);
+LINK_ENTITY_TO_CLASS(item_ammo_ar2_large, CItem_LargeBoxLRounds);	//OBSELETE - DO NOT USE
 
 
 // ========================================================================
 //	>> CItem_Box357Rounds
+// 357 Clip
 // ========================================================================
 class CItem_Box357Rounds : public CItem
 {
@@ -278,6 +329,7 @@ LINK_ENTITY_TO_CLASS(item_ammo_357, CItem_Box357Rounds);
 
 // ========================================================================
 //	>> CItem_LargeBox357Rounds
+// OBSELETE USE item_large_box_lrounds KEPT FOR COMPATIBILITY
 // ========================================================================
 class CItem_LargeBox357Rounds : public CItem
 {
@@ -308,7 +360,7 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_ammo_357_large, CItem_LargeBox357Rounds);
+LINK_ENTITY_TO_CLASS(item_ammo_357_large, CItem_LargeBox357Rounds);	//OBSELETE - DO NOT USE
 
 
 // ========================================================================
@@ -346,9 +398,45 @@ public:
 };
 LINK_ENTITY_TO_CLASS(item_ammo_crossbow, CItem_BoxXBowRounds);
 
+#if 0
+// ========================================================================
+//	>> CItem_BoxAR1Rounds
+// AR1 Clip
+// ========================================================================
+class CItem_BoxAR1Rounds : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_BoxAR1Rounds, CItem );
+
+	void Spawn( void )
+	{
+		Precache( );
+		SetModel( "models/items/combine_rifle_cartridge01.mdl");
+		BaseClass::Spawn( );
+	}
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");
+	}
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR1, "AR1"))
+		{
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}	
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_ar1, CItem_BoxAR1Rounds);
+#endif
 
 // ========================================================================
 //	>> FlareRound
+// Single flare
 // ========================================================================
 class CItem_FlareRound : public CItem
 {
@@ -356,7 +444,7 @@ public:
 	DECLARE_CLASS( CItem_FlareRound, CItem );
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/flare.mdl");
 		BaseClass::Spawn( );
@@ -380,18 +468,18 @@ public:
 };
 LINK_ENTITY_TO_CLASS(item_flare_round, CItem_FlareRound);
 
+
 // ========================================================================
 //	>> BoxFlareRounds
+// Flaregun clip
 // ========================================================================
-#define SIZE_BOX_FLARE_ROUNDS 5
-
 class CItem_BoxFlareRounds : public CItem
 {
 public:
 	DECLARE_CLASS( CItem_BoxFlareRounds, CItem );
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/boxflares.mdl");
 		BaseClass::Spawn( );
@@ -415,6 +503,7 @@ public:
 };
 LINK_ENTITY_TO_CLASS(item_box_flare_rounds, CItem_BoxFlareRounds);
 
+
 // ========================================================================
 // RPG Round
 // ========================================================================
@@ -424,7 +513,7 @@ public:
 	DECLARE_CLASS( CItem_RPG_Round, CItem );
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/weapons/w_missile_closed.mdl");
 		BaseClass::Spawn( );
@@ -446,11 +535,13 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS( item_ml_grenade, CItem_RPG_Round );
-LINK_ENTITY_TO_CLASS( item_rpg_round, CItem_RPG_Round );
+LINK_ENTITY_TO_CLASS(item_ml_grenade, CItem_RPG_Round);	//OBSELETE - DO NOT USE
+LINK_ENTITY_TO_CLASS(item_rpg_round, CItem_RPG_Round);
+
 
 // ========================================================================
-//	>> AR2_Grenade
+//	>> AR2_Grenade/SMG1_Grenade
+// Grenade for grenade launcher
 // ========================================================================
 class CItem_AR2_Grenade : public CItem
 {
@@ -458,7 +549,7 @@ public:
 	DECLARE_CLASS( CItem_AR2_Grenade, CItem );
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/ar2_grenade.mdl");
 		BaseClass::Spawn( );
@@ -483,18 +574,18 @@ public:
 LINK_ENTITY_TO_CLASS(item_ar2_grenade, CItem_AR2_Grenade);
 LINK_ENTITY_TO_CLASS(item_ammo_smg1_grenade, CItem_AR2_Grenade);
 
+
 // ========================================================================
 //	>> BoxSniperRounds
+// Scrapgun clip
 // ========================================================================
-#define SIZE_BOX_SNIPER_ROUNDS 10
-
 class CItem_BoxSniperRounds : public CItem
 {
 public:
 	DECLARE_CLASS( CItem_BoxSniperRounds, CItem );
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/boxsniperrounds.mdl");
 		BaseClass::Spawn( );
@@ -552,8 +643,44 @@ public:
 };
 LINK_ENTITY_TO_CLASS(item_box_buckshot, CItem_BoxBuckshot);
 
+
+// ========================================================================
+//	>> LargeBoxBuckshot
+// ========================================================================
+class CItem_LargeBoxBuckshot : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_LargeBoxBuckshot, CItem );
+
+	void Spawn( void )
+	{ 
+		Precache( );
+		SetModel( "models/items/boxbuckshot.mdl");
+		BaseClass::Spawn( );
+	}
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxbuckshot.mdl");
+	}
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_BUCKSHOT_LARGE, "Buckshot"))
+		{
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_large_box_buckshot, CItem_LargeBoxBuckshot);
+
+
 // ========================================================================
 //	>> CItem_AR2AltFireRound
+// Old AR2 Altfire
 // ========================================================================
 class CItem_AR2AltFireRound : public CItem
 {
@@ -567,7 +694,7 @@ public:
 	}
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/combine_rifle_ammo01.mdl");
 		BaseClass::Spawn( );
@@ -586,8 +713,80 @@ public:
 		return false;
 	}
 };
-
 LINK_ENTITY_TO_CLASS( item_ammo_ar2_altfire, CItem_AR2AltFireRound );
+
+
+// ========================================================================
+//	>> CItem_FlamerTank
+// Tank o' napalm
+// ========================================================================
+class CItem_FlamerTank : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_FlamerTank, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/flametank.mdl");
+	}
+	void Spawn( void )
+	{
+		Precache( );
+		SetModel( "models/items/flametank.mdl");
+		BaseClass::Spawn( );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_FLAMER, "Flamer"))
+		{
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}	
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_flamer, CItem_FlamerTank);
+
+
+// ========================================================================
+//	>> CItem_LargeFlamerTank
+// ========================================================================
+#if 0
+class CItem_LargeFlamerTank : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_LargeFlamerTank, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/flame_tank_large.mdl");
+	}
+	void Spawn( void )
+	{
+		Precache( );
+		SetModel( "models/items/flame_tank_large.mdl");
+		BaseClass::Spawn( );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PROJECTOR, "Flamer"))
+		{
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}	
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_flamer_large, CItem_LargeFlamerTank);
+#endif
 
 // ==================================================================
 // Ammo crate which will supply infinite ammo of the specified type
@@ -718,7 +917,7 @@ int CItem_AmmoCrate::m_nAmmoAmounts[NUM_AMMO_CRATE_TYPES] =
 	300,	// AR2
 	3,		// RPG rounds
 	120,	// Buckshot
-	5,		// Grenades
+	4,		// Grenades
 	50,		// 357
 	50,		// Crossbow
 	3,		// AR2 alt-fire
@@ -873,8 +1072,9 @@ int CItem_AmmoCrate::OnTakeDamage( const CTakeDamageInfo &info )
 	if (player)
 	{
 		CBaseCombatWeapon *weapon = player->GetActiveWeapon();
-
-		if (weapon && !stricmp(weapon->GetName(), "weapon_crowbar"))
+		
+		// Shouldnt this just grab the damage type?
+		if (weapon && ( !stricmp(weapon->GetName(), "weapon_crowbar") || !stricmp(weapon->GetName(), "weapon_swing") || !stricmp(weapon->GetName(), "weapon_stab") ) )
 		{
 			// play the normal use sound
 			player->EmitSound( "HL2Player.Use" );

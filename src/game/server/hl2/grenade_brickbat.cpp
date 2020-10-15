@@ -1,8 +1,8 @@
-//========= Copyright © 1996-2003, Valve LLC, All rights reserved. ============
+//========= Copyright ? 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Things thrown from the hand
 //
-//=============================================================================
+//=============================================================================//
 
 #include "cbase.h"
 #include "player.h"
@@ -15,16 +15,19 @@
 #include "IEffects.h"
 #include "engine/IEngineSound.h"
 
+// memdbgon must be the last include file in a .cpp file!!!
+#include "tier0/memdbgon.h"
+
 // Global Savedata for changelevel trigger
 BEGIN_DATADESC( CGrenade_Brickbat )
 
-	DEFINE_FIELD( CGrenade_Brickbat, m_nType, FIELD_INTEGER ),
-	DEFINE_FIELD( CGrenade_Brickbat, m_bExplodes, FIELD_BOOLEAN ),
-	DEFINE_FIELD( CGrenade_Brickbat, m_bBounceToFlat, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_nType, FIELD_INTEGER ),
+	DEFINE_FIELD( m_bExplodes, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bBounceToFlat, FIELD_BOOLEAN ),
 
 	// Function Pointers
-	DEFINE_FUNCTION( CGrenade_Brickbat, BrickbatTouch ),
-	DEFINE_FUNCTION( CGrenade_Brickbat, BrickbatThink ),
+	DEFINE_ENTITYFUNC( BrickbatTouch ),
+	DEFINE_THINKFUNC( BrickbatThink ),
 
 END_DATADESC()
 
@@ -32,10 +35,10 @@ LINK_ENTITY_TO_CLASS( brickbat, CGrenade_Brickbat );
 
 void CGrenade_Brickbat::Spawn( void )
 {
-	m_fEffects &= ~EF_NOINTERP;
-
-	SetTouch( BrickbatTouch );
-	SetThink( BrickbatThink );
+	RemoveEffects( EF_NOINTERP );
+	SetCollisionGroup( COLLISION_GROUP_PROJECTILE );
+	SetTouch( &CGrenade_Brickbat::BrickbatTouch );
+	SetThink( &CGrenade_Brickbat::BrickbatThink );
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	m_takedamage = DAMAGE_YES;
@@ -79,14 +82,15 @@ void CGrenade_Brickbat::BrickbatTouch( CBaseEntity *pOther )
 	// -----------------------------------
 	if (vVelocity.Length() > 100)
 	{
-		if (GetOwner())
+		if (GetThrower())
 		{
-			trace_t tr = CBaseEntity::GetTouchTrace( );
+			trace_t tr;
+			tr = CBaseEntity::GetTouchTrace( );
 			ClearMultiDamage( );
 			Vector forward;
 			AngleVectors( GetLocalAngles(), &forward );
 
-			CTakeDamageInfo info( this, GetOwner(), m_flDamage, DMG_CRUSH );
+			CTakeDamageInfo info( this, GetThrower(), m_flDamage, DMG_CRUSH );
 			CalculateMeleeDamageForce( &info, forward, tr.endpos );
 			pOther->DispatchTraceAttack( info, forward, &tr );
 			ApplyMultiDamage();
@@ -136,7 +140,7 @@ void CGrenade_Brickbat::BrickbatThink( void )
 	// Might be physically simulated so get my velocity manually
 	// -----------------------------------------------------------
 	Vector vVelocity;
-	QAngle vAngVel;
+	AngularImpulse vAngVel;
 	GetVelocity(&vVelocity,&vAngVel);
 
 	// See if I can lose my owner (has dropper moved out of way?)
@@ -181,9 +185,7 @@ void CGrenade_Brickbat::BrickbatThink( void )
 				IPhysicsObject *pPhysicsObject = VPhysicsGetObject();
 				if ( pPhysicsObject )
 				{
-					AngularImpulse impAngVel;
-					QAngleToAngularImpulse( vAngVel, impAngVel );
-					pPhysicsObject->AddVelocity( &vNewVel, &impAngVel );
+					pPhysicsObject->AddVelocity( &vNewVel, &vAngVel );
 				}
 				// Otherwise
 				else
@@ -217,7 +219,7 @@ public:
 	}
 	void Precache( void )
 	{
-		engine->PrecacheModel("models/props_junk/Rock001a.mdl");
+		PrecacheModel("models/props_junk/Rock001a.mdl");
 		BaseClass::Precache();
 	}
 };
@@ -246,7 +248,9 @@ public:
 
 void CGrenadeBottle::Precache( void )
 {
-	engine->PrecacheModel("models/weapons/w_bb_bottle.mdl");
+	PrecacheModel("models/weapons/w_bb_bottle.mdl");
+
+	PrecacheScriptSound( "GrenadeBottle.Detonate" );
 
 	BaseClass::Precache();
 }
@@ -269,48 +273,3 @@ LINK_ENTITY_TO_CLASS( grenade_beerbottle, CGrenadeBottle );
 PRECACHE_REGISTER(grenade_beerbottle);
 
 
-
-//=====================================================================
-//	> CrematorHead
-//=====================================================================
-class CGrenadeCrematorHead : public CGrenade_Brickbat
-{
-public:
-	DECLARE_CLASS( CGrenadeCrematorHead, CGrenade_Brickbat );
-
-	void Spawn(void);
-	void Precache( void );
-	void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
-};
-
-//-----------------------------------------------------------------------------
-// Purpose:
-// Input  :
-// Output :
-//-----------------------------------------------------------------------------
-void CGrenadeCrematorHead::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
-{
-	if ( info.GetDamageType() & DMG_BULLET)
-	{
-		g_pEffects->Ricochet(ptr->endpos,ptr->plane.normal);
-	}
-	BaseClass::TraceAttack( info, vecDir, ptr );
-}
-
-void CGrenadeCrematorHead::Spawn(void)
-{
-	m_nType		= BRICKBAT_CREMATORHEAD;
-	m_bExplodes	= false;
-	SetModel( "models/cremator_head.mdl" );
-	BaseClass::Spawn();
-	SetMoveType( MOVETYPE_VPHYSICS );		// uses physics
-}
-
-void CGrenadeCrematorHead::Precache( void )
-{
-	engine->PrecacheModel("models/cremator_head.mdl");
-	BaseClass::Precache();
-}
-
-LINK_ENTITY_TO_CLASS( grenade_crematorhead, CGrenadeCrematorHead );
-PRECACHE_REGISTER(grenade_crematorhead);

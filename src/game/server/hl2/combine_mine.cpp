@@ -18,6 +18,9 @@
 #include "vphysics/constraints.h"
 #include "ai_hint.h"
 
+// memdbgon must be the last include file in a .cpp file!!!
+#include "tier0/memdbgon.h"
+
 enum
 {
 	MINE_STATE_DORMANT = 0,
@@ -49,14 +52,20 @@ char *pszMineStateNames[] =
 	"Launched",
 };
 
-// memdbgon must be the last include file in a .cpp file!!!
-#include "tier0/memdbgon.h"
-
 // After this many flips, seriously cut the frequency with which you try.
 #define BOUNCEBOMB_MAX_FLIPS	5
 
 // Approximate radius of the bomb's model
 #define BOUNCEBOMB_RADIUS		24
+
+ConVar	sk_bouncebomb_detonate_radius	( "sk_bouncebomb_detonate_radius","100");
+#define BOUNCEBOMB_DETONATE_RADIUS		sk_bouncebomb_detonate_radius.GetFloat()
+
+ConVar	sk_bouncebomb_radius			( "sk_bouncebomb_radius","128");
+#define BOUNCEBOMB_EXPLODE_RADIUS		sk_bouncebomb_radius.GetFloat()
+
+ConVar	sk_npc_dmg_bouncebomb			( "sk_npc_dmg_bouncebomb","150");
+#define BOUNCEBOMB_EXPLODE_DAMAGE		sk_npc_dmg_bouncebomb.GetFloat()
 
 BEGIN_DATADESC( CBounceBomb )
 	DEFINE_THINKFUNC( ExplodeThink ),

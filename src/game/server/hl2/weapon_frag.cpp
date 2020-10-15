@@ -2,6 +2,7 @@
 //
 // Purpose: GREN-AYYYY-DUH
 //
+// TODO; Cooking
 //=============================================================================//
 
 #include "cbase.h"
@@ -19,7 +20,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define GRENADE_TIMER	3.0f //Seconds
+#define GRENADE_TIMER	random->RandomFloat( 3.0f, 3.5f ) //3.0f
 
 #define GRENADE_PAUSED_NO			0
 #define GRENADE_PAUSED_PRIMARY		1

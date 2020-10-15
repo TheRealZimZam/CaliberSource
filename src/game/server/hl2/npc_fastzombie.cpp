@@ -2,7 +2,7 @@
 //
 // Purpose: Fast, Jumpy, Scratchy, Scrawny little bastard.
 //
-// $NoKeywords: $
+// TODO's: Dodge from side to side (enemy is aiming at me), optimization
 //=============================================================================//
 
 #include "cbase.h"
@@ -34,8 +34,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define FASTZOMBIE_IDLE_PITCH			35
-#define FASTZOMBIE_MIN_PITCH			70
+#define FASTZOMBIE_IDLE_PITCH			70
+#define FASTZOMBIE_MIN_PITCH			85
 #define FASTZOMBIE_MAX_PITCH			130
 #define FASTZOMBIE_SOUND_UPDATE_FREQ	0.5
 
@@ -197,6 +197,7 @@ enum
 	SCHED_FASTZOMBIE_UNSTICK_JUMP,
 	SCHED_FASTZOMBIE_CLIMBING_UNSTICK_JUMP,
 	SCHED_FASTZOMBIE_MELEE_ATTACK1,
+	SCHED_FASTZOMBIE_FRENZY,
 	SCHED_FASTZOMBIE_TORSO_MELEE_ATTACK1,
 };
 
@@ -602,7 +603,7 @@ void CFastZombie::SoundInit( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Make the zombie sound calm.
+// Purpose: Make the zombie sound "calm".
 //-----------------------------------------------------------------------------
 void CFastZombie::SetIdleSoundState( void )
 {
@@ -726,18 +727,15 @@ float CFastZombie::MaxYawSpeed( void )
 	{
 	case ACT_TURN_LEFT:
 	case ACT_TURN_RIGHT:
-		return 120;
+		return 45;
 		break;
-
 	case ACT_RUN:
-		return 160;
+		return 90;
 		break;
-
 	case ACT_WALK:
 	case ACT_IDLE:
 		return 25;
 		break;
-		
 	default:
 		return 20;
 		break;
@@ -961,7 +959,6 @@ float CFastZombie::InnateRange1MaxRange( void )
 //-----------------------------------------------------------------------------
 int CFastZombie::RangeAttack1Conditions( float flDot, float flDist )
 {
-
 	if (GetEnemy() == NULL)
 	{
 		return( COND_NONE );
@@ -2075,7 +2072,7 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		TASK_FACE_ENEMY					0"
 		"	"
 		"	Interrupts"
-	)
+	);
 
 	//=========================================================
 	// I have landed somewhere that's pathfinding-unfriendly
@@ -2089,7 +2086,7 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		TASK_FASTZOMBIE_UNSTICK_JUMP	0"
 		"	"
 		"	Interrupts"
-	)
+	);
 
 	//=========================================================
 	//=========================================================
@@ -2102,11 +2099,12 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		TASK_FASTZOMBIE_UNSTICK_JUMP	0"
 		"	"
 		"	Interrupts"
-	)
+	);
 
 	//=========================================================
 	// > Melee_Attack1
 	//=========================================================
+	//!!! Shouldnt "frenzy" be a seperate sched???
 	DEFINE_SCHEDULE
 	(
 		SCHED_FASTZOMBIE_MELEE_ATTACK1,
@@ -2116,6 +2114,25 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		TASK_FACE_ENEMY					0"
 		"		TASK_MELEE_ATTACK1				0"
 		"		TASK_MELEE_ATTACK1				0"
+//		"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_FASTZOMBIE_FRENZY"
+//		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY"
+//		"		TASK_FASTZOMBIE_VERIFY_ATTACK	0"
+//		"		TASK_PLAY_SEQUENCE_FACE_ENEMY	ACTIVITY:ACT_FASTZOMBIE_BIG_SLASH"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FASTZOMBIE_FRENZY"
+
+		""
+		"	Interrupts"
+		"		COND_NEW_ENEMY"
+		"		COND_ENEMY_DEAD"
+		"		COND_ENEMY_OCCLUDED"
+	);
+
+	DEFINE_SCHEDULE
+	(
+		SCHED_FASTZOMBIE_FRENZY,
+
+		"	Tasks"
+		"		TASK_FACE_ENEMY					0"
 		"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_FASTZOMBIE_FRENZY"
 		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY"
 		"		TASK_FASTZOMBIE_VERIFY_ATTACK	0"
@@ -2126,13 +2143,14 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		COND_NEW_ENEMY"
 		"		COND_ENEMY_DEAD"
 		"		COND_ENEMY_OCCLUDED"
+		"		COND_HEAVY_DAMAGE"
 	);
 
 	//=========================================================
 	// > Melee_Attack1
 	//=========================================================
 	DEFINE_SCHEDULE
-		(
+	(
 		SCHED_FASTZOMBIE_TORSO_MELEE_ATTACK1,
 
 		"	Tasks"
@@ -2148,7 +2166,7 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		COND_NEW_ENEMY"
 		"		COND_ENEMY_DEAD"
 		"		COND_ENEMY_OCCLUDED"
-		);
+	);
 
 AI_END_CUSTOM_NPC()
 

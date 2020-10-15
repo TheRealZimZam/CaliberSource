@@ -217,7 +217,7 @@ void CCrossbowBolt::BoltTouch( CBaseEntity *pOther )
 #if defined(HL2_EPISODIC)
 		//!!!HACKHACK - specific hack for ep2_outland_10 to allow crossbow bolts to pass through her bounding box when she's crouched in front of the player
 		// (the player thinks they have clear line of sight because Alyx is crouching, but her BBOx is still full-height and blocks crossbow bolts.
-		if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() && pOther->Classify() == CLASS_PLAYER_ALLY_VITAL && FStrEq(STRING(gpGlobals->mapname), "ep2_outland_10") )
+		if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() && pOther->Classify() == CLASS_PLAYER_ALLY_VITAL )
 		{
 			// Change the owner to stop further collisions with Alyx. We do this by making her the owner.
 			// The player won't get credit for this kill but at least the bolt won't magically disappear!

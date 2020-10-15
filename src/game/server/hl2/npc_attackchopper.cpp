@@ -92,7 +92,7 @@ static const char *s_pChunkModelName[CHOPPER_MAX_CHUNKS] =
 #define CHOPPER_MIN_CIRCLE_OF_DEATH_RADIUS	150.0f
 #define CHOPPER_MAX_CIRCLE_OF_DEATH_RADIUS	350.0f
 
-#define CHOPPER_BOMB_DROP_COUNT 6
+#define CHOPPER_BOMB_DROP_COUNT 4
 
 // Bullrush
 #define CHOPPER_BULLRUSH_MODE_DISTANCE g_helicopter_bullrush_distance.GetFloat()
@@ -127,7 +127,7 @@ static const char *s_pChunkModelName[CHOPPER_MAX_CHUNKS] =
 // CVars
 ConVar	sk_helicopter_health( "sk_helicopter_health","5600");
 ConVar	sk_helicopter_firingcone( "sk_helicopter_firingcone","20.0", 0, "The angle in degrees of the cone in which the shots will be fired" );
-ConVar	sk_helicopter_burstcount( "sk_helicopter_burstcount","12", 0, "How many shot bursts to fire after charging up. The bigger the number, the longer the firing is" );
+ConVar	sk_helicopter_burstcount( "sk_helicopter_burstcount","16", 0, "How many shot bursts to fire after charging up. The bigger the number, the longer the firing is" );
 ConVar	sk_helicopter_roundsperburst( "sk_helicopter_roundsperburst","5", 0, "How many shots to fire in a single burst" );
 
 ConVar	sk_helicopter_grenadedamage( "sk_helicopter_grenadedamage","25.0", 0, "The amount of damage the helicopter grenade deals." );
@@ -137,7 +137,7 @@ ConVar	sk_helicopter_grenade_puntscale( "sk_helicopter_grenade_puntscale","1.5",
 
 // Number of bomb hits it takes to kill a chopper on each skill level.
 ConVar sk_helicopter_num_bombs1("sk_helicopter_num_bombs1", "3");
-ConVar sk_helicopter_num_bombs2("sk_helicopter_num_bombs2", "5");
+ConVar sk_helicopter_num_bombs2("sk_helicopter_num_bombs2", "4");
 ConVar sk_helicopter_num_bombs3("sk_helicopter_num_bombs3", "5");
 
 ConVar	sk_npc_dmg_helicopter_to_plr( "sk_npc_dmg_helicopter_to_plr","3", 0, "Damage helicopter shots deal to the player" );

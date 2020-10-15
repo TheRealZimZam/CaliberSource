@@ -88,8 +88,18 @@ public:
 	void			DoImpactEffect( trace_t &tr, int nDamageType );
 
 	bool HeadlightIsOn( void ) { return m_bHeadlightIsOn; }
-	void HeadlightTurnOn( void ) { m_bHeadlightIsOn = true; }
-	void HeadlightTurnOff( void ) { m_bHeadlightIsOn = false; }
+//	void HeadlightTurnOn( void ) { m_bHeadlightIsOn = true; }
+//	void HeadlightTurnOff( void ) { m_bHeadlightIsOn = false; }
+	void HeadlightTurnOn( void )
+	{
+		EmitSound( "Jeep.HeadlightOn" );
+		m_bHeadlightIsOn = true;
+	}
+	void HeadlightTurnOff( void )
+	{
+		EmitSound( "Jeep.HeadlightOff" );
+		m_bHeadlightIsOn = false;
+	}
 
 private:
 

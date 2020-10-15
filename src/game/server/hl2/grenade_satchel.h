@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright Â© 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Satchel Charge
 //
@@ -14,25 +14,28 @@
 #pragma once
 #endif
 
-
 #include "basegrenade_shared.h"
-#include "hl2mp/weapon_slam.h"
+#include "weapon_slam.h"
 
 class CSoundPatch;
+class CSprite;
 
 class CSatchelCharge : public CBaseGrenade
 {
 public:
 	DECLARE_CLASS( CSatchelCharge, CBaseGrenade );
 
-	void			Spawn( void );
 	void			Precache( void );
+	void			Spawn( void );
 	void			BounceSound( void );
 	void			UpdateSlideSound( void );
 	void			KillSlideSound(void);
 	void			SatchelTouch( CBaseEntity *pOther );
 	void			SatchelThink( void );
 	void			SatchelUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+
+	// Input handlers
+	void			InputExplode( inputdata_t &inputdata );
 
 	CSoundPatch*	m_soundSlide;
 	float			m_flSlideVolume;
@@ -51,7 +54,9 @@ public:
 	DECLARE_DATADESC();
 
 private:
-	void InitSlideSound(void);
+	void InitSlideSound( void );
+	void CreateEffects( void );
+	CHandle<CSprite>	m_hGlowSprite;
 };
 
 #endif	//SATCHEL_H

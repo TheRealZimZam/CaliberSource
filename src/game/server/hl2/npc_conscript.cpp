@@ -1,35 +1,23 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: The shamed and castrated military of Earth.
+// Purpose: The shamed and castrated military of Earf.
 //
 //=============================================================================//
 
 #include "cbase.h"
-#include "ai_default.h"
-#include "ai_task.h"
-#include "ai_schedule.h"
-#include "ai_node.h"
-#include "ai_hull.h"
-#include "ai_hint.h"
-#include "ai_squad.h"
-#include "ai_senses.h"
-#include "ai_navigator.h"
-#include "ai_motor.h"
-#include "ai_behavior.h"
-#include "ai_baseactor.h"
-#include "ai_behavior_lead.h"
-#include "ai_behavior_follow.h"
-#include "ai_behavior_standoff.h"
-#include "ai_behavior_assault.h"
-#include "npc_playercompanion.h"
 #include "soundent.h"
-#include "game.h"
 #include "npcevent.h"
-#include "activitylist.h"
-#include "vstdlib/random.h"
-#include "engine/IEngineSound.h"
-#include "sceneentity.h"
+#include "npc_playercompanion.h"
+#include "ai_squad.h"
+#include "ai_pathfinder.h"
+#include "ai_route.h"
+#include "ai_hint.h"
+#include "ai_interactions.h"
+#include "ai_looktarget.h"
+#include "ai_behavior.h"
 #include "ai_behavior_functank.h"
+#include "sceneentity.h"
+#include "tier0/ICommandLine.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -38,18 +26,17 @@
 
 ConVar	sk_conscript_health( "sk_conscript_health","0");
 
-ConVar	npc_conscript_explosive_resist( "npc_citizen_explosive_resist", "1" );
+Activity ACT_CONSCRIPT_SUPPRESS;
 
 //=========================================================
-// Conscript activities
+// Conscript
 //=========================================================
 
 class CNPC_Conscript : public CNPC_PlayerCompanion
 {
-public:
 	DECLARE_CLASS( CNPC_Conscript, CNPC_PlayerCompanion );
-	DECLARE_SERVERCLASS();
-	DECLARE_DATADESC();
+public:
+//	DECLARE_SERVERCLASS();
 
 	virtual void Precache()
 	{
@@ -70,11 +57,11 @@ public:
 	void	SelectModel();
 	Class_T Classify( void );
 
-	void	Weapon_Equip( CBaseCombatWeapon *pWeapon );
 	WeaponProficiency_t CalcWeaponProficiency( CBaseCombatWeapon *pWeapon );
 
 	bool CreateBehaviors( void );
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	virtual int		SelectSchedule( void );
 	
 	void HandleAnimEvent( animevent_t *pEvent );
 //	string_t 		GetModelName() const;
@@ -84,25 +71,36 @@ public:
 	void OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  CAI_BehaviorBase *pNewBehavior );
 
 	void DeathSound( const CTakeDamageInfo &info );
-	void GatherConditions();
 	void UseFunc( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	CAI_FuncTankBehavior		m_FuncTankBehavior;
 	COutputEvent				m_OnPlayerUse;
 
+private:
+	//=========================================================
+	// Schedules
+	//=========================================================
+	enum
+	{
+		SCHED_CONSCRIPT_SUPPRESS = BaseClass::NEXT_SCHEDULE,
+		NEXT_SCHEDULE,
+	};
+
+	DECLARE_DATADESC();
 	DEFINE_CUSTOM_AI;
 };
 
 
 LINK_ENTITY_TO_CLASS( npc_conscript, CNPC_Conscript );
-IMPLEMENT_CUSTOM_AI( npc_citizen, CNPC_Conscript );
+//!!!IMPLEMENT_CUSTOM_AI( npc_citizen, CNPC_Conscript );
 
 //---------------------------------------------------------
 // 
 //---------------------------------------------------------
+#if 0
 IMPLEMENT_SERVERCLASS_ST(CNPC_Conscript, DT_NPC_Conscript)
 END_SEND_TABLE()
-
+#endif
 
 //---------------------------------------------------------
 // Save/Restore
@@ -118,39 +116,8 @@ END_DATADESC()
 //-----------------------------------------------------------------------------
 void CNPC_Conscript::SelectModel()
 {
-	SetModelName( AllocPooledString( Conscript_MODEL ) );
+	SetModelName( AllocPooledString( CONSCRIPT_MODEL ) );
 }
-
-//---------------------------------------------------------
-// Random Models
-//---------------------------------------------------------
-
-static const char *g_ppszRandomHeads[] = 
-{
-	"male_01.mdl",
-	"male_02.mdl",
-	"female_01.mdl",
-	"male_03.mdl",
-	"female_02.mdl",
-	"male_04.mdl",
-	"female_03.mdl",
-	"male_05.mdl",
-	"female_04.mdl",
-	"male_06.mdl",
-	"female_06.mdl",
-	"male_07.mdl",
-	"female_07.mdl",
-	"male_08.mdl",
-	"male_09.mdl",
-};
-
-static const char *g_ppszModelLocs[] =
-{
-	"Group01",
-	"Group01",
-	"Group02",
-	"Group03%s",
-};
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -188,23 +155,16 @@ Class_T	CNPC_Conscript::Classify( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-void CNPC_Conscript::Weapon_Equip( CBaseCombatWeapon *pWeapon )
-{
-	BaseClass::Weapon_Equip( pWeapon );
-
-	if( FClassnameIs( pWeapon, "weapon_ar2" ) )
-	{
-		// Conscripts are better with the AR2 than citizens
-		pWeapon->m_fMinRange1 = 0.0f;
-	}
-}
-
 WeaponProficiency_t CNPC_Conscript::CalcWeaponProficiency( CBaseCombatWeapon *pWeapon )
 {
+	// Conscripts are better with the AR2 than citizens
 	if( FClassnameIs( pWeapon, "weapon_ar2" ) )
 	{
-		// Conscripts are better with the AR2 than citizens
 		return WEAPON_PROFICIENCY_VERY_GOOD;
+	}
+	else if( FClassnameIs( pWeapon, "weapon_smg1" ) )
+	{
+		return WEAPON_PROFICIENCY_GOOD;
 	}
 
 	return BaseClass::CalcWeaponProficiency( pWeapon );
@@ -241,7 +201,6 @@ void CNPC_Conscript::DeathSound( const CTakeDamageInfo &info )
 	SentenceStop();
 
 	EmitSound( "NPC_Conscript.die" );
-
 }
 
 bool CNPC_Conscript::CreateBehaviors( void )
@@ -268,18 +227,6 @@ void CNPC_Conscript::OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  C
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-void CNPC_Conscript::GatherConditions()
-{
-	BaseClass::GatherConditions();
-
-	// Handle speech AI. Don't do AI speech if we're in scripts unless permitted by the EnableSpeakWhileScripting input.
-	if ( m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT || m_NPCState == NPC_STATE_COMBAT ||
-		( ( m_NPCState == NPC_STATE_SCRIPT ) && CanSpeakWhileScripting() ) )
-	{
-		DoCustomSpeechAI();
-	}
-}
-
 int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
 	// make sure friends talk about it if player hurts allies
@@ -289,7 +236,7 @@ int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		return ret;
 	}
 
-//~	CTakeDamageInfo newInfo = info;
+	CTakeDamageInfo newInfo = info;
 
 	if( IsInSquad() && (info.GetDamageType() & DMG_BLAST) && info.GetInflictor() )
 	{
@@ -299,7 +246,7 @@ int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		// single explosion.
 		if( m_pSquad->IsSquadInflictor( info.GetInflictor() ) )
 		{
-			newInfo.ScaleDamage( 0.75 );
+			newInfo.ScaleDamage( 0.5 );
 		}
 		else
 		{
@@ -311,7 +258,8 @@ int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 			}
 		}
 	}
-	
+
+#if 0
 	if ( m_NPCState != NPC_STATE_PRONE && (info.GetAttacker()->GetFlags() & FL_CLIENT) )
 	{
 		// This is a heurstic to determine if the player intended to harm me
@@ -328,7 +276,7 @@ int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 				CapabilitiesRemove(bits_CAP_NO_HIT_PLAYER);
 
-				StopFollowing();
+			//	StopFollowing();
 			}
 			else
 			{
@@ -339,10 +287,50 @@ int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		}
 		else if ( !(GetEnemy()->IsPlayer()) && (m_lifeState != LIFE_DEAD ))
 		{
-			Speak( CONSCRIPT_SHOT );
+			Speak( TLK_SHOT );
 		}
 	}
+#endif
 	return ret;
+}
+
+int CNPC_Conscript::SelectSchedule( void )
+{
+	switch	( m_NPCState )
+	{
+	case NPC_STATE_COMBAT:
+		{
+			// -----------
+			// New Enemy
+			// -----------
+			if ( HasCondition( COND_ENEMY_OCCLUDED ) )
+			{
+				// Conscripts never wait to establish LOS
+				if( GetEnemy() && !(GetEnemy()->GetFlags() & FL_NOTARGET) )
+				{
+					// Charge in and break the enemy's cover!
+					return SCHED_ESTABLISH_LINE_OF_FIRE;
+				}
+
+				// Fallback case
+				Remember( bits_MEMORY_INCOVER );
+				return SCHED_STANDOFF;
+			}
+			else if ( HasCondition( COND_SEE_ENEMY ) && !HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+			{
+				// Get into range!
+				if ( HasCondition( COND_TOO_FAR_TO_ATTACK ) )
+				{
+					return SCHED_MOVE_TO_WEAPON_RANGE;
+				}
+				return SCHED_ESTABLISH_LINE_OF_FIRE;
+			}
+		}
+		break;
+	}
+
+	// no special cases here, call the base class
+	return BaseClass::SelectSchedule();
 }
 
 //-----------------------------------------------------------------------------
@@ -363,5 +351,31 @@ void CNPC_Conscript::UseFunc( CBaseEntity *pActivator, CBaseEntity *pCaller, USE
 //-----------------------------------------------------------------------------
 
 AI_BEGIN_CUSTOM_NPC( npc_conscript, CNPC_Conscript )
+
+DECLARE_ACTIVITY( ACT_CONSCRIPT_SUPPRESS )
+
+ //=========================================================
+ // SUPPRESS
+ //=========================================================
+ DEFINE_SCHEDULE	
+ (
+ SCHED_CONSCRIPT_SUPPRESS,
+
+ "	Tasks"
+ "		TASK_STOP_MOVING			0"
+ "		TASK_FACE_ENEMY				0"
+ "		TASK_WAIT					0.5"
+ "		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_CONSCRIPT_SUPPRESS"
+ "		TASK_RANGE_ATTACK1			0"
+ ""
+ "	Interrupts"
+ "		COND_ENEMY_DEAD"
+ "		COND_HEAVY_DAMAGE"
+ "		COND_NO_PRIMARY_AMMO"
+ "		COND_TOO_CLOSE_TO_ATTACK"
+ "		COND_HEAR_DANGER"
+ "		COND_HEAR_MOVE_AWAY"
+ "		COND_WEAPON_BLOCKED_BY_FRIEND"
+ );
 
 AI_END_CUSTOM_NPC()

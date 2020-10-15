@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Burn things funly
+// Purpose: Burn things funly - currently only (kinda) works for npcs
 //
-// TODO's; Fix sound. Impact fx. Optimize.
+// TODO's; Fix sound/collision bug. Better fx. Optimize.
 // $NoKeywords: $
 //=============================================================================//
 
@@ -154,7 +154,7 @@ void CWeaponFlameprojector::PrimaryAttack( void )
 
 //-----------------------------------------------------------------------------
 // This weapon is said to have Line of Sight when it CAN'T see the target, but
-// can see a place near the target than can.
+// can see a place near the target that can.
 //-----------------------------------------------------------------------------
 bool CWeaponFlameprojector::WeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions )
 {
@@ -339,7 +339,13 @@ void CWeaponFlameprojector::Update()
 	}
 	else
 	{
-		// The attack beam struck some kind of entity directly.
+		// The attack beam struck some kind of entity directly, the radius doesnt have to be as big to do damage.
+		/*
+		if( m_flBurnRadius > 32.0 )
+		{
+			ImmolationDamage( CTakeDamageInfo( this, this, 1, DMG_BURN ), tr.endpos, m_flBurnRadius, CLASS_NONE );
+		}
+		*/
 	}
 
 	m_flTimeLastUpdatedRadius = gpGlobals->curtime;
@@ -357,7 +363,6 @@ void CWeaponFlameprojector::ItemPostFrame( void )
 {
 	BaseClass::ItemPostFrame();
 }
-
 
 
 void CWeaponFlameprojector::ImmolationDamage( const CTakeDamageInfo &info, const Vector &vecSrcIn, float flRadius, int iClassIgnore )
@@ -400,7 +405,8 @@ void CWeaponFlameprojector::ImmolationDamage( const CTakeDamageInfo &info, const
 				continue;
 			}
 
-			pBCC->Ignite( random->RandomFloat( 15, 20 ) );
+			pBCC->Ignite( random->RandomFloat( 10, 15 ) );
 		}
 	}
 }
+

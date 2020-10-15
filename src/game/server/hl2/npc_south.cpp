@@ -4,22 +4,7 @@
 //			plane as Joe.
 //
 //=============================================================================//
-// TODO:
-// 1. Fix the response speech, add custom entries if needed.
-// 2. LMG Free-fire ability, when at low health/triggered by map.
-// 3. Iron bugs
 //
-//
-// ASSUMPTIONS MADE:
-//
-// You're making a character based on CAI_BaseNPC. If this 
-// is not true, make sure you replace all occurances
-// of 'CAI_BaseNPC' in this file with the appropriate 
-// parent class.
-//
-// You're making a human-sized NPC that walks.
-//
-//=============================================================================//
 // Base behavior files
 #include "cbase.h"
 #include "ai_default.h"
@@ -133,21 +118,7 @@ public:
 	bool		 CanBeBlindedByFlashlight( bool bCheckLightSources );
 	bool		 PlayerFlashlightOnMyEyes( CBasePlayer *pPlayer );
 	bool		 BlindedByFlare( void );
-//	bool		 CanReload( void );
-	
-	//---------------------------------
-	// Special abilities
-	//---------------------------------
-	
-//	bool 			CanHeal();
-//	bool 			ShouldHealTossTarget( CBaseEntity *pTarget, bool bActiveUse = false );
-//
-//	void 			Heal();
-//
-//	bool			ShouldLookForHealthItem();
-//
-//	void			TossHealthKit( CBaseCombatCharacter *pThrowAt, const Vector &offset ); // create a healthkit and throw it at someone
-//	void			InputForceHealthKitToss( inputdata_t &inputdata );
+
 	PassengerState_e	GetPassengerState( void );
 	bool	RunningPassengerBehavior( void );
 
@@ -212,7 +183,7 @@ void CNPC_South::Activate()
 	
 	BaseClass::Activate();
 	
-	// Assume boston has already said hello
+	// Assume tom has already said hello
 	SetSpokeConcept( TLK_HELLO, NULL, false );
 }
 
@@ -280,11 +251,11 @@ void CNPC_South::Spawn()
 	m_iszCombatExpression = MAKE_STRING("scenes/Expressions/TomCombat.vcd");
 	
 	m_iHealth			= sk_south_health.GetFloat();
-	m_flFieldOfView		= 0.5;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
+	m_flFieldOfView		= 0.2;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
 	
-	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP | bits_CAP_OPEN_DOORS | bits_CAP_ANIMATEDFACE | bits_CAP_TURN_HEAD | bits_CAP_DUCK | bits_CAP_SQUAD );
-	CapabilitiesAdd( bits_CAP_AIM_GUN );
+	// Basic Capabilities are defined in the base AI
+	CapabilitiesAdd( bits_CAP_MOVE_JUMP | bits_CAP_OPEN_DOORS );
 	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 
 	AddEFlags( EFL_NO_DISSOLVE | EFL_NO_MEGAPHYSCANNON_RAGDOLL | EFL_NO_PHYSCANNON_INTERACTION );
@@ -297,8 +268,7 @@ void CNPC_South::Spawn()
 	m_fCombatEndTime   = 0.0f;
 
 	// Dont set too low, otherwise he wont shut-up
-	m_AnnounceAttackTimer.Set( 4, 6 );
-	
+	m_AnnounceAttackTimer.Set( 4, 8 );
 }
 
 void CNPC_South::PainSound( const CTakeDamageInfo &info )
@@ -312,7 +282,6 @@ void CNPC_South::DeathSound( const CTakeDamageInfo &info )
 	SentenceStop();
 
 	EmitSound( "npc_south.die" );
-
 }
 
 void CNPC_South::BarnacleDeathSound( void )
@@ -332,9 +301,8 @@ void CNPC_South::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 {
 	BaseClass::Weapon_Equip( pWeapon );
 
-	if( hl2_episodic.GetBool() && FClassnameIs( pWeapon, "weapon_ar2" ) )
+	if( hl2_episodic.GetBool() && FClassnameIs( pWeapon, "weapon_smg1" ) )
 	{
-		// Allow Boston to defend himself at point-blank range in hydro.
 		pWeapon->m_fMinRange1 = 0.0f;
 	}
 }
@@ -369,40 +337,16 @@ void CNPC_South::GatherConditions()
 
 	if( HasCondition( COND_HEAR_DANGER ) )
 	{
-		// A small fix copied from Alyx. Don't worry about combat sounds if in panic. 
+		// Don't worry about combat sounds if in panic. 
 		ClearCondition( COND_HEAR_COMBAT );
 	}
-	
-	// Handle speech AI. Don't do AI speech if we're in scripts unless permitted by the EnableSpeakWhileScripting input.
-	if ( m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT || m_NPCState == NPC_STATE_COMBAT ||
-		( ( m_NPCState == NPC_STATE_SCRIPT ) && CanSpeakWhileScripting() ) )
-	{
-		DoCustomSpeechAI();
-	}
-	
+
 	// Custom combat AI
 	if ( m_NPCState == NPC_STATE_COMBAT )
 	{
 		DoCustomCombatAI();
 	}
-	
-	// Flinching gestures -- Might add this for other humanoid ai's too
-	// Mainly for explosions
-	if( HasCondition(COND_HEAR_COMBAT) )
-	{
-		CSound *pSound = GetBestSound(); 
 
-			if( (pSound->SoundTypeNoContext() & SOUND_COMBAT) && (pSound->SoundContext() & SOUND_CONTEXT_EXPLOSION) )
-			{
-					if ( !IsPlayingGesture(ACT_GESTURE_FLINCH_BLAST) && !IsPlayingGesture(ACT_GESTURE_FLINCH_BLAST_DAMAGED) )
-					{
-						RestartGesture( ACT_GESTURE_FLINCH_BLAST );
-						GetShotRegulator()->FireNoEarlierThan( gpGlobals->curtime + SequenceDuration( ACT_GESTURE_FLINCH_BLAST ) + 0.5f ); // One sec cooldown
-					}
-			}
-		
-	}
-	
 //	if ( (GetFlags() & FL_FLY) && m_NPCState != NPC_STATE_SCRIPT && !m_ActBusyBehavior.IsActive() && !m_PassengerBehavior.IsEnabled() )
 //	{
 //		Warning( "Removed FL_FLY from Alyx, who wasn't running a script or actbusy. Time %.2f, map %s.\n", gpGlobals->curtime, STRING(gpGlobals->mapname) );
@@ -687,7 +631,7 @@ void CNPC_South::DoCustomCombatAI( void )
 	{
 		if( pEnemy )
 		{
-			if( GetAbsOrigin().DistToSqr( pEnemy->GetAbsOrigin() ) < Square( 60.0f ) )
+			if( GetAbsOrigin().DistToSqr( pEnemy->GetAbsOrigin() ) < Square( 80.0f ) )
 			{
 				// Don't reload if an enemy is right in my face.
 				ClearCondition( COND_LOW_PRIMARY_AMMO );
@@ -769,7 +713,7 @@ void CNPC_South::DoMobbedCombatAI( void )
 	// Scream some combat speech
 	if( HasCondition( COND_MOBBED_BY_ENEMIES ) )
 	{
-		SpeakIfAllowed( TLK_MOBBED );		
+		SpeakIfAllowed( TLK_MOBBED );
 	}
 	else if( visibleEnemiesScore > 4 )
 	{
@@ -783,12 +727,11 @@ WeaponProficiency_t CNPC_South::CalcWeaponProficiency( CBaseCombatWeapon *pWeapo
 {
 
 	// Main Weapon
-	if( FClassnameIs( pWeapon, "weapon_ar2" ) )
+	if( FClassnameIs( pWeapon, "weapon_smg1" ) )
 	{
-		return WEAPON_PROFICIENCY_GOOD;
+		return WEAPON_PROFICIENCY_VERY_GOOD;
 	}
-	
-	// Add a check here to see if its a friendly citizen. If it is, then put it to avg.
+
 	if( FClassnameIs( pWeapon, "weapon_pistol" ) )
 	{
 		return WEAPON_PROFICIENCY_AVERAGE;
@@ -798,9 +741,9 @@ WeaponProficiency_t CNPC_South::CalcWeaponProficiency( CBaseCombatWeapon *pWeapo
 		return WEAPON_PROFICIENCY_VERY_GOOD;
 	}
 
-	if( FClassnameIs( pWeapon, "weapon_smg1" ) )
+	if( FClassnameIs( pWeapon, "weapon_ar2" ) )
 	{
-		return WEAPON_PROFICIENCY_VERY_GOOD;
+		return WEAPON_PROFICIENCY_GOOD;
 	}
 
 	// Shotgun is calculated differently
@@ -811,18 +754,6 @@ WeaponProficiency_t CNPC_South::CalcWeaponProficiency( CBaseCombatWeapon *pWeapo
 
 	return BaseClass::CalcWeaponProficiency( pWeapon );
 }
-
-//-----------------------------------------------------------------------------
-//
-// Schedules
-//
-//-----------------------------------------------------------------------------
-
-
-
-//=============================================================================
-// AI Schedules Guts
-//=============================================================================
 
 //-----------------------------------------------------------------------------
 // Purpose: Use custom generic attacking speech
@@ -845,7 +776,7 @@ void CNPC_South::SpeakAttacking( void )
 	{
 		// Also gets the weapon used
 		SpeakIfAllowed( TLK_ATTACKING, UTIL_VarArgs("attacking_with_weapon:%s", GetActiveWeapon()->GetClassname()) );
-		m_AnnounceAttackTimer.Set( 4, 6 );
+		m_AnnounceAttackTimer.Set( 4, 8 );
 	}
 }
 

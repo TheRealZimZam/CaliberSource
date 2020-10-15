@@ -70,7 +70,6 @@ bool IsInCommentaryMode( void );
 
 #define ALYX_MIN_ENEMY_DIST_TO_CROUCH			360			// Minimum distance that our enemy must be for me to crouch
 #define ALYX_MIN_ENEMY_HEALTH_TO_CROUCH			15
-#define ALYX_CROUCH_DELAY						5			// Time after crouching before Alyx will crouch again
 
 //-----------------------------------------------------------------------------
 // Interactions
@@ -98,7 +97,6 @@ BEGIN_DATADESC( CNPC_Alyx )
 	DEFINE_FIELD( m_fTimeUntilNextDarknessFoundPlayer, FIELD_TIME ),
 	DEFINE_FIELD( m_fCombatStartTime, FIELD_TIME ),
 	DEFINE_FIELD( m_fCombatEndTime, FIELD_TIME ),
-	DEFINE_FIELD( m_flNextCrouchTime, FIELD_TIME ),
 	DEFINE_FIELD( m_WeaponType, FIELD_INTEGER ),
 	DEFINE_KEYFIELD( m_bShouldHaveEMP, FIELD_BOOLEAN, "ShouldHaveEMP" ),
 	
@@ -128,7 +126,7 @@ BEGIN_DATADESC( CNPC_Alyx )
 END_DATADESC()
 
 #define ALYX_FEAR_ZOMBIE_DIST_SQR	Square(60)
-#define ALYX_FEAR_ANTLION_DIST_SQR	Square(360)
+#define ALYX_FEAR_ANTLION_DIST_SQR	Square(300)
 
 //-----------------------------------------------------------------------------
 // Anim events
@@ -930,21 +928,6 @@ bool CNPC_Alyx::IsValidEnemy( CBaseEntity *pEnemy )
 
 		if( pEnemy->GetEnemy() != this && !pEnemy->GetEnemy()->IsPlayer() )
 		{
-			return false;
-		}
-	}
-
-	if ( m_AssaultBehavior.IsRunning() && IsTurret( pEnemy ) )
-	{
-		CBaseCombatCharacter *pBCC = dynamic_cast<CBaseCombatCharacter*>(pEnemy);
-
-		if ( pBCC != NULL && !pBCC->FInViewCone(this) )
-		{
-			// Don't let turrets that can't shoot me distract me from my assault behavior.
-			// This fixes a very specific problem that appeared in Episode 2 map ep2_outland_09
-			// Where Alyx wouldn't terminate an assault while standing on an assault point because
-			// she was afraid of a turret that was visible from the assault point, but facing the 
-			// other direction and thus not a threat. 
 			return false;
 		}
 	}
@@ -1805,11 +1788,6 @@ int CNPC_Alyx::TranslateSchedule( int scheduleType )
 	case SCHED_ALERT_REACT_TO_COMBAT_SOUND:
 		return SCHED_ALYX_ALERT_REACT_TO_COMBAT_SOUND;
 		break;
-
-	case SCHED_COWER:
-	case SCHED_PC_COWER:
-		// Alyx doesn't have cower animations.
-		return SCHED_FAIL;
 
 	case SCHED_RANGE_ATTACK1:
 		{
@@ -2913,61 +2891,6 @@ float CNPC_Alyx::MaxYawSpeed( void )
 
 	return BaseClass::MaxYawSpeed();
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-bool CNPC_Alyx::Stand( void )
-{
-	bool bWasCrouching = IsCrouching();
-	if ( !BaseClass::Stand() )
-		return false;
-
-	if ( bWasCrouching )
-	{
-		m_flNextCrouchTime = gpGlobals->curtime + ALYX_CROUCH_DELAY;
-		OnUpdateShotRegulator();
-	}
-
-	return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-bool CNPC_Alyx::Crouch( void )
-{
-	if ( !npc_alyx_crouch.GetBool() )
-		return false;
-
-	// Alyx will ignore crouch requests while she has the shotgun
-	if ( HasShotgun() )
-		return false;
-
-	bool bWasStanding = !IsCrouching();
-	if ( !BaseClass::Crouch() )
-		return false;
-
-	if ( bWasStanding )
-	{
-		OnUpdateShotRegulator();
-	}
-
-	return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_Alyx::DesireCrouch( void )
-{
-	// Ignore crouch desire if we've been crouching recently to reduce oscillation
-	if ( m_flNextCrouchTime > gpGlobals->curtime )
-		return;
-
-	BaseClass::DesireCrouch();
-}
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Tack on extra criteria for responses

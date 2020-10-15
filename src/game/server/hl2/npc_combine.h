@@ -42,13 +42,19 @@ public:
 	// Create components
 	virtual bool	CreateComponents();
 
-	bool			CanThrowGrenade( const Vector &vecTarget );
-	bool			CheckCanThrowGrenade( const Vector &vecTarget );
-	virtual	bool	CanGrenadeEnemy( bool bUseFreeKnowledge = true );
-	virtual bool	CanAltFireEnemy( bool bUseFreeKnowledge );
+	void			Spawn( void );
+	void			Precache( void );
+	void			Activate();
+
+//!	bool			GetGrenadeConditions( const Vector &vecTarget );
 	int				GetGrenadeConditions( float flDot, float flDist );
+	int				CheckCanThrowGrenade( const Vector &vecTarget );
 	int				RangeAttack2Conditions( float flDot, float flDist ); // For innate grenade attack
 	int				MeleeAttack1Conditions( float flDot, float flDist ); // For kick/punch
+
+	virtual bool	CanAltFireEnemy();
+	bool			CanLaunchGrenade( const Vector &vecTarget );
+
 	bool			FVisible( CBaseEntity *pEntity, int traceMask = MASK_BLOCKLOS, CBaseEntity **ppBlocker = NULL );
 	virtual bool	IsCurTaskContinuousMove();
 
@@ -57,6 +63,7 @@ public:
 	virtual Vector  GetCrouchEyeOffset( void );
 
 	void Event_Killed( const CTakeDamageInfo &info );
+	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
 
 
 	void SetActivity( Activity NewActivity );
@@ -70,12 +77,9 @@ public:
 	void InputAssault( inputdata_t &inputdata );
 	void InputHitByBugbait( inputdata_t &inputdata );
 	void InputThrowGrenadeAtTarget( inputdata_t &inputdata );
+//!	void InputThrowTeleportGrenadeAtTarget( inputdata_t &inputdata );
 
 	bool			UpdateEnemyMemory( CBaseEntity *pEnemy, const Vector &position, CBaseEntity *pInformer = NULL );
-
-	void			Spawn( void );
-	void			Precache( void );
-	void			Activate();
 
 	Class_T			Classify( void );
 	bool			IsElite() { return m_fIsElite; }
@@ -83,6 +87,7 @@ public:
 	void			DelaySquadAltFireAttack( float flDelay );
 	float			MaxYawSpeed( void );
 	bool			ShouldMoveAndShoot();
+	void			OnUpdateShotRegulator();
 	bool			OverrideMoveFacing( const AILocalMoveGoal_t &move, float flInterval );;
 	void			HandleAnimEvent( animevent_t *pEvent );
 	Vector			Weapon_ShootPosition( );
@@ -94,14 +99,12 @@ public:
 
 	void			StartTask( const Task_t *pTask );
 	void			RunTask( const Task_t *pTask );
-	void			PostNPCInit();
 	void			GatherConditions();
 	virtual void	PrescheduleThink();
 
 	Activity		NPC_TranslateActivity( Activity eNewActivity );
 	void			BuildScheduleTestBits( void );
 	virtual int		SelectSchedule( void );
-//	virtual int		SelectFailSchedule( int failedSchedule, int failedTask, AI_TaskFailureCode_t taskFailCode );
 	int				SelectScheduleAttack();
 
 	bool			CreateBehaviors();
@@ -113,6 +116,7 @@ public:
 	WeaponProficiency_t CalcWeaponProficiency( CBaseCombatWeapon *pWeapon );
 	bool			HasShotgun();
 	bool			ActiveWeaponIsFullyLoaded();
+	bool			CanDoSignal();
 
 	bool			HandleInteraction(int interactionType, void *data, CBaseCombatCharacter *sourceEnt);
 	const char*		GetSquadSlotDebugName( int iSquadSlot );
@@ -145,7 +149,6 @@ public:
 	void			SpeakSentence( int sentType );
 
 	virtual int		TranslateSchedule( int scheduleType );
-	void			OnStartSchedule( int scheduleType );
 
 //	virtual bool	ShouldPickADeathPose( void );
 
@@ -155,7 +158,7 @@ protected:
 
 private:
 	//=========================================================
-	// Combine S schedules
+	// Combine schedules
 	//=========================================================
 	enum
 	{
@@ -169,29 +172,31 @@ private:
 //		SCHED_COMBINE_OVERWATCH,
 		SCHED_COMBINE_ASSAULT,
 		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE,
+		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE_FACE,
 		SCHED_COMBINE_PRESS_ATTACK,
 		SCHED_COMBINE_WAIT_IN_COVER,
 		SCHED_COMBINE_RANGE_ATTACK1,
+		SCHED_COMBINE_MELEE_ATTACK1,
 		SCHED_COMBINE_RANGE_ATTACK2,
 		SCHED_COMBINE_TAKE_COVER1,
 		SCHED_COMBINE_TAKE_COVER2,
 		SCHED_COMBINE_TAKE_COVER_FROM_BEST_SOUND,
 		SCHED_COMBINE_RUN_AWAY_FROM_BEST_SOUND,
+		SCHED_COMBINE_SIGNAL_TAKE_COVER,
 		SCHED_COMBINE_GRENADE_COVER1,
-		SCHED_COMBINE_TOSS_GRENADE_COVER1,
 		SCHED_COMBINE_TAKECOVER_FAILED,
-		SCHED_COMBINE_RUN_FROM_ENEMY,
 		SCHED_COMBINE_GRENADE_AND_RELOAD,
 		SCHED_COMBINE_PATROL,
 		SCHED_COMBINE_BUGBAIT_DISTRACTION,
-		SCHED_COMBINE_SHOOT_ENEMY_COVER,
 		SCHED_COMBINE_CHARGE_TURRET,
 		SCHED_COMBINE_DROP_GRENADE,
 		SCHED_COMBINE_CHARGE_PLAYER,
+		SCHED_COMBINE_SIGNAL_CHARGE_PLAYER,
 		SCHED_COMBINE_PATROL_ENEMY,
 		SCHED_COMBINE_BURNING_STAND,
-		SCHED_COMBINE_EVADE,
+//		SCHED_COMBINE_EVADE,
 		SCHED_COMBINE_AR2_ALTFIRE,
+//		SCHED_COMBINE_SMG1_ALTFIRE,
 		SCHED_COMBINE_FORCED_GRENADE_THROW,
 		SCHED_COMBINE_MOVE_TO_FORCED_GREN_LOS,
 		SCHED_COMBINE_MOVE_TO_MELEE,
@@ -212,8 +217,10 @@ private:
 		TASK_COMBINE_PLAY_SEQUENCE_FACE_ALTFIRE_TARGET,
 		TASK_COMBINE_GET_PATH_TO_FORCED_GREN_LOS,
 		TASK_COMBINE_SET_STANDING,
-	//	TASK_COMBINE_MOVE_AND_SHOOT,
-	//	TASK_COMBINE_MOVE_AND_AIM,
+//		TASK_COMBINE_MOVE_AND_SHOOT,
+//		TASK_COMBINE_MOVE_AND_AIM,
+//!		TASK_WAIT_FOR_TELEPORT,
+//!		TASK_ADVISOR_LEVITATE,
 		NEXT_TASK
 	};
 
@@ -260,13 +267,21 @@ private:
 	// Rappel
 	virtual bool IsWaitingToRappel( void ) { return m_RappelBehavior.IsWaitingToRappel(); }
 	void BeginRappel() { m_RappelBehavior.BeginRappel(); }
+/*
+private:
+	void OnTossedTeleportProjectile( CBaseEntity *pProjectile );
+	void OnTeleportProjectileAction( CBaseEntity *pProjectile, bool bTeleport );
 
+	void FullyLoadWeaponClips();
+*/
 private:
 	int				m_nKickDamage;
+	int				m_lastGrenadeCondition;
 	Vector			m_vecTossVelocity;
 	EHANDLE			m_hForcedGrenadeTarget;
 	bool			m_bShouldPatrol;
 	bool			m_bFirstEncounter;// only put on the handsign show in the squad's first encounter.
+//	float			flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
 
 	// Time Variables
 	float			m_flNextPainSoundTime;
@@ -274,9 +289,11 @@ private:
 	float			m_flNextGrenadeCheck;	
 	float			m_flNextLostSoundTime;
 	float			m_flAlertPatrolTime;		// When to stop doing alert patrol
-	float			m_flSignalTime;		// When to stop doing alert patrol
+	float			m_flNextSignalTime;			// Clock until a signal can be used
 	float			m_flNextAltFireTime;		// Elites only. Next time to begin considering alt-fire attack.
+//	float			m_flNextNewEnemyTime;		// Clock until the new enemy logic can be used again
 
+//	int				m_iNewEnemies;				// When this hits three, new enemy logic is deactivated for 10 seconds.
 	int				m_nShots;
 	float			m_flShotDelay;
 	float			m_flStopMoveShootTime;

@@ -2,6 +2,7 @@
 //
 // Purpose: This is the base version of the vortigaunt
 //
+// TODO; This should really NOT be a branch of npc_playercompanion
 //=============================================================================//
 
 #ifndef NPC_VORTIGAUNT_H

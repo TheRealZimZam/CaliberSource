@@ -1,10 +1,10 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Pump-action shotgun/Starting shotgun. Used by gangsters/rebels/police.
+// Purpose: Pump-action shotgun/Starting shotgun.
 //
 //			Primary attack: single barrel shot.
 //			Secondary attack: double barrel shot.
-// TODO's: Fix muzzle-fx (not code-related), new impact effects (normal holes are too big)
+// TODO's: New impact effects (normal holes are too big)
 //
 //=============================================================================//
 
@@ -25,6 +25,8 @@
 
 extern ConVar sk_auto_reload_time;
 extern ConVar sk_plr_num_shotgun_pellets;
+extern ConVar sk_npc_num_shotgun_pellets;
+extern ConVar sv_funmode;
 
 class CWeaponShotgun : public CBaseHLCombatWeapon
 {
@@ -46,22 +48,21 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector vitalAllyCone = VECTOR_CONE_3DEGREES;
+		static Vector AllyCone = VECTOR_CONE_3DEGREES;
 		static Vector cone = VECTOR_CONE_10DEGREES;
-	//	static Vector doubleBarrelCone = VECTOR_CONE_12DEGREES;
 
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
 			// Give Alyx's shotgun blasts more a more directed punch. She needs
 			// to be at least as deadly as she would be with her pistol to stay interesting (sjb)
-			return vitalAllyCone;
+			return AllyCone;
 		}
 
 		return cone;
 	}
 
 	virtual int				GetMinBurst() { return 1; }
-	virtual int				GetMaxBurst() { return 3; }
+	virtual int				GetMaxBurst() { return 1; }
 
 	virtual float			GetMinRestTime();
 	virtual float			GetMaxRestTime();
@@ -79,9 +80,9 @@ public:
 	void ItemPostFrame( void );
 	void PrimaryAttack( void );
 	void SecondaryAttack( void );
-	void DryFire( void );
 //	void DoImpactEffect( trace_t &tr, int nDamageType );
 
+	const char *GetTracerType( void ) { return "ShotgunTracer"; }
 	void FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
 	void Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
 	void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
@@ -107,12 +108,16 @@ END_DATADESC()
 
 acttable_t	CWeaponShotgun::m_acttable[] = 
 {
-	{ ACT_IDLE,						ACT_IDLE_SMG1,					true },	// FIXME: hook to shotgun unique
-
 	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_SHOTGUN,			true },
 	{ ACT_RELOAD,					ACT_RELOAD_SHOTGUN,					false },
-	{ ACT_WALK,						ACT_WALK_RIFLE,						true },
+	{ ACT_IDLE,						ACT_IDLE_RIFLE,						true },	// FIXME: hook to shotgun unique
 	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_SHOTGUN,				true },
+
+	{ ACT_WALK,						ACT_WALK_RIFLE,						true },
+	{ ACT_WALK_AIM,					ACT_WALK_AIM_SHOTGUN,				true },
+	{ ACT_RUN,						ACT_RUN_RIFLE,						true },
+	{ ACT_RUN_AIM,					ACT_RUN_AIM_SHOTGUN,				true },
+
 
 // Readiness activities (not aiming)
 	{ ACT_IDLE_RELAXED,				ACT_IDLE_SHOTGUN_RELAXED,		false },//never aims
@@ -121,31 +126,28 @@ acttable_t	CWeaponShotgun::m_acttable[] =
 
 	{ ACT_WALK_RELAXED,				ACT_WALK_RIFLE_RELAXED,			false },//never aims
 	{ ACT_WALK_STIMULATED,			ACT_WALK_RIFLE_STIMULATED,		false },
-	{ ACT_WALK_AGITATED,			ACT_WALK_AIM_RIFLE,				false },//always aims
+	{ ACT_WALK_AGITATED,			ACT_WALK_AIM_SHOTGUN,			false },//always aims
 
 	{ ACT_RUN_RELAXED,				ACT_RUN_RIFLE_RELAXED,			false },//never aims
 	{ ACT_RUN_STIMULATED,			ACT_RUN_RIFLE_STIMULATED,		false },
-	{ ACT_RUN_AGITATED,				ACT_RUN_AIM_RIFLE,				false },//always aims
+	{ ACT_RUN_AGITATED,				ACT_RUN_AIM_SHOTGUN,			false },//always aims
 
 // Readiness activities (aiming)
-	{ ACT_IDLE_AIM_RELAXED,			ACT_IDLE_SMG1_RELAXED,			false },//never aims	
+	{ ACT_IDLE_AIM_RELAXED,			ACT_IDLE_SHOTGUN_RELAXED,		false },//never aims	
 	{ ACT_IDLE_AIM_STIMULATED,		ACT_IDLE_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_IDLE_AIM_AGITATED,		ACT_IDLE_ANGRY_SMG1,			false },//always aims
+	{ ACT_IDLE_AIM_AGITATED,		ACT_IDLE_ANGRY_SHOTGUN,			false },//always aims
 
 	{ ACT_WALK_AIM_RELAXED,			ACT_WALK_RIFLE_RELAXED,			false },//never aims
 	{ ACT_WALK_AIM_STIMULATED,		ACT_WALK_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_WALK_AIM_AGITATED,		ACT_WALK_AIM_RIFLE,				false },//always aims
+	{ ACT_WALK_AIM_AGITATED,		ACT_WALK_AIM_SHOTGUN,			false },//always aims
 
 	{ ACT_RUN_AIM_RELAXED,			ACT_RUN_RIFLE_RELAXED,			false },//never aims
 	{ ACT_RUN_AIM_STIMULATED,		ACT_RUN_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_RUN_AIM_AGITATED,			ACT_RUN_AIM_RIFLE,				false },//always aims
+	{ ACT_RUN_AIM_AGITATED,			ACT_RUN_AIM_SHOTGUN,			false },//always aims
 //End readiness activities
 
-	{ ACT_WALK_AIM,					ACT_WALK_AIM_SHOTGUN,				true },
 	{ ACT_WALK_CROUCH,				ACT_WALK_CROUCH_RIFLE,				true },
 	{ ACT_WALK_CROUCH_AIM,			ACT_WALK_CROUCH_AIM_RIFLE,			true },
-	{ ACT_RUN,						ACT_RUN_RIFLE,						true },
-	{ ACT_RUN_AIM,					ACT_RUN_AIM_SHOTGUN,				true },
 	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RIFLE,				true },
 	{ ACT_RUN_CROUCH_AIM,			ACT_RUN_CROUCH_AIM_RIFLE,			true },
 	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_SHOTGUN,	true },
@@ -155,6 +157,27 @@ acttable_t	CWeaponShotgun::m_acttable[] =
 };
 
 IMPLEMENT_ACTTABLE(CWeaponShotgun);
+
+//-----------------------------------------------------------------------------
+// Purpose: Constructor
+//-----------------------------------------------------------------------------
+CWeaponShotgun::CWeaponShotgun( void )
+{
+	m_bReloadsSingly = true;
+
+	m_bNeedPump		= false;
+	m_bDelayedFire1 = false;
+	m_bDelayedFire2 = false;
+
+	if ( !sv_funmode.GetBool() )
+	{
+		m_bCanJam			= true;
+	}
+	m_fMinRange1		= 0.0;
+	m_fMaxRange1		= 768;
+	m_fMinRange2		= 0.0;
+	m_fMaxRange2		= 256;
+}
 
 void CWeaponShotgun::Precache( void )
 {
@@ -186,7 +209,8 @@ void CWeaponShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool
 		vecShootDir = npc->GetActualShootTrajectory( vecShootOrigin );
 	}
 
-	pOperator->FireBullets( 8, vecShootOrigin, vecShootDir, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0 );
+	int	TracerFreq = random->RandomInt( 2, 3 );
+	pOperator->FireBullets( sk_npc_num_shotgun_pellets.GetInt(), vecShootOrigin, vecShootDir, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, TracerFreq );
 }
 
 //-----------------------------------------------------------------------------
@@ -234,106 +258,50 @@ void CWeaponShotgun::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 //			we are going to fix the combine's rate of shotgun fire in episodic.
 //			This change will not affect Alyx using a shotgun in EP1. (sjb)
 //-----------------------------------------------------------------------------
-//			This is currently unused. Conscripts dont use the pumpy.
-//			However, police do. 
-//			As a compromise, Conscripts lose alot of accuracy when
-//			shooting on the move with the shotgun.
-//-----------------------------------------------------------------------------
-/*
 float CWeaponShotgun::GetMinRestTime()
 {
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_COMBINE )
-	{
-		return 1.2f;
-	}
+	Class_T OwnerClass = GetOwner()->Classify();
+
+	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
+		 OwnerClass == CLASS_CITIZEN_REBEL	||
+		 OwnerClass == CLASS_METROPOLICE	)
+		 return 1.2f;
 	
-	return BaseClass::GetMinRestTime();
-}
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-float CWeaponShotgun::GetMaxRestTime()
-{
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_COMBINE )
-	{
-		return 1.5f;
-	}
-
-	return BaseClass::GetMaxRestTime();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Time between successive shots in a burst. Also returned for EP2
-//			with an eye to not messing up Alyx in EP1.
-//-----------------------------------------------------------------------------
-float CWeaponShotgun::GetFireRate()
-{
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_COMBINE )
-	{
-		return 0.8f;
-	}
-
-	return 0.7;
-}
-*/
-
-//-----------------------------------------------------------------------------
-// Purpose:	When we shipped Caliber, the shotgun was op as fu**,
-//			enemies could blow your brains out in less than a second,
-//			cause' the rof was around 1 shot a second, so I nerfed it. (wm)
-//-----------------------------------------------------------------------------
-// Purpose: Cops and gangsters use shot regulator, not conscripts. Conscripts lose accuracy instead.
-// Input  :
-// Output :
-//-----------------------------------------------------------------------------
-float CWeaponShotgun::GetMinRestTime()
-{
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
-	{
-		return 1.2f;
-	}
-	// Mobsters need to regulate too, cause' they also use the shotgun alot (ONLY APPLIES DURING PRECRIMINAL)
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
-	{
-		return 1.2f;
-	}
-	
-	return BaseClass::GetMinRestTime();
+	return 0.9f;
 }
 
 //-----------------------------------------------------------------------------
 float CWeaponShotgun::GetMaxRestTime()
 {
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
-	{
-		return 1.5f;
-	}
-	// Mobsters need to regulate too, cause' they also use the shotgun alot (ONLY APPLIES DURING PRECRIMINAL)
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
-	{
-		return 1.5f;
-	}
+	Class_T OwnerClass = GetOwner()->Classify();
 
-	return BaseClass::GetMaxRestTime();
+	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
+		 OwnerClass == CLASS_CITIZEN_REBEL	||
+		 OwnerClass == CLASS_METROPOLICE	)
+		 return 1.6f;
+
+	return 1.2f;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Time between successive shots in a burst. Also returned for EP2
-//			with an eye to not messing up Alyx in EP1.
+// NOTENOTE; This is only for the AI! Player firerate is controlled through
+// the attack functions, and (currently) uses the viewmodel sequence duration
 //-----------------------------------------------------------------------------
 float CWeaponShotgun::GetFireRate()
 {
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
+#if 0
+	if( GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
 	{
-		return 0.8f;
+		return 1.0f;
 	}
-	// Conscript troops do (need) to have a bit of a pause when firing, even without the pump
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
+	if( GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
 	{
-		return 0.8f;
+		return 1.0f;
 	}
-
-	return 0.7f;
+#endif
+	//TODO; this should really just grab the duration of the pump animation
+	return 0.9f;
 }
 
 //-----------------------------------------------------------------------------
@@ -356,7 +324,7 @@ bool CWeaponShotgun::StartReload( void )
 
 	// If shotgun totally emptied then a pump animation is needed
 	
-	//NOTENOTE: This is kinda lame because the player doesn't get strong feedback on when the reload has finished,
+	//NOTENOTE: This is kinda coolio because the player doesn't get strong feedback on when the reload has finished,
 	//			without the pump.  Technically, it's incorrect, but it's good for feedback...
 
 	if (m_iClip1 <= 0)
@@ -479,7 +447,7 @@ void CWeaponShotgun::Pump( void )
 
 	if ( pOwner == NULL )
 		return;
-	
+
 	m_bNeedPump = false;
 	
 	WeaponSound( SPECIAL1 );
@@ -493,20 +461,7 @@ void CWeaponShotgun::Pump( void )
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-//
-//
-//-----------------------------------------------------------------------------
-void CWeaponShotgun::DryFire( void )
-{
-	WeaponSound(EMPTY);
-	SendWeaponAnim( ACT_VM_DRYFIRE );
-	
-	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//
+// NOTENOTE; This should probably be compressed and baseclass'd
 //-----------------------------------------------------------------------------
 void CWeaponShotgun::PrimaryAttack( void )
 {
@@ -538,9 +493,9 @@ void CWeaponShotgun::PrimaryAttack( void )
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 1.0 );
 	
 	// Fire the bullets, and force the first shot to be perfectly accuracy
-	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0, -1, -1, 0, NULL, true, true );
-	
-	pPlayer->ViewPunch( QAngle( random->RandomFloat( -2, -1 ), random->RandomFloat( -2, 2 ), 0 ) );
+	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, true, true );
+
+	pPlayer->ViewPunch( QAngle( random->RandomFloat( -2, 2 ), random->RandomFloat( -3, 3 ), 0 ) );
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
 
@@ -579,6 +534,7 @@ void CWeaponShotgun::SecondaryAttack( void )
 	// MUST call sound before removing a round from the clip of a CMachineGun
 	WeaponSound(WPN_DOUBLE);
 
+	//TODO; Do two muzzle flashes OR put some new logic in the fire effect
 	pPlayer->DoMuzzleFlash();
 
 	SendWeaponAnim( ACT_VM_SECONDARYATTACK );
@@ -593,14 +549,13 @@ void CWeaponShotgun::SecondaryAttack( void )
 	Vector vecSrc	 = pPlayer->Weapon_ShootPosition();
 	Vector vecAiming = pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
 
-	// Fire the bullets
-	// Was 12
-	pPlayer->FireBullets( 16, vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0, -1, -1, 0, NULL, false, false );
-	pPlayer->ViewPunch( QAngle( -8, random->RandomFloat( -4, 4 ), 0 ) );
-	// Original; This one was buggy
-	// pPlayer->ViewPunch( QAngle(random->RandomFloat( -5, 5 ),0,0) );
-
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 1.0 );
+
+	// Fire the bullets
+	int NumPellets = sk_plr_num_shotgun_pellets.GetInt() * 2;
+	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, VECTOR_CONE_12DEGREES, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, false, false );
+
+	pPlayer->ViewPunch( QAngle( -8, random->RandomFloat( -4, 4 ), 0 ) );
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );
 
@@ -706,7 +661,7 @@ void CWeaponShotgun::ItemPostFrame( void )
 		// Fire underwater?
 		else if (GetOwner()->GetWaterLevel() == 3 && m_bFiresUnderwater == false)
 		{
-			WeaponSound(EMPTY);
+			DryFire();
 			m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
 			return;
 		}
@@ -737,7 +692,8 @@ void CWeaponShotgun::ItemPostFrame( void )
 		// Fire underwater?
 		else if (pOwner->GetWaterLevel() == 3 && m_bFiresUnderwater == false)
 		{
-			WeaponSound(EMPTY);
+		//	WeaponSound(EMPTY);
+			DryFire();
 			m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
 			return;
 		}
@@ -792,7 +748,7 @@ void CWeaponShotgun::ItemPostFrame( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: New Impact FX
+// Purpose: Smaller Impact FX
 //-----------------------------------------------------------------------------
 /*
 void CWeaponShotgun::DoImpactEffect( trace_t &tr, int nDamageType )
@@ -802,27 +758,11 @@ void CWeaponShotgun::DoImpactEffect( trace_t &tr, int nDamageType )
 	data.m_vOrigin = tr.endpos + ( tr.plane.normal * 1.0f );
 	data.m_vNormal = tr.plane.normal;
 
-	DispatchEffect( "AR2Impact", data );
+	DispatchEffect( "ShotgunImpact", data );
 
 	BaseClass::DoImpactEffect( tr, nDamageType );
 }
 */
-//-----------------------------------------------------------------------------
-// Purpose: Constructor
-//-----------------------------------------------------------------------------
-CWeaponShotgun::CWeaponShotgun( void )
-{
-	m_bReloadsSingly = true;
-
-	m_bNeedPump		= false;
-	m_bDelayedFire1 = false;
-	m_bDelayedFire2 = false;
-
-	m_fMinRange1		= 0.0;
-	m_fMaxRange1		= 768;
-	m_fMinRange2		= 0.0;
-	m_fMaxRange2		= 256;
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -860,8 +800,8 @@ void CWeaponShotgun::ItemHolsterFrame( void )
 //==================================================
 // Purpose: 
 //==================================================
-/*
-void CWeaponShotgun::WeaponIdle( void )
+#if 0
+void CWeaponSuperShotgun::WeaponIdle( void )
 {
 	//Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = GetOwner()
@@ -874,5 +814,7 @@ void CWeaponShotgun::WeaponIdle( void )
 	{
 		SendWeaponAnim( ACT_VM_IDLE_ACTIVE );
 	}
+	
+	BaseClass::WeaponIdle();
 }
-*/
+#endif

@@ -38,6 +38,7 @@
 
  ********************************************************************/
 
+ConVar	sk_dmg_flaregun_scale( "sk_dmg_flaregun_scale", "1.0" );
 
 #define	FLARE_LAUNCH_SPEED	1500
 
@@ -388,22 +389,20 @@ void CFlare::FlareTouch( CBaseEntity *pOther )
 	//If the flare hit a person or NPC, do damage here.
 	if ( pOther && pOther->m_takedamage )
 	{
-		/*
-			The Flare is the iRifle round right now. No damage, just ignite. (sjb)
-
+#ifdef HL2_EPISODIC
 		//Damage is a function of how fast the flare is flying.
-		int iDamage = GetAbsVelocity().Length() / 50.0f;
+		int iDamage = GetAbsVelocity().Length() / 50.0f * sk_dmg_flaregun_scale.GetFloat();	//TODO; Factor skill into this
 
 		if ( iDamage < 5 )
 		{
-			//Clamp minimum damage
-			iDamage = 5;
+			//If its just a light pat, dont do any damage
+			iDamage = 0;
 		}
 
 		//Use m_pOwner, not GetOwnerEntity()
-		pOther->TakeDamage( CTakeDamageInfo( this, m_pOwner, iDamage, (DMG_BULLET|DMG_BURN) ) );
+		pOther->TakeDamage( CTakeDamageInfo( this, m_pOwner, iDamage, (DMG_BULLET|DMG_BURN) ) );	//Should this have bullet???
 		m_flNextDamage = gpGlobals->curtime + 1.0f;
-		*/
+#endif
 
 		CBaseAnimating *pAnim;
 
@@ -657,7 +656,9 @@ void CFlare::AddToActiveFlares( void )
 	}
 }
 
-//#if 0
+//-----------------------------------------------------------------------------
+// FLAREGUN
+//-----------------------------------------------------------------------------
 
 IMPLEMENT_SERVERCLASS_ST(CFlaregun, DT_Flaregun)
 END_SEND_TABLE()
@@ -717,6 +718,7 @@ void CFlaregun::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+/*
 void CFlaregun::SecondaryAttack( void )
 {
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
@@ -751,5 +753,4 @@ void CFlaregun::SecondaryAttack( void )
 
 	WeaponSound( SINGLE );
 }
-
-//#endif
+*/

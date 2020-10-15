@@ -35,7 +35,7 @@ public:
 	CWeaponStab();
 
 	float		GetRange( void )		{	return	STAB_RANGE;	}
-	float		GetFireRate( void )		{	return	STAB_REFIRE;	}
+	float		GetFireRate( void )		{	return BaseClass::GetCycleTime();	}	//STAB_REFIRE
 
 	void		AddViewKick( void );
 	float		GetDamageForActivity( Activity hitActivity );

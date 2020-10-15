@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: 	Police enemy for city
 //
 //=============================================================================//
 
@@ -174,7 +174,6 @@ private:
 	int SelectScheduleNewEnemy();
 	int SelectScheduleArrestEnemy();
 //	int SelectRangeAttackSchedule();
-	int SelectScheduleNoDirectEnemy();
 	int SelectAlertSchedule();
 	int SelectShoveSchedule( void );
 
@@ -204,9 +203,6 @@ private:
 
 	// Choose a random vector somewhere between the two specified vectors
 	void RandomDirectionBetweenVectors( const Vector &vecStart, const Vector &vecEnd, Vector *pResult );
-
-	// Can me enemy see me? 
-	bool CanEnemySeeMe( );
 
 	// Combat schedule selection 
 	int SelectMoveToLedgeSchedule();
@@ -244,8 +240,9 @@ private:
 		SCHED_METROPOLICE_CHASE_ENEMY,
 		SCHED_METROPOLICE_ESTABLISH_LINE_OF_FIRE,
 		SCHED_METROPOLICE_DRAW_PISTOL,
+		SCHED_METROPOLICE_COMBAT_FACE,
 		SCHED_METROPOLICE_RANGE_ATTACK1,
-		SCHED_METROPOLICE_LEAPFROG,
+		SCHED_METROPOLICE_TAKE_COVER,
 		SCHED_METROPOLICE_DEPLOY_MANHACK,
 		SCHED_METROPOLICE_ADVANCE,
 		SCHED_METROPOLICE_CHARGE,
@@ -258,10 +255,10 @@ private:
 		SCHED_METROPOLICE_WARN_AND_ARREST_ENEMY,
 		SCHED_METROPOLICE_ARREST_ENEMY,
 		SCHED_METROPOLICE_ENEMY_RESISTING_ARREST,
-		SCHED_METROPOLICE_WARN_TARGET,
-		SCHED_METROPOLICE_HARASS_TARGET,
-		SCHED_METROPOLICE_SUPPRESS_TARGET,
-		SCHED_METROPOLICE_RETURN_FROM_HARASS,
+//		SCHED_METROPOLICE_WARN_TARGET,
+//		SCHED_METROPOLICE_HARASS_TARGET,
+//		SCHED_METROPOLICE_SUPPRESS_TARGET,
+//		SCHED_METROPOLICE_RETURN_FROM_HARASS,
 		SCHED_METROPOLICE_SHOVE,
 		SCHED_METROPOLICE_ACTIVATE_BATON,
 		SCHED_METROPOLICE_DEACTIVATE_BATON,
@@ -296,7 +293,7 @@ private:
 	CRandSimTimer	m_TimeYieldShootSlot;
 	CSimpleSimTimer m_BatonSwingTimer;
 	CSimpleSimTimer m_NextChargeTimer;
-	CSimpleSimTimer m_LeapfrogTimer;
+//	CSimpleSimTimer m_LeapfrogTimer;
 	Vector			m_vecTossVelocity;
 
 	float			m_flNextGrenadeCheck;	// Last grenade check time

@@ -7,8 +7,7 @@
 //
 // Purpose: This is the brickbat weapon
 //
-// $Workfile:     $
-// $Date:         $
+// TODO; Fixup bogus code, fire/throw-rate dependent on held object
 // $NoKeywords: $
 //=============================================================================
 
@@ -30,6 +29,9 @@
 #include "baseviewmodel.h"
 #include "movevars_shared.h"
 
+// memdbgon must be the last include file in a .cpp file!!!
+#include "tier0/memdbgon.h"
+
 extern ConVar sk_npc_dmg_brickbat;
 extern ConVar sk_plr_dmg_brickbat;
 
@@ -46,17 +48,21 @@ BrickbatAmmo_s	BrickBatAmmoArray[NUM_BRICKBAT_AMMO_TYPES] =
 {
 	{ "grenade_rockbb",			BRICKBAT_ROCK,			5,	"models/weapons/v_bb_bottle.mdl",		"models/props_junk/Rock001a.mdl" },
 	{ "grenade_beerbottle",		BRICKBAT_BOTTLE,		3,	"models/weapons/v_bb_bottle.mdl",		"models/weapons/w_bb_bottle.mdl" },
+//	{ "grenade_headcrab",		BRICKBAT_HEADCRAB,		1,	"models/weapons/v_bb_headcrab.mdl",		"models/hc_squashed01.mdl" },
 	{ "grenade_crematorhead",	BRICKBAT_CREMATORHEAD,	1,	"models/weapons/v_bb_crematorhead.mdl",	"models/cremator_head.mdl" },
 };
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponBrickbat, DT_WeaponBrickbat)
 END_SEND_TABLE()
 
-//LINK_ENTITY_TO_CLASS( weapon_brickbat, CWeaponBrickbat );
-//PRECACHE_WEAPON_REGISTER(weapon_brickbat);
+#ifdef HL2_DLL
+LINK_ENTITY_TO_CLASS( weapon_brickbat, CWeaponBrickbat );
+PRECACHE_WEAPON_REGISTER(weapon_brickbat);
+#endif// HL2_DLL
 
 acttable_t	CWeaponBrickbat::m_acttable[] = 
 {
+	{ ACT_IDLE_ANGRY,	 ACT_IDLE_ANGRY_MELEE,	 true },	
 	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_THROW, true },
 };
 IMPLEMENT_ACTTABLE(CWeaponBrickbat);
@@ -65,16 +71,16 @@ IMPLEMENT_ACTTABLE(CWeaponBrickbat);
 
 BEGIN_DATADESC( CWeaponBrickbat )
 
-	DEFINE_FIELD( CWeaponBrickbat, m_bNeedDraw, FIELD_BOOLEAN ),
-	DEFINE_FIELD( CWeaponBrickbat, m_bNeedThrow, FIELD_BOOLEAN ),
-	DEFINE_FIELD( CWeaponBrickbat, m_iThrowBits, FIELD_INTEGER ),
-	DEFINE_FIELD( CWeaponBrickbat, m_fNextThrowCheck, FIELD_TIME ),
-	DEFINE_FIELD( CWeaponBrickbat, m_vecTossVelocity, FIELD_VECTOR ),
-	DEFINE_ARRAY( CWeaponBrickbat, m_nAmmoCount, FIELD_INTEGER, NUM_BRICKBAT_AMMO_TYPES ),
-	DEFINE_KEYFIELD( CWeaponBrickbat, m_iCurrentAmmoType, FIELD_INTEGER, "BrickbatType" ),
+	DEFINE_FIELD( m_bNeedDraw, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bNeedThrow, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_iThrowBits, FIELD_INTEGER ),
+	DEFINE_FIELD( m_fNextThrowCheck, FIELD_TIME ),
+	DEFINE_FIELD( m_vecTossVelocity, FIELD_VECTOR ),
+	DEFINE_ARRAY( m_nAmmoCount, FIELD_INTEGER, NUM_BRICKBAT_AMMO_TYPES ),
+	DEFINE_KEYFIELD( m_iCurrentAmmoType, FIELD_INTEGER, "BrickbatType" ),
 
 	// Function Pointers
-	DEFINE_FUNCTION( CWeaponBrickbat, BrickbatTouch ),
+	DEFINE_FUNCTION( BrickbatTouch ),
 
 END_DATADESC()
 
@@ -87,8 +93,8 @@ void CWeaponBrickbat::Precache( void )
 {
 	for (int i=0;i<ARRAYSIZE(BrickBatAmmoArray);i++)
 	{
-		engine->PrecacheModel(BrickBatAmmoArray[i].m_sWorldModel);
-		engine->PrecacheModel(BrickBatAmmoArray[i].m_sViewModel);
+		PrecacheModel(BrickBatAmmoArray[i].m_sWorldModel);
+		PrecacheModel(BrickBatAmmoArray[i].m_sViewModel);
 	}
 
 	UTIL_PrecacheOther("grenade_molotov");
@@ -105,9 +111,12 @@ void CWeaponBrickbat::Spawn( void )
 	{
 		m_nAmmoCount[i] = 0;
 	}
+
 	// Call base class first
 	BaseClass::Spawn();
 
+	// Deactivate the trigger bounds so we can pick it up with the physgun
+	CollisionProp()->UseTriggerBounds( false );
 }
 
 //-----------------------------------------------------------------------------
@@ -146,17 +155,7 @@ bool CWeaponBrickbat::Deploy( void )
 //------------------------------------------------------------------------------
 void CWeaponBrickbat::SetPickupTouch( void )
 {
-	SetTouch( BrickbatTouch );
-}
-
-//------------------------------------------------------------------------------
-// Purpose : Override base class so can be picked up with physics gun
-// Input   :
-// Output  :
-//------------------------------------------------------------------------------
-void CWeaponBrickbat::SetObjectCollisionBox( void )
-{
-	BaseClass::BaseClass::SetObjectCollisionBox();
+	SetTouch( &CWeaponBrickbat::BrickbatTouch );
 }
 
 //-----------------------------------------------------------------------------
@@ -173,18 +172,19 @@ void CWeaponBrickbat::BrickbatTouch( CBaseEntity *pOther )
 	// ---------------------------------------------------
 	BaseClass::DefaultTouch(pOther);
 
-	//FIXME: This ammo handling code is a bit bogus, need a real solution if brickbats are going to live
 
-	/*
+	//FIXME: This ammo handling code is a bit bogus, need a real solution if brickbats are going to live
 	// ----------------------------------------------------
 	//  Give brickbat ammo if touching client
 	// ----------------------------------------------------
 	if (pOther->GetFlags() & FL_CLIENT)
 	{
 		CBaseCombatCharacter* pBCC = ToBaseCombatCharacter( pOther );
+
 		// Exit if game rules say I can't have any more of this ammo type.
 		if ( g_pGameRules->CanHaveAmmo( pBCC, m_iPrimaryAmmoType ) == false )
 			return;
+
 		// ------------------------------------------------
 		//  If already owned weapon of this type remove me
 		// ------------------------------------------------
@@ -192,6 +192,7 @@ void CWeaponBrickbat::BrickbatTouch( CBaseEntity *pOther )
 		
 		// Remove physics object if is one
 		VPhysicsDestroyObject();
+
 		if ( ( oldWeapon != NULL ) && ( oldWeapon != this ) )
 		{
 			// Only pick up if not at max ammo amount
@@ -209,9 +210,11 @@ void CWeaponBrickbat::BrickbatTouch( CBaseEntity *pOther )
 			{
 				m_nAmmoCount[m_iCurrentAmmoType]++;
 				pBCC->GiveAmmo( 1, m_iPrimaryAmmoType ); 
+
 				SetThink (NULL);
 			}
 		}
+
 		// -----------------------------------------------------
 		// Switch to this weapon if the only weapon I own
 		// -----------------------------------------------------
@@ -220,7 +223,7 @@ void CWeaponBrickbat::BrickbatTouch( CBaseEntity *pOther )
 			pBCC->Weapon_Switch(oldWeapon);
 		}
 	}
-	*/
+	
 }
 
 
@@ -373,9 +376,8 @@ int CWeaponBrickbat::WeaponRangeAttack1Condition( float flDot, float flDist )
 		}
 
 		// Get Enemy Position 
-		Vector vecTarget = Vector( pEnemy->GetAbsOrigin().x, 
-									pEnemy->GetAbsOrigin().y, 
-									pEnemy->GetAbsMins().z );
+		Vector vecTarget;
+		pEnemy->CollisionProp()->NormalizedToWorldSpace( Vector( 0.5f, 0.5f, 0.0f ), &vecTarget );
 
 		// Get Toss Vector
 		Vector			throwStart  = pNPC->Weapon_ShootPosition();
@@ -441,7 +443,7 @@ void CWeaponBrickbat::ThrowBrickbat( Vector vecSrc, Vector vecVelocity, float da
 		pBrickbat->SetLocalAngularVelocity( angVel );
 	}
 
-	pBrickbat->SetOwner( GetOwner() );
+	pBrickbat->SetThrower( GetOwner() );
 	pBrickbat->SetOwnerEntity( ((CBaseEntity*)GetOwner()) );
 	pBrickbat->SetDamage(damage);
 
@@ -646,8 +648,7 @@ void CWeaponBrickbat::TraceAttack( const CTakeDamageInfo &info, const Vector &ve
 {
 	if ( info.GetDamageType() & DMG_BULLET)
 	{
-		if (BrickBatAmmoArray[m_iCurrentAmmoType].m_nAmmoType == BRICKBAT_CREMATORHEAD ||
-			BrickBatAmmoArray[m_iCurrentAmmoType].m_nAmmoType == BRICKBAT_ROCK			)
+		if ( BrickBatAmmoArray[m_iCurrentAmmoType].m_nAmmoType == BRICKBAT_ROCK )
 		{
 			g_pEffects->Ricochet(ptr->endpos,ptr->plane.normal);
 		}	

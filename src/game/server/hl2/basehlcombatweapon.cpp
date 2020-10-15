@@ -2,6 +2,7 @@
 //
 // Purpose: 
 //
+// TODO; Fix burst firing (only fires one bullet)
 //=============================================================================//
 
 #include "cbase.h"
@@ -153,7 +154,9 @@ int CHLMachineGun::WeaponRangeAttack1Condition( float flDot, float flDist )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Add recoil and kick effects
+// TODO; Accuracy should be seperate to the kick angle, and crouching should
+// reduce the recoil/accuracy hit (sort of like RTCW)
 //-----------------------------------------------------------------------------
 void CHLMachineGun::DoMachineGunKick( CBasePlayer *pPlayer, float dampEasy, float maxVerticleKickAngle, float fireDurationTime, float slideLimitTime )
 {
@@ -211,7 +214,7 @@ bool CHLMachineGun::Deploy( void )
 }
 
 
-
+//NOTENOTE; Shouldnt this just do a looped sound??
 //-----------------------------------------------------------------------------
 // Purpose: Make enough sound events to fill the estimated think interval
 // returns: number of shots needed
@@ -335,7 +338,7 @@ void CHLSelectFireMachineGun::PrimaryAttack( void )
 	{
 	case FIREMODE_FULLAUTO:
 		BaseClass::PrimaryAttack();
-		// Msg("%.3f\n", m_flNextPrimaryAttack.Get() );
+		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
 		SetWeaponIdleTime( gpGlobals->curtime + 3.0f );
 		break;
 

@@ -5,9 +5,9 @@
 //=============================================================================//
 
 #include "cbase.h"
+#include "npc_combines.h"
 #include "ai_hull.h"
 #include "ai_motor.h"
-#include "npc_combines.h"
 #include "bitstring.h"
 #include "engine/IEngineSound.h"
 #include "soundent.h"
@@ -15,6 +15,7 @@
 #include "npcevent.h"
 #include "hl2/hl2_player.h"
 #include "game.h"
+#include "globalstate.h"
 #include "ammodef.h"
 #include "explode.h"
 #include "ai_memory.h"
@@ -33,15 +34,10 @@ ConVar	sk_combine_s_kick( "sk_combine_s_kick","0");
 
 ConVar	sk_combine_guard_health( "sk_combine_guard_health", "0");
 ConVar	sk_combine_guard_kick( "sk_combine_guard_kick", "0");
- 
-// Whether or not the combine guard should spawn health on death
-ConVar	combine_guard_spawn_health( "combine_guard_spawn_health", "1" );
 
-extern ConVar sk_plr_dmg_buckshot;	
+extern ConVar sk_plr_dmg_buckshot;
 extern ConVar sk_plr_num_shotgun_pellets;
-
-//Whether or not the combine should spawn health on death
-ConVar	combine_spawn_health( "combine_spawn_health", "1" );
+extern ConVar combine_drop_health;
 
 LINK_ENTITY_TO_CLASS( npc_combine_s, CNPC_CombineS );
 LINK_ENTITY_TO_CLASS( npc_ancorp_s, CNPC_CombineS );
@@ -65,17 +61,19 @@ void CNPC_CombineS::Spawn( void )
 		SetHealth( sk_combine_guard_health.GetFloat() );
 		SetMaxHealth( sk_combine_guard_health.GetFloat() );
 		SetKickDamage( sk_combine_guard_kick.GetFloat() );
+	//	m_flFieldOfView			= 0.4;	//Narrower
 	}
 	else
 	{
 		SetHealth( sk_combine_s_health.GetFloat() );
 		SetMaxHealth( sk_combine_s_health.GetFloat() );
 		SetKickDamage( sk_combine_s_kick.GetFloat() );
+	//	m_flFieldOfView			= 0.3;	//Normal
 	}
+	m_flFieldOfView			= 0.3;	//*140
 
 	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
-	// If soldier speed is upped/default movement is sprinting, get rid of the move and shoot
-//~	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
+	CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
 	CapabilitiesAdd( bits_CAP_DOORS_GROUP );
 
 	BaseClass::Spawn();
@@ -106,14 +104,16 @@ void CNPC_CombineS::Precache()
 		m_fIsElite = false;
 	}
 
-//	if( !Q_stricmp( pModelName, "models/combine_shock_soldier.mdl" ) )
-//	{
-//		m_fIsShock = true;
-//	}
-//	else
-//	{
-//		m_fIsShock = false;
-//	}
+/*
+	if( !Q_stricmp( pModelName, "models/combine_shock_soldier.mdl" ) )
+	{
+		m_fIsShock = true;
+	}
+	else
+	{
+		m_fIsShock = false;
+	}
+*/
 
 	if( !GetModelName() )
 	{
@@ -122,10 +122,13 @@ void CNPC_CombineS::Precache()
 
 	PrecacheModel( STRING( GetModelName() ) );
 
+//	PrecacheScriptSound( "NPC_Combine.Die" );
+	PrecacheScriptSound( "NPC_Combine.DieIWHBYD" );
+
 	UTIL_PrecacheOther( "item_healthvial" );
-	UTIL_PrecacheOther( "weapon_frag" );
-//	UTIL_PrecacheOther( "item_ammo_ar2_altfire" );
 	UTIL_PrecacheOther( "item_battery" );
+	UTIL_PrecacheOther( "item_ammo_smg1_grenade" );
+	UTIL_PrecacheOther( "weapon_frag" );
 
 	BaseClass::Precache();
 }
@@ -137,7 +140,15 @@ void CNPC_CombineS::DeathSound( const CTakeDamageInfo &info )
 	if ( GetFlags() & FL_DISSOLVING )
 		return;
 
-	GetSentences()->Speak( "COMBINE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
+	if ( GlobalEntity_GetState("iwhbyd") == GLOBAL_ON && random->RandomInt( 0, 10 ) == 10 )
+	{
+		// IWHBYD
+		EmitSound( "NPC_Combine.DieIWHBYD" );
+	}
+	else
+	{
+		GetSentences()->Speak( "COMBINE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
+	}
 }
 
 
@@ -161,30 +172,6 @@ void CNPC_CombineS::ClearAttackConditions( )
 		// don't sense for it every frame.
 		SetCondition( COND_CAN_RANGE_ATTACK2 );
 	}
-}
-
-void CNPC_CombineS::PrescheduleThink( void )
-{
-	/*//FIXME: This doesn't need to be in here, it's all debug info
-	if( HasCondition( COND_HEAR_PHYSICS_DANGER ) )
-	{
-		// Don't react unless we see the item!!
-		CSound *pSound = NULL;
-
-		pSound = GetLoudestSoundOfType( SOUND_PHYSICS_DANGER );
-
-		if( pSound )
-		{
-			if( FInViewCone( pSound->GetSoundReactOrigin() ) )
-			{
-				DevMsg( "OH CRAP!\n" );
-				NDebugOverlay::Line( EyePosition(), pSound->GetSoundReactOrigin(), 0, 0, 255, false, 2.0f );
-			}
-		}
-	}
-	*/
-
-	BaseClass::PrescheduleThink();
 }
 
 //-----------------------------------------------------------------------------
@@ -211,34 +198,6 @@ int CNPC_CombineS::SelectSchedule ( void )
 {
 	return BaseClass::SelectSchedule();
 }
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-/*
-float CNPC_CombineS::GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info )
-{
-	switch( iHitGroup )
-	{
-	case HITGROUP_HEAD:
-		{
-			// Soldiers take double headshot damage - Those helmets must be made of tissue-paper
-			return 2.0f;
-		}
-	case HITGROUP_CHEST:
-	case HITGROUP_STOMACH:
-	case HITGROUP_LEFTARM:
-	case HITGROUP_RIGHTARM:
-	case HITGROUP_LEFTLEG:
-	case HITGROUP_RIGHTLEG:
-		if ( info.GetDamageType() & (DMG_BULLET | DMG_SLASH | DMG_BLAST) )
-		{
-			return 0.5f;
-		}
-	}
-
-	return BaseClass::GetHitgroupDamageMultiplier( iHitGroup, info );
-}
-*/
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -303,7 +262,7 @@ void CNPC_CombineS::OnListened()
 void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 {
 	// Don't bother if we've been told not to, or the player has a megaphyscannon
-	if ( combine_spawn_health.GetBool() == false || PlayerHasMegaPhysCannon() )
+	if ( combine_drop_health.GetBool() == false || PlayerHasMegaPhysCannon() )
 	{
 		BaseClass::Event_Killed( info );
 		return;
@@ -322,14 +281,12 @@ void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 
 	if ( pPlayer != NULL )
 	{
-		// Elites drop alt-fire ammo, so long as they weren't killed by dissolving.
+		// Elites drop armor/altfire ammo, so long as they weren't killed by dissolving.
 		if( IsElite() )
 		{
-#ifdef HL2_EPISODIC
 			if ( HasSpawnFlags( SF_COMBINE_NO_AR2DROP ) == false )
-#endif
 			{
-				CBaseEntity *pItem = DropItem( "item_battery", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
+				CBaseEntity *pItem = DropItem( "item_ammo_smg1_grenade", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
 
 				if ( pItem )
 				{
@@ -366,6 +323,10 @@ void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 		// Attempt to drop health
 		if ( pHL2GameRules->NPC_ShouldDropHealth( pPlayer ) )
 		{
+			if ( IsElite() && !(info.GetDamageType() & DMG_DISSOLVE) )
+			{
+				DropItem( "item_battery", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
+			}
 			DropItem( "item_healthvial", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
 			pHL2GameRules->NPC_DroppedHealth();
 		}
@@ -394,21 +355,8 @@ bool CNPC_CombineS::IsLightDamage( const CTakeDamageInfo &info )
 	return BaseClass::IsLightDamage( info );
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : &info - 
-// Output : Returns true on success, false on failure.
-//-----------------------------------------------------------------------------
 bool CNPC_CombineS::IsHeavyDamage( const CTakeDamageInfo &info )
 {
-	// Consider AR2 fire to be heavy damage
-	if ( info.GetAmmoType() == GetAmmoDef()->Index("AR2") )
-		return true;
-
-	// 357 rounds are heavy damage
-	if ( info.GetAmmoType() == GetAmmoDef()->Index("357") )
-		return true;
-
 	// Shotgun blasts where at least half the pellets hit me are heavy damage
 	if ( info.GetDamageType() & DMG_BUCKSHOT )
 	{
@@ -416,20 +364,14 @@ bool CNPC_CombineS::IsHeavyDamage( const CTakeDamageInfo &info )
 		if ( info.GetDamage() >= iHalfMax )
 			return true;
 	}
-
-	// Rollermine shocks
-	if( (info.GetDamageType() & DMG_SHOCK) && hl2_episodic.GetBool() )
+	else if ( info.GetDamageType() & (DMG_BULLET|DMG_SHOCK) )
 	{
-		return true;
+		// Any bullets that do more than 9 damage
+		if ( info.GetDamage() >= 9 )
+			return true;
 	}
 
-//	// Scrapgun direct hits/at least half the splash hits
-//	if( (info.GetAmmoType() == GetAmmoDef()->Index("ScrapGun")) && hl2_episodic.GetBool() )
-//	{
-//		return true;
-//	}
-	
-	// Rifle-grenades (This grenade is too quick for them to yell "Grenade!", so yell the heavy damage after it hits)
+	// Rifle-grenades (This grenade is too quick to yell "Grenade!", so yell the heavy damage after it hits)
 	if( info.GetAmmoType() == GetAmmoDef()->Index("SMG1_Grenade") )
 	{
 		return true;
@@ -438,7 +380,7 @@ bool CNPC_CombineS::IsHeavyDamage( const CTakeDamageInfo &info )
 	return BaseClass::IsHeavyDamage( info );
 }
 
-#if HL2_EPISODIC
+#ifdef HL2_EPISODIC
 //-----------------------------------------------------------------------------
 // Purpose: Translate base class activities into combot activites
 //-----------------------------------------------------------------------------

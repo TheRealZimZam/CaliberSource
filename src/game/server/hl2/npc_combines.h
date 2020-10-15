@@ -25,17 +25,17 @@ class CNPC_CombineS : public CNPC_Combine
 public: 
 	void		Spawn( void );
 	void		Precache( void );
-	void		DeathSound( const CTakeDamageInfo &info );
-	void		PrescheduleThink( void );
+	void		Event_Killed( const CTakeDamageInfo &info );
+
 	void		BuildScheduleTestBits( void );
+	void		ClearAttackConditions( void );
+	// -----------------------------------------------------------------------------------
+	// -----------------------------------------------------------------------------------
+	void		DeathSound( const CTakeDamageInfo &info );
 	int			SelectSchedule ( void );
-//	float		GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info );
 	void		HandleAnimEvent( animevent_t *pEvent );
 	void		OnChangeActivity( Activity eNewActivity );
-	void		Event_Killed( const CTakeDamageInfo &info );
 	void		OnListened();
-
-	void		ClearAttackConditions( void );
 
 	bool		m_fIsBlocking;
 

@@ -2,6 +2,7 @@
 //
 // Purpose: 
 //
+// TODO; Attach the rocketflare [CTempEnts::RocketFlare( const Vector& pos )]
 //=============================================================================//
 
 #include "cbase.h"
@@ -126,7 +127,7 @@ class CWeaponRPG;
 CMissile::CMissile()
 {
 	m_hRocketTrail = NULL;
-	m_bCreateDangerSounds = false;
+	m_bCreateDangerSounds = false;	//In a perfect world, this would be true
 }
 
 CMissile::~CMissile()
@@ -237,8 +238,10 @@ void CMissile::DumbFire( void )
 
 	EmitSound( "Missile.Ignite" );
 
-	// Smoke trail.
+	// Smoketrail.
 	CreateSmokeTrail();
+	// Flare
+//	CreateFlare();
 }
 
 //-----------------------------------------------------------------------------
@@ -342,7 +345,7 @@ void CMissile::DoExplosion( void )
 {
 	// Explode
 	ExplosionCreate( GetAbsOrigin(), GetAbsAngles(), GetOwnerEntity(), GetDamage(), CMissile::EXPLOSION_RADIUS, 
-		SF_ENVEXPLOSION_NOSPARKS | SF_ENVEXPLOSION_NODLIGHTS | SF_ENVEXPLOSION_NOSMOKE, 0.0f, this);
+		SF_ENVEXPLOSION_NOSPARKS | SF_ENVEXPLOSION_NOSMOKE, 0.0f, this);
 }
 
 
@@ -465,7 +468,10 @@ void CMissile::IgniteThink( void )
 		}
 	}
 
+	// Smoketrail.
 	CreateSmokeTrail();
+	// Flare
+//	CreateFlare();
 }
 
 
@@ -688,8 +694,6 @@ void CMissile::SeekThink( void )
 	// Think as soon as possible
 	SetNextThink( gpGlobals->curtime );
 
-#ifdef HL2_EPISODIC
-
 	if ( m_bCreateDangerSounds == true )
 	{
 		trace_t tr;
@@ -697,7 +701,6 @@ void CMissile::SeekThink( void )
 
 		CSoundEnt::InsertSound( SOUND_DANGER, tr.endpos, 100, 0.2, this, SOUNDENT_CHANNEL_REPEATED_DANGER );
 	}
-#endif
 }
 
 
@@ -993,6 +996,7 @@ void CAPCMissile::Init()
 	SetModel("models/weapons/w_missile.mdl");
 	UTIL_SetSize( this, vec3_origin, vec3_origin );
 	CreateSmokeTrail();
+//	CreateFlare();
 	SetTouch( &CAPCMissile::APCMissileTouch );
 	m_flLastHomingSpeed = APC_HOMING_SPEED;
 	CreateDangerSounds( true );
@@ -1394,17 +1398,17 @@ PRECACHE_WEAPON_REGISTER(weapon_rpg);
 
 acttable_t	CWeaponRPG::m_acttable[] = 
 {
-	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_RPG, true },
+	{ ACT_IDLE,						ACT_IDLE_RPG,					true },
+	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_RPG,				true },
+	{ ACT_RANGE_ATTACK1, 			ACT_RANGE_ATTACK_RPG,			true },
+	{ ACT_WALK,						ACT_WALK_RPG,					true },
+	{ ACT_RUN,						ACT_RUN_RPG,					true },
 
 	{ ACT_IDLE_RELAXED,				ACT_IDLE_RPG_RELAXED,			true },
 	{ ACT_IDLE_STIMULATED,			ACT_IDLE_ANGRY_RPG,				true },
 	{ ACT_IDLE_AGITATED,			ACT_IDLE_ANGRY_RPG,				true },
 
-	{ ACT_IDLE,						ACT_IDLE_RPG,					true },
-	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_RPG,				true },
-	{ ACT_WALK,						ACT_WALK_RPG,					true },
 	{ ACT_WALK_CROUCH,				ACT_WALK_CROUCH_RPG,			true },
-	{ ACT_RUN,						ACT_RUN_RPG,					true },
 	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RPG,				true },
 	{ ACT_COVER_LOW,				ACT_COVER_LOW_RPG,				true },
 };
@@ -1422,7 +1426,7 @@ CWeaponRPG::CWeaponRPG()
 	m_bHideGuiding = 		false;
 	m_bInitialStateUpdate =	false;
 
-	m_fMinRange1 = m_fMinRange2 = 40*12;
+	m_fMinRange1 = m_fMinRange2 = 16*12;
 	m_fMaxRange1 = m_fMaxRange2 = 500*12;
 }
 
@@ -2093,13 +2097,14 @@ int CWeaponRPG::WeaponRangeAttack1Condition( float flDot, float flDist )
 		Vector vecMuzzle = pOwner->Weapon_ShootPosition();
 		Vector vecShootDir = pOwner->GetActualShootTrajectory( vecMuzzle );
 
-		// Make sure I have a good 10 feet of wide clearance in front, or I'll blow my teeth out.
-		AI_TraceHull( vecMuzzle, vecMuzzle + vecShootDir * (10.0f*12.0f), Vector( -24, -24, -24 ), Vector( 24, 24, 24 ), MASK_NPCSOLID, NULL, &tr );
+		// Make sure I have a good 8 feet of wide clearance in front, or I'll blow my teeth out.
+		AI_TraceHull( vecMuzzle, vecMuzzle + vecShootDir * (8.0f*12.0f), Vector( -20, -20, -20 ), Vector( 20, 20, 20 ), MASK_NPCSOLID, NULL, &tr );
 
 		if( tr.fraction != 1.0 )
 		{
 			return COND_WEAPON_SIGHT_OCCLUDED;
 		}
+		//TODO; If this fails more than 2 times, just ignore it and shoot
 	}
 
 	return COND_CAN_RANGE_ATTACK1;
@@ -2425,7 +2430,7 @@ CWeaponLightRPG::CWeaponLightRPG()
 	m_bReloadsSingly = false;
 	m_bInitialStateUpdate = false;
 
-	m_fMinRange1 = m_fMinRange2 = 40*12;
+	m_fMinRange1 = m_fMinRange2 = 24*12;
 	m_fMaxRange1 = m_fMaxRange2 = 500*12;
 }
 
@@ -2537,10 +2542,6 @@ bool CWeaponLightRPG::WeaponShouldBeLowered( void )
 //-----------------------------------------------------------------------------
 void CWeaponLightRPG::PrimaryAttack( void )
 {
-	// Can't have an active missile out
-//	if ( m_hMissile != NULL )
-//		return;
-
 	// If my clip is empty (and I use clips) start reload
 	if ( UsesClipsForAmmo1() && !m_iClip1 ) 
 	{
@@ -2657,7 +2658,6 @@ void CWeaponLightRPG::ItemPostFrame( void )
 	{
 		m_bInitialStateUpdate = false;
 	}
-
 }
 
 //-----------------------------------------------------------------------------
@@ -2669,18 +2669,6 @@ bool CWeaponLightRPG::Deploy( void )
 	m_bInitialStateUpdate = true;
 
 	return BaseClass::Deploy();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-bool CWeaponLightRPG::Holster( CBaseCombatWeapon *pSwitchingTo )
-{
-	//Can't have an active missile out
-	if ( m_hMissile != NULL )
-		return false;
-
-	return BaseClass::Holster( pSwitchingTo );
 }
 
 //-----------------------------------------------------------------------------
@@ -2743,8 +2731,8 @@ bool CWeaponLightRPG::WeaponLOSCondition( const Vector &ownerPos, const Vector &
 			Vector vecMuzzle = ownerPos + vecRelativeShootPosition;
 			Vector vecShootDir = npcOwner->GetActualShootTrajectory( vecMuzzle );
 
-			// Make sure I have a good 10 feet of wide clearance in front, or I'll blow my teeth out.
-			AI_TraceHull( vecMuzzle, vecMuzzle + vecShootDir * (10.0f*12.0f), Vector( -24, -24, -24 ), Vector( 24, 24, 24 ), MASK_NPCSOLID, NULL, &tr );
+			// Make sure I have a good 8 feet of wide clearance in front, or I'll blow my teeth out.
+			AI_TraceHull( vecMuzzle, vecMuzzle + vecShootDir * (8.0f*12.0f), Vector( -20, -20, -20 ), Vector( 20, 20, 20 ), MASK_NPCSOLID, NULL, &tr );
 
 			if( tr.fraction != 1.0f )
 				bResult = false;
@@ -2793,13 +2781,14 @@ int CWeaponLightRPG::WeaponRangeAttack1Condition( float flDot, float flDist )
 		Vector vecMuzzle = pOwner->Weapon_ShootPosition();
 		Vector vecShootDir = pOwner->GetActualShootTrajectory( vecMuzzle );
 
-		// Make sure I have a good 10 feet of wide clearance in front, or I'll blow my teeth out.
-		AI_TraceHull( vecMuzzle, vecMuzzle + vecShootDir * (10.0f*12.0f), Vector( -24, -24, -24 ), Vector( 24, 24, 24 ), MASK_NPCSOLID, NULL, &tr );
+		// Make sure I have a good 8 feet of wide clearance in front, or I'll blow my teeth out.
+		AI_TraceHull( vecMuzzle, vecMuzzle + vecShootDir * (8.0f*12.0f), Vector( -24, -24, -24 ), Vector( 24, 24, 24 ), MASK_NPCSOLID, NULL, &tr );
 
 		if( tr.fraction != 1.0 )
 		{
 			return COND_WEAPON_SIGHT_OCCLUDED;
 		}
+		//TODO; If this fails more than 2 times, just ignore it and shoot
 	}
 
 	return COND_CAN_RANGE_ATTACK1;

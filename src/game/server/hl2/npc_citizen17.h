@@ -33,7 +33,7 @@ struct SquadCandidate_t;
 #define SF_CITIZEN_RANDOM_HEAD_MALE	( 1 << 22 )	//4194304
 #define SF_CITIZEN_RANDOM_HEAD_FEMALE ( 1 << 23 )//8388608
 #define SF_CITIZEN_USE_RENDER_BOUNDS ( 1 << 24 )//16777216
-#define SF_CITIZEN_LEADER ( 1 << 25 )//33554432	Leader/Elite variant
+#define SF_CITIZEN_LEADER ( 1 << 25 )//33554432	Leader/Rebel citizen
 
 //-------------------------------------
 // Animation events
@@ -44,6 +44,7 @@ enum CitizenType_t
 	CT_DEFAULT,
 	CT_DOWNTRODDEN,
 	CT_REFUGEE,
+	CT_CRIMINAL,
 	CT_REBEL,
 	CT_UNIQUE
 };
@@ -115,7 +116,7 @@ public:
 	int 			SelectScheduleRetrieveItem();
 	int 			SelectScheduleNonCombat();
 	int 			SelectScheduleManhackCombat();
-	int 			SelectScheduleCombat();
+	int 			SelectCombatSchedule();
 	bool			ShouldDeferToFollowBehavior();
 	int 			TranslateSchedule( int scheduleType );
 
@@ -145,7 +146,7 @@ public:
 	bool 			OnBeginMoveAndShoot();
 	void 			OnEndMoveAndShoot();
 	
-	virtual bool	UseAttackSquadSlots()	{ return false; }
+//!!!virtual bool	UseAttackSquadSlots()	{ return false; }
 	void 			LocateEnemySound();
 
 	bool			IsManhackMeleeCombatant();
@@ -161,12 +162,13 @@ public:
 	//---------------------------------
 	int 			OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	float			GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info );
+	virtual	bool	AllowedToIgnite( void ) { return true; }
 
 	//---------------------------------
 	// Commander mode
 	//---------------------------------
-	bool			m_fIsLeader;
-	bool			IsLeader() { return m_fIsLeader; }
+	bool			m_fIsRebel;
+	bool			IsLeader() { return m_fIsRebel; }
 	bool 			IsCommandable();
 	bool			IsPlayerAlly( CBasePlayer *pPlayer = NULL );
 	bool			CanJoinPlayerSquad();
@@ -271,8 +273,9 @@ private:
 		SCHED_CITIZEN_MOURN_PLAYER,
 		SCHED_CITIZEN_SIT_ON_TRAIN,
 		SCHED_CITIZEN_STRIDER_RANGE_ATTACK1_RPG,
-
 		SCHED_CITIZEN_HEAL_TOSS,
+		SCHED_CITIZEN_FLEE,
+		SCHED_CITIZEN_HIDE,
 
 		
 		TASK_CIT_HEAL = BaseClass::NEXT_TASK,
@@ -281,7 +284,6 @@ private:
 		TASK_CIT_SIT_ON_TRAIN,
 		TASK_CIT_LEAVE_TRAIN,
 		TASK_CIT_SPEAK_MOURNING,
-
 		TASK_CIT_HEAL_TOSS,
 
 
@@ -301,7 +303,7 @@ private:
 	int				m_iAmmoAmount;
 	bool			m_bRPGAvoidPlayer;
 	bool			m_bShouldPatrol;
-//	bool			m_fIsLeader;
+//	bool			m_fIsRebel;
 	string_t		m_iszOriginalSquad;
 	float			m_flTimeJoinedPlayerSquad;
 	bool			m_bWasInPlayerSquad;

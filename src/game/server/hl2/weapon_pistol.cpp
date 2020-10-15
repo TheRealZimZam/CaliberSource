@@ -3,7 +3,7 @@
 // Purpose:	Pistol - hand gun - 10mm of fun!
 //
 //			Primary attack: single accurate shot(s).
-//			Secondary attack: innaccurate 3 round burst.
+//			Secondary attack: innaccurate 4 round burst.
 // TODO's:  Change secondary fire to burst
 //
 // $NoKeywords: $
@@ -25,12 +25,11 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	PISTOL_FASTEST_REFIRE_TIME		0.125f
-#define	PISTOL_FASTEST_DRY_REFIRE_TIME	0.2f
+#define	PISTOL_FASTEST_REFIRE_TIME		0.2f
 
-#define	PISTOL_ACCURACY_MAXIMUM_PENALTY_TIME	1.5f	// Maximum penalty to deal out
-
-//ConVar	pistol_use_new_accuracy( "pistol_use_new_accuracy", "1" );
+ConVar	sk_pistol_accuracy			( "sk_pistol_accuracy",			"0.01745");	//2 DEGREES
+ConVar	sk_pistol_burst_accuracy	( "sk_pistol_burst_accuracy",	"0.06105");	//7 DEGREES
+extern ConVar sv_funmode;
 
 //-----------------------------------------------------------------------------
 // CWeaponPistol
@@ -78,21 +77,21 @@ public:
 		return cone;
 	}
 	
-	virtual int		GetMinBurst() { return 2; }
-	virtual int		GetMaxBurst() { return 4; }
+	virtual int		GetMinBurst() { return 1; }
+	virtual int		GetMaxBurst() { return 2; }
 
 	virtual float GetFireRate( void ) 
 	{
-		// This is default fire-rate (primary attack) holding it down, should be about 1 1/2 shots a second; TF2 is 0.15
+		// This is default fire-rate (primary attack) holding it down
 		if ( GetOwner() && GetOwner()->IsNPC() )
 		{
 			// NPC value
-			return 0.5f;
+			return BaseClass::GetFireRate() + 0.25f;	//0.5f
 		}
 		else
 		{
 			// Player(s) value
-			return 0.3f;
+			return BaseClass::GetFireRate();	//0.35f
 		}
 
 	}
@@ -100,10 +99,8 @@ public:
 	DECLARE_ACTTABLE();
 
 private:
-//	void	PistolFire( float flSpread, float flCycleTime, char stShootSound );
-	void	PistolFire( float flSpread, float flCycleTime );
+	void	PistolFire( float flSpread, float flCycleTime, bool bBurstFire );
 	float	m_flSoonestPrimaryAttack;
-	float	m_flLastAttackTime;
 	int		m_nNumShotsFired;
 };
 
@@ -118,27 +115,27 @@ BEGIN_DATADESC( CWeaponPistol )
 
 	DEFINE_FIELD( m_flSoonestPrimaryAttack, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextSecondaryAttack, FIELD_TIME ),
-	DEFINE_FIELD( m_flLastAttackTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_nNumShotsFired,			FIELD_INTEGER ),
 
 END_DATADESC()
 
 acttable_t	CWeaponPistol::m_acttable[] = 
 {
-	{ ACT_IDLE,						ACT_IDLE_PISTOL,				true },
-	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_PISTOL,			true },
 	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_PISTOL,		true },
 	{ ACT_RELOAD,					ACT_RELOAD_PISTOL,				true },
+	{ ACT_IDLE,						ACT_IDLE_PISTOL,				true },
+	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_PISTOL,			true },
+
+	{ ACT_WALK,						ACT_WALK_PISTOL,				true },
 	{ ACT_WALK_AIM,					ACT_WALK_AIM_PISTOL,			true },
+	{ ACT_RUN,						ACT_RUN_PISTOL,					true },
 	{ ACT_RUN_AIM,					ACT_RUN_AIM_PISTOL,				true },
-	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_PISTOL,true },
-	{ ACT_RELOAD_LOW,				ACT_RELOAD_PISTOL_LOW,			false },
-	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_PISTOL_LOW,	false },
-	{ ACT_COVER_LOW,				ACT_COVER_PISTOL_LOW,			false },
-	{ ACT_RANGE_AIM_LOW,			ACT_RANGE_AIM_PISTOL_LOW,		false },
-	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_PISTOL,		false },
-	{ ACT_WALK,						ACT_WALK_PISTOL,				false },
-	{ ACT_RUN,						ACT_RUN_PISTOL,					false },
+
+	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_PISTOL,	false },
+	{ ACT_RANGE_AIM_LOW,			ACT_RANGE_AIM_PISTOL_LOW,			false },
+	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_PISTOL_LOW,		false },
+	{ ACT_RELOAD_LOW,				ACT_RELOAD_PISTOL_LOW,				false },
+	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_PISTOL,			false },
 };
 
 
@@ -152,10 +149,14 @@ CWeaponPistol::CWeaponPistol( void )
 //	m_flSoonestPrimaryAttack = gpGlobals->curtime;
 
 	m_fMinRange1		= 24;
-	m_fMaxRange1		= 1500;
+	m_fMaxRange1		= 1024;
 //	m_fMinRange2		= 24;
 //	m_fMaxRange2		= 200;
 
+	if ( !sv_funmode.GetBool() )
+	{
+		m_bCanJam			= true;
+	}
 	m_bReloadsSingly	= false;
 	m_bFiresUnderwater	= true;
 }
@@ -208,8 +209,8 @@ void CWeaponPistol::DryFire( void )
 {
 	WeaponSound( EMPTY );
 	SendWeaponAnim( ACT_VM_DRYFIRE );
-	
-//	m_flSoonestPrimaryAttack	= gpGlobals->curtime + PISTOL_FASTEST_DRY_REFIRE_TIME;
+
+	m_flSoonestPrimaryAttack	= gpGlobals->curtime + PISTOL_FASTEST_REFIRE_TIME;
 	m_flNextPrimaryAttack		= gpGlobals->curtime + SequenceDuration();
 }
 
@@ -218,21 +219,21 @@ void CWeaponPistol::DryFire( void )
 //-----------------------------------------------------------------------------
 void CWeaponPistol::PrimaryAttack( void )
 {
-	PistolFire( 0.01745, 0.35f );
+	PistolFire( sk_pistol_accuracy.GetFloat(), GetFireRate(), false );
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Inaccurate burst fire
+// Purpose: Inaccurate but very quick-burst fire
 //-----------------------------------------------------------------------------
 void CWeaponPistol::SecondaryAttack( void )
 {
-	PistolFire( 0.12500, 0.085f );
+	PistolFire( sk_pistol_burst_accuracy.GetFloat(), GetFireRate() * 0.25, true );
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Shoot de gun, mon!
 //-----------------------------------------------------------------------------
-void CWeaponPistol::PistolFire( float flSpread, float flCycleTime )
+void CWeaponPistol::PistolFire( float flSpread, float flCycleTime, bool bBurstFire )
 {
 	// If my clip is empty (and I use clips) start reload
 	if ( UsesClipsForAmmo1() && !m_iClip1 ) 
@@ -246,10 +247,6 @@ void CWeaponPistol::PistolFire( float flSpread, float flCycleTime )
 	if ( !pPlayer )
 		return;
 
-	m_nNumShotsFired++;
-
-	m_flNextSecondaryAttack = gpGlobals->curtime;
-
 	WeaponSound( SINGLE );
 	pPlayer->DoMuzzleFlash();
 	m_iClip1--;
@@ -260,15 +257,35 @@ void CWeaponPistol::PistolFire( float flSpread, float flCycleTime )
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, GetOwner() );
 
-//	m_flLastAttackTime = gpGlobals->curtime;
-//	m_flSoonestPrimaryAttack = gpGlobals->curtime + PISTOL_FASTEST_REFIRE_TIME;
-	m_flNextPrimaryAttack	= gpGlobals->curtime + flCycleTime;
-	m_flNextSecondaryAttack	= gpGlobals->curtime + flCycleTime;
+	//TEMP; This needs improvement
+	if ( bBurstFire )
+	{
+		m_nNumShotsFired++;
+		//Lock/delay the primary fire
+		m_flSoonestPrimaryAttack = gpGlobals->curtime + (flCycleTime * 4);
+		m_flNextPrimaryAttack	= gpGlobals->curtime + (flCycleTime * 4);
+		m_flNextSecondaryAttack = gpGlobals->curtime + flCycleTime;
+		//If four boolets have been shooted, reset
+		if ( m_nNumShotsFired > 3 )
+		{
+			m_nNumShotsFired = 0;
+			m_flSoonestPrimaryAttack = gpGlobals->curtime;
+			m_flNextPrimaryAttack	= gpGlobals->curtime;
+			m_flNextSecondaryAttack = gpGlobals->curtime + (flCycleTime * 4);
+		}
+	}
+	else
+	{
+		m_nNumShotsFired++;
+		m_flSoonestPrimaryAttack = gpGlobals->curtime + PISTOL_FASTEST_REFIRE_TIME;
+		m_flNextPrimaryAttack	= gpGlobals->curtime + flCycleTime;
+		m_flNextSecondaryAttack	= gpGlobals->curtime + flCycleTime;
+	}
 
 	Vector	vecSrc	 = pPlayer->Weapon_ShootPosition( );
 	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
 
-	pPlayer->FireBullets( 1, vecSrc, vecAiming, Vector( flSpread, flSpread, flSpread ), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0 );
+	pPlayer->FireBullets( 1, vecSrc, vecAiming, Vector( flSpread, flSpread, flSpread ), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
 
 	if( pPlayer )
 	{
@@ -284,7 +301,7 @@ void CWeaponPistol::PistolFire( float flSpread, float flCycleTime )
 
 //	BaseClass::PrimaryAttack();
 
-//	m_iPrimaryAttacks++;
+	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 }
 
@@ -303,7 +320,12 @@ void CWeaponPistol::ItemPostFrame( void )
 	if ( pOwner == NULL )
 		return;
 
-	if ( ( pOwner->m_nButtons & IN_ATTACK ) && ( m_flNextPrimaryAttack < gpGlobals->curtime ) && ( m_iClip1 <= 0 ) )
+	//Allow a refire as fast as the player can click
+	if ( ( ( pOwner->m_nButtons & IN_ATTACK ) == false ) && ( m_flSoonestPrimaryAttack < gpGlobals->curtime ) )
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime - 0.1f;
+	}
+	else if ( ( pOwner->m_nButtons & IN_ATTACK ) && ( m_flNextPrimaryAttack < gpGlobals->curtime ) && ( m_iClip1 <= 0 ) )
 	{
 		DryFire();
 	}
@@ -358,6 +380,8 @@ void CWeaponPistol::AddViewKick( void )
 	//Add it to the view punch
 	pPlayer->ViewPunch( viewPunch );
 }
+
+
 
 //=============================================================================//
 //
@@ -431,7 +455,6 @@ public:
 			// Player(s) value
 			return 0.4f;
 		}
-
 	}
 	
 	DECLARE_ACTTABLE();

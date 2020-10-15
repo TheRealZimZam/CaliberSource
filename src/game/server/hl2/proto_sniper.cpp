@@ -44,9 +44,9 @@
 
 extern Vector PointOnLineNearestPoint(const Vector& vStartPos, const Vector& vEndPos, const Vector& vPoint);
 
-ConVar bulletSpeed( "bulletspeed", "6000" );
+ConVar bulletSpeed( "bulletspeed", "6000" );	//This might be better to offload
 ConVar sniperLines( "showsniperlines", "0" );
-ConVar sniperviewdist("sniperviewdist", "35" );
+ConVar sniperviewdist("sniperviewdist", "35" );	//Achtually the viewCONE
 ConVar showsniperdist("showsniperdist", "0" );
 ConVar sniperspeak( "sniperspeak", "0" );
 ConVar sniper_xbox_delay( "sniper_xbox_delay", "1" );
@@ -644,7 +644,7 @@ void CProtoSniper::LaserOn( const Vector &vecTarget, const Vector &vecDeviance )
 	if (!m_pBeam)
 	{
 		m_pBeam = CBeam::BeamCreate( "effects/bluelaser1.vmt", 1.0f );
-		m_pBeam->SetColor( 0, 100, 255 );
+		m_pBeam->SetColor( 255, 50, 0 );	//0, 100, 255 -- Isnt this important enough to be exported?
 	}
 	else
 	{
@@ -912,6 +912,7 @@ void CProtoSniper::Precache( void )
 	UTIL_PrecacheOther( "sniperbullet" );
 
 	PrecacheScriptSound( "NPC_Sniper.Die" );
+//	PrecacheScriptSound( "NPC_Sniper.CoverDestroyed" );
 	PrecacheScriptSound( "NPC_Sniper.TargetDestroyed" );
 	PrecacheScriptSound( "NPC_Sniper.HearDanger");
 	PrecacheScriptSound( "NPC_Sniper.FireBullet" );
@@ -1337,11 +1338,11 @@ void CProtoSniper::Event_Killed( const CTakeDamageInfo &info )
 
 		if( HasSpawnFlags( SF_NPC_FADE_CORPSE ) )
 		{
-			flFadeTime = 5.0;
+			flFadeTime = 10.0;
 		}
 
 		CBaseEntity *pGib;
-		bool bShouldIgnite = IsOnFire() || hl2_episodic.GetBool();
+		bool bShouldIgnite = IsOnFire();	//|| hl2_episodic.GetBool()
 		pGib = CreateRagGib( "models/combine_soldier.mdl", GetLocalOrigin(), GetLocalAngles(), (vecForward * flForce) + Vector(0, 0, 600), flFadeTime, bShouldIgnite );
 
 	}
@@ -3341,7 +3342,7 @@ bool CSniperBullet::Start( const Vector &vecOrigin, const Vector &vecTarget, CBa
 	// the trace comes from the loop above that does penetration.
 	trace_t tr;
 	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + m_vecDir * 8192, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
-	UTIL_Tracer( vecOrigin, tr.endpos, 0, TRACER_DONT_USE_ATTACHMENT, m_Speed, true, "StriderTracer" );
+	UTIL_Tracer( vecOrigin, tr.endpos, 0, TRACER_DONT_USE_ATTACHMENT, m_Speed, true, "AR2Tracer" );	//StriderTracer
 
 	float flElapsedTime = ( (tr.startpos - tr.endpos).Length() / m_Speed );
 	m_SoundTime = gpGlobals->curtime + flElapsedTime * 0.5;

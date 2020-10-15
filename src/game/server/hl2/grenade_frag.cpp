@@ -15,8 +15,17 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define FRAG_GRENADE_BLIP_FREQUENCY			1.0f
-#define FRAG_GRENADE_BLIP_FAST_FREQUENCY	0.3f
+// Shouldnt this be a convar? (for difficulty tuning)
+//#define FRAG_GRENADE_BLOP_FREQUENCY			1.0f
+//#define FRAG_GRENADE_BLOP_FAST_FREQUENCY	0.25f
+
+ConVar	grenade_blip_frequency	( "grenade_blip_frequency",	"1");
+#define FRAG_GRENADE_BLOP_FREQUENCY		grenade_blip_frequency.GetFloat()
+
+ConVar	grenade_blip_fast_frequency	( "grenade_blip_fast_frequency",	"0.3");
+#define FRAG_GRENADE_BLOP_FAST_FREQUENCY		grenade_blip_fast_frequency.GetFloat()
+
+ConVar	grenade_glow_enable	( "grenade_glow_enable",	"1");
 
 #define FRAG_GRENADE_GRACE_TIME_AFTER_PICKUP 1.5f
 #define FRAG_GRENADE_WARN_TIME 1.5f
@@ -120,14 +129,14 @@ void CGrenadeFrag::Spawn( void )
 	}
 
 	m_takedamage	= DAMAGE_YES;
-	m_iHealth		= 1;
+	m_iHealth		= 15;
 
 	SetSize( -Vector(4,4,4), Vector(4,4,4) );
 	SetCollisionGroup( COLLISION_GROUP_WEAPON );
 	CreateVPhysics();
 
 	BlipSound();
-	m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLIP_FREQUENCY;
+	m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLOP_FREQUENCY;
 
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 
@@ -154,31 +163,49 @@ void CGrenadeFrag::OnRestore( void )
 //-----------------------------------------------------------------------------
 void CGrenadeFrag::CreateEffects( void )
 {
-	// Start up the eye glow
-	m_pMainGlow = CSprite::SpriteCreate( "sprites/redglow1.vmt", GetLocalOrigin(), false );
-
 	int	nAttachment = LookupAttachment( "fuse" );
 
-	if ( m_pMainGlow != NULL )
+	if ( grenade_glow_enable.GetBool() )
 	{
-		m_pMainGlow->FollowEntity( this );
-		m_pMainGlow->SetAttachment( this, nAttachment );
-		m_pMainGlow->SetTransparency( kRenderGlow, 255, 255, 255, 200, kRenderFxNoDissipation );
-		m_pMainGlow->SetScale( 0.2f );
-		m_pMainGlow->SetGlowProxySize( 4.0f );
+		// Start up the eye glow
+		m_pMainGlow = CSprite::SpriteCreate( "sprites/redglow1.vmt", GetLocalOrigin(), false );
+
+		if ( m_pMainGlow != NULL )
+		{
+			m_pMainGlow->FollowEntity( this );
+			m_pMainGlow->SetAttachment( this, nAttachment );
+			m_pMainGlow->SetTransparency( kRenderGlow, 255, 255, 255, 200, kRenderFxNoDissipation );
+			m_pMainGlow->SetScale( 0.2f );
+			m_pMainGlow->SetGlowProxySize( 4.0f );
+		}
+
+		// Start up the eye trail
+		m_pGlowTrail	= CSpriteTrail::SpriteTrailCreate( "sprites/bluelaser1.vmt", GetLocalOrigin(), false );
+
+		if ( m_pGlowTrail != NULL )
+		{
+			m_pGlowTrail->FollowEntity( this );
+			m_pGlowTrail->SetAttachment( this, nAttachment );
+			m_pGlowTrail->SetTransparency( kRenderTransAdd, 255, 0, 0, 255, kRenderFxNone );
+			m_pGlowTrail->SetStartWidth( 8.0f );
+			m_pGlowTrail->SetEndWidth( 1.0f );
+			m_pGlowTrail->SetLifeTime( 0.5f );
+		}
 	}
-
-	// Start up the eye trail
-	m_pGlowTrail	= CSpriteTrail::SpriteTrailCreate( "sprites/bluelaser1.vmt", GetLocalOrigin(), false );
-
-	if ( m_pGlowTrail != NULL )
+	else
 	{
-		m_pGlowTrail->FollowEntity( this );
-		m_pGlowTrail->SetAttachment( this, nAttachment );
-		m_pGlowTrail->SetTransparency( kRenderTransAdd, 255, 0, 0, 255, kRenderFxNone );
-		m_pGlowTrail->SetStartWidth( 8.0f );
-		m_pGlowTrail->SetEndWidth( 1.0f );
-		m_pGlowTrail->SetLifeTime( 0.5f );
+		// Start up the smoke trail
+		m_pGlowTrail	= CSpriteTrail::SpriteTrailCreate( "sprites/xbeam2.vmt", GetLocalOrigin(), true );	//sprites/smoke.vmt
+
+		if ( m_pGlowTrail != NULL )
+		{
+			m_pGlowTrail->FollowEntity( this );
+			m_pGlowTrail->SetAttachment( this, nAttachment );
+			m_pGlowTrail->SetTransparency( kRenderTransAdd, 96, 96, 96, 64, kRenderFxNone );
+			m_pGlowTrail->SetStartWidth( 4.0f );
+			m_pGlowTrail->SetEndWidth( 1.0f );
+			m_pGlowTrail->SetLifeTime( 0.25f );
+		}
 	}
 }
 
@@ -281,6 +308,7 @@ void CGrenadeFrag::Precache( void )
 
 	PrecacheModel( "sprites/redglow1.vmt" );
 	PrecacheModel( "sprites/bluelaser1.vmt" );
+	PrecacheModel( "sprites/xbeam2.vmt" );
 
 	BaseClass::Precache();
 }
@@ -303,7 +331,7 @@ void CGrenadeFrag::OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_t r
 	SetTimer( FRAG_GRENADE_GRACE_TIME_AFTER_PICKUP, FRAG_GRENADE_GRACE_TIME_AFTER_PICKUP / 2);
 
 	BlipSound();
-	m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLIP_FAST_FREQUENCY;
+	m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLOP_FAST_FREQUENCY;
 	m_bHasWarnedAI = true;
 #else
 	if( IsX360() )
@@ -311,7 +339,7 @@ void CGrenadeFrag::OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_t r
 		// Give 'em a couple of seconds to aim and throw. 
 		SetTimer( 2.0f, 1.0f);
 		BlipSound();
-		m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLIP_FAST_FREQUENCY;
+		m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLOP_FAST_FREQUENCY;
 	}
 #endif
 
@@ -344,11 +372,11 @@ void CGrenadeFrag::DelayThink()
 		
 		if( m_bHasWarnedAI )
 		{
-			m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLIP_FAST_FREQUENCY;
+			m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLOP_FAST_FREQUENCY;
 		}
 		else
 		{
-			m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLIP_FREQUENCY;
+			m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLOP_FREQUENCY;
 		}
 	}
 
@@ -424,7 +452,7 @@ CBaseGrenade *Fraggrenade_Create( const Vector &position, const QAngle &angles, 
 	pGrenade->SetTimer( timer, timer - FRAG_GRENADE_WARN_TIME );
 	pGrenade->SetVelocity( velocity, angVelocity );
 	pGrenade->SetThrower( ToBaseCombatCharacter( pOwner ) );
-	pGrenade->m_takedamage = DAMAGE_EVENTS_ONLY;
+	pGrenade->m_takedamage = DAMAGE_YES;	//DAMAGE_EVENTS_ONLY
 	pGrenade->SetCombineSpawned( combineSpawned );
 
 	return pGrenade;

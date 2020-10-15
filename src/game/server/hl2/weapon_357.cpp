@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		357 - hand gun
+// Purpose:		Three-Fiddy-Seven Magdump
 //
-// $NoKeywords: $
+// TODO; Add a 0.3 sec prefiring delay (pulling the hammer)
 //=============================================================================//
 
 #include "cbase.h"
@@ -24,7 +24,7 @@
 #include "tier0/memdbgon.h"
 
 #define	MAGNUM_REFIRE_TIME		0.6f
-#define	MAGNUM_ACCURACY_SHOT_PENALTY_TIME		0.75f	// Applied amount of time each shot adds to the time we must recover from. Should match firerate
+#define	MAGNUM_ACCURACY_SHOT_PENALTY_TIME		0.75f	// Applied amount of time each shot adds to the time we must recover from. Should be a bit over firerate
 #define	MAGNUM_ACCURACY_MAXIMUM_PENALTY_TIME	2.0f	// Maximum penalty to deal out
 
 ConVar	magnum_use_new_accuracy( "magnum_use_new_accuracy", "1" );
@@ -52,6 +52,7 @@ public:
 	void	DryFire( void );
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
+	const char *GetTracerType( void ) { return "BigTracer"; }
 	void	UpdatePenaltyTime( void );
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 	float	WeaponAutoAimScale()	{ return 0.6f; }
@@ -75,13 +76,13 @@ public:
 											0.0f, 
 											1.0f ); 
 
-			// We lerp from very accurate to inaccurate over time
-			VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_8DEGREES, ramp, cone );
+			// If the player wants to break his wrist, give him the accuracy of one
+			VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_9DEGREES, ramp, cone );
 		}
 		else
 		{
 			// Old value
-			cone = VECTOR_CONE_1DEGREES;
+			cone = VECTOR_CONE_2DEGREES;
 		}
 
 		return cone;
@@ -93,12 +94,12 @@ public:
 		if ( GetOwner() && GetOwner()->IsNPC() )
 		{
 			// NPC value
-			return 0.75f;
+			return BaseClass::GetFireRate() + 0.25f;	//0.5f
 		}
 		else
 		{
 			// Player(s) value
-			return 0.6f;
+			return BaseClass::GetFireRate();	//0.35f
 		}
 
 	}
@@ -177,7 +178,7 @@ void CWeapon357::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatChara
 				CEffectData data;
 
 				// Emit six spent shells
-				for ( int i = 0; i < 6; i++ )
+				for ( int i = 0; i < GetDefaultClip1(); i++ )
 				{
 					data.m_vOrigin = pOwner->WorldSpaceCenter() + RandomVector( -4, 4 );
 					data.m_vAngles = QAngle( 90, random->RandomInt( 0, 360 ), 0 );

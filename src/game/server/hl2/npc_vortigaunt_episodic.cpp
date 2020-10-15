@@ -2,6 +2,7 @@
 //
 // Purpose: Vortigaunt - now much friendlier!
 //
+// TODO; This should really NOT be a branch of npc_playercompanion
 //=============================================================================
 
 #include "cbase.h"

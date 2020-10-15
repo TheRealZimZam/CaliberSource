@@ -30,7 +30,8 @@ extern short	g_sModelIndexFireball;
 
 extern ConVar    sk_plr_dmg_molotov;
 extern ConVar    sk_npc_dmg_molotov;
-ConVar    sk_molotov_radius			( "sk_molotov_radius","0");
+//This is the radius of the fire, not the explosion
+ConVar    sk_molotov_radius			( "sk_molotov_radius","128");
 
 #define MOLOTOV_EXPLOSION_VOLUME	1024
 

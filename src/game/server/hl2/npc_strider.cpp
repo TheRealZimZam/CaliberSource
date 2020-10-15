@@ -3777,7 +3777,7 @@ float CNPC_Strider::MaxYawSpeed()
 		return 10;
 
 	default:
-		return 10;		// should be zero, but this makes it easy to see when he's turning with default AI code
+		return 5;		// should be zero, but this makes it easy to see when he's turning with default AI code
 		break;
 	}
 }

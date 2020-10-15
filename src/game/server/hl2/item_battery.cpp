@@ -21,7 +21,7 @@ public:
 	DECLARE_CLASS( CItemBattery, CItem );
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/battery.mdl" );
 		BaseClass::Spawn( );
@@ -43,3 +43,31 @@ public:
 LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);
 PRECACHE_REGISTER(item_battery);
 
+//-----------------------------------------------------------------------------
+class CItemBigBattery : public CItem
+{
+public:
+	DECLARE_CLASS( CItemBigBattery, CItem );
+
+	void Spawn( void )
+	{
+		Precache( );
+		SetModel( "models/items/battery_aaa.mdl" );
+		BaseClass::Spawn( );
+	}
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/battery_aaa.mdl");
+
+		PrecacheScriptSound( "ItemBattery.Touch" );
+
+	}
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
+		return ( pHL2Player && pHL2Player->ApplyBattery() );
+	}
+};
+
+LINK_ENTITY_TO_CLASS(item_bigplate, CItemBigBattery);
+PRECACHE_REGISTER(item_bigplate);

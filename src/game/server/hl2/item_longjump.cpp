@@ -40,8 +40,9 @@ void CItemLongJump::Spawn( void )
 {
 	Precache( );
 	SetModel( "models/w_longjump.mdl" );
-
 	BaseClass::Spawn( );
+
+	CollisionProp()->UseTriggerBounds( true, 16.0f );
 }
 
 //-----------------------------------------------------------------------------
@@ -61,25 +62,27 @@ void CItemLongJump::Precache( void )
 //-----------------------------------------------------------------------------
 bool CItemLongJump::MyTouch( CBasePlayer *pPlayer )
 {
-	if ( pPlayer->m_fLongJump )
+	CHL2_Player *pHL2Player = (CHL2_Player*)pPlayer;
+
+	if ( pHL2Player->m_bHasLongJump == true )	//m_fLongJump
 	{
-		return FALSE;
+		return false;
 	}
 
-	if ( pPlayer->IsSuitEquipped() )
+	if ( pHL2Player->IsSuitEquipped() )
 	{
-		pPlayer->m_fLongJump = TRUE;// player now has longjump module
+		pHL2Player->m_bHasLongJump = true;// player now has longjump module
 
-		CSingleUserRecipientFilter user( pPlayer );
+		CSingleUserRecipientFilter user( pHL2Player );
 		user.MakeReliable();
 
 		UserMessageBegin( user, "ItemPickup" );
-			WRITE_STRING( STRING(pev->classname) );
+			WRITE_STRING( STRING(m_iClassname) );
 		MessageEnd();
 
-		UTIL_EmitSoundSuit( pPlayer->edict(), "!HEV_A1" );	// Play the longjump sound UNDONE: Kelly? correct sound?
+		UTIL_EmitSoundSuit( pHL2Player->edict(), "!HEV_A1" );	// Play the longjump sound UNDONE: Kelly? correct sound?
 		return true;		
 	}
-	return false;
+	return false; 
 }
 

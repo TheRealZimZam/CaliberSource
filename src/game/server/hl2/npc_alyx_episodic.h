@@ -60,9 +60,6 @@ public:
 	Vector  GetCrouchEyeOffset( void ) { return Vector(0,0,50); }
 	Vector  GetCrouchGunOffset( void ) { return Vector(0,0,40); }
 	bool	EnemyIsValidCrouchTarget( CBaseEntity *pEnemy );
-	bool	Stand( void );
-	bool	Crouch( void );
-	void	DesireCrouch( void );
 
 	// Custom AI
 	void	DoCustomCombatAI( void );
@@ -192,7 +189,6 @@ private:
 	float	m_fTimeUntilNextDarknessFoundPlayer;
 	float   m_fCombatStartTime;
 	float	m_fCombatEndTime;
-	float	m_flNextCrouchTime;
 
 	CSoundPatch		*m_sndDarknessBreathing;
 

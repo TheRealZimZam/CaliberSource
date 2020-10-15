@@ -3,9 +3,8 @@
 // Purpose: Magazine-fed auto shotgun used by soldiers.
 //
 //			Primary attack: single barrel shot.
-//			5-6 second reload
-// TODO's: Allow firing right after a shot, but double the spread/recoil
 //
+// TODO's: Use machinegun recoil, do 1 damage to the player per shot after constant firing after 3 rounds
 //=============================================================================//
 
 #include "cbase.h"
@@ -24,8 +23,12 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+//ConVar sk_weapon_supershotgun_lerp( "sk_weapon_supershotgun_lerp", "5.0" );	//NOT USED
+
 extern ConVar sk_auto_reload_time;
 extern ConVar sk_plr_num_shotgun_pellets;
+extern ConVar sk_npc_num_shotgun_pellets;
+extern ConVar sv_funmode;
 
 class CWeaponSuperShotgun : public CBaseHLCombatWeapon
 {
@@ -35,24 +38,18 @@ public:
 
 	DECLARE_SERVERCLASS();
 
-private:
-	bool	m_bDelayedFire1;	// Clang when finished reloading
-
-public:
 	void	Precache( void );
 
 	int CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector AllyCone = VECTOR_CONE_3DEGREES;
-		// 12 in SP, 15 in MP
-	//	static Vector MPcone = VECTOR_CONE_15DEGREES;
+		static Vector AllyCone = VECTOR_CONE_4DEGREES;
 		static Vector cone = VECTOR_CONE_12DEGREES;
 
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
-			// Allies fire shots more akin to slugs. Leave room-clearing for the player.
+			// Story allies fire shots more akin to slugs. Leave room-clearing for the player.
 			return AllyCone;
 		}
 
@@ -60,7 +57,7 @@ public:
 	}
 
 	virtual int				GetMinBurst() { return 2; }
-	virtual int				GetMaxBurst() { return 4; }
+	virtual int				GetMaxBurst() { return 3; }
 
 	virtual float			GetMinRestTime();
 	virtual float			GetMaxRestTime();
@@ -68,13 +65,12 @@ public:
 	virtual float			GetFireRate( void );
 
 	bool	Reload( void );
-	void	Pump( void );
 //	void	WeaponIdle( void );
 	void	ItemHolsterFrame( void );
 //	void	ItemPostFrame( void );
 	void	PrimaryAttack( void );
-	void	DryFire( void );
-	
+
+	const char *GetTracerType( void ) { return "ShotgunTracer"; }
 	void	FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
 	void	Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
@@ -94,18 +90,19 @@ PRECACHE_WEAPON_REGISTER( weapon_supershotgun );
 
 BEGIN_DATADESC( CWeaponSuperShotgun )
 
-	DEFINE_FIELD( m_bDelayedFire1, FIELD_BOOLEAN ),
-
 END_DATADESC()
 
 acttable_t	CWeaponSuperShotgun::m_acttable[] = 
 {
-	{ ACT_IDLE,						ACT_IDLE_SMG1,					true },	// FIXME: hook to shotgun unique
-
-	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_SHOTGUN,			true },
+	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_SHOTGUN,			true },		//ACT_RANGE_ATTACK_SUPERSHOTGUN
 	{ ACT_RELOAD,					ACT_RELOAD_SMG1,					false },	// FIXME: hook to shotgun unique
-	{ ACT_WALK,						ACT_WALK_RIFLE,						true },
+	{ ACT_IDLE,						ACT_IDLE_RIFLE,						true },		// FIXME: hook to shotgun unique
 	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_SHOTGUN,				true },
+
+	{ ACT_WALK,						ACT_WALK_RIFLE,						true },
+	{ ACT_WALK_AIM,					ACT_WALK_AIM_SHOTGUN,				true },
+	{ ACT_RUN,						ACT_RUN_RIFLE,						true },
+	{ ACT_RUN_AIM,					ACT_RUN_AIM_SHOTGUN,				true },
 
 // Readiness activities (not aiming)
 	{ ACT_IDLE_RELAXED,				ACT_IDLE_SHOTGUN_RELAXED,		false },//never aims
@@ -114,37 +111,34 @@ acttable_t	CWeaponSuperShotgun::m_acttable[] =
 
 	{ ACT_WALK_RELAXED,				ACT_WALK_RIFLE_RELAXED,			false },//never aims
 	{ ACT_WALK_STIMULATED,			ACT_WALK_RIFLE_STIMULATED,		false },
-	{ ACT_WALK_AGITATED,			ACT_WALK_AIM_RIFLE,				false },//always aims
+	{ ACT_WALK_AGITATED,			ACT_WALK_AIM_SHOTGUN,			false },//always aims
 
 	{ ACT_RUN_RELAXED,				ACT_RUN_RIFLE_RELAXED,			false },//never aims
 	{ ACT_RUN_STIMULATED,			ACT_RUN_RIFLE_STIMULATED,		false },
-	{ ACT_RUN_AGITATED,				ACT_RUN_AIM_RIFLE,				false },//always aims
+	{ ACT_RUN_AGITATED,				ACT_RUN_AIM_SHOTGUN,			false },//always aims
 
 // Readiness activities (aiming)
-	{ ACT_IDLE_AIM_RELAXED,			ACT_IDLE_SMG1_RELAXED,			false },//never aims	
+	{ ACT_IDLE_AIM_RELAXED,			ACT_IDLE_SHOTGUN_RELAXED,		false },//never aims	
 	{ ACT_IDLE_AIM_STIMULATED,		ACT_IDLE_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_IDLE_AIM_AGITATED,		ACT_IDLE_ANGRY_SMG1,			false },//always aims
+	{ ACT_IDLE_AIM_AGITATED,		ACT_IDLE_ANGRY_SHOTGUN,			false },//always aims
 
 	{ ACT_WALK_AIM_RELAXED,			ACT_WALK_RIFLE_RELAXED,			false },//never aims
 	{ ACT_WALK_AIM_STIMULATED,		ACT_WALK_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_WALK_AIM_AGITATED,		ACT_WALK_AIM_RIFLE,				false },//always aims
+	{ ACT_WALK_AIM_AGITATED,		ACT_WALK_AIM_SHOTGUN,			false },//always aims
 
 	{ ACT_RUN_AIM_RELAXED,			ACT_RUN_RIFLE_RELAXED,			false },//never aims
 	{ ACT_RUN_AIM_STIMULATED,		ACT_RUN_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_RUN_AIM_AGITATED,			ACT_RUN_AIM_RIFLE,				false },//always aims
+	{ ACT_RUN_AIM_AGITATED,			ACT_RUN_AIM_SHOTGUN,			false },//always aims
 //End readiness activities
 
-	{ ACT_WALK_AIM,					ACT_WALK_AIM_SHOTGUN,				true },
 	{ ACT_WALK_CROUCH,				ACT_WALK_CROUCH_RIFLE,				true },
 	{ ACT_WALK_CROUCH_AIM,			ACT_WALK_CROUCH_AIM_RIFLE,			true },
-	{ ACT_RUN,						ACT_RUN_RIFLE,						true },
-	{ ACT_RUN_AIM,					ACT_RUN_AIM_SHOTGUN,				true },
 	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RIFLE,				true },
 	{ ACT_RUN_CROUCH_AIM,			ACT_RUN_CROUCH_AIM_RIFLE,			true },
-	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_SHOTGUN,	true },
+	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_SHOTGUN,	true },	//ACT_GESTURE_RANGE_ATTACK_SUPERSHOTGUN
 	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_SHOTGUN_LOW,		true },
 	{ ACT_RELOAD_LOW,				ACT_RELOAD_SHOTGUN_LOW,				false },
-	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_SHOTGUN,			false },
+	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_SMG1,			false },
 };
 
 IMPLEMENT_ACTTABLE(CWeaponSuperShotgun);
@@ -152,6 +146,23 @@ IMPLEMENT_ACTTABLE(CWeaponSuperShotgun);
 void CWeaponSuperShotgun::Precache( void )
 {
 	CBaseCombatWeapon::Precache();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Constructor
+//-----------------------------------------------------------------------------
+CWeaponSuperShotgun::CWeaponSuperShotgun( void )
+{
+	m_bReloadsSingly	= false;
+	if ( !sv_funmode.GetBool() )
+	{
+		m_bCanJam			= true;
+	}
+
+	m_fMinRange1		= 0.0;
+	m_fMaxRange1		= 768;
+	m_fMinRange2		= 0.0;
+	m_fMaxRange2		= 256;
 }
 
 //-----------------------------------------------------------------------------
@@ -179,7 +190,8 @@ void CWeaponSuperShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator,
 		vecShootDir = npc->GetActualShootTrajectory( vecShootOrigin );
 	}
 
-	pOperator->FireBullets( 8, vecShootOrigin, vecShootDir, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0 );
+	int	TracerFreq = random->RandomInt( 2, 3 );
+	pOperator->FireBullets( sk_npc_num_shotgun_pellets.GetInt(), vecShootOrigin, vecShootDir, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, TracerFreq );
 }
 
 //-----------------------------------------------------------------------------
@@ -188,7 +200,7 @@ void CWeaponSuperShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator,
 void CWeaponSuperShotgun::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
 {
 	// Ensure we have enough rounds in the clip
-//	m_iClip1++;
+	m_iClip1++;
 
 	FireNPCPrimaryAttack( pOperator, true );
 }
@@ -215,52 +227,33 @@ void CWeaponSuperShotgun::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCo
 
 
 //-----------------------------------------------------------------------------
-// Purpose:	When we shipped Caliber, the shotgun was op as fu**,
-//			enemies could blow your brains out in less than a second,
-//			cause' the rof was around 1 shot a second, so I nerfed it. (wm)
-//-----------------------------------------------------------------------------
 // Purpose: Cops and gangsters use shot regulator, not conscripts. Conscripts lose accuracy instead.
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
 float CWeaponSuperShotgun::GetMinRestTime()
 {
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_COMBINE )
-	{
-		return 1.2f;
-	}
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
-	{
-		return 1.2f;
-	}
-	// Gangsters need to regulate too, cause' they also use the shotgun alot (ONLY APPLIES DURING PRECRIMINAL)
-	if( GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
-	{
-		return 1.2f;
-	}
-	
-	return BaseClass::GetMinRestTime();
+	Class_T OwnerClass = GetOwner()->Classify();
+
+	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
+		 OwnerClass == CLASS_METROPOLICE	||
+		 OwnerClass == CLASS_COMBINE	)
+		 return 0.9f;
+
+	return 0.6f;
 }
 
 //-----------------------------------------------------------------------------
 float CWeaponSuperShotgun::GetMaxRestTime()
 {
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_COMBINE )
-	{
-		return 1.5f;
-	}
-	// Cops might pickup the gun, so regulate them too even if they are never "supposed" to get one
-	if( hl2_episodic.GetBool() && GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
-	{
-		return 1.5f;
-	}
-	// Mobsters need to regulate too, cause' they also use the shotgun alot (ONLY APPLIES DURING PRECRIMINAL)
-	if( GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
-	{
-		return 1.5f;
-	}
+	Class_T OwnerClass = GetOwner()->Classify();
 
-	return BaseClass::GetMaxRestTime();
+	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
+		 OwnerClass == CLASS_METROPOLICE	||
+		 OwnerClass == CLASS_COMBINE	)
+		 return 1.2f;
+
+	return 0.9f;
 }
 
 //-----------------------------------------------------------------------------
@@ -269,53 +262,15 @@ float CWeaponSuperShotgun::GetMaxRestTime()
 //-----------------------------------------------------------------------------
 float CWeaponSuperShotgun::GetFireRate()
 {
-	if( GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
+	if ( GetOwner() && GetOwner()->IsNPC() )
 	{
-		return 0.75f;
+		// NPC value
+		return BaseClass::GetCycleTime() * 1.25;
 	}
 
-	// Conscript troops do (need) to have a bit of a pause when firing, even without the clang
-	if( GetOwner() && GetOwner()->Classify() == CLASS_COMBINE )
-	{
-		return 0.675f;
-	}
-
-	return 0.5f;
+	return BaseClass::GetFireRate();
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: Play weapon clang anim
-// Input  :
-// Output :
-//-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::Pump( void )
-{
-	CBaseCombatCharacter *pOwner  = GetOwner();
-
-	if ( pOwner == NULL )
-		return;
-
-	WeaponSound( SPECIAL1 );
-
-	// Finish reload animation
-	SendWeaponAnim( ACT_SHOTGUN_PUMP );
-
-	pOwner->m_flNextAttack	= gpGlobals->curtime + SequenceDuration();
-	m_flNextPrimaryAttack	= gpGlobals->curtime + SequenceDuration();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//
-//
-//-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::DryFire( void )
-{
-	WeaponSound(EMPTY);
-	SendWeaponAnim( ACT_VM_DRYFIRE );
-	
-	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
-}
 
 //-----------------------------------------------------------------------------
 // Purpose:
@@ -338,12 +293,11 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 		}
 		else
 		{
-			WeaponSound( EMPTY );
-			m_flNextPrimaryAttack = 0.15;
+			DryFire();
 		}
-
 		return;
 	}
+
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 
@@ -356,14 +310,13 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 
 	// Don't fire again until fire animation has completed
 	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
-//	m_iClip1 -= 1;
 	m_iClip1--;
 
 	Vector	vecSrc		= pPlayer->Weapon_ShootPosition( );
 	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
 
 	// Fire the bullets, and force the first shot to be perfectly accuracy
-	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0, -1, -1, 0, NULL, true, true );
+	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, true, true );
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 
 	//Disorient the player
@@ -380,39 +333,10 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Override so shotgun can do mulitple reloads in a row
-//-----------------------------------------------------------------------------
-/*
-void CWeaponSuperShotgun::ItemPostFrame( void )
-{
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
-	if (!pOwner)
-	{
-		return;
-	}
-
-//	if ((m_bNeedPump) && (m_flNextPrimaryAttack <= gpGlobals->curtime))
-//	{
-//		Pump();
-//		return;
-//	}
-
-}
-*/
-//-----------------------------------------------------------------------------
 // Purpose: Override if we're waiting to release a shot
 //-----------------------------------------------------------------------------
-
 bool CWeaponSuperShotgun::Reload( void )
 {
-
-//	// Clang
-//	if ( m_bNeedPump )
-//	{
-//		Pump();
-//	}
-//
-
 	bool fRet = DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
 	if ( fRet )
 	{
@@ -422,22 +346,8 @@ bool CWeaponSuperShotgun::Reload( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Constructor
-//-----------------------------------------------------------------------------
-CWeaponSuperShotgun::CWeaponSuperShotgun( void )
-{
-	m_bReloadsSingly	= false;
-
-	m_fMinRange1		= 0.0;
-	m_fMaxRange1		= 768;
-	m_fMinRange2		= 0.0;
-	m_fMaxRange2		= 256;
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-
 void CWeaponSuperShotgun::ItemHolsterFrame( void )
 {
 	// Must be player held
@@ -448,12 +358,29 @@ void CWeaponSuperShotgun::ItemHolsterFrame( void )
 	if ( GetOwner()->GetActiveWeapon() == this )
 		return;
 
+	if ( ( gpGlobals->curtime - m_flHolsterTime ) > sk_auto_reload_time.GetFloat() )
+	{
+		// Reset the timer
+		m_flHolsterTime = gpGlobals->curtime;
+	
+		if ( GetOwner() == NULL )
+			return;
+
+		if ( m_iClip1 == GetMaxClip1() )
+			return;
+
+		// Just load the clip with no animations
+		int ammoFill = min( (GetMaxClip1() - m_iClip1), GetOwner()->GetAmmoCount( GetPrimaryAmmoType() ) );
+		
+		GetOwner()->RemoveAmmo( ammoFill, GetPrimaryAmmoType() );
+		m_iClip1 += ammoFill;
+	}
 }
 
 //==================================================
 // Purpose: 
 //==================================================
-/*
+#if 0
 void CWeaponSuperShotgun::WeaponIdle( void )
 {
 	//Only the player fires this way so we can cast
@@ -467,5 +394,7 @@ void CWeaponSuperShotgun::WeaponIdle( void )
 	{
 		SendWeaponAnim( ACT_VM_IDLE_ACTIVE );
 	}
+	
+	BaseClass::WeaponIdle();
 }
-*/
+#endif

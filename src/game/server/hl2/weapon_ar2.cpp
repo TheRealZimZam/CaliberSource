@@ -4,7 +4,7 @@
 //
 //			Primary attack: Normal full-auto with decent accuracy.
 //			Secondary attack: Sniper mode - Single shots with perfect accuracy.
-// TODO's: Add secondary fire
+// TODO's: Better scope-in effect, optimize
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -35,6 +35,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar sk_weapon_ar2_lerp( "sk_weapon_ar2_lerp", "5.0" );
+
 ConVar sk_weapon_ar2_alt_fire_radius( "sk_weapon_ar2_alt_fire_radius", "10" );
 ConVar sk_weapon_ar2_alt_fire_duration( "sk_weapon_ar2_alt_fire_duration", "2" );
 ConVar sk_weapon_ar2_alt_fire_mass( "sk_weapon_ar2_alt_fire_mass", "150" );
@@ -62,53 +64,53 @@ PRECACHE_WEAPON_REGISTER(weapon_ar2);
 acttable_t	CWeaponAR2::m_acttable[] = 
 {
 	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_AR2,			true },
-	{ ACT_RELOAD,					ACT_RELOAD_SMG1,				true },		// FIXME: hook to AR2 unique
-	{ ACT_IDLE,						ACT_IDLE_SMG1,					true },		// FIXME: hook to AR2 unique
-	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_SMG1,			true },		// FIXME: hook to AR2 unique
+	{ ACT_RELOAD,					ACT_RELOAD_AR2,					true },	
+	{ ACT_IDLE,						ACT_IDLE_AR2,					true },	
+	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_AR2,				true },	
 
-	{ ACT_WALK,						ACT_WALK_RIFLE,					true },
+	{ ACT_WALK,						ACT_WALK_RIFLE,					true },	// FIXME: hook to AR2 unique
+	{ ACT_WALK_AIM,					ACT_WALK_AIM_RIFLE,				true },	// FIXME: hook to AR2 unique
+	{ ACT_RUN,						ACT_RUN_RIFLE,					true },	// FIXME: hook to AR2 unique
+	{ ACT_RUN_AIM,					ACT_RUN_AIM_RIFLE,				true },	// FIXME: hook to AR2 unique
 
 // Readiness activities (not aiming)
-	{ ACT_IDLE_RELAXED,				ACT_IDLE_SMG1_RELAXED,			false },//never aims
-	{ ACT_IDLE_STIMULATED,			ACT_IDLE_SMG1_STIMULATED,		false },
-	{ ACT_IDLE_AGITATED,			ACT_IDLE_ANGRY_SMG1,			false },//always aims
+	{ ACT_IDLE_RELAXED,				ACT_IDLE_AR2_RELAXED,			false },//never aims
+	{ ACT_IDLE_STIMULATED,			ACT_IDLE_AR2_STIMULATED,		false },
+	{ ACT_IDLE_AGITATED,			ACT_IDLE_ANGRY_AR2,				false },//always aims
 
 	{ ACT_WALK_RELAXED,				ACT_WALK_RIFLE_RELAXED,			false },//never aims
 	{ ACT_WALK_STIMULATED,			ACT_WALK_RIFLE_STIMULATED,		false },
-	{ ACT_WALK_AGITATED,			ACT_WALK_AIM_RIFLE,				false },//always aims
+	{ ACT_WALK_AGITATED,			ACT_WALK_AIM_AR2,				false },//always aims
 
 	{ ACT_RUN_RELAXED,				ACT_RUN_RIFLE_RELAXED,			false },//never aims
-	{ ACT_RUN_STIMULATED,			ACT_RUN_RIFLE_STIMULATED,		false },
-	{ ACT_RUN_AGITATED,				ACT_RUN_AIM_RIFLE,				false },//always aims
+	{ ACT_RUN_STIMULATED,			ACT_RUN_RIFLE_STIMULATED,			false },
+	{ ACT_RUN_AGITATED,				ACT_RUN_AIM_AR2,				false },//always aims
 
 // Readiness activities (aiming)
-	{ ACT_IDLE_AIM_RELAXED,			ACT_IDLE_SMG1_RELAXED,			false },//never aims	
+	{ ACT_IDLE_AIM_RELAXED,			ACT_IDLE_AR2_RELAXED,			false },//never aims	
 	{ ACT_IDLE_AIM_STIMULATED,		ACT_IDLE_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_IDLE_AIM_AGITATED,		ACT_IDLE_ANGRY_SMG1,			false },//always aims
+	{ ACT_IDLE_AIM_AGITATED,		ACT_IDLE_ANGRY_AR2,				false },//always aims
 
 	{ ACT_WALK_AIM_RELAXED,			ACT_WALK_RIFLE_RELAXED,			false },//never aims
-	{ ACT_WALK_AIM_STIMULATED,		ACT_WALK_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_WALK_AIM_AGITATED,		ACT_WALK_AIM_RIFLE,				false },//always aims
+	{ ACT_WALK_AIM_STIMULATED,		ACT_WALK_AIM_AR2,				false },
+	{ ACT_WALK_AIM_AGITATED,		ACT_WALK_AIM_AR2,				false },//always aims
 
-	{ ACT_RUN_AIM_RELAXED,			ACT_RUN_RIFLE_RELAXED,			false },//never aims
-	{ ACT_RUN_AIM_STIMULATED,		ACT_RUN_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_RUN_AIM_AGITATED,			ACT_RUN_AIM_RIFLE,				false },//always aims
+	{ ACT_RUN_AIM_RELAXED,			ACT_RUN_AR2_RELAXED,			false },//never aims
+	{ ACT_RUN_AIM_STIMULATED,		ACT_RUN_AIM_AR2_STIMULATED,		false },
+	{ ACT_RUN_AIM_AGITATED,			ACT_RUN_AIM_AR2,				false },//always aims
 //End readiness activities
 
-	{ ACT_WALK_AIM,					ACT_WALK_AIM_RIFLE,				true },
 	{ ACT_WALK_CROUCH,				ACT_WALK_CROUCH_RIFLE,			true },
 	{ ACT_WALK_CROUCH_AIM,			ACT_WALK_CROUCH_AIM_RIFLE,		true },
-	{ ACT_RUN,						ACT_RUN_RIFLE,					true },
-	{ ACT_RUN_AIM,					ACT_RUN_AIM_RIFLE,				true },
 	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RIFLE,			true },
 	{ ACT_RUN_CROUCH_AIM,			ACT_RUN_CROUCH_AIM_RIFLE,		true },
 	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_AR2,	false },
-	{ ACT_COVER_LOW,				ACT_COVER_SMG1_LOW,				false },		// FIXME: hook to AR2 unique
+//	{ ACT_COVER_LOW,				ACT_COVER_SMG1_LOW,				false },		// FIXME: hook to AR2 unique
 	{ ACT_RANGE_AIM_LOW,			ACT_RANGE_AIM_AR2_LOW,			false },
-	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_SMG1_LOW,		true },		// FIXME: hook to AR2 unique
-	{ ACT_RELOAD_LOW,				ACT_RELOAD_SMG1_LOW,			false },
-	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_SMG1,		true },
-//	{ ACT_RANGE_ATTACK2, ACT_RANGE_ATTACK_AR2_GRENADE, true },
+	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_AR2_LOW,		true },
+	{ ACT_RELOAD_LOW,				ACT_RELOAD_AR2_LOW,				false },
+	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_AR2,			true },
+	{ ACT_RANGE_ATTACK2,			ACT_RANGE_ATTACK_AR2_GRENADE,	true },
 };
 
 IMPLEMENT_ACTTABLE(CWeaponAR2);
@@ -171,11 +173,13 @@ bool CWeaponAR2::Deploy( void )
 //-----------------------------------------------------------------------------
 void CWeaponAR2::ItemPostFrame( void )
 {
+#if 0
 	// See if we need to fire off our secondary round
-//	if ( m_bShotDelayed && gpGlobals->curtime > m_flDelayedFire )
-//	{
-//		DelayedAttack();
-//	}
+	if ( m_bShotDelayed && gpGlobals->curtime > m_flDelayedFire )
+	{
+		DelayedAttack();
+	}
+#endif
 
 	// Update our pose parameter for the vents
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
@@ -196,7 +200,6 @@ void CWeaponAR2::ItemPostFrame( void )
 		}
 	}
 
-	
 	//Zoom in
 	if ( pOwner->m_afButtonPressed & IN_ATTACK2 )
 	{
@@ -208,8 +211,7 @@ void CWeaponAR2::ItemPostFrame( void )
 	{
 		m_fFireDuration = 0.05f;
 	}
-	
-	
+
 	BaseClass::ItemPostFrame();
 }
 
@@ -246,6 +248,133 @@ void CWeaponAR2::DoImpactEffect( trace_t &tr, int nDamageType )
 	DispatchEffect( "AR2Impact", data );
 
 	BaseClass::DoImpactEffect( tr, nDamageType );
+}
+
+#if 0
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void CWeaponAR2::DoMuzzleFlash( int nAttachment )
+{
+	BaseClass::DoMuzzleFlash();
+
+	// Dispatch the elight
+	CEffectData data;
+
+	data.m_nAttachmentIndex = LookupAttachment( "muzzle" );
+	data.m_nEntIndex = entindex();
+	DispatchEffect( "AR2MuzzleFlash", data );
+}
+#endif
+
+//-----------------------------------------------------------------------------
+// Purpose: Tracer frequency
+//-----------------------------------------------------------------------------
+void CWeaponAR2::PrimaryAttack( void )
+{
+	// Only the player fires this way so we can cast
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	if (!pPlayer)
+		return;
+
+	// Abort here to handle burst and auto fire modes
+	if ( (UsesClipsForAmmo1() && m_iClip1 == 0) || ( !UsesClipsForAmmo1() && !pPlayer->GetAmmoCount(m_iPrimaryAmmoType) ) )
+		return;
+
+	m_nShotsFired++;
+
+	pPlayer->DoMuzzleFlash();
+
+	// To make the firing framerate independent, we may have to fire more than one bullet here on low-framerate systems, 
+	// especially if the weapon we're firing has a really fast rate of fire.
+	int iBulletsToFire = 0;
+	float fireRate = GetFireRate();
+
+	// MUST call sound before removing a round from the clip of a CHLMachineGun
+	while ( m_flNextPrimaryAttack <= gpGlobals->curtime )
+	{
+		WeaponSound(SINGLE, m_flNextPrimaryAttack);
+		m_flNextPrimaryAttack = m_flNextPrimaryAttack + fireRate;
+		iBulletsToFire++;
+	}
+
+	// Make sure we don't fire more than the amount in the clip, if this weapon uses clips
+	if ( UsesClipsForAmmo1() )
+	{
+		if ( iBulletsToFire > m_iClip1 )
+			iBulletsToFire = m_iClip1;
+		m_iClip1 -= iBulletsToFire;
+	}
+
+	m_iPrimaryAttacks++;
+	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
+
+	// Fire the bullets
+	FireBulletsInfo_t info;
+	info.m_iShots = iBulletsToFire;
+	info.m_vecSrc = pPlayer->Weapon_ShootPosition( );
+	info.m_vecDirShooting = pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
+	info.m_vecSpread = GetBulletSpread();
+	info.m_flDistance = MAX_TRACE_LENGTH;
+	info.m_iAmmoType = m_iPrimaryAmmoType;
+	info.m_iTracerFreq = 1;
+	FireBullets( info );
+
+	//Factor in the view kick
+	AddViewKick();
+
+	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_MACHINEGUN, 0.2, pPlayer );
+	
+	if (!m_iClip1 && pPlayer->GetAmmoCount(m_iPrimaryAmmoType) <= 0)
+	{
+		// HEV suit - indicate out of ammo condition
+		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
+	}
+
+	SendWeaponAnim( GetPrimaryAttackActivity() );
+	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+
+	// Register a muzzleflash for the AI
+	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Energy Ball
+//-----------------------------------------------------------------------------
+#if 0
+void CWeaponAR2::SecondaryAttack( void )
+{
+	if ( m_bShotDelayed )
+		return;
+
+	// Cannot fire underwater
+	if ( GetOwner() && GetOwner()->GetWaterLevel() == 3 )
+	{
+		SendWeaponAnim( ACT_VM_DRYFIRE );
+		BaseClass::WeaponSound( EMPTY );
+		m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
+		return;
+	}
+
+	m_bShotDelayed = true;
+	m_flNextPrimaryAttack = m_flNextSecondaryAttack = m_flDelayedFire = gpGlobals->curtime + 0.5f;
+
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	if( pPlayer )
+	{
+		pPlayer->RumbleEffect(RUMBLE_AR2_ALT_FIRE, 0, RUMBLE_FLAG_RESTART );
+	}
+
+	SendWeaponAnim( ACT_VM_FIDGET );
+	WeaponSound( SPECIAL1 );
+
+	m_iSecondaryAttacks++;
+	gamestats->Event_WeaponFired( pPlayer, false, GetClassname() );
+}
+#endif
+
+void CWeaponAR2::SecondaryAttack( void )
+{
+	//NOTENOTE: The zooming is handled by the post/busy frames
 }
 
 //-----------------------------------------------------------------------------
@@ -314,46 +443,6 @@ void CWeaponAR2::DelayedAttack( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Energy Ball
-//-----------------------------------------------------------------------------
-/*
-void CWeaponAR2::SecondaryAttack( void )
-{
-	if ( m_bShotDelayed )
-		return;
-
-	// Cannot fire underwater
-	if ( GetOwner() && GetOwner()->GetWaterLevel() == 3 )
-	{
-		SendWeaponAnim( ACT_VM_DRYFIRE );
-		BaseClass::WeaponSound( EMPTY );
-		m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
-		return;
-	}
-
-	m_bShotDelayed = true;
-	m_flNextPrimaryAttack = m_flNextSecondaryAttack = m_flDelayedFire = gpGlobals->curtime + 0.5f;
-
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	if( pPlayer )
-	{
-		pPlayer->RumbleEffect(RUMBLE_AR2_ALT_FIRE, 0, RUMBLE_FLAG_RESTART );
-	}
-
-	SendWeaponAnim( ACT_VM_FIDGET );
-	WeaponSound( SPECIAL1 );
-
-	m_iSecondaryAttacks++;
-	gamestats->Event_WeaponFired( pPlayer, false, GetClassname() );
-}
-*/
-
-void CWeaponAR2::SecondaryAttack( void )
-{
-	//NOTENOTE: The zooming is handled by the post/busy frames
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CWeaponAR2::Zoom( void )
@@ -367,37 +456,72 @@ void CWeaponAR2::Zoom( void )
 
 	if ( m_bZoomed )
 	{
-		pPlayer->ShowViewModel( true );
-
 		// Zoom out to the default zoom level
 		WeaponSound(SPECIAL2);
 		pPlayer->SetFOV( this, 0, 0.1f );
 		m_bZoomed = false;
-
-		// Switch back to normal damage
 		
 		// Change this to an overlay (cus its fugly)
+		// sprites/reticle1
 		UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_IN|FFADE_PURGE) );
 	}
 	else
 	{
 		// If underwater, do not zoom
-//		if ( GetOwner() && !GetOwner()->GetWaterLevel() == 3 )
-//		{
+		if (GetOwner()->GetWaterLevel() == 3 && m_bAltFiresUnderwater == false)
+		{
+			WeaponSound(EMPTY);
+			m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
+			return;
+		}
+		else
+		{
 		SendWeaponAnim( ACT_VM_FIDGET );
-			
-		pPlayer->ShowViewModel( false );
 
 		WeaponSound(SPECIAL1);
 		pPlayer->SetFOV( this, 35, 0.1f );
 		m_bZoomed = true;
 
-		// Increase damage
-
 		// Change this to an overlay (cus its fugly)
+		// sprites/reticle1
 		UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT) );	
-//		}
+		}
 	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: Adjust time between bursts for different npc types.
+//-----------------------------------------------------------------------------
+float CWeaponAR2::GetMinRestTime()
+{
+	//Default is 0.3
+	Class_T OwnerClass = GetOwner()->Classify();
+
+	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
+		 OwnerClass == CLASS_CITIZEN_REBEL	||
+		 OwnerClass == CLASS_PLAYER_ALLY	||
+		 OwnerClass == CLASS_METROPOLICE	)
+		 return 0.5f;
+
+	return 0.4f;
+}
+
+//-----------------------------------------------------------------------------
+float CWeaponAR2::GetMaxRestTime()
+{
+	// Default is 0.6
+	Class_T OwnerClass = GetOwner()->Classify();
+
+	if ( OwnerClass == CLASS_PLAYER_ALLY	||
+		 OwnerClass == CLASS_METROPOLICE	)
+		 return 0.9f;
+
+	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
+		 OwnerClass == CLASS_CITIZEN_REBEL	)
+		 return 1.0f;
+
+	return 0.7f;
 }
 
 //-----------------------------------------------------------------------------
@@ -407,9 +531,9 @@ void CWeaponAR2::Zoom( void )
 float CWeaponAR2::GetFireRate( void )
 {
 	if ( m_bZoomed )
-		return 0.3f;
+		return BaseClass::GetCycleTime() * 2.0;
 
-	return 0.125f;
+	return BaseClass::GetCycleTime();
 }
 
 
@@ -473,14 +597,13 @@ void CWeaponAR2::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUs
 
 	WeaponSoundRealtime( SINGLE_NPC );
 
+	// NOTENOTE: This is overriden on the client-side
+	pOperator->DoMuzzleFlash();
+	m_iClip1 = m_iClip1 - 1;
+
 	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(), SOUNDENT_VOLUME_MACHINEGUN, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
 
-	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
-
-	// NOTENOTE: This is overriden on the client-side
-	// pOperator->DoMuzzleFlash();
-
-	m_iClip1 = m_iClip1 - 1;
+	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 1 );
 }
 
 //-----------------------------------------------------------------------------
@@ -577,7 +700,7 @@ void CWeaponAR2::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bS
 void CWeaponAR2::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
 	switch( pEvent->event )
-	{ 
+	{
 		case EVENT_WEAPON_AR2:
 			{
 				FireNPCPrimaryAttack( pOperator, false );
@@ -602,7 +725,6 @@ void CWeaponAR2::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatChara
 void CWeaponAR2::AddViewKick( void )
 {
 	#define	EASY_DAMPEN			0.5f
-//	#define	MAX_VERTICAL_KICK	8.0f	//Degrees
 	#define	MAX_VERTICAL_KICK	12.0f	//Degrees
 	#define	SLIDE_LIMIT			5.0f	//Seconds
 	
@@ -612,18 +734,7 @@ void CWeaponAR2::AddViewKick( void )
 	if (!pPlayer)
 		return;
 
-	float flDuration = m_fFireDuration;
-
-	if( g_pGameRules->GetAutoAimMode() == AUTOAIM_ON_CONSOLE )
-	{
-		// On the 360 (or in any configuration using the 360 aiming scheme), don't let the
-		// AR2 progressive into the late, highly inaccurate stages of its kick. Just
-		// spoof the time to make it look (to the kicking code) like we haven't been
-		// firing for very long.
-		flDuration = min( flDuration, 0.75f );
-	}
-
-	DoMachineGunKick( pPlayer, EASY_DAMPEN, MAX_VERTICAL_KICK, flDuration, SLIDE_LIMIT );
+	DoMachineGunKick( pPlayer, EASY_DAMPEN, MAX_VERTICAL_KICK, m_fFireDuration, SLIDE_LIMIT );
 }
 
 //-----------------------------------------------------------------------------
@@ -631,6 +742,7 @@ const WeaponProficiencyInfo_t *CWeaponAR2::GetProficiencyValues()
 {
 	static WeaponProficiencyInfo_t proficiencyTable[] =
 	{
+		{ 7.0,		0.75	},
 		{ 7.0,		0.75	},
 		{ 5.00,		0.75	},
 		{ 3.0,		0.85	},

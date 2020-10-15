@@ -384,23 +384,6 @@ void CNPC_Boston::GatherConditions()
 		DoCustomCombatAI();
 	}
 	
-	// Flinching gestures -- Might add this for other humanoid ai's too
-	// Mainly for explosions
-	if( HasCondition(COND_HEAR_COMBAT) )
-	{
-		CSound *pSound = GetBestSound(); 
-
-			if( (pSound->SoundTypeNoContext() & SOUND_COMBAT) && (pSound->SoundContext() & SOUND_CONTEXT_EXPLOSION) )
-			{
-					if ( !IsPlayingGesture(ACT_GESTURE_FLINCH_BLAST) && !IsPlayingGesture(ACT_GESTURE_FLINCH_BLAST_DAMAGED) )
-					{
-						RestartGesture( ACT_GESTURE_FLINCH_BLAST );
-						GetShotRegulator()->FireNoEarlierThan( gpGlobals->curtime + SequenceDuration( ACT_GESTURE_FLINCH_BLAST ) + 0.5f ); // One sec cooldown
-					}
-			}
-		
-	}
-	
 //	if ( (GetFlags() & FL_FLY) && m_NPCState != NPC_STATE_SCRIPT && !m_ActBusyBehavior.IsActive() && !m_PassengerBehavior.IsEnabled() )
 //	{
 //		Warning( "Removed FL_FLY from Alyx, who wasn't running a script or actbusy. Time %.2f, map %s.\n", gpGlobals->curtime, STRING(gpGlobals->mapname) );

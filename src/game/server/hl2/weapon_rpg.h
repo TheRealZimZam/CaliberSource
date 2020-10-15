@@ -276,7 +276,6 @@ public:
 	void	ItemPostFrame( void );
 
 	bool	Deploy( void );
-	bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
 	bool	Reload( void );
 	bool	WeaponShouldBeLowered( void );
 	bool	Lower( void );

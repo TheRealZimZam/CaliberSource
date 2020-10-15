@@ -2,7 +2,7 @@
 //
 // Purpose: SMG-Launched Grenade
 //
-// TODO's: Reduce range a bit, keep speed the same but reduce the arc size
+// TODO's: Fix smoke-trail orientation, when bounced face direction of new trajectory
 // $NoKeywords: $
 //=============================================================================//
 
@@ -32,11 +32,12 @@ extern short	g_sModelIndexFireball;			// (in combatweapon.cpp) holds the index f
 // Moved to HL2_SharedGameRules because these are referenced by shared AmmoDef functions
 extern ConVar    sk_plr_dmg_smg1_grenade;
 extern ConVar    sk_npc_dmg_smg1_grenade;
-extern ConVar    sk_max_smg1_grenade;
+//extern ConVar    sk_max_smg1_grenade;
 
-ConVar	  sk_smg1_grenade_radius		( "sk_smg1_grenade_radius","0");
+ConVar	  sk_smg_grenade_radius			( "sk_smg_grenade_radius","0");
+ConVar	  sk_smg_airburst_radius		( "sk_smg_airburst_radius","0");
 
-ConVar g_CV_SmokeTrail("smoke_trail", "1", 0); // temporary dust explosion switch
+ConVar g_CV_SmokeTrail("ar2_smoke_trail", "1", 0); // temporary dust explosion switch
 
 BEGIN_DATADESC( CGrenadeAR2 )
 
@@ -79,12 +80,12 @@ void CGrenadeAR2::Spawn( void )
 		m_flDamage = sk_npc_dmg_smg1_grenade.GetFloat();
 	}
 
-	m_DmgRadius		= sk_smg1_grenade_radius.GetFloat();
+	m_DmgRadius		= sk_smg_grenade_radius.GetFloat();
 	m_takedamage	= DAMAGE_YES;
-	m_bIsLive		= true;
-	m_iHealth		= 1;
+	m_bIsLive		= false;
+	m_iHealth		= 1;		//Can be blown-up midair by other explosives n' such
 
-	SetGravity( UTIL_ScaleForGravity( 400 ) );	// use a lower gravity for grenades to make them easier to see
+	SetGravity( UTIL_ScaleForGravity( 400 ) );	// use a lower gravity for grenades to make them easier to shoot
 	SetFriction( 0.8 );
 	SetSequence( 0 );
 
@@ -105,7 +106,7 @@ void CGrenadeAR2::Spawn( void )
 			m_hSmokeTrail->m_ParticleLifetime = 1;
 			m_hSmokeTrail->m_StartColor.Init(0.1f, 0.1f, 0.1f);
 			m_hSmokeTrail->m_EndColor.Init(0,0,0);
-			m_hSmokeTrail->m_StartSize = 12;
+			m_hSmokeTrail->m_StartSize = 8;	// 12
 			m_hSmokeTrail->m_EndSize = m_hSmokeTrail->m_StartSize * 4;
 			m_hSmokeTrail->m_SpawnRadius = 4;
 			m_hSmokeTrail->m_MinSpeed = 4;
@@ -206,10 +207,11 @@ void CGrenadeAR2::Detonate(void)
 
 	CPASFilter filter( GetAbsOrigin() );
 
+	//TODO; Use FX_MicroExplosion
 	te->Explosion( filter, 0.0,
 		&GetAbsOrigin(), 
 		g_sModelIndexFireball,
-		2.0, 
+		m_DmgRadius * .02, 
 		15,
 		TE_EXPLFLAG_NONE,
 		m_DmgRadius,
@@ -232,7 +234,7 @@ void CGrenadeAR2::Detonate(void)
 	}
 	else
 	{
-		UTIL_DecalTrace( &tr, "Scorch" );
+		UTIL_DecalTrace( &tr, "Scorch" );	//FIXME; Hook to unique/smaller decal 
 	}
 
 	UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
@@ -251,4 +253,65 @@ void CGrenadeAR2::Precache( void )
 CGrenadeAR2::CGrenadeAR2(void)
 {
 	m_hSmokeTrail  = NULL;
+}
+
+
+//=============================================================================
+// Purpose:  Airburst variant - goes live when near a target/impact point
+// NOTENOTE; This nade creates two explosions - one in the center and one
+// in-front of the grenade as distacted by the airburst dist
+//=============================================================================
+LINK_ENTITY_TO_CLASS( grenade_ar2_airburst, CGrenadeAR2Airburst );
+
+void CGrenadeAR2Airburst::GrenadeAR2Touch( CBaseEntity *pOther )
+{
+	Assert( pOther );
+	if ( !pOther->IsSolid() )
+		return;
+
+	// If I'm live go ahead and blow up
+	if (m_bIsLive)
+	{
+		Detonate();
+	}
+}
+
+// Explode when near an enemy/the impact destination
+void CGrenadeAR2Airburst::GrenadeAR2Think( void )
+{
+	SetNextThink( gpGlobals->curtime + 0.05f );
+
+	if (!m_bIsLive)
+	{
+		// Go live after a short delay
+		if (m_fSpawnTime + MAX_AR2_NO_COLLIDE_TIME < gpGlobals->curtime)
+		{
+			m_bIsLive  = true;
+		}
+	}
+	
+	// If I'm just about to hit an enemy, or the world, blow up!
+	if (m_bIsLive)
+	{
+		//FIXME; This is temp and doesnt work, just here to stop errors really
+		//Do a trace infront of me, if theres ANYTHING solid then detonate
+		Vector vecForward = GetAbsVelocity();
+		VectorNormalize(vecForward);
+		trace_t		tr;
+		UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + AR2_AIRBURST_DIST*vecForward, MASK_SHOT, this, COLLISION_GROUP_PROJECTILE, &tr );
+		if ( tr.m_pEnt || GetAbsVelocity().Length() == 0.0)	//Else if i've somehow glitched out and got on stuck on something nonsolid, dont be a dud!
+		{
+			Detonate();
+		}
+	}
+
+	// The old way of making danger sounds would scare the crap out of EVERYONE between you and where the grenade
+	// was going to hit. The radius of the danger sound now 'blossoms' over the grenade's lifetime, making it seem
+	// dangerous to a larger area downrange than it does from where it was fired.
+	if( m_fDangerRadius <= AR2_GRENADE_MAX_DANGER_RADIUS )
+	{
+		m_fDangerRadius += ( AR2_GRENADE_MAX_DANGER_RADIUS * 0.05 );
+	}
+
+	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin() + GetAbsVelocity() * 0.5, m_fDangerRadius, 0.2, this, SOUNDENT_CHANNEL_REPEATED_DANGER );
 }

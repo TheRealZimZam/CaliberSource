@@ -155,6 +155,7 @@ public:
 	bool SuitPower_RemoveDevice( const CSuitPowerDevice &device );
 	bool SuitPower_ShouldRecharge( void );
 	float SuitPower_GetCurrentPercentage( void ) { return m_HL2Local.m_flSuitPower; }
+//!	bool m_bHasLongJump;
 	
 	void SetFlashlightEnabled( bool bState );
 

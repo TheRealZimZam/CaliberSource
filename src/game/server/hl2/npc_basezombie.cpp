@@ -144,11 +144,11 @@ ConVar	sk_zombie_dmg_both_slash( "sk_zombie_dmg_both_slash","0");
 
 // When a zombie spawns, he will select a 'base' pitch value
 // that's somewhere between basepitchmin & basepitchmax
-ConVar zombie_basemin( "zombie_basemin", "100" );
-ConVar zombie_basemax( "zombie_basemax", "100" );
+ConVar zombie_basemin( "zombie_basemin", "95" );
+ConVar zombie_basemax( "zombie_basemax", "105" );
 
-ConVar zombie_changemin( "zombie_changemin", "0" );
-ConVar zombie_changemax( "zombie_changemax", "0" );
+ConVar zombie_changemin( "zombie_changemin", "-5" );
+ConVar zombie_changemax( "zombie_changemax", "5" );
 
 // play a sound once in every zombie_stepfreq steps
 ConVar zombie_stepfreq( "zombie_stepfreq", "4" );
@@ -452,7 +452,7 @@ float CNPC_BaseZombie::MaxYawSpeed( void )
 		{
 		case ACT_TURN_LEFT:
 		case ACT_TURN_RIGHT:
-			return 100;
+			return 90;
 			break;
 		case ACT_RUN:
 			return 15;
@@ -857,7 +857,7 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	{
 		if( bChopped )
 		{
-			EmitSound( "E3_Phystown.Slicer" );
+			EmitSound( "Slicer.Slice" );
 		}
 
 		DieChopped( info );
@@ -879,7 +879,7 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 
 		case RELEASE_RAGDOLL_SLICED_OFF:
 			{
-				EmitSound( "E3_Phystown.Slicer" );
+				EmitSound( "Slicer.Slice" );
 				Vector vecForce = inputInfo.GetDamageForce() * 0.1;
 				vecForce += Vector( 0, 0, 2000.0 );
 				ReleaseHeadcrab( EyePosition(), vecForce, true, false, true );
@@ -1709,7 +1709,7 @@ void CNPC_BaseZombie::Precache( void )
 {
 	UTIL_PrecacheOther( GetHeadcrabClassname() );
 
-	PrecacheScriptSound( "E3_Phystown.Slicer" );
+	PrecacheScriptSound( "Slicer.Slice" );
 	PrecacheScriptSound( "NPC_BaseZombie.PoundDoor" );
 	PrecacheScriptSound( "NPC_BaseZombie.Swat" );
 

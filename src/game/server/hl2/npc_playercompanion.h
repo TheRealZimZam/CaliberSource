@@ -1,7 +1,9 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+// This class should really be renamed, but eh thats more than 10 seconds of work soooo
+// SCREW THAT SCOOBIEDOO YABBADABBADO
 //
 // Purpose: Base class for humanoid NPCs intended to fight along side player.
-// For the most part, squads are not needed as each entity has most of its AI independent
+// For the most part, squads are not needed as each entity has most of its AI act independently
 //
 //=============================================================================//
 
@@ -108,9 +110,11 @@ public:
 	//---------------------------------
 	int 			ObjectCaps();
 	bool 			ShouldAlwaysThink();
+	float			MaxYawSpeed( void );
 
 	Disposition_t	IRelationType( CBaseEntity *pTarget );
-	
+
+	bool			ShouldGib( const CTakeDamageInfo &info );
 	bool			IsSilentSquadMember() const;
 
 	//---------------------------------
@@ -129,9 +133,8 @@ public:
 
 	virtual int 	SelectScheduleDanger();
 	virtual int 	SelectSchedulePriorityAction();
-	virtual int 	SelectScheduleNonCombat();
-	virtual int 	SelectScheduleCombat();
-//	virtual int 	SelectScheduleAttack();
+	virtual int 	SelectNonCombatSchedule();
+	virtual int 	SelectCombatSchedule();
 	int 			SelectSchedulePlayerPush();
 
 	virtual bool	CanReload( void );
@@ -163,6 +166,13 @@ public:
 	void			PrepareReadinessRemap( void );
 	
 	virtual bool	IsNavigationUrgent( void );
+
+	// Temporary fix for current animations
+#if 0
+	bool	Stand( void );
+	bool	Crouch( void );
+	void	DesireCrouch( void );
+#endif
 
 	//---------------------------------
 	// Readiness
@@ -250,7 +260,7 @@ public:
 	bool			ShouldMoveAndShoot( void );
 	void			OnUpdateShotRegulator();
 
-	void			DecalTrace( trace_t *pTrace, char const *decalName );
+//	void			DecalTrace( trace_t *pTrace, char const *decalName );
 	bool 			FCanCheckAttacks();
 	Vector 			GetActualShootPosition( const Vector &shootOrigin );
 	WeaponProficiency_t CalcWeaponProficiency( CBaseCombatWeapon *pWeapon );
@@ -325,12 +335,17 @@ protected:
 		SCHED_PC_MOVE_TOWARDS_COVER_FROM_BEST_SOUND,
 		SCHED_PC_TAKE_COVER_FROM_BEST_SOUND,
 		SCHED_PC_FLEE_FROM_BEST_SOUND,
+		SCHED_PC_TAKE_COVER,
 		SCHED_PC_FAIL_TAKE_COVER_TURRET,
 		SCHED_PC_FAKEOUT_MORTAR,
 		SCHED_PC_GET_OFF_COMPANION,
 		SCHED_PC_RANGE_ATTACK1,
-		SCHED_PC_TAKE_COVER_LIGHT_DAMAGE,
-		SCHED_PC_ADVANCE,
+		SCHED_PC_SPOT_ENEMY,
+		SCHED_PC_ESTABLISH_LOF_WAIT,
+		SCHED_PC_MOVE_TO_WEAPON_RANGE,
+		SCHED_PC_ESTABLISH_LINE_OF_FIRE,
+		SCHED_PC_COMBAT_FACE,
+		SCHED_PC_KNOCKDOWN,
 		NEXT_SCHEDULE,
 
 		TASK_PC_WAITOUT_MORTAR = BaseClass::NEXT_TASK,
@@ -346,6 +361,8 @@ private:
 	
 	bool			m_bMovingAwayFromPlayer;
 	bool			m_bWeightPathsInCover;
+	bool			m_bFirstEncounter;	// only alert everyone else during the first encounter.
+//	float			m_flNextCrouchTime;
 
 	enum eCoverType
 	{

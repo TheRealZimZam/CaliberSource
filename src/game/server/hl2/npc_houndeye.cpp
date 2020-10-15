@@ -37,8 +37,8 @@
 
 #define HOUNDEYE_EYE_FRAMES 4 // how many different switchable maps for the eye
 
-ConVar	sk_Houndeye_health( "sk_Houndeye_health","0");
-ConVar	sk_Houndeye_dmg_blast( "sk_Houndeye_dmg_blast","0");
+ConVar	sk_houndeye_health( "sk_houndeye_health","0");
+ConVar	sk_houndeye_dmg_blast( "sk_houndeye_dmg_blast","0");
 
 //=========================================================
 // Interactions
@@ -246,10 +246,10 @@ float CNPC_Houndeye::MaxYawSpeed ( void )
 
 	switch ( GetActivity() )
 	{
-	case ACT_CROUCHIDLE://sleeping!
+	case ACT_CROUCHIDLE: //sleeping!
 		ys = 0;
 		break;
-	case ACT_IDLE:	
+	case ACT_IDLE:
 		ys = 60;
 		break;
 	case ACT_WALK:
@@ -413,7 +413,7 @@ void CNPC_Houndeye::Spawn()
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_STEP );
 	SetBloodColor( BLOOD_COLOR_YELLOW );
-	m_iHealth			= sk_Houndeye_health.GetFloat();
+	m_iHealth			= sk_houndeye_health.GetFloat();
 	m_flFieldOfView		= 0.5;// indicates the width of this monster's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
 	m_fAsleep			= false; // everyone spawns awake
@@ -752,7 +752,7 @@ void CNPC_Houndeye::SonicAttack ( void )
 			// ------------------------------
 			if (pEntity->m_takedamage != DAMAGE_NO)
 			{
-				CTakeDamageInfo info( this, this, flDamageAdjuster * sk_Houndeye_dmg_blast.GetFloat(), DMG_SONIC | DMG_ALWAYSGIB );
+				CTakeDamageInfo info( this, this, flDamageAdjuster * sk_houndeye_dmg_blast.GetFloat(), DMG_SONIC | DMG_ALWAYSGIB );
 				CalculateExplosiveDamageForce( &info, (pEntity->GetAbsOrigin() - GetAbsOrigin()), pEntity->GetAbsOrigin() );
 
 				pEntity->TakeDamage( info );

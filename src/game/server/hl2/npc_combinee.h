@@ -1,11 +1,11 @@
-//=========== (C) Copyright 1999 Valve, L.L.C. All rights reserved. ===========
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		This is the camo version of the combine soldier
 //
-//=============================================================================
+//=============================================================================//
 
-#ifndef	NPC_COMBINE_E_H
-#define	NPC_COMBINE_E_H
+#ifndef	NPC_COMBINEE_H
+#define	NPC_COMBINEE_H
 #ifdef _WIN32
 #pragma once
 #endif
@@ -22,7 +22,15 @@ class CNPC_CombineE : public CNPC_Combine
 public:
 	void		Spawn( void );
 	void		Precache( void );
-	void		DeathSound( const CTakeDamageInfo &info );
+	void		Event_Killed( const CTakeDamageInfo &info );
+
+	void		BuildScheduleTestBits( void );
+	void		ClearAttackConditions( void );
+	// -----------------------------------------------------------------------------------
+	// -----------------------------------------------------------------------------------
+	void			DeathSound( const CTakeDamageInfo &info );
+	void			PainSound( const CTakeDamageInfo &info );
+
 	virtual void	PrescheduleThink();
 
 	bool		m_fIsBlocking;
@@ -35,8 +43,9 @@ public:
 
 private:
 	// Time Variables
+	float			m_flNextPainSoundTime;
 	float			m_flStopMoveShootTime;
 
 };
 
-#endif	//NPC_COMBINE_E_H
+#endif	//NPC_COMBINEE_H

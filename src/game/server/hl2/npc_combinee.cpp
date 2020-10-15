@@ -29,19 +29,20 @@
 #include "tier0/memdbgon.h"
 
 #define AE_SOLDIER_BLOCK_PHYSICS		20 // trying to block an incoming physics object
-#define COMBINE_ELITE_LIMP_HEALTH		15 // Limp
+
+extern ConVar npc_combine_limp_health;
+#define COMBINE_ELITE_LIMP_HEALTH		npc_combine_limp_health.GetFloat()
 
 ConVar	sk_combine_e_health( "sk_combine_e_health","0");
 ConVar	sk_combine_e_kick( "sk_combine_e_kick","0");
 
 extern ConVar sk_plr_dmg_buckshot;	
 extern ConVar sk_plr_num_shotgun_pellets;
+extern ConVar sk_plr_dmg_ar2;
+extern ConVar combine_drop_health;
 
 LINK_ENTITY_TO_CLASS( npc_combine_e, CNPC_CombineE );
 LINK_ENTITY_TO_CLASS( npc_ancorp_e, CNPC_CombineE );
-
-extern Activity ACT_WALK_EASY;
-extern Activity ACT_WALK_MARCH;
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -50,15 +51,18 @@ extern Activity ACT_WALK_MARCH;
 void CNPC_CombineE::Spawn( void )
 {
 	Precache();
-//	SetModel( "models/combine_shock_soldier.mdl" );
-	SetModel( "models/combine_elite.mdl" );
+	SetModel( STRING( GetModelName() ) );
 
 	m_iHealth = sk_combine_e_health.GetFloat();
-//	m_nKickDamage = sk_combine_e_kick.GetFloat();
 	SetKickDamage( sk_combine_e_kick.GetFloat() );
+	m_flFieldOfView			= 0.2;	//*150
 
 	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
-	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
+//	if ( !FClassnameIs( GetActiveWeapon(), "weapon_sniperrifle" ) )
+//	{
+		CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
+//	}
+	CapabilitiesAdd( bits_CAP_MOVE_SHOOT | bits_CAP_MOVE_JUMP );
 	CapabilitiesAdd( bits_CAP_DOORS_GROUP );
 
 	m_flStopMoveShootTime = FLT_MAX; // Move and shoot defaults on.
@@ -75,15 +79,22 @@ void CNPC_CombineE::Spawn( void )
 //-----------------------------------------------------------------------------
 void CNPC_CombineE::Precache()
 {
-	engine->PrecacheModel("models/combine_elite.mdl");
+	if( !GetModelName() )
+	{
+		SetModelName( MAKE_STRING( "models/combine_elite.mdl" ) );
+	}
+
+	PrecacheModel( STRING( GetModelName() ) );
 
 	UTIL_PrecacheOther( "item_healthvial" );
 	UTIL_PrecacheOther( "weapon_frag" );
-	UTIL_PrecacheOther( "item_ammo_ar2_altfire" );
 
 	BaseClass::Precache();
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Sounds
+//-----------------------------------------------------------------------------
 void CNPC_CombineE::DeathSound( const CTakeDamageInfo &info )
 {
 	// NOTE: The response system deals with this at the moment
@@ -93,7 +104,63 @@ void CNPC_CombineE::DeathSound( const CTakeDamageInfo &info )
 	GetSentences()->Speak( "COMBINE_ELITE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
 }
 
+void CNPC_CombineE::PainSound( const CTakeDamageInfo &info )
+{
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
+	
+	// NOTE: The response system deals with this at the moment
+	if ( GetFlags() & FL_DISSOLVING )
+		return;
+
+	float healthRatio = (float)GetHealth() / (float)GetMaxHealth();
+	if ( healthRatio > 0.0f )
+	{
+		// This causes it to speak it no matter what; doesn't bother with setting sounds.
+		GetSentences()->Speak( "COMBINE_ELITE_PAIN", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
+		m_flNextPainSoundTime = gpGlobals->curtime + 1;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Soldiers use CAN_RANGE_ATTACK2 to indicate whether they can throw
+//			a grenade. Because they check only every half-second or so, this
+//			condition must persist until it is updated again by the code
+//			that determines whether a grenade can be thrown, so prevent the 
+//			base class from clearing it out. (sjb)
+//-----------------------------------------------------------------------------
+void CNPC_CombineE::ClearAttackConditions( )
+{
+	bool fCanRangeAttack2 = HasCondition( COND_CAN_RANGE_ATTACK2 );
+
+	// Call the base class.
+	BaseClass::ClearAttackConditions();
+
+	if( fCanRangeAttack2 )
+	{
+		// We don't allow the base class to clear this condition because we
+		// don't sense for it every frame.
+		SetCondition( COND_CAN_RANGE_ATTACK2 );
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Allows for modification of the interrupt mask for the current schedule.
+//			In the most cases the base implementation should be called first.
+//-----------------------------------------------------------------------------
+void CNPC_CombineE::BuildScheduleTestBits( void )
+{
+	//Interrupt any schedule with physics danger (as long as I'm not moving or already trying to block)
+	if ( m_flGroundSpeed == 0.0 && !IsCurSchedule( SCHED_FLINCH_PHYSICS ) )
+	{
+		SetCustomInterruptCondition( COND_HEAR_PHYSICS_DANGER );
+	}
+
+	BaseClass::BuildScheduleTestBits();
+}
+
 //---------------------------------------------------------
+// Different footstep
 //---------------------------------------------------------
 void CNPC_CombineE::HandleAnimEvent( animevent_t *pEvent )
 {
@@ -125,9 +192,40 @@ void CNPC_CombineE::HandleAnimEvent( animevent_t *pEvent )
 // Input  : &info - 
 // Output : Returns true on success, false on failure.
 //-----------------------------------------------------------------------------
-bool CNPC_CombineE::IsLightDamage( const CTakeDamageInfo &info )
+void CNPC_CombineE::Event_Killed( const CTakeDamageInfo &info )
 {
-	return BaseClass::IsLightDamage( info );
+	// Don't bother if we've been told not to, or the player has a megaphyscannon
+	if ( combine_drop_health.GetBool() == false || PlayerHasMegaPhysCannon() )
+	{
+		BaseClass::Event_Killed( info );
+		return;
+	}
+
+	CBasePlayer *pPlayer = ToBasePlayer( info.GetAttacker() );
+
+	if ( pPlayer != NULL )
+	{
+		CHalfLife2 *pHL2GameRules = static_cast<CHalfLife2 *>(g_pGameRules);
+
+		// Attempt to drop health
+		if ( pHL2GameRules->NPC_ShouldDropHealth( pPlayer ) )
+		{
+			DropItem( "item_healthvial", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
+			pHL2GameRules->NPC_DroppedHealth();
+		}
+		
+		if ( HasSpawnFlags( SF_COMBINE_NO_GRENADEDROP ) == false )
+		{
+			// Attempt to drop a grenade
+			if ( pHL2GameRules->NPC_ShouldDropGrenade( pPlayer ) )
+			{
+				DropItem( "weapon_frag", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
+				pHL2GameRules->NPC_DroppedGrenade();
+			}
+		}
+	}
+
+	BaseClass::Event_Killed( info );
 }
 
 //-----------------------------------------------------------------------------
@@ -135,15 +233,19 @@ bool CNPC_CombineE::IsLightDamage( const CTakeDamageInfo &info )
 // Input  : &info - 
 // Output : Returns true on success, false on failure.
 //-----------------------------------------------------------------------------
+bool CNPC_CombineE::IsLightDamage( const CTakeDamageInfo &info )
+{
+	return BaseClass::IsLightDamage( info );
+}
+
 bool CNPC_CombineE::IsHeavyDamage( const CTakeDamageInfo &info )
 {
-	// Consider AR2 fire to be heavy damage
+	// AR2 fire to chest/head is always heavy damage
 	if ( info.GetAmmoType() == GetAmmoDef()->Index("AR2") )
-		return true;
-
-	// 357 rounds are heavy damage
-	if ( info.GetAmmoType() == GetAmmoDef()->Index("357") )
-		return true;
+	{
+		if ( info.GetDamage() >= sk_plr_dmg_ar2.GetFloat() )
+			return true;
+	}
 
 	// Shotgun blasts where at least half the pellets hit me are heavy damage
 	if ( info.GetDamageType() & DMG_BUCKSHOT )
@@ -152,21 +254,15 @@ bool CNPC_CombineE::IsHeavyDamage( const CTakeDamageInfo &info )
 		if ( info.GetDamage() >= iHalfMax )
 			return true;
 	}
-
-	// Rollermine shocks
-	if( (info.GetDamageType() & DMG_SHOCK) && hl2_episodic.GetBool() )
+	else if ( info.GetDamageType() & (DMG_BULLET|DMG_SHOCK) )
 	{
-		return true;
+		// Any bullets that do more than 10 damage
+		if ( info.GetDamage() >= 10 )
+			return true;
 	}
 
-//	// Scrapgun direct hits/at least half the splash hits
-//	if( (info.GetAmmoType() == GetAmmoDef()->Index("ScrapGun")) && hl2_episodic.GetBool() )
-//	{
-//		return true;
-//	}
-	
-	// Rifle-grenades (This grenade is too quick for them to yell "Grenade!", so yell the heavy damage after it hits)
-	if( (info.GetAmmoType() == GetAmmoDef()->Index("SMG1_Grenade")) )
+	// Rifle-grenades (This grenade is too quick to yell "Grenade!", so yell the heavy damage after it hits)
+	if( info.GetAmmoType() == GetAmmoDef()->Index("SMG1_Grenade") )
 	{
 		return true;
 	}
@@ -211,24 +307,15 @@ void CNPC_CombineE::PrescheduleThink()
 //-----------------------------------------------------------------------------
 bool CNPC_CombineE::ShouldMoveAndShoot()
 {
-	// Set this timer so that gpGlobals->curtime can't catch up to it. 
-	// Essentially, we're saying that we're not going to interfere with 
-	// what the AI wants to do with move and shoot. 
-	//
-	// If any code below changes this timer, the code is saying 
-	// "It's OK to move and shoot until gpGlobals->curtime == m_flStopMoveShootTime"
 	m_flStopMoveShootTime = FLT_MAX;
 
 	// Dont move n' shoot when hurt
 	if ( m_iHealth <= COMBINE_ELITE_LIMP_HEALTH )
 		return false;
 
-	if( HasCondition( COND_NO_PRIMARY_AMMO, false ) )
-		return false;
-
 	// If you hear danger, focus on running for the first second or two
 	if( HasCondition( COND_HEAR_DANGER, false ) )
-		m_flStopMoveShootTime = gpGlobals->curtime + random->RandomFloat( 0.4f, 0.6f );
+		m_flStopMoveShootTime = gpGlobals->curtime + random->RandomFloat( 1.0f, 2.0f );
 	
-	return true;
+	return BaseClass::ShouldMoveAndShoot();
 }

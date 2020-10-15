@@ -1,7 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose:		Player for HL2.
-// TODO's: Sprinting reduces received accuracy of hitscan weapons
+// TODO's: Sprinting reduces received accuracy, 1-weapon limit for each bucket category (except grenades)
 //
 //=============================================================================//
 
@@ -68,7 +68,10 @@ extern ConVar autoaim_max_dist;
 #define PLAYER_HULL_REDUCTION	0.70
 
 // This switches between the single primary weapon, and multiple weapons with buckets approach (jdw)
-#define	HL2_SINGLE_PRIMARY_WEAPON_MODE	0
+//#define	HL2_SINGLE_PRIMARY_WEAPON_MODE	0
+ConVar hl2_single_primary_weapon_mode( "hl2_single_primary_weapon_mode", "0" );
+// 1-weapon limit for each slot -- FIXME; Grenades/anything in bucket 6 shouldnt count
+ConVar hl2_single_weapon_slot( "hl2_single_weapon_slot", "0" );
 
 #define TIME_IGNORE_FALL_DAMAGE 10.0
 
@@ -76,14 +79,14 @@ extern int gEvilImpulse101;
 
 ConVar sv_autojump( "sv_autojump", "0" );
 
-ConVar hl2_walkspeed( "hl2_walkspeed", "140" );
-ConVar hl2_normspeed( "hl2_normspeed", "200" );
+ConVar hl2_walkspeed( "hl2_walkspeed", "150" );
+ConVar hl2_normspeed( "hl2_normspeed", "240" );
 ConVar hl2_sprintspeed( "hl2_sprintspeed", "300" );
 
 ConVar hl2_darkness_flashlight_factor ( "hl2_darkness_flashlight_factor", "1" );
 
 #ifdef HL2MP
-	#define	HL2_WALK_SPEED 150
+	#define	HL2_WALK_SPEED 140
 	#define	HL2_NORM_SPEED 200
 	#define	HL2_SPRINT_SPEED 320
 #else
@@ -104,8 +107,11 @@ ConVar autoaim_unlock_target( "autoaim_unlock_target", "0.8666" );
 
 ConVar sv_stickysprint("sv_stickysprint", "0", FCVAR_ARCHIVE | FCVAR_ARCHIVE_XBOX);
 
-#define	FLASH_DRAIN_TIME	 1.1111	// 100 units / 90 secs
-#define	FLASH_CHARGE_TIME	 50.0f	// 100 units / 2 secs
+ConVar hl2_flashlight_drain_time( "hl2_flashlight_drain_time", "1.1111" );	// 100 units / 90 secs
+ConVar hl2_flashlight_charge_time( "hl2_flashlight_charge_time", "50" );	// 100 units / 2 secs
+
+#define	FLASH_DRAIN_TIME	 hl2_flashlight_drain_time.GetFloat()
+#define	FLASH_CHARGE_TIME	 hl2_flashlight_charge_time.GetFloat()
 
 
 //==============================================================================================
@@ -343,6 +349,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flMoveTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flLastDamageTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flTargetFindTime, FIELD_TIME ),
+//!	DEFINE_FIELD( m_bHasLongJump, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_flAdmireGlovesAnimTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextFlashlightCheckTime, FIELD_TIME ),
@@ -413,6 +420,7 @@ CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100 
 IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropDataTable(SENDINFO_DT(m_HL2Local), &REFERENCE_SEND_TABLE(DT_HL2Local), SendProxy_SendLocalDataTable),
 	SendPropBool( SENDINFO(m_fIsSprinting) ),
+//!	SendPropInt( SENDINFO( m_bHasLongJump ), 1, SPROP_UNSIGNED ),
 END_SEND_TABLE()
 
 
@@ -425,6 +433,7 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.UseDeny" );
 	PrecacheScriptSound( "HL2Player.FlashLightOn" );
 	PrecacheScriptSound( "HL2Player.FlashLightOff" );
+//	PrecacheScriptSound( "HL2Player.PickupAmmo" );
 	PrecacheScriptSound( "HL2Player.PickupWeapon" );
 	PrecacheScriptSound( "HL2Player.TrainUse" );
 	PrecacheScriptSound( "HL2Player.Use" );
@@ -1969,6 +1978,7 @@ bool CHL2_Player::SuitPower_ShouldRecharge( void )
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 ConVar	sk_battery( "sk_battery","0" );			
+ConVar	sk_bigbattery( "sk_bigbattery","0" );	
 
 bool CHL2_Player::ApplyBattery( float powerMultiplier )
 {
@@ -2641,14 +2651,22 @@ bool CHL2_Player::Weapon_CanUse( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 {
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
-	if ( pWeapon->GetSlot() == WEAPON_PRIMARY_SLOT )
+	if( hl2_single_primary_weapon_mode.GetBool() )
 	{
-		Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
+		//Drop the primary slot
+		if ( pWeapon->GetSlot() == WEAPON_PRIMARY_SLOT )
+		{
+			Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
+		}
 	}
-
-#endif
+	else if( hl2_single_weapon_slot.GetBool() )
+	{
+		//Drop the active slot
+		if ( Weapon_SlotOccupied( pWeapon ) )
+		{
+			Weapon_Drop( pWeapon, NULL, NULL );
+		}
+	}
 
 	if( GetActiveWeapon() == NULL )
 	{
@@ -2665,79 +2683,108 @@ void CHL2_Player::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 {
-
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
-	CBaseCombatCharacter *pOwner = pWeapon->GetOwner();
-
-	// Can I have this weapon type?
-	if ( pOwner || !Weapon_CanUse( pWeapon ) || !g_pGameRules->CanHavePlayerItem( this, pWeapon ) )
+	//TODO; This needs to grab the ammo based on ammotype, not weapon!!!
+	if( hl2_single_primary_weapon_mode.GetBool() || hl2_single_weapon_slot.GetBool() )
 	{
-		if ( gEvilImpulse101 )
-		{
-			UTIL_Remove( pWeapon );
-		}
-		return false;
-	}
+		CBaseCombatCharacter *pOwner = pWeapon->GetOwner();
 
-	// ----------------------------------------
-	// If I already have it just take the ammo
-	// ----------------------------------------
-	if (Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType())) 
-	{
-		//Only remove the weapon if we attained ammo from it
-		if ( Weapon_EquipAmmoOnly( pWeapon ) == false )
+		// Can I have this weapon type?
+		if ( !IsAllowedToPickupWeapons() )
 			return false;
 
-		// Only remove me if I have no ammo left
-		// Can't just check HasAnyAmmo because if I don't use clips, I want to be removed, 
-		if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
-			return false;
-
-		UTIL_Remove( pWeapon );
-		return false;
-	}
-	// -------------------------
-	// Otherwise take the weapon
-	// -------------------------
-	else 
-	{
-		//Make sure we're not trying to take a new weapon type we already have
-		if ( Weapon_SlotOccupied( pWeapon ) )
+		// Can I have this weapon type?
+		if ( pOwner || !Weapon_CanUse( pWeapon ) || !g_pGameRules->CanHavePlayerItem( this, pWeapon ) )
 		{
-			CBaseCombatWeapon *pActiveWeapon = Weapon_GetSlot( WEAPON_PRIMARY_SLOT );
-
-			if ( pActiveWeapon != NULL && pActiveWeapon->HasAnyAmmo() == false && Weapon_CanSwitchTo( pWeapon ) )
+			if ( gEvilImpulse101 )
 			{
-				Weapon_Equip( pWeapon );
+				UTIL_Remove( pWeapon );
+			}
+			return false;
+		}
+
+		// Don't let the player fetch weapons through walls (use MASK_SOLID so that you can't pickup through windows)
+		if( pWeapon->FVisible( this, MASK_SOLID ) == false && !(GetFlags() & FL_NOTARGET) )
+			return false;
+
+		// ----------------------------------------
+		// If I already have it just take the ammo
+		// ----------------------------------------
+		if (Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType())) 
+		{
+#if 0
+			//Only remove the weapon if we attained ammo from it
+			if ( Weapon_EquipAmmoOnly( pWeapon ) == false )
+				return false;
+
+			// Only remove me if I have no ammo left
+			// Can't just check HasAnyAmmo because if I don't use clips, I still want to be removed, 
+			if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
+				return false;
+
+			UTIL_Remove( pWeapon );
+			return false;
+#endif
+			//Only remove the weapon if we attained ammo from it
+			if( Weapon_EquipAmmoOnly( pWeapon ) )
+			{
+				// Only remove me if I have no ammo left
+				// Can't just check HasAnyAmmo because if I don't use clips, I still want to be removed, 
+				if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
+					return false;
+
+				UTIL_Remove( pWeapon );
 				return true;
 			}
-
-			//Attempt to take ammo if this is the gun we're holding already
-			if ( Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
+			else
 			{
+				return false;
+			}
+		}
+		// -------------------------
+		// Otherwise take the weapon
+		// -------------------------
+		else 
+		{
+			//Make sure we're not trying to take a new weapon when the slots occupied, just take the ammo
+			if ( Weapon_SlotOccupied( pWeapon ) && !(pWeapon->GetWpnData().iFlags & ITEM_FLAG_EXHAUSTIBLE) )	//FIXME; Temp exhaustible check - need proper thingy here!!
+			{
+				if (hl2_single_primary_weapon_mode.GetBool())
+				{
+					CBaseCombatWeapon *pActiveWeapon = Weapon_GetSlot( WEAPON_PRIMARY_SLOT );
+
+					if ( pActiveWeapon != NULL && pActiveWeapon->HasAnyAmmo() == false && Weapon_CanSwitchTo( pWeapon ) )
+					{
+						Weapon_Equip( pWeapon );
+						return true;
+					}
+				}
+
+				//TODO; This isnt working... Why???
 				Weapon_EquipAmmoOnly( pWeapon );
+//				EmitSound( "HL2Player.PickupAmmo" );
+				return false;
 			}
 
-			return false;
-		}
+			pWeapon->CheckRespawn();
 
-		pWeapon->CheckRespawn();
+			pWeapon->AddSolidFlags( FSOLID_NOT_SOLID );
+			pWeapon->AddEffects( EF_NODRAW );
 
-		pWeapon->AddSolidFlags( FSOLID_NOT_SOLID );
-		pWeapon->AddEffects( EF_NODRAW );
+			Weapon_Equip( pWeapon );
+			if ( IsInAVehicle() )
+			{
+				pWeapon->Holster();
+			}
 
-		Weapon_Equip( pWeapon );
-
-		EmitSound( "HL2Player.PickupWeapon" );
+			EmitSound( "HL2Player.PickupWeapon" );
 		
-		return true;
+			return true;
+		}
 	}
-#else
-
-	return BaseClass::BumpWeapon( pWeapon );
-
-#endif
+	else
+	{
+		return BaseClass::BumpWeapon( pWeapon );
+	}
 
 }
 
@@ -2748,16 +2795,19 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 bool CHL2_Player::ClientCommand( const CCommand &args )
 {
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
 	//Drop primary weapon
 	if ( !Q_stricmp( args[0], "DropPrimary" ) )
 	{
-		Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
+		if( hl2_single_primary_weapon_mode.GetBool() )
+		{
+			Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
+		}
+		else
+		{
+			Weapon_Drop( GetActiveWeapon(), NULL, NULL );
+		}
 		return true;
 	}
-
-#endif
 
 	if ( !Q_stricmp( args[0], "emit" ) )
 	{
@@ -2867,30 +2917,31 @@ void CHL2_Player::PlayerUse ( void )
 			usedSomething = true;
 		}
 
-#if	HL2_SINGLE_PRIMARY_WEAPON_MODE
-
-		//Check for weapon pick-up
-		if ( m_afButtonPressed & IN_USE )
+		if( hl2_single_primary_weapon_mode.GetBool() || hl2_single_weapon_slot.GetBool() )
 		{
-			CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>(pUseEntity);
-
-			if ( ( pWeapon != NULL ) && ( Weapon_CanSwitchTo( pWeapon ) ) )
+			//Check for weapon pick-up
+			if ( m_afButtonPressed & IN_USE )
 			{
-				//Try to take ammo or swap the weapon
-				if ( Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType() ) )
-				{
-					Weapon_EquipAmmoOnly( pWeapon );
-				}
-				else
-				{
-					Weapon_DropSlot( pWeapon->GetSlot() );
-					Weapon_Equip( pWeapon );
-				}
+				CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>(pUseEntity);
 
-				usedSomething = true;
+				if ( ( pWeapon != NULL ) && ( Weapon_CanSwitchTo( pWeapon ) ) )
+				{
+					//Try to take ammo or swap the weapon
+					if ( Weapon_OwnsThisType(pWeapon->GetClassname(), pWeapon->GetSubType()) )
+					{
+						Weapon_EquipAmmoOnly( pWeapon );
+					}
+					else
+					{
+						Weapon_DropSlot( pWeapon->GetSlot() );
+						Weapon_Equip( pWeapon );
+						Weapon_Switch( pWeapon );
+					}
+
+					usedSomething = true;
+				}
 			}
 		}
-#endif
 	}
 	else if ( m_afButtonPressed & IN_USE )
 	{
@@ -3691,10 +3742,10 @@ void CHL2_Player::ModifyOrAppendPlayerCriteria( AI_CriteriaSet& set )
 	BaseClass::ModifyOrAppendPlayerCriteria( set );
 
 	//NOTENOTE; Re-enable, but remove the god-mode from this
-//	if ( GlobalEntity_GetIndex( "gordon_precriminal" ) == -1 )
-//	{
-//		set.AppendCriteria( "gordon_precriminal", "0" );
-//	}
+	if ( GlobalEntity_GetIndex( "gordon_precriminal" ) == -1 )
+	{
+		set.AppendCriteria( "gordon_precriminal", "0" );
+	}
 }
 
 

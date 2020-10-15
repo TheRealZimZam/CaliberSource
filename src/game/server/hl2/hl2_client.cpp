@@ -1,17 +1,10 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: HL2 client/server game specific stuff
 //
 // $NoKeywords: $
 //
 //=============================================================================//
-/*
-
-===== tf_client.cpp ========================================================
-
-  HL2 client/server game specific stuff
-
-*/
 
 #include "cbase.h"
 #include "hl2_player.h"

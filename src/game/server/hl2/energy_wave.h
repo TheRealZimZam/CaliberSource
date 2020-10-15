@@ -12,8 +12,6 @@
 #endif
 
 #include "basecombatweapon.h"
-#include "energy_wave.h"
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Shield

@@ -900,7 +900,9 @@ void CFuncTank::Precache( void )
 		PrecacheScriptSound( STRING(m_soundLoopRotate) );
 
 	PrecacheScriptSound( "Func_Tank.BeginUse" );
-	
+//	PrecacheScriptSound( "Func_Tank.Fire" );
+	PrecacheScriptSound( "Weapon_Functank.Single" );
+
 	// Precache the combine cannon
 	if ( m_iEffectHandling == EH_COMBINE_CANNON )
 	{
@@ -2159,7 +2161,7 @@ void CFuncTank::DoMuzzleFlash( void )
 			data.m_nEntIndex = pAnim->entindex();
 			data.m_nAttachmentIndex = m_nBarrelAttachment;
 			data.m_flScale = 1.0f;
-			data.m_fFlags = MUZZLEFLASH_COMBINE;
+			data.m_fFlags = MUZZLEFLASH_COMBINE_TURRET;
 
 			DispatchEffect( "MuzzleFlash", data );
 		}
@@ -2199,7 +2201,7 @@ void CFuncTank::Fire( int bulletCount, const Vector &barrelEnd, const Vector &fo
 		DoMuzzleFlash();
 
 		// Play the AR2 sound
-		EmitSound( "Weapon_functank.Single" );
+		EmitSound( "Weapon_Functank.Single" );
 	}
 	else if ( m_iEffectHandling == EH_COMBINE_CANNON )
 	{
@@ -2227,6 +2229,8 @@ void CFuncTank::Fire( int bulletCount, const Vector &barrelEnd, const Vector &fo
 			pSprite->SetTransparency( kRenderTransAdd, 255, 255, 255, 255, kRenderFxNoDissipation );
 			pSprite->SetScale( m_spriteScale );
 		}
+
+//		EmitSound( "Func_Tank.Fire" );
 	}
 
 	if( pAttacker && pAttacker->IsPlayer() )

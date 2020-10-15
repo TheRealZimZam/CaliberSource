@@ -1,6 +1,6 @@
 //========= Copyright © 2009, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: The G-Man, misunderstood servant of the people
+// Purpose: Garry Newman
 //
 // $NoKeywords: $
 //
@@ -59,7 +59,8 @@ END_DATADESC()
 //-----------------------------------------------------------------------------
 Class_T	CNPC_GMan::Classify ( void )
 {
-	return CLASS_PLAYER_ALLY_VITAL;
+	// Why was this ally_vital??
+	return CLASS_NONE;
 }
 
 

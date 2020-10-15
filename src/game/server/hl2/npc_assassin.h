@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Jumpy, Shooty thing
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -11,10 +11,19 @@
 #pragma once
 #endif
 
-#include "AI_BaseNPC.h"
-#include "Sprite.h"
-#include "SpriteTrail.h"
-#include "soundent.h"
+#include "ai_basenpc.h"
+#include "ai_basehumanoid.h"
+#include "ai_behavior.h"
+#include "ai_behavior_assault.h"
+#include "ai_behavior_standoff.h"
+#include "ai_behavior_follow.h"
+#include "ai_behavior_functank.h"
+#include "ai_behavior_rappel.h"
+#include "ai_behavior_actbusy.h"
+#include "ai_sentence.h"
+#include "ai_baseactor.h"
+#include "sprite.h"
+#include "spritetrail.h"
 
 //Eye states
 enum eyeState_t
@@ -28,25 +37,28 @@ enum eyeState_t
 
 //=========================================================
 //=========================================================
-class CNPC_Assassin : public CAI_BaseNPC
+class CNPC_Assassin : public CAI_BaseActor
 {
-public:
-	DECLARE_CLASS( CNPC_Assassin, CAI_BaseNPC );
-	// DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
+	DEFINE_CUSTOM_AI;
+	DECLARE_CLASS( CNPC_Assassin, CAI_BaseActor );
+	// DECLARE_SERVERCLASS();
 
+public:
 	CNPC_Assassin( void );
 	
 	Class_T		Classify( void )			{ return CLASS_COMBINE;	}
-	int			GetSoundInterests ( void )	{ return (SOUND_WORLD|SOUND_COMBAT|SOUND_PLAYER);	}
-
-	int			SelectSchedule ( void );
-	int			MeleeAttack1Conditions ( float flDot, float flDist );
-	int			RangeAttack1Conditions ( float flDot, float flDist );
-	int			RangeAttack2Conditions ( float flDot, float flDist );
-
+	int			GetSoundInterests( void )	{ return (SOUND_WORLD|SOUND_COMBAT|SOUND_PLAYER|SOUND_DANGER|SOUND_BULLET_IMPACT|SOUND_MOVE_AWAY);	}
+	virtual float	GetJumpGravity() const		{ return 1.8f; }
+	
 	void		Precache( void );
 	void		Spawn( void );
+
+	int			SelectSchedule( void );
+	int			MeleeAttack1Conditions( float flDot, float flDist );
+	int			RangeAttack1Conditions( float flDot, float flDist );
+	int			RangeAttack2Conditions( float flDot, float flDist );
+
 	void		PrescheduleThink( void );
 	void		HandleAnimEvent( animevent_t *pEvent );
 	void		StartTask( const Task_t *pTask );
@@ -65,7 +77,49 @@ public:
 	const Vector &GetViewOffset( void );
 
 private:
+	//=========================================================
+	// Flip types
+	//=========================================================
+	enum 
+	{
+		FLIP_LEFT,
+		FLIP_RIGHT,
+		FLIP_FORWARD,
+		FLIP_BACKWARD,
+		NUM_FLIP_TYPES,
+	};
 
+	//=========================================================
+	// Private conditions
+	//=========================================================
+	enum Assassin_Conds
+	{
+		COND_ASSASSIN_ENEMY_TARGETTING_ME = LAST_SHARED_CONDITION,
+	};
+
+	//=========================================================
+	// Assassin schedules
+	//=========================================================
+	enum
+	{
+		SCHED_ASSASSIN_FIND_VANTAGE_POINT = LAST_SHARED_SCHEDULE,
+		SCHED_ASSASSIN_EVADE,
+		SCHED_ASSASSIN_STALK_ENEMY,
+		SCHED_ASSASSIN_LUNGE,
+	};
+
+	//=========================================================
+	// Assassin tasks
+	//=========================================================
+	enum 
+	{
+		TASK_ASSASSIN_GET_PATH_TO_VANTAGE_POINT = LAST_SHARED_TASK,
+		TASK_ASSASSIN_EVADE,
+		TASK_ASSASSIN_SET_EYE_STATE,
+		TASK_ASSASSIN_LUNGE,
+	};
+
+private:
 	void		SetEyeState( eyeState_t state );
 	void		FirePistol( int hand );
 	bool		CanFlip( int flipType, Activity &activity, const Vector *avoidPosition );
@@ -83,7 +137,6 @@ private:
 	CSprite				*m_pEyeSprite;
 	CSpriteTrail		*m_pEyeTrail;
 
-	DEFINE_CUSTOM_AI;
 };
 
 

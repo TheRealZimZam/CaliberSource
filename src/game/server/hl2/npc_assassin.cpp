@@ -1,25 +1,35 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Jump N' Shoot. JUMP N' SHOOT!
 //
 //=============================================================================//
 
 #include "cbase.h"
 #include "ammodef.h"
-#include "AI_Hint.h"
-#include "AI_Navigator.h"
-#include "npc_Assassin.h"
+#include "ai_hull.h"
+#include "ai_navigator.h"
+#include "ai_motor.h"
+#include "ai_squad.h"
+#include "ai_squadslot.h"
+#include "ai_route.h"
+#include "ai_interactions.h"
+#include "ai_tacticalservices.h"
+#include "npc_assassin.h"
+#include "soundent.h"
 #include "game.h"
-#include "NPCEvent.h"
+#include "npcevent.h"
+#include "activitylist.h"
+#include "player.h"
+#include "basecombatweapon.h"
+#include "vstdlib/random.h"
 #include "engine/IEngineSound.h"
-#include "AI_Squad.h"
-#include "AI_SquadSlot.h"
+#include "globals.h"
 #include "ai_moveprobe.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar	sk_assassin_health( "sk_assassin_health","150");
+ConVar	sk_assassin_health( "sk_assassin_health","80");
 ConVar	g_debug_assassin( "g_debug_assassin", "0" );
 
 //=========================================================
@@ -42,59 +52,12 @@ int ACT_ASSASSIN_FLIP_BACK;
 int ACT_ASSASSIN_FLIP_FORWARD;
 int ACT_ASSASSIN_PERCH;
 
-//=========================================================
-// Flip types
-//=========================================================
-enum 
-{
-	FLIP_LEFT,
-	FLIP_RIGHT,
-	FLIP_FORWARD,
-	FLIP_BACKWARD,
-	NUM_FLIP_TYPES,
-};
-
-//=========================================================
-// Private conditions
-//=========================================================
-enum Assassin_Conds
-{
-	COND_ASSASSIN_ENEMY_TARGETTING_ME = LAST_SHARED_CONDITION,
-};
-
-//=========================================================
-// Assassin schedules
-//=========================================================
-enum
-{
-	SCHED_ASSASSIN_FIND_VANTAGE_POINT = LAST_SHARED_SCHEDULE,
-	SCHED_ASSASSIN_EVADE,
-	SCHED_ASSASSIN_STALK_ENEMY,
-	SCHED_ASSASSIN_LUNGE,
-};
-
-//=========================================================
-// Assassin tasks
-//=========================================================
-enum 
-{
-	TASK_ASSASSIN_GET_PATH_TO_VANTAGE_POINT = LAST_SHARED_TASK,
-	TASK_ASSASSIN_EVADE,
-	TASK_ASSASSIN_SET_EYE_STATE,
-	TASK_ASSASSIN_LUNGE,
-};
-
-
 //-----------------------------------------------------------------------------
 // Purpose: Class Constructor
 //-----------------------------------------------------------------------------
 CNPC_Assassin::CNPC_Assassin( void )
 {
 }
-
-//-----------------------------------------------------------------------------
-
-LINK_ENTITY_TO_CLASS( npc_assassin, CNPC_Assassin );
 
 #if 0
 //---------------------------------------------------------
@@ -104,6 +67,8 @@ IMPLEMENT_SERVERCLASS_ST(CNPC_Assassin, DT_NPC_Assassin)
 END_SEND_TABLE()
 
 #endif
+
+LINK_ENTITY_TO_CLASS( npc_assassin, CNPC_Assassin );
 
 //---------------------------------------------------------
 // Save/Restore
@@ -123,12 +88,10 @@ END_DATADESC()
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-//
-//
 //-----------------------------------------------------------------------------
 void CNPC_Assassin::Precache( void )
 {
-	PrecacheModel( "models/fassassin.mdl" );
+	PrecacheModel( "models/assassin.mdl" );
 
 	PrecacheScriptSound( "NPC_Assassin.ShootPistol" );
 	PrecacheScriptSound( "Zombie.AttackHit" );
@@ -143,14 +106,12 @@ void CNPC_Assassin::Precache( void )
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-//
-//
 //-----------------------------------------------------------------------------
 void CNPC_Assassin::Spawn( void )
 {
 	Precache();
 
-	SetModel( "models/fassassin.mdl" );
+	SetModel( "models/assassin.mdl" );
 
 	SetHullType(HULL_HUMAN);
 	SetHullSizeNormal();
@@ -161,7 +122,7 @@ void CNPC_Assassin::Spawn( void )
 	SetBloodColor( BLOOD_COLOR_RED );
 	
 	m_iHealth			= sk_assassin_health.GetFloat();
-	m_flFieldOfView		= 0.1;
+	m_flFieldOfView		= 0.1;	//*170
 	m_NPCState			= NPC_STATE_NONE;
 
 	CapabilitiesClear();
@@ -201,6 +162,40 @@ void CNPC_Assassin::Spawn( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Set turn speed
+//-----------------------------------------------------------------------------
+float CNPC_Assassin::MaxYawSpeed( void )
+{
+	switch( GetActivity() )
+	{
+	case ACT_IDLE:		
+		return 60;
+		break;
+	case ACT_TURN_LEFT:
+	case ACT_TURN_RIGHT:
+		return 60;
+		break;
+	case ACT_RUN:
+	case ACT_RUN_HURT:
+		return 30;
+		break;
+	case ACT_WALK:
+	case ACT_WALK_CROUCH:
+	case ACT_RUN_CROUCH:
+	case ACT_COVER_LOW:
+		return 30;
+		break;
+	case ACT_RANGE_ATTACK1:
+	case ACT_MELEE_ATTACK1:
+		return 30;
+		break;
+	default:
+		return 45;
+		break;
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Returns true if a reasonable jumping distance
 // Input  :
 // Output :
@@ -222,14 +217,18 @@ bool CNPC_Assassin::IsJumpLegal(const Vector &startPos, const Vector &apex, cons
 //-----------------------------------------------------------------------------
 int CNPC_Assassin::MeleeAttack1Conditions ( float flDot, float flDist )
 {
-	if ( flDist > 84 )
-		return COND_TOO_FAR_TO_ATTACK;
-	
-	if ( flDot < 0.7f )
-		return 0;
+	if (flDist > 84)
+	{
+		return COND_NONE; // COND_TOO_FAR_TO_ATTACK;
+	}
+	else if (flDot < 0.7)
+	{
+		return COND_NONE; // COND_NOT_FACING_ATTACK;
+	}
 
-	if ( GetEnemy() == NULL )
-		return 0;
+	// Check Z
+	if ( GetEnemy() && fabs(GetEnemy()->GetAbsOrigin().z - GetAbsOrigin().z) > 84 )
+		return COND_NONE;
 
 	return COND_CAN_MELEE_ATTACK1;
 }
@@ -240,7 +239,7 @@ int CNPC_Assassin::MeleeAttack1Conditions ( float flDot, float flDist )
 //			flDist - 
 // Output : int CNPC_Assassin::RangeAttack1Conditions
 //-----------------------------------------------------------------------------
-int CNPC_Assassin::RangeAttack1Conditions ( float flDot, float flDist )
+int CNPC_Assassin::RangeAttack1Conditions( float flDot, float flDist )
 {
 	if ( flDist < 84 )
 		return COND_TOO_CLOSE_TO_ATTACK;
@@ -260,7 +259,7 @@ int CNPC_Assassin::RangeAttack1Conditions ( float flDot, float flDist )
 //			flDist - 
 // Output : int CNPC_Assassin::RangeAttack1Conditions
 //-----------------------------------------------------------------------------
-int CNPC_Assassin::RangeAttack2Conditions ( float flDot, float flDist )
+int CNPC_Assassin::RangeAttack2Conditions( float flDot, float flDist )
 {
 	if ( m_flNextLungeTime > gpGlobals->curtime )
 		return 0;
@@ -333,7 +332,7 @@ void CNPC_Assassin::FirePistol( int hand )
 //---------------------------------------------------------
 void CNPC_Assassin::HandleAnimEvent( animevent_t *pEvent )
 {
-	
+
 	if ( pEvent->event == AE_ASSASIN_FIRE_PISTOL_RIGHT )
 	{
 		FirePistol( 0 );
@@ -405,7 +404,7 @@ bool CNPC_Assassin::MovementCost( int moveType, const Vector &vecStart, const Ve
 	// If we're moving towards our enemy, then the cost is much higher than normal
 	if ( DotProduct( enemyDir, moveDir ) > 0.5f )
 	{
-		multiplier = 16.0f;
+		multiplier = 8.0f;
 	}
 
 	*pCost *= multiplier;
@@ -415,31 +414,133 @@ bool CNPC_Assassin::MovementCost( int moveType, const Vector &vecStart, const Ve
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-int CNPC_Assassin::SelectSchedule ( void )
+int CNPC_Assassin::SelectSchedule( void )
 {
+
+	int nSched = SelectFlinchSchedule();
+	if ( nSched != SCHED_NONE )
+		return nSched;
+
+	if ( m_NPCState != NPC_STATE_SCRIPT)
+	{
+		// We've been told to move away from a target to make room for a grenade to be thrown at it
+		if ( HasCondition( COND_HEAR_MOVE_AWAY ) )
+		{
+			return SCHED_MOVE_AWAY;
+		}
+
+		// These things are done in any state but dead and prone
+		if (m_NPCState != NPC_STATE_DEAD && m_NPCState != NPC_STATE_PRONE )
+		{
+			// grunts place HIGH priority on running away from danger sounds.
+			if ( HasCondition( COND_HEAR_DANGER ) && !HasCondition( COND_CAN_MELEE_ATTACK1 ) )
+			{
+				CSound *pSound;
+				pSound = GetBestSound();
+
+				Assert( pSound != NULL );
+				if ( pSound)
+				{
+					if (pSound->m_iType & SOUND_DANGER)
+					{
+						// If the sound is approaching danger, I have no enemy, and I don't see it, turn to face.
+						if( !GetEnemy() && pSound->IsSoundType(SOUND_CONTEXT_DANGER_APPROACH) && pSound->m_hOwner && !FInViewCone(pSound->GetSoundReactOrigin()) )
+						{
+							GetMotor()->SetIdealYawToTarget( pSound->GetSoundReactOrigin() );
+						}
+
+						return SCHED_TAKE_COVER_FROM_BEST_SOUND;
+					}
+				}
+			}
+		}
+
+		if( BehaviorSelectSchedule() )
+		{
+			return BaseClass::SelectSchedule();
+		}
+	}
+
 	switch	( m_NPCState )
 	{
 	case NPC_STATE_IDLE:
 	case NPC_STATE_ALERT:
 		{
-			if ( HasCondition ( COND_HEAR_DANGER ) )
-				 return SCHED_TAKE_COVER_FROM_BEST_SOUND;
-				
-			if ( HasCondition ( COND_HEAR_COMBAT ) )
-				return SCHED_INVESTIGATE_SOUND;
+			if( HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_HEAVY_DAMAGE ) )
+			{
+				AI_EnemyInfo_t *pDanger = GetEnemies()->GetDangerMemory();
+				if( pDanger && FInViewCone(pDanger->vLastKnownLocation) && !BaseClass::FVisible(pDanger->vLastKnownLocation) )
+				{
+					// I've been hurt, I'm facing the danger, but I don't see it, so move from this position.
+					return SCHED_TAKE_COVER_FROM_ORIGIN;
+				}
+			}
+
+			// Investigate nearby sounds
+			if( HasCondition( COND_HEAR_COMBAT ) )
+			{
+				CSound *pSound = GetBestSound();
+
+				if( pSound && pSound->IsSoundType( SOUND_COMBAT ) )
+				{
+					if( m_pSquad && m_pSquad->GetSquadMemberNearestTo( pSound->GetSoundReactOrigin() ) == this && OccupyStrategySlot( SQUAD_SLOT_INVESTIGATE_SOUND ) )
+					{
+						return SCHED_INVESTIGATE_SOUND;
+					}
+				}
+			}
+			
+			// Scan around for new enemies
+			if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
+			{
+				return SCHED_VICTORY_DANCE;
+			}
 		}
 		break;
 
 	case NPC_STATE_COMBAT:
 		{
-			// dead enemy
+			// -----------
+			// Dead Enemy
+			// -----------
 			if ( HasCondition( COND_ENEMY_DEAD ) )
 			{
 				// call base class, all code to handle dead enemies is centralized there.
 				return BaseClass::SelectSchedule();
 			}
 
+			// -----------
+			// new enemy
+			// -----------
+			if ( HasCondition( COND_NEW_ENEMY ) )
+			{
+				CBaseEntity *pEnemy = GetEnemy();
+				if ( m_pSquad && pEnemy )
+				{
+					if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) && OccupyStrategySlot( SQUAD_SLOT_ATTACK1 ) )
+					{
+						// I'm the first one to spot the enemy, start shooting
+						return SCHED_RANGE_ATTACK1;
+					}
+					if ( m_pSquad->IsLeader( this ) )
+					{
+						if( HasCondition( COND_WEAPON_HAS_LOS ) && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+						{
+							// If everyone else is attacking and I have line of fire, wait for a chance to cover someone.
+							return SCHED_ASSASSIN_FIND_VANTAGE_POINT;
+						}
+					}
+					else
+					{
+						return SCHED_TAKE_COVER_FROM_ENEMY;
+					}
+				}
+				return SCHED_TAKE_COVER_FROM_ENEMY;
+			}
+			
+			// -----------
 			// Need to move
+			// -----------
 			if ( /*(	HasCondition( COND_SEE_ENEMY ) && HasCondition( COND_ASSASSIN_ENEMY_TARGETTING_ME ) && random->RandomInt( 0, 32 ) == 0 && m_flNextFlipTime < gpGlobals->curtime ) )*/
 					( m_nNumFlips > 0 ) || 
 					( ( HasCondition ( COND_LIGHT_DAMAGE ) && random->RandomInt( 0, 2 ) == 0 ) ) || ( HasCondition ( COND_HEAVY_DAMAGE ) ) )
@@ -472,10 +573,6 @@ int CNPC_Assassin::SelectSchedule ( void )
 			// Face our enemy
 			if ( HasCondition( COND_SEE_ENEMY ) )
 				return SCHED_COMBAT_FACE;
-
-			// new enemy
-			if ( HasCondition( COND_NEW_ENEMY ) )
-				return SCHED_TAKE_COVER_FROM_ENEMY;
 
 			// ALERT( at_console, "stand\n");
 			return SCHED_ASSASSIN_FIND_VANTAGE_POINT;
@@ -708,7 +805,7 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 	
 			hint.SetFlag( bits_HINT_NODE_NEAREST );
 
-			CAI_Hint *pHint = CAI_HintManager::FindHint( this, GetEnemy()->GetAbsOrigin(), &hint );
+			CAI_Hint *pHint = CAI_HintManager::FindHint( this, GetEnemy()->GetAbsOrigin(), hint );
 
 			if ( pHint == NULL )
 			{
@@ -733,31 +830,6 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 
 	default:
 		BaseClass::StartTask( pTask );
-		break;
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//
-//
-//-----------------------------------------------------------------------------
-float CNPC_Assassin::MaxYawSpeed( void )
-{
-	switch( GetActivity() )
-	{
-	case ACT_TURN_LEFT:
-	case ACT_TURN_RIGHT:
-		return 160;
-		break;
-	case ACT_RUN:
-		return 900;
-		break;
-	case ACT_RANGE_ATTACK1:
-		return 0;
-		break;
-	default:
-		return 60;
 		break;
 	}
 }
@@ -995,7 +1067,6 @@ void CNPC_Assassin::Event_Killed( const CTakeDamageInfo &info )
 	// Turn off the pistols
 	SetBodygroup( 1, 0 );
 
-	// Spawn her guns
 }
 
 //-----------------------------------------------------------------------------

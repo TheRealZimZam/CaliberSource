@@ -2492,10 +2492,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\c_boston.cpp"
-					>
-				</File>
-				<File
 					RelativePath=".\hl2\c_citadel_effects.cpp"
 					>
 				</File>

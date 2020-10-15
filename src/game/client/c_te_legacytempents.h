@@ -129,6 +129,7 @@ public:
 private:
 	enum
 	{ 
+		// Shouldnt this be related to perf?
 		MAX_TEMP_ENTITIES = 500,
 		MAX_TEMP_ENTITY_SPRITES = 200,
 		MAX_TEMP_ENTITY_STUDIOMODEL = 50,
@@ -169,6 +170,8 @@ private:
 	inline void				CacheMuzzleFlashes( void );
 	PMaterialHandle			m_Material_MuzzleFlash_Player[4];
 	PMaterialHandle			m_Material_MuzzleFlash_NPC[4];
+	PMaterialHandle			m_Material_AR2_MuzzleFlash_Player[2];
+	PMaterialHandle			m_Material_AR2_MuzzleFlash_NPC[2];
 	PMaterialHandle			m_Material_Combine_MuzzleFlash_Player[2];
 	PMaterialHandle			m_Material_Combine_MuzzleFlash_NPC[2];
 
@@ -183,30 +186,36 @@ private:
 	int						AddVisibleTempEntity( C_LocalTempEntity *pEntity );
 
 	// AR2
-	void					MuzzleFlash_AR2_Player( const Vector &origin, const QAngle &angles, ClientEntityHandle_t hEntity );
-	void					MuzzleFlash_AR2_NPC( const Vector &origin, const QAngle &angles, ClientEntityHandle_t hEntity );
-							
-	// SMG1					
-	void					MuzzleFlash_SMG1_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
-	void					MuzzleFlash_SMG1_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
-							
-	// Shotgun				
-	void					MuzzleFlash_Shotgun_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
-	void					MuzzleFlash_Shotgun_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
-							
-	// Pistol				
-	void					MuzzleFlash_Pistol_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
-	void					MuzzleFlash_Pistol_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
-							
+	void					MuzzleFlash_AR2_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
+	void					MuzzleFlash_AR2_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
+
 	// Combine				
 	void					MuzzleFlash_Combine_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
 	void					MuzzleFlash_Combine_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
+			
+	// Shotgun				
+	void					MuzzleFlash_Shotgun_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
+	void					MuzzleFlash_Shotgun_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
+
+	// SMG1					
+	void					MuzzleFlash_SMG1_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
+	void					MuzzleFlash_SMG1_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
+
+	// Pistol				
+	void					MuzzleFlash_Pistol_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
+	void					MuzzleFlash_Pistol_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
 
 	// 357
 	void					MuzzleFlash_357_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
+	void					MuzzleFlash_357_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
 
 	// RPG
+	void					MuzzleFlash_RPG_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
 	void					MuzzleFlash_RPG_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
+
+	// Turret			
+	void					MuzzleFlash_Turret_Player( ClientEntityHandle_t hEntity, int attachmentIndex );
+	void					MuzzleFlash_Turret_NPC( ClientEntityHandle_t hEntity, int attachmentIndex );
 };
 
 

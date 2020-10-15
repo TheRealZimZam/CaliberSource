@@ -378,7 +378,7 @@ void CFlashlightEffect::UpdateLightOld(const Vector &vecPos, const Vector &vecDi
 		// Set up the environment light
 		m_pPointLight = effects->CL_AllocDlight(m_nEntIndex);
 		m_pPointLight->flags = 0.0f;
-		m_pPointLight->radius = 80;
+		m_pPointLight->radius = 96;	//80
 	}
 	
 	// For bumped lighting

@@ -39,16 +39,22 @@ bool FX_GetAttachmentTransform( ClientEntityHandle_t hEntity, int attachmentInde
 bool FX_GetAttachmentTransform( ClientEntityHandle_t hEntity, int attachmentIndex, Vector *origin, QAngle *angles );
 
 void FX_RicochetSound( const Vector& pos );
+void FX_HMGRicochetSound( const Vector& pos );
 
 void FX_AntlionImpact( const Vector &pos, trace_t *tr );
 void FX_DebrisFlecks( const Vector& origin, trace_t *trace, char materialType, int iScale, bool bNoFlecks = false );
 void FX_Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
+void FX_BigTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
 void FX_GunshipTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
 void FX_StriderTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
 void FX_HunterTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
+void FX_ShotgunTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
 void FX_PlayerTracer( Vector& start, Vector& end );
+void FX_BigPlayerTracer( Vector& start, Vector& end );
+void FX_PlayerShotgunTracer( Vector& start, Vector& end );
 void FX_BulletPass( Vector& start, Vector& end );
 void FX_MetalSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal, int iScale = 1 );
+void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal );
 void FX_MetalScrape( Vector &position, Vector &normal );
 void FX_Sparks( const Vector &pos, int nMagnitude, int nTrailLength, const Vector &vecDir, float flWidth, float flMinSpeed, float flMaxSpeed, char *pSparkMaterial = NULL );
 void FX_ElectricSpark( const Vector &pos, int nMagnitude, int nTrailLength, const Vector *vecDir );
@@ -101,7 +107,7 @@ extern PMaterialHandle g_Mat_Fleck_Wood[2];
 extern PMaterialHandle g_Mat_Fleck_Cement[2];
 extern PMaterialHandle g_Mat_Fleck_Antlion[2];
 extern PMaterialHandle g_Mat_Fleck_Tile[2];
-extern PMaterialHandle g_Mat_DustPuff[2];
+extern PMaterialHandle g_Mat_DustPuff[3];
 extern PMaterialHandle g_Mat_BloodPuff[2];
 extern PMaterialHandle g_Mat_Fleck_Glass[2];
 extern PMaterialHandle g_Mat_SMG_Muzzleflash[4];

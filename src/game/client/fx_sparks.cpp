@@ -28,6 +28,7 @@ CLIENTEFFECT_MATERIAL( "effects/energysplash" )
 CLIENTEFFECT_MATERIAL( "effects/energyball" )
 CLIENTEFFECT_MATERIAL( "sprites/rico1" )
 CLIENTEFFECT_MATERIAL( "sprites/rico1_noz" )
+CLIENTEFFECT_MATERIAL( "sprites/richo1" )
 CLIENTEFFECT_MATERIAL( "sprites/blueflare1" )
 CLIENTEFFECT_MATERIAL( "effects/yellowflare" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1_nocull" )
@@ -605,7 +606,7 @@ void FX_MetalScrape( Vector &position, Vector &normal )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Ricochet spark on metal
+// Purpose: General metal spark/impact
 // Input  : &position - origin of effect
 //			&normal - normal of the surface struck
 //-----------------------------------------------------------------------------
@@ -665,11 +666,11 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 		if( iScale > 1 && i%3 == 0 )
 		{
 			// Every third spark goes flying far if we're having a big batch of sparks.
-			pParticle->m_flDieTime	= random->RandomFloat( 0.15f, 0.25f );
+			pParticle->m_flDieTime	= random->RandomFloat( 0.15f, 0.25f ) * iScale * 2;	//* iScale * 2
 		}
 		else
 		{
-			pParticle->m_flDieTime	= random->RandomFloat( 0.05f, 0.1f );
+			pParticle->m_flDieTime	= random->RandomFloat( 0.05f, 0.15f )  * iScale;		//* iScale
 		}
 
 		float	spreadOfs = random->RandomFloat( 0.0f, 2.0f );
@@ -694,7 +695,7 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 
 	FXQuadData_t data;
 
-	data.SetMaterial( "effects/yellowflare" );
+	data.SetMaterial( "sprites/richo1" );
 	data.SetColor( 1.0f, 1.0f, 1.0f );
 	data.SetOrigin( offset );
 	data.SetNormal( surfaceNormal );
@@ -702,7 +703,102 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 	data.SetLifeTime( 0.1f );
 	data.SetYaw( random->RandomInt( 0, 360 ) );
 	
-	int scale = random->RandomInt( 24, 28 );
+	int scale = random->RandomInt( 24, 32 );
+	data.SetScale( scale, 0 );
+
+	FX_AddQuad( data );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Ricochet bullet - Addon to metalspark, bullet and small smoke trail
+// Input  : &position - origin of effect
+//			&normal - normal of the surface struck
+//-----------------------------------------------------------------------------
+#define	RICOCHET_SPARK_SPREAD	0.5f
+#define	RICOCHET_SPARK_MINSPEED	128.0f
+#define	RICOCHET_SPARK_MAXSPEED	512.0f
+#define	RICOCHET_SPARK_GRAVITY	600.0f	// The initial force sends it up, and the high gravity brings it quickly down in a nice arc
+
+void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal )
+{
+	VPROF_BUDGET( "FX_RicochetSpark", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+
+	//
+	// Bullet
+	//
+
+	Vector offset = position + ( surfaceNormal * 1.0f );
+
+#if 0
+	CSmartPtr<CTrailParticles> sparkEmitter = CTrailParticles::Create( "FX_RicochetSpark 1" );
+
+	if ( sparkEmitter == NULL )
+		return;
+
+	//Setup our information
+	sparkEmitter->SetSortOrigin( offset );
+	sparkEmitter->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
+	sparkEmitter->SetVelocityDampen( 8.0f );
+	sparkEmitter->SetGravity( METAL_SPARK_GRAVITY );
+	sparkEmitter->SetCollisionDamped( 0.25f );
+	sparkEmitter->GetBinding().SetBBox( offset - Vector( 32, 32, 32 ), offset + Vector( 32, 32, 32 ) );
+	
+	if ( g_Material_Spark == NULL )
+	{
+		g_Material_Spark = sparkEmitter->GetPMaterial( "sprites/dot" );
+	}
+
+	TrailParticle	*pParticle;
+	Vector	dir;
+	float	length	= 0.1f;
+
+	// Send the bullet and smoketrail
+	for ( int i = 0; i < 1; i++ )
+	{
+		pParticle = (TrailParticle *) sparkEmitter->AddParticle( sizeof(TrailParticle), g_Material_Spark, offset );
+
+		if ( pParticle == NULL )
+			return;
+
+		pParticle->m_flLifetime	= 0.0f;
+		
+		if( iScale > 1 && i%3 == 0 )
+		{
+			// Every third spark goes flying far if we're having a big batch of sparks.
+			pParticle->m_flDieTime	= random->RandomFloat( 0.15f, 0.25f );
+		}
+		else
+		{
+			pParticle->m_flDieTime	= random->RandomFloat( 0.05f, 0.1f );
+		}
+
+		float	spreadOfs = random->RandomFloat( 0.0f, 2.0f );
+
+		dir[0] = direction[0] + random->RandomFloat( -(METAL_SPARK_SPREAD*spreadOfs), (METAL_SPARK_SPREAD*spreadOfs) );
+		dir[1] = direction[1] + random->RandomFloat( -(METAL_SPARK_SPREAD*spreadOfs), (METAL_SPARK_SPREAD*spreadOfs) );
+		dir[2] = direction[2] + random->RandomFloat( -(METAL_SPARK_SPREAD*spreadOfs), (METAL_SPARK_SPREAD*spreadOfs) );
+	
+		VectorNormalize( dir );
+
+		pParticle->m_flWidth		= random->RandomFloat( 1.0f, 4.0f );
+		pParticle->m_flLength		= random->RandomFloat( length*0.25f, length );
+		
+		pParticle->m_vecVelocity	= dir * random->RandomFloat( (METAL_SPARK_MINSPEED*(2.0f-spreadOfs)), (METAL_SPARK_MAXSPEED*(2.0f-spreadOfs)) );
+		
+		Color32Init( pParticle->m_color, 255, 255, 255, 255 );
+	}
+#endif
+	FXQuadData_t data;
+
+	data.SetMaterial( "sprites/rico1" );
+	data.SetColor( 1.0f, 1.0f, 1.0f );
+	data.SetOrigin( offset );
+	data.SetNormal( surfaceNormal );
+	data.SetAlpha( 1.0f, 0.0f );
+	data.SetLifeTime( 0.15f );
+	data.SetYaw( random->RandomInt( 0, 360 ) );
+	
+	int scale = random->RandomInt( 16, 24 );
 	data.SetScale( scale, 0 );
 
 	FX_AddQuad( data );

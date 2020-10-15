@@ -23,6 +23,8 @@
 #include "view.h"
 #include "ieffects.h"
 #include "fx.h"
+#include "fx_line.h"
+#include "fx_quad.h"
 #include "c_te_legacytempents.h"
 #include "toolframework_client.h"
 
@@ -37,6 +39,7 @@ CLIENTEFFECT_MATERIAL( "effects/muzzleflash2" )
 CLIENTEFFECT_MATERIAL( "effects/muzzleflash3" )
 CLIENTEFFECT_MATERIAL( "effects/muzzleflash4" )
 CLIENTEFFECT_MATERIAL( "effects/bluemuzzle" )
+CLIENTEFFECT_MATERIAL( "effects/stridertracer" )
 CLIENTEFFECT_MATERIAL( "effects/gunshipmuzzle" )
 CLIENTEFFECT_MATERIAL( "effects/gunshiptracer" )
 CLIENTEFFECT_MATERIAL( "effects/huntertracer" )
@@ -44,11 +47,14 @@ CLIENTEFFECT_MATERIAL( "sprites/physcannon_bluelight2" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle2" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle2_nocull" )
+CLIENTEFFECT_MATERIAL( "effects/fire_embers1" )
+CLIENTEFFECT_MATERIAL( "effects/fire_embers2" )
 CLIENTEFFECT_REGISTER_END()
 #endif
 
 //Whether or not we should emit a dynamic light
 ConVar muzzleflash_light( "muzzleflash_light", "1", FCVAR_ARCHIVE );
+ConVar explosion_light( "explosion_light", "1", FCVAR_ARCHIVE );
 
 extern void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType );
 
@@ -93,12 +99,23 @@ public:
 //-----------------------------------------------------------------------------
 // Purpose: Play random ricochet sound
 // Input  : *pos - 
+// TODO; Sound location needs to be fixed, currently it plays accross the entire
+// map. It should be emiting from the origin of the hit, and the db volume takes
+// care of the range.
 //-----------------------------------------------------------------------------
 void FX_RicochetSound( const Vector& pos )
 {
 	Vector org = pos;
 	CLocalPlayerFilter filter;
  	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.Ricochet", &org );
+}
+
+void FX_HMGRicochetSound( const Vector& pos )
+{
+	Vector org = pos;
+	CLocalPlayerFilter filter;
+	// FIXME; This is a looped sound
+ 	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.HMGRicochet", &org );
 }
 
 //-----------------------------------------------------------------------------
@@ -176,7 +193,7 @@ bool FX_GetAttachmentTransform( ClientEntityHandle_t hEntity, int attachmentInde
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Generic muzzleflash
 //-----------------------------------------------------------------------------
 void FX_MuzzleEffect( 
 	const Vector &origin, 
@@ -211,7 +228,7 @@ void FX_MuzzleEffect(
 	//
 
 	int i;
-	for ( i = 1; i < 9; i++ )
+	for ( i = 1; i < 8; i++ )
 	{
 		offset = origin + (forward * (i*2.0f*scale));
 
@@ -221,7 +238,7 @@ void FX_MuzzleEffect(
 			return;
 
 		pParticle->m_flLifetime		= 0.0f;
-		pParticle->m_flDieTime		= /*bOneFrame ? 0.0001f : */0.1f;
+		pParticle->m_flDieTime		= bOneFrame ? 0.01f : 0.1f;
 
 		pParticle->m_vecVelocity.Init();
 
@@ -263,7 +280,7 @@ void FX_MuzzleEffect(
 		color = random->RandomInt( 64, 164 );
 
 		pParticle->m_flLifetime		= 0.0f;
-		pParticle->m_flDieTime		= random->RandomFloat( 0.5f, 1.0f );
+		pParticle->m_flDieTime		= random->RandomFloat( 0.25f, 0.5f );
 
 		pParticle->m_vecVelocity.Random( -0.5f, 0.5f );
 		pParticle->m_vecVelocity += forward;
@@ -286,7 +303,7 @@ void FX_MuzzleEffect(
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Generic muzzleflash
 // Input  : scale - 
 //			attachmentIndex - 
 //			bOneFrame - 
@@ -323,21 +340,19 @@ void FX_MuzzleEffectAttached(
 	}
 
 	//
-	// Flash
+	// Fire
 	//
-
-	int i;
-	for ( i = 1; i < 9; i++ )
+	for ( int i = 1; i < 8; i++ )
 	{
 		offset = (forward * (i*2.0f*scale));
 
 		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_SMG_Muzzleflash[random->RandomInt(0,3)], offset );
-			
+
 		if ( pParticle == NULL )
 			return;
 
 		pParticle->m_flLifetime		= 0.0f;
-		pParticle->m_flDieTime		= bOneFrame ? 0.0001f : 0.1f;
+		pParticle->m_flDieTime		= bOneFrame ? 0.01f : random->RandomFloat( 0.05f, 0.1f );
 
 		pParticle->m_vecVelocity.Init();
 
@@ -345,7 +360,7 @@ void FX_MuzzleEffectAttached(
 		{
 			pParticle->m_uchColor[0]	= 255;
 			pParticle->m_uchColor[1]	= 255;
-			pParticle->m_uchColor[2]	= 255;
+			pParticle->m_uchColor[2]	= 200+random->RandomInt(0,55);
 		}
 		else
 		{
@@ -355,14 +370,13 @@ void FX_MuzzleEffectAttached(
 		}
 
 		pParticle->m_uchStartAlpha	= 255;
-		pParticle->m_uchEndAlpha	= 128;
+		pParticle->m_uchEndAlpha	= 255;
 
 		pParticle->m_uchStartSize	= (random->RandomFloat( 6.0f, 9.0f ) * (12-(i))/9) * flScale;
 		pParticle->m_uchEndSize		= pParticle->m_uchStartSize;
 		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
 		pParticle->m_flRollDelta	= 0.0f;
 	}
-
 
 	if ( !ToolsEnabled() )
 		return;
@@ -920,7 +934,7 @@ void FX_StriderTracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 	float life = ( totalDist + length ) / velocity;	//NOTENOTE: We want the tail to finish its run as well
 	
 	//Add it
-	FX_AddDiscreetLine( start, shotDir, velocity, length, totalDist, 2.5f, life, "effects/gunshiptracer" );
+	FX_AddDiscreetLine( start, shotDir, velocity, length, totalDist, 2.5f, life, "effects/stridertracer" );
 
 	if( makeWhiz )
 	{
@@ -989,6 +1003,66 @@ void FX_GaussTracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 	
 	//Add it
 	FX_AddDiscreetLine( start, shotDir, velocity, length, totalDist, random->RandomFloat( 5.0f, 8.0f ), life, "effects/spark" );
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : start - 
+//			end - 
+//			velocity - 
+//			makeWhiz - 
+//-----------------------------------------------------------------------------
+void FX_ShotgunTracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
+{
+	VPROF_BUDGET( "FX_ShotgunTracer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+	//Don't make small tracers
+	float dist;
+	Vector dir;
+
+	VectorSubtract( end, start, dir );
+	dist = VectorNormalize( dir );
+
+	// Don't make short tracers.
+	if ( dist >= 128 )
+	{
+		float length = random->RandomFloat( 64.0f, 128.0f );
+		float life = ( dist + length ) / velocity;	//NOTENOTE: We want the tail to finish its run as well
+		
+		//This is achtually a good hack - instead of firing off 8 or so tracers just use a spotted texture
+		FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 0.8f, 1.0f ), life, "effects/fire_embers2" );
+	}
+
+	if( makeWhiz )
+	{
+		FX_TracerSound( start, end, TRACER_TYPE_SHOTGUN );	
+	}
+}
+
+void FX_PlayerShotgunTracer( Vector& start, Vector& end )
+{
+	VPROF_BUDGET( "FX_PlayerShotgunTracer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+	Vector	shotDir, dStart, dEnd;
+	float	length;
+
+	//Find the direction of the tracer
+	VectorSubtract( end, start, shotDir );
+	length = VectorNormalize( shotDir );
+
+	//We don't want to draw them if they're too close to us
+	if ( length < 128 )
+		return;
+
+	//Randomly place the tracer along this line, with a random length
+	VectorMA( start, random->RandomFloat( 0.0f, 8.0f ), shotDir, dStart );
+	VectorMA( dStart, min( length, random->RandomFloat( 128.0f, 512.0f ) ), shotDir, dEnd );
+
+	//fire_embers1 is a bit chunkier, good for player-view
+	CFXStaticLine *tracerLine = new CFXStaticLine( "Tracer", dStart, dEnd, random->RandomFloat( 0.7f, 0.9f ), 0.01f, "effects/fire_embers1", 0 );
+	assert( tracerLine );
+
+	//Throw it into the list
+	clienteffects->AddEffect( tracerLine );
 }
 
 

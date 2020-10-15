@@ -23,6 +23,7 @@
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectGlow )
 CLIENTEFFECT_MATERIAL( "sun/overlay" )
 CLIENTEFFECT_MATERIAL( "sprites/light_glow02_add_noz" )
+CLIENTEFFECT_MATERIAL( "effects/flare" )
 CLIENTEFFECT_REGISTER_END()
 
 class CGlowOverlaySystem : public CAutoGameSystem

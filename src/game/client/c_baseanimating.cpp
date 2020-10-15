@@ -59,13 +59,17 @@ static ConVar cl_SetupAllBones( "cl_SetupAllBones", "0" );
 ConVar r_sequence_debug( "r_sequence_debug", "" );
 
 // If an NPC is moving faster than this, he should play the running footstep sound
-const float RUN_SPEED_ESTIMATE_SQR = 150.0f * 150.0f;
+const float RUN_SPEED_ESTIMATE_SQR = 150.0f * 150.0f;	//TODO; Get anim (act_run) instead
 
 // Removed macro used by shared code stuff
 #if defined( CBaseAnimating )
 #undef CBaseAnimating
 #endif
 
+
+CLIENTEFFECT_REGISTER_BEGIN( PrecacheBaseAnimating )
+CLIENTEFFECT_MATERIAL( "sprites/fire" )
+CLIENTEFFECT_REGISTER_END()
 
 mstudioevent_t *GetEventIndexForSequence( mstudioseqdesc_t &seqdesc );
 
@@ -283,6 +287,21 @@ C_ClientRagdoll::C_ClientRagdoll( bool bRestoring )
 
 void C_ClientRagdoll::OnSave( void )
 {
+	//From 2006
+	C_EntityFlame *pFireChild = dynamic_cast<C_EntityFlame *>( GetEffectEntity() );
+
+	if ( pFireChild )
+	{
+		for ( int i = 0; i < NUM_HITBOX_FIRES; i++ )
+		{
+			if ( pFireChild->m_pFireSmoke[i] != NULL )
+			{
+				 m_flScaleEnd[i] = pFireChild->m_pFireSmoke[i]->m_flScaleEnd;
+				 m_flScaleTimeStart[i] = pFireChild->m_pFireSmoke[i]->m_flScaleTimeStart;
+				 m_flScaleTimeEnd[i] = pFireChild->m_pFireSmoke[i]->m_flScaleTimeEnd;
+			}
+		}
+	}
 }
 
 void C_ClientRagdoll::OnRestore( void )
@@ -2989,47 +3008,48 @@ int C_BaseAnimating::InternalDrawModel( int flags )
 }
 
 extern ConVar muzzleflash_light;
+//extern PWeapon;
 
 void C_BaseAnimating::ProcessMuzzleFlashEvent()
 {
-	// If we have an attachment, then stick a light on it.
+	// If we have an attachment and no muzzleflash data, then stick a default flash on it.
 	if ( muzzleflash_light.GetBool() )
 	{
-		//FIXME: We should really use a named attachment for this
+		//!!!TODO: This needs to check if there hasnt been any other muzzle lights applied
 		if ( m_Attachments.Count() > 0 )
 		{
-			//Vector vAttachment;
-			//QAngle dummyAngles;
-			//GetAttachment( 1, vAttachment, dummyAngles );
-			//
-			// Make an elight
-			//dlight_t *el = effects->CL_AllocElight( LIGHT_INDEX_MUZZLEFLASH + index );
-			//el->origin = vAttachment;
-			//el->radius = random->RandomInt( 32, 64 ); 
-			//el->decay = el->radius / 0.05f;
-			//el->die = gpGlobals->curtime + 0.05f;
-			//el->color.r = 255;
-			//el->color.g = 192;
-			//el->color.b = 64;
-			//el->color.exponent = 5;
 			// Below code courtesy of the VDC
 			Vector vAttachment, vAng;
 			QAngle angles;
-//#ifdef HL2_EPISODIC
+#ifdef HL2_EPISODIC
 			GetAttachment( 1, vAttachment, angles ); // set 1 instead "attachment"
-//#else
-//			GetAttachment( attachment, vAttachment, angles );
-//#endif
+#else
+			GetAttachment( attachment, vAttachment, angles );
+#endif
 			AngleVectors( angles, &vAng );
 			vAttachment += vAng * 2;
  
-			dlight_t *dl = effects->CL_AllocDlight ( index );
+			dlight_t *dl = effects->CL_AllocDlight ( LIGHT_INDEX_MUZZLEFLASH + index );
 			dl->origin = vAttachment;
-			dl->color.r = 250;
-			dl->color.g = 234;
-			dl->color.b = 120;
+# if 0
+			// Disgusting hack just for testing
+			CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+			if( FClassnameIs( pWeapon, "weapon_ar2" ) )
+			{
+				dl->color.r = 255;
+				dl->color.g = 192;
+				dl->color.b = 192;
+				dl->die = gpGlobals->curtime + 0.05f;
+				dl->radius = 256.0f;
+				dl->decay = 512.0f;
+				return true
+			}
+#endif
+			dl->color.r = 255;
+			dl->color.g = 192;
+			dl->color.b = 96;
 			dl->die = gpGlobals->curtime + 0.05f;
-			dl->radius = random->RandomFloat( 245.0f, 256.0f );
+			dl->radius = random->RandomFloat( 232.0f, 256.0f );
 			dl->decay = 512.0f;
 		}
 	}
@@ -3221,9 +3241,17 @@ bool C_BaseAnimating::DispatchMuzzleEffect( const char *options, bool isFirstPer
 	if ( token ) 
 	{
 		//TODO: Parse the type from a list instead
-		if ( Q_stricmp( token, "COMBINE" ) == 0 )
+		if ( Q_stricmp( token, "AR2" ) == 0 )
+		{
+			weaponType = MUZZLEFLASH_AR2;
+		}
+		else if ( Q_stricmp( token, "COMBINE" ) == 0 )
 		{
 			weaponType = MUZZLEFLASH_COMBINE;
+		}
+		else if ( Q_stricmp( token, "SHOTGUN" ) == 0 )
+		{
+			weaponType = MUZZLEFLASH_SHOTGUN;
 		}
 		else if ( Q_stricmp( token, "SMG1" ) == 0 )
 		{
@@ -3232,10 +3260,6 @@ bool C_BaseAnimating::DispatchMuzzleEffect( const char *options, bool isFirstPer
 		else if ( Q_stricmp( token, "PISTOL" ) == 0 )
 		{
 			weaponType = MUZZLEFLASH_PISTOL;
-		}
-		else if ( Q_stricmp( token, "SHOTGUN" ) == 0 )
-		{
-			weaponType = MUZZLEFLASH_SHOTGUN;
 		}
 		else if ( Q_stricmp( token, "357" ) == 0 )
 		{
@@ -3435,6 +3459,7 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 	case CL_EVENT_FOOTSTEP_LEFT:
 		{
 #ifndef HL2MP
+			//TODO; This is terrible
 			char pSoundName[256];
 			if ( !options || !options[0] )
 			{
@@ -3461,6 +3486,7 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 	case CL_EVENT_FOOTSTEP_RIGHT:
 		{
 #ifndef HL2MP
+			//TODO; This is terrible
 			char pSoundName[256];
 			if ( !options || !options[0] )
 			{
@@ -3485,25 +3511,25 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 
 	case CL_EVENT_MFOOTSTEP_LEFT:
 		{
-			MaterialFootstepSound( this, true, VOL_NORM * 0.5f );
+			MaterialFootstepSound( this, true, VOL_NORM * 0.5f );	//VOL_NORM - shouldnt this get the soundscript params???
 		}
 		break;
 
 	case CL_EVENT_MFOOTSTEP_RIGHT:
 		{
-			MaterialFootstepSound( this, false, VOL_NORM * 0.5f );
+			MaterialFootstepSound( this, false, VOL_NORM * 0.5f );	//VOL_NORM - shouldnt this get the soundscript params???
 		}
 		break;
 
 	case CL_EVENT_MFOOTSTEP_LEFT_LOUD:
 		{
-			MaterialFootstepSound( this, true, VOL_NORM );
+			MaterialFootstepSound( this, true, VOL_NORM );	//VOL_NORM - shouldnt this get the soundscript params???
 		}
 		break;
 
 	case CL_EVENT_MFOOTSTEP_RIGHT_LOUD:
 		{
-			MaterialFootstepSound( this, false, VOL_NORM );
+			MaterialFootstepSound( this, false, VOL_NORM );	//VOL_NORM - shouldnt this get the soundscript params???
 		}
 		break;
 
@@ -3570,7 +3596,7 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 
 	// OBSOLETE EVENTS. REPLACED BY NEWER SYSTEMS.
 	// See below in FireObsoleteEvent() for comments on what to use instead.
-	case AE_CLIENT_EFFECT_ATTACH:
+	case AE_CLIENT_EFFECT_ATTACH:		//Not achtually obselete???
 	case CL_EVENT_DISPATCHEFFECT0:
 	case CL_EVENT_DISPATCHEFFECT1:
 	case CL_EVENT_DISPATCHEFFECT2:
@@ -3589,7 +3615,7 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 	case CL_EVENT_NPC_MUZZLEFLASH1:
 	case CL_EVENT_NPC_MUZZLEFLASH2:
 	case CL_EVENT_NPC_MUZZLEFLASH3:
-	case CL_EVENT_SPARK0:
+	case CL_EVENT_SPARK0:				//Not achtually obselete???
 	case CL_EVENT_SOUND:
 		FireObsoleteEvent( origin, angles, event, options );
 		break;

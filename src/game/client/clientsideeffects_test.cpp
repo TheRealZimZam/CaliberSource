@@ -25,6 +25,9 @@
 //FIXME: All these functions will be moved out to FX_Main.CPP or a individual folder
 
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectsTest )
+CLIENTEFFECT_MATERIAL( "effects/tracer_middle" )
+CLIENTEFFECT_MATERIAL( "effects/tracer_middle2" )
+CLIENTEFFECT_MATERIAL( "effects/tracer_player" )
 CLIENTEFFECT_MATERIAL( "effects/spark" )
 CLIENTEFFECT_MATERIAL( "effects/gunshiptracer" )
 CLIENTEFFECT_MATERIAL( "effects/bluespark" )
@@ -154,15 +157,46 @@ void FX_PlayerTracer( Vector& start, Vector& end )
 		return;
 
 	//Randomly place the tracer along this line, with a random length
-	VectorMA( start, TRACER_BASE_OFFSET + random->RandomFloat( -24.0f, 64.0f ), shotDir, dStart );
+	VectorMA( start, TRACER_BASE_OFFSET + random->RandomFloat( -24.0f, 48.0f ), shotDir, dStart );
 	VectorMA( dStart, ( length * random->RandomFloat( 0.1f, 0.6f ) ), shotDir, dEnd );
 
 	//Create the line
 	CFXStaticLine	*t;
 	const char		*materialName;
 
-	//materialName = ( random->RandomInt( 0, 1 ) ) ? "effects/tracer_middle" : "effects/tracer_middle2";
-	materialName = "effects/spark";
+	materialName = "effects/tracer_player";
+
+	t = new CFXStaticLine( "Tracer", dStart, dEnd, random->RandomFloat( 0.35f, 0.5f ), 0.01f, materialName, 0 );
+	assert( t );
+
+	//Throw it into the list
+	clienteffects->AddEffect( t );
+}
+
+//TODO; This should be able to take color-values
+void FX_BigPlayerTracer( Vector& start, Vector& end )
+{
+	VPROF_BUDGET( "FX_BigPlayerTracer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+	Vector	shotDir, dStart, dEnd;
+	float	length;
+
+	//Find the direction of the tracer
+	VectorSubtract( end, start, shotDir );
+	length = VectorNormalize( shotDir );
+
+	//We don't want to draw them if they're too close to us
+	if ( length < 256 )
+		return;
+
+	//Randomly place the tracer along this line, with a random length
+	VectorMA( start, TRACER_BASE_OFFSET + random->RandomFloat( -24.0f, 48.0f ), shotDir, dStart );
+	VectorMA( dStart, ( length * random->RandomFloat( 0.1f, 0.6f ) ), shotDir, dEnd );
+
+	//Create the line
+	CFXStaticLine	*t;
+	const char		*materialName;
+
+	materialName = "effects/tracer_middle";
 
 	t = new CFXStaticLine( "Tracer", dStart, dEnd, random->RandomFloat( 0.5f, 0.75f ), 0.01f, materialName, 0 );
 	assert( t );
@@ -171,15 +205,11 @@ void FX_PlayerTracer( Vector& start, Vector& end )
 	clienteffects->AddEffect( t );
 }
 
-/*
-==================================================
-FX_Tracer
-==================================================
-*/
+//-----------------------------------------------------------------------------
 // Tracer must be this close to be considered for hearing
 #define	TRACER_MAX_HEAR_DIST	(6*12)
 #define TRACER_SOUND_TIME_MIN	0.1f
-#define TRACER_SOUND_TIME_MAX	0.1f
+#define TRACER_SOUND_TIME_MAX	0.3f
 
 
 class CBulletWhizTimer : public CAutoGameSystem
@@ -220,7 +250,7 @@ void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType )
 	case TRACER_TYPE_DEFAULT:
 		{
 			pszSoundName = "Bullets.DefaultNearmiss";
-			flWhizDist = 24;
+			flWhizDist = 32;	//24
 
 			Ray_t bullet, listener;
 			bullet.Init( start, end );
@@ -238,10 +268,12 @@ void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType )
 
 	case TRACER_TYPE_GUNSHIP:
 		pszSoundName = "Bullets.GunshipNearmiss";
+		flWhizDist = 48;
 		break;
 
 	case TRACER_TYPE_STRIDER:
 		pszSoundName = "Bullets.StriderNearmiss";
+		flWhizDist = 64;
 		break;
 
 	case TRACER_TYPE_WATERBULLET:
@@ -253,6 +285,7 @@ void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType )
 
 	case TRACER_TYPE_SHOTGUN:
 		pszSoundName = "Bullets.ShotgunNearmiss";
+		flWhizDist = 32;
 		break;
 
 	default:
@@ -286,12 +319,17 @@ void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType )
 	}
 
 	// FIXME: This has a bad behavior when both bullet + strider shots are whizzing by at the same time
-	// Could use different timers for the different types.
+	// Could use timers for the different types or add a priority for each type.
 
 	// Don't play another bullet whiz for this client until this time has run out
 	g_BulletWhiz.m_nextWhizTime = gpGlobals->curtime + random->RandomFloat( flMinWhizTime, flMaxWhizTime );
 }
 
+/*
+==================================================
+FX_Tracer
+==================================================
+*/
 
 void FX_Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 {
@@ -306,11 +344,15 @@ void FX_Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 	// Don't make short tracers.
 	if ( dist >= 256 )
 	{
-		float length = random->RandomFloat( 64.0f, 128.0f );
+		float length = random->RandomFloat( 64.0f, 96.0f );
 		float life = ( dist + length ) / velocity;	//NOTENOTE: We want the tail to finish its run as well
 		
 		//Add it
-		FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 0.75f, 0.9f ), life, "effects/spark" );
+		const char		*materialName;
+
+		materialName = ( random->RandomInt( 0, 1 ) ) ? "effects/tracer_middle" : "effects/tracer_middle2";
+	//	materialName = "effects/spark";
+		FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 0.25f, 0.45f ), life, materialName );
 	}
 
 	if( makeWhiz )
@@ -318,3 +360,33 @@ void FX_Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 		FX_TracerSound( start, end, TRACER_TYPE_DEFAULT );	
 	}
 }
+
+//TODO; This should be able to take color-values
+void FX_BigTracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
+{
+	VPROF_BUDGET( "FX_BigTracer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+	float dist;
+	Vector dir;
+
+	VectorSubtract( end, start, dir );
+	dist = VectorNormalize( dir );
+
+	// Don't make short tracers.
+	if ( dist >= 256 )
+	{
+		float length = random->RandomFloat( 64.0f, 128.0f );
+		float life = ( dist + length ) / velocity;	//NOTENOTE: We want the tail to finish its run as well
+		
+		//Add it
+		const char		*materialName;
+
+		materialName = ( random->RandomInt( 0, 1 ) ) ? "effects/tracer_middle" : "effects/tracer_middle2";
+		FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 0.75f, 0.85f ), life, materialName );
+	}
+
+	if( makeWhiz )
+	{
+		FX_TracerSound( start, end, TRACER_TYPE_GUNSHIP );	
+	}
+}
+

@@ -146,6 +146,7 @@ C_SmokeTrail::C_SmokeTrail()
 {
 	m_MaterialHandle[0] = NULL;
 	m_MaterialHandle[1] = NULL;
+	m_MaterialHandle[2] = NULL;
 
 	m_SpawnRate = 10;
 	m_ParticleSpawn.Init(10);
@@ -264,7 +265,8 @@ void C_SmokeTrail::Start( CParticleMgr *pParticleMgr, IPrototypeArgAccess *pArgs
 
 	m_MaterialHandle[0] = g_Mat_DustPuff[0];
 	m_MaterialHandle[1] = g_Mat_DustPuff[1];
-	
+	m_MaterialHandle[2] = g_Mat_DustPuff[2];
+
 	m_ParticleSpawn.Init( m_SpawnRate );
 }
 
@@ -306,7 +308,7 @@ void C_SmokeTrail::Update( float fTimeDelta )
 		offset += vecOrigin;
 		VectorMA( offset, fldt, GetAbsVelocity(), offset );
 
-		pParticle = (SimpleParticle *) m_pSmokeEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,1)], offset );
+		pParticle = (SimpleParticle *) m_pSmokeEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,2)], offset );
 
 		if ( pParticle == NULL )
 			continue;
@@ -535,10 +537,11 @@ C_RocketTrail::C_RocketTrail()
 {
 	m_MaterialHandle[0] = NULL;
 	m_MaterialHandle[1] = NULL;
-	
+	m_MaterialHandle[2] = NULL;
+
 	m_SpawnRate = 10;
 	m_ParticleSpawn.Init(10);
-	m_StartColor.Init(0.5, 0.5, 0.5);
+	m_StartColor.Init(0.75, 0.75, 0.75);	//.5
 	m_EndColor.Init(0,0,0);
 	m_ParticleLifetime = 5;
 	m_StopEmitTime = 0;	// No end time
@@ -641,6 +644,7 @@ void C_RocketTrail::Start( CParticleMgr *pParticleMgr, IPrototypeArgAccess *pArg
 
 	m_MaterialHandle[0] = g_Mat_DustPuff[0];
 	m_MaterialHandle[1] = g_Mat_DustPuff[1];
+	m_MaterialHandle[2] = g_Mat_DustPuff[2];
 	
 	m_ParticleSpawn.Init( m_SpawnRate );
 
@@ -729,7 +733,7 @@ void C_RocketTrail::Update( float fTimeDelta )
 
 			//debugoverlay->AddBoxOverlay( offset, -Vector(2,2,2), Vector(2,2,2), vec3_angle, i*4, i*4, i*4, true, 4.0f );
 			
-			pParticle = (SimpleParticle *) m_pRocketEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,1)], offset );
+			pParticle = (SimpleParticle *) m_pRocketEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,2)], offset );
 
 			if ( pParticle != NULL )
 			{
@@ -738,7 +742,8 @@ void C_RocketTrail::Update( float fTimeDelta )
 
 				pParticle->m_vecVelocity.Random( -1.0f, 1.0f );
 				pParticle->m_vecVelocity *= random->RandomFloat( m_MinSpeed, m_MaxSpeed );
-				
+
+				//TODO; This smoke needs to be a bit darker-exhaust smoke isnt white
 				offsetColor = m_StartColor * random->RandomFloat( 0.75f, 1.25f );
 
 				offsetColor[0] = clamp( offsetColor[0], 0.0f, 1.0f );
@@ -1728,7 +1733,8 @@ void C_DustTrail::OnDataChanged(DataUpdateType_t updateType)
 
 // FIXME: These all have to be moved out of this old system and into the new to leverage art assets!
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectDusttrail )
-CLIENTEFFECT_MATERIAL( "particle/smokesprites_0001" )
+//The hell?? particle/smokesprites doesnt even exist?!
+CLIENTEFFECT_MATERIAL( "particle/particle_smokegrenade" )	//smokesprites_0001
 /*
 CLIENTEFFECT_MATERIAL( "particle/smokesprites_0002" )
 CLIENTEFFECT_MATERIAL( "particle/smokesprites_0003" )
@@ -1775,7 +1781,7 @@ void C_DustTrail::Start( CParticleMgr *pParticleMgr, IPrototypeArgAccess *pArgs 
 	{
 		//char name[256];
 		//Q_snprintf( name, sizeof( name ), "particle/smokesprites_%04d", i + 1 );
-		m_MaterialHandle[i] = m_pDustEmitter->GetPMaterial( "particle/smokesprites_0001" );
+		m_MaterialHandle[i] = m_pDustEmitter->GetPMaterial( "particle/particle_smokegrenade" );	//smokesprites_0001
 	}
 	
 	m_ParticleSpawn.Init( m_SpawnRate );
@@ -1822,7 +1828,7 @@ void C_DustTrail::Update( float fTimeDelta )
 		//if ( random->RandomFloat( 0.f, 5.0f ) > GetAbsVelocity().Length())
 		//	continue;
 
-		pParticle = (SimpleParticle *) m_pDustEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,0)], offset ); // FIXME: the other sprites look bad
+		pParticle = (SimpleParticle *) m_pDustEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,0)], offset );
 
 		if ( pParticle == NULL )
 			continue;
@@ -1923,7 +1929,7 @@ void C_DustTrail::CleanupToolRecordingState( KeyValues *msg )
 		msg->SetFloat( "time", gpGlobals->curtime );
 
 		KeyValues *pEmitter = msg->FindKey( "DmeSpriteEmitter", true );
-		pEmitter->SetString( "material", "particle/smokesprites_0001" );
+		pEmitter->SetString( "material", "particle/particle_smokegrenade" );
 		pEmitter->SetInt( "count", m_SpawnRate );	// particles per second, when duration is < 0
 		pEmitter->SetFloat( "duration", -1 ); // FIXME
 		pEmitter->SetInt( "active", bEmitterActive );

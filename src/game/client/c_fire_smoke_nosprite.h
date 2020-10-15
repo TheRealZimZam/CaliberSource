@@ -84,14 +84,14 @@ class C_FireFromAboveSprite : public C_Sprite
 
 #ifdef _XBOX
 // XBox reduces the flame count
-#define	NUM_CHILD_FLAMES	2
+#define	NUM_CHILD_FLAMES	1
 #else
-#define	NUM_CHILD_FLAMES	6	//Was 4 - this should be perf related
+#define	NUM_CHILD_FLAMES	4
 #endif
 
 #define	SMOKE_RISE_RATE		92.0f
-#define	SMOKE_LIFETIME		2.5f
-#define	EMBER_LIFETIME		3.0f
+#define	SMOKE_LIFETIME		2.0f
+#define	EMBER_LIFETIME		2.0f
 
 #define	FLAME_CHILD_SPREAD	64.0f
 #define	FLAME_SOURCE_HEIGHT	128.0f
@@ -108,6 +108,8 @@ class C_FireFromAboveSprite : public C_Sprite
 #define	bitsFIRESMOKE_SMOKE_COLLISION		0x00000004
 #define	bitsFIRESMOKE_GLOW					0x00000008
 #define	bitsFIRESMOKE_VISIBLE_FROM_ABOVE	0x00000010
+
+#define	OVERLAY_MAX_VISIBLE_RANGE	512.0f
 
 
 class C_FireSmoke : public C_BaseEntity
@@ -170,7 +172,7 @@ protected:
 
 	void	UpdateEffects( void );
 
-	CSmartPtr<CEmberEffect> m_pEmberEmitter;
+	//CSmartPtr<CEmberEffect> m_pEmberEmitter;
 	CSmartPtr<CLitSmokeEmitter> m_pSmokeEmitter;
 
 	C_FireSprite			m_entFlames[NUM_CHILD_FLAMES];
@@ -181,15 +183,13 @@ protected:
 
 	CFireOverlay		*m_pFireOverlay;
 
+	// New Particle Fire Effect
+	CNewParticleEffect *m_hEffect;
 private:
 	C_FireSmoke( const C_FireSmoke & );
 };
 
-
 //Fire overlay
-
-#define	OVERLAY_MAX_VISIBLE_RANGE	512.0f
-
 class CFireOverlay : public CGlowOverlay
 {
 public:
@@ -233,7 +233,7 @@ public:
 		m_vPos[2] += dscale * FLAME_SOURCE_HEIGHT;
 		m_flScale = scale;
 
-//		scale *= 0.75f;
+		scale *= 0.75f;
 
 		float flickerScale = GetFlickerScale();
 
@@ -244,13 +244,11 @@ public:
 		
 		float	cameraDistance = ( CurrentViewOrigin() - (m_pOwner->GetAbsOrigin())).Length();
 
-#if 1
 		C_BasePlayer *local = C_BasePlayer::GetLocalPlayer();
 		if ( local )
 		{
 			cameraDistance *= local->GetFOVDistanceAdjustFactor();
 		}
-#endif
 
 		if ( cameraDistance > OVERLAY_MAX_VISIBLE_RANGE )
 			cameraDistance = OVERLAY_MAX_VISIBLE_RANGE;
@@ -286,41 +284,19 @@ public:
 	C_EntityFlame( void );
 	~C_EntityFlame( void );
 
-	void UpdateOnRemove( void );
-	void CleanUpRagdollOnRemove( void );
-	void OnDataChanged( DataUpdateType_t updateType );
-	RenderGroup_t GetRenderGroup();
-	void Simulate( void );
-
-	EHANDLE			m_hEntAttached;				// The entity that we are burning (attached to).
-	bool			m_bUseHitboxes;
-	bool			m_bCreatedClientside;
+	virtual void	Simulate( void );
+	virtual void	UpdateOnRemove( void );
+	virtual void	OnDataChanged( DataUpdateType_t updateType );
 	virtual void	ClientThink( void );
 
-	C_FireSmoke *m_pFireSmoke[NUM_HITBOX_FIRES];
+	CNewParticleEffect *m_hEffect;
+	EHANDLE				m_hEntAttached;		// The entity that we are burning (attached to).
+	EHANDLE				m_hOldAttached;
 
 protected:
 
-	void AttachToHitBoxes( void );
-	void UpdateHitBoxFlames( void );
-	void DeleteHitBoxFlames( void );
-
-	float			m_flSize;
-	CSmartPtr<CEmberEffect> m_pEmitter;
-	TimedEvent		m_ParticleSpawn;
-	bool			m_bAttachedToHitboxes;
-	float			m_flLifetime;
-	bool			m_bStartedFading;
-
-	const model_t	*m_pCachedModel;				// Holds the model pointer to detect when it changes
-
-	Vector			m_vecLastPosition;
-
-	PMaterialHandle	m_MaterialHandle[NUM_FLAMELETS];
-
-	// For attaching to the hitboxes of an animating model.
-	Vector m_vecFireOrigin[NUM_HITBOX_FIRES];
-	int m_nHitbox[NUM_HITBOX_FIRES];
+	void	CreateEffect( void );
+	void	StopEffect( void );
 };
 
 #endif //C_FIRE_SMOKE_H

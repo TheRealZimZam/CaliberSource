@@ -204,6 +204,14 @@ bool CExplosionOverlay::Update( void )
 	return false;
 }
 
+#if 0
+void CExplosionOverlay::Draw( void )
+{
+	m_Sprites[i].m_pMaterial = ParticleMgr()->GetPMaterial( "effects/flare" );
+
+	return BaseClass::Draw();
+}
+#endif
 
 //-----------------------------------------------------------------------------
 // Recording 
@@ -267,7 +275,8 @@ void C_TEExplosion::PostDataUpdate( DataUpdateType_t updateType )
 			pOverlay->m_flLifetime	= 0;
 			pOverlay->m_vPos		= m_vecOrigin;
 			pOverlay->m_nSprites	= 1;
-			
+
+		//	pOverlay->m_Sprites[0].m_pMaterial = materials->FindMaterial( "effects/flare", TEXTURE_GROUP_CLIENT_EFFECTS );
 			pOverlay->m_vBaseColors[0].Init( 1.0f, 0.9f, 0.7f );
 
 			pOverlay->m_Sprites[0].m_flHorzSize = 0.05f;

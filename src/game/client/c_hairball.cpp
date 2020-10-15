@@ -329,7 +329,7 @@ int C_Hairball::DrawModel( int flags )
 
 void CreateHairballCallback()
 {
-	for ( int i=0; i < 20; i++ )
+	for ( int i=0; i < 10; i++ )
 	{
 		C_Hairball *pHairball = new C_Hairball;
 		pHairball->Init();

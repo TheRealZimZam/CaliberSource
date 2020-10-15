@@ -33,6 +33,8 @@ CLIENTEFFECT_MATERIAL( "effects/fleck_wood2" )
 CLIENTEFFECT_MATERIAL( "effects/blood" )
 CLIENTEFFECT_MATERIAL( "effects/blood2" )
 CLIENTEFFECT_MATERIAL( "sprites/bloodspray" )
+CLIENTEFFECT_MATERIAL( "particle/particle_smokegrenade" )
+CLIENTEFFECT_MATERIAL( "particle/particle_smokegrenade2" )
 CLIENTEFFECT_MATERIAL( "particle/particle_noisesphere" )
 CLIENTEFFECT_REGISTER_END()
 
@@ -42,10 +44,12 @@ PMaterialHandle g_Mat_Fleck_Cement[2] = { NULL, NULL };
 PMaterialHandle g_Mat_Fleck_Antlion[2] = { NULL, NULL };
 PMaterialHandle g_Mat_Fleck_Glass[2] = { NULL, NULL };
 PMaterialHandle g_Mat_Fleck_Tile[2] = { NULL, NULL };
-PMaterialHandle g_Mat_DustPuff[2] = { NULL, NULL };
+PMaterialHandle g_Mat_DustPuff[3] = { NULL, NULL, NULL };
 PMaterialHandle g_Mat_BloodPuff[2] = { NULL, NULL };
+#ifndef TF_CLIENT_DLL
 PMaterialHandle g_Mat_SMG_Muzzleflash[4] = { NULL, NULL, NULL, NULL };
 PMaterialHandle g_Mat_Combine_Muzzleflash[3] = { NULL, NULL, NULL };
+#endif
 
 static ConVar fx_drawimpactdebris( "fx_drawimpactdebris", "1", FCVAR_DEVELOPMENTONLY, "Draw impact debris effects." );
 static ConVar fx_drawimpactdust( "fx_drawimpactdust", "1", FCVAR_DEVELOPMENTONLY, "Draw impact dust effects." );
@@ -69,6 +73,7 @@ void FX_CacheMaterialHandles( void )
 
 	g_Mat_DustPuff[0] = ParticleMgr()->GetPMaterial( "particle/particle_smokegrenade" );
 	g_Mat_DustPuff[1] = ParticleMgr()->GetPMaterial( "particle/particle_noisesphere" );
+	g_Mat_DustPuff[2] = ParticleMgr()->GetPMaterial( "particle/particle_smokegrenade2" );
 
 	g_Mat_BloodPuff[0] = ParticleMgr()->GetPMaterial( "effects/blood" );
 	g_Mat_BloodPuff[1] = ParticleMgr()->GetPMaterial( "effects/blood2" );
@@ -392,7 +397,6 @@ void FX_DebrisFlecks( const Vector& origin, trace_t *tr, char materialType, int 
 
 		AddSimpleParticle( &newParticle, g_Mat_DustPuff[0] );
 	}
-
 
 	for ( i = 0; i < 4; i++ )
 	{
@@ -719,7 +723,7 @@ void FX_AntlionImpact( const Vector &pos, trace_t *trace )
 			break;
 
 		pParticle->m_flLifetime	= 0.0f;
-		pParticle->m_flDieTime	= 1.0f;
+		pParticle->m_flDieTime	= 0.35f;
 		
 		dir[0] = shotDir[0] + random->RandomFloat( -0.8f, 0.8f );
 		dir[1] = shotDir[1] + random->RandomFloat( -0.8f, 0.8f );
@@ -873,7 +877,7 @@ void FX_BugBlood( Vector &pos, Vector &dir, Vector &vWorldMins, Vector &vWorldMa
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Blood puff
+// Purpose: Old Blood puff
 //-----------------------------------------------------------------------------
 void FX_Blood( Vector &pos, Vector &dir, float r, float g, float b, float a )
 {

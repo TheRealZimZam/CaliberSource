@@ -198,6 +198,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 		pSimple->SetGravity( 0 );
 
 		PMaterialHandle	hMaterial;
+		int	numBlood = random->RandomInt( 6, 8 );
 
 		//
 		// Tight blossom of blood at the center.
@@ -208,7 +209,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 
 			SimpleParticle *pParticle;
 
-			for ( i = 0; i < 6; i++ )
+			for ( i = 0; i < numBlood; i++ )
 			{
 				// Originate from within a circle 'scale' inches in diameter.
 				offset = origin + ( 0.5 * scale * normal );
@@ -254,7 +255,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 
 			SimpleParticle *pParticle;
 
-			for ( i = 0; i < 6; i++ )
+			for ( i = 0; i < numBlood; i++ )
 			{
 				// Originate from within a circle '2 * scale' inches in diameter.
 				offset = origin + ( scale * normal );
@@ -281,7 +282,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 					pParticle->m_uchStartSize	= random->RandomFloat( scale * 1.5f, scale * 2.0f );
 					pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 4;
 					
-					pParticle->m_uchStartAlpha	= random->RandomInt( 80, 128 );
+					pParticle->m_uchStartAlpha	= random->RandomInt( 96, 128 );
 					pParticle->m_uchEndAlpha	= 0;
 					
 					pParticle->m_flRoll			= random->RandomInt( 0, 360 );
@@ -463,6 +464,142 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 	//C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, CHAN_VOICE, "Physics.WaterSplash", 1.0, ATTN_NORM, 0, 100, &origin );
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose: GIB effect - WIP
+// Input  : &origin - 
+//			&normal - 
+//			scale - 
+//			r - 
+//			g - 
+//			b - 
+//			flags - 
+//-----------------------------------------------------------------------------
+
+void FX_Gib( const Vector &origin, const Vector &normal, float scale, unsigned char r, unsigned char g, unsigned char b )
+{
+	if ( UTIL_IsLowViolence() )
+		return;
+
+	Vector offset;
+	float spread	= 0.2f;
+	
+	//Find area ambient light color and use it to slightly tint blood
+	Vector worldLight = WorldGetLightForPoint( origin, true );
+	Vector color = Vector( (float)(worldLight[0] * r) / 128.0f, (float)(worldLight[1] * g) / 128.0f, (float)(worldLight[2] * b) / 128.0f );
+	float colorRamp;
+
+	int i;
+
+	Vector	offDir;
+
+	Vector right;
+	Vector up;
+
+	if (normal != Vector(0, 0, 1) )
+	{
+		right = normal.Cross( Vector(0, 0, 1) );
+		up = right.Cross( normal );
+	}
+	else
+	{
+		right = Vector(0, 0, 1);
+		up = right.Cross( normal );
+	}
+
+	CSmartPtr<CBloodSprayEmitter> pSimple = CBloodSprayEmitter::Create( "bloodgib" );
+	if ( !pSimple )
+		return;
+
+	pSimple->SetSortOrigin( origin );
+	pSimple->SetGravity( 0 );
+
+	PMaterialHandle	hMaterial;
+
+	//
+	// Tight chunk of blood in the center
+	//
+	hMaterial = ParticleMgr()->GetPMaterial( "effects/blood_gore" );
+
+	SimpleParticle *pParticle;
+
+	for ( i = 0; i < 6; i++ )
+	{
+		// Originate from within a circle 'scale' inches in diameter.
+		offset = origin + ( 0.5 * scale * normal );
+		offset += right * random->RandomFloat( -0.5f, 0.5f ) * scale;
+		offset += up * random->RandomFloat( -0.5f, 0.5f ) * scale;
+
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial, offset );
+
+		if ( pParticle != NULL )
+		{
+			pParticle->m_flLifetime = 0.0f;
+			pParticle->m_flDieTime	= 0.3f;
+
+			spread = 0.2f;
+			pParticle->m_vecVelocity.Random( -spread, spread );
+			pParticle->m_vecVelocity += normal * random->RandomInt( 10, 100 );
+			//VectorNormalize( pParticle->m_vecVelocity );
+
+			colorRamp = random->RandomFloat( 0.75f, 1.25f );
+
+			pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
+			pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
+			pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
+	
+			pParticle->m_uchStartSize	= random->RandomFloat( scale * 0.5, scale );
+			pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 3;
+		
+			pParticle->m_uchStartAlpha	= random->RandomInt( 200, 255 );
+			pParticle->m_uchEndAlpha	= 0;
+	
+			pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+			pParticle->m_flRollDelta	= 0.0f;
+		}
+	}
+
+	//
+	// Cloud of blood
+	//
+	hMaterial = ParticleMgr()->GetPMaterial( "effects/blood_puff" );
+
+	for ( i = 0; i < 6; i++ )
+	{
+		// Originate from within a circle '2 * scale' inches in diameter.
+		offset = origin + ( scale * normal );
+		offset += right * random->RandomFloat( -1, 1 ) * scale;
+		offset += up * random->RandomFloat( -1, 1 ) * scale;
+
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial, offset );
+
+		if ( pParticle != NULL )
+		{
+			pParticle->m_flLifetime = 0.0f;
+			pParticle->m_flDieTime	= random->RandomFloat( 1.0f, 1.5f);
+
+			spread = 0.5f;
+			pParticle->m_vecVelocity.Random( -spread, spread );
+			pParticle->m_vecVelocity += normal * random->RandomInt( 100, 200 );
+
+			colorRamp = random->RandomFloat( 0.75f, 1.25f );
+
+			pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
+			pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
+			pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
+					
+			pParticle->m_uchStartSize	= random->RandomFloat( scale * 1.5f, scale * 2.0f );
+			pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 4;
+					
+			pParticle->m_uchStartAlpha	= random->RandomInt( 96, 128 );
+			pParticle->m_uchEndAlpha	= 0;
+					
+			pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+			pParticle->m_flRollDelta	= 0.0f;
+		}
+	}
+}
+
 // FIXME: This will be simplified when the initializer can take color parameters as an input
 //	      For now, we use different systems
 
@@ -501,10 +638,13 @@ DECLARE_CLIENT_EFFECT( "bloodspray", BloodSprayCallback );
 //-----------------------------------------------------------------------------
 void BloodImpactCallback( const CEffectData & data )
 {
-/*
+#if 0
 	bool bFoundBlood = false;
-
-	// Find which sort of blood we are
+	/*
+	BFoundBlood is really misleading - it doesnt check if the effect exists,
+	just the color. Because of this, it will almost always default to the
+	particle system, which in most cases actually looks somewhat worse.
+	*/
 
 	for ( int i = 0; i < ARRAYSIZE( bloodCallbacks ); i++ )
 	{
@@ -520,7 +660,7 @@ void BloodImpactCallback( const CEffectData & data )
 
 	if ( bFoundBlood == false )
 	{
-*/
+#endif
 // Until there's some better PFX available, use the old system
 		Vector vecPosition;
 		vecPosition = data.m_vOrigin;
@@ -593,3 +733,17 @@ void HunterDamageCallback( const CEffectData &data )
 }
 
 DECLARE_CLIENT_EFFECT( "HunterDamage", HunterDamageCallback );
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : &data - 
+//-----------------------------------------------------------------------------
+void GibCallback( const CEffectData &data )
+{
+	colorentry_t color;
+
+	GetBloodColor( data.m_nColor, color );
+	FX_Gib( data.m_vOrigin, data.m_vNormal, data.m_flScale, color.r, color.g, color.b );
+}
+
+DECLARE_CLIENT_EFFECT( "Gib", GibCallback );

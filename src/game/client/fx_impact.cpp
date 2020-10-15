@@ -6,6 +6,7 @@
 #include "cbase.h"
 #include "decals.h"
 #include "materialsystem/IMaterialVar.h"
+//#include "c_splash.h"
 #include "ieffects.h"
 #include "fx.h"
 #include "fx_impact.h"
@@ -184,10 +185,77 @@ char const *GetImpactDecal( C_BaseEntity *pEntity, int iMaterial, int iDamageTyp
 	return decalsystem->TranslateDecalForGameMaterial( decalName, iMaterial );
 }
 
+//------------------------------------------------------------------------------
+// Purpose : Create leak effect if material requests it
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void LeakEffect( trace_t &tr )
+{
+	#if 0
+	Vector			diffuseColor, baseColor;
+	Vector			vTraceDir	= (tr.endpos - tr.startpos);
+	VectorNormalize(vTraceDir);
+	Vector			vTraceStart = tr.endpos - 0.1*vTraceDir;
+	Vector			vTraceEnd	= tr.endpos + 0.1*vTraceDir;
+	IMaterial*		pTraceMaterial = engine->TraceLineMaterialAndLighting( vTraceStart, vTraceEnd, diffuseColor, baseColor );
+
+	if (!pTraceMaterial)
+		return;
+
+	bool			found;
+	IMaterialVar	*pLeakVar = pTraceMaterial->FindVar( "$leakamount", &found, false );
+	if( !found )
+		return;
+
+	C_Splash* pLeak = new C_Splash();
+	if (!pLeak)
+		return;
+
+	ClientEntityList().AddNonNetworkableEntity( pLeak->GetIClientUnknown() );
+
+	IMaterialVar*	pLeakColorVar = pTraceMaterial->FindVar( "$leakcolor", &found );
+	if (found)
+	{
+		Vector color;
+		pLeakColorVar->GetVecValue(color.Base(),3);
+		pLeak->m_vStartColor = pLeak->m_vEndColor = color;
+	}
+
+	IMaterialVar*	pLeakNoiseVar = pTraceMaterial->FindVar( "$leaknoise", &found );
+	if (found)
+	{
+		pLeak->m_flNoise = pLeakNoiseVar->GetFloatValue();
+	}
+
+	IMaterialVar*	pLeakForceVar = pTraceMaterial->FindVar( "$leakforce", &found );
+	if (found)
+	{
+		float flForce = pLeakForceVar->GetFloatValue();
+		pLeak->m_flSpeed		 = flForce;
+		pLeak->m_flSpeedRange	 = pLeak->m_flNoise * flForce;
+	}
+
+	pLeak->m_flSpawnRate		= pLeakVar->GetFloatValue();;
+	pLeak->m_flParticleLifetime = 10;
+	pLeak->m_flWidthMin			= 1;
+	pLeak->m_flWidthMax			= 5;
+	pLeak->SetLocalOrigin( tr.endpos );
+	
+	QAngle angles;
+	VectorAngles( tr.plane.normal, angles );
+	pLeak->SetLocalAngles( angles );
+
+	pLeak->Start(&g_ParticleMgr, NULL);
+	pLeak->m_flStopEmitTime	= gpGlobals->curtime+5.0;
+	pLeak->SetNextClientThink(gpGlobals->curtime+20.0);
+	#endif
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Perform custom effects based on the Decal index
 //-----------------------------------------------------------------------------
-static ConVar cl_new_impact_effects( "cl_new_impact_effects", "0" );
+static ConVar cl_new_impact_effects( "cl_new_impact_effects", "0" );	//Use the new particle system
 
 struct ImpactEffect_t
 {
@@ -298,7 +366,7 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 		bNoFlecks = ( ( nFlags & FLAGS_CUSTIOM_EFFECTS_NOFLECKS ) != 0  );
 	}
 
-	// Cement and wood have dust and flecks
+	// TODO; CHAR_TEX_FLESH, CHAR_TEX_FOLIAGE
 	if ( ( iMaterial == CHAR_TEX_CONCRETE ) || ( iMaterial == CHAR_TEX_TILE ) )
 	{
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
@@ -311,7 +379,7 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 	{
 		FX_DustImpact( vecOrigin, &tr, iScale );
 	}
-	else if ( iMaterial == CHAR_TEX_ANTLION )
+	else if ( ( iMaterial == CHAR_TEX_ANTLION ) || ( iMaterial == CHAR_TEX_EGGSHELL ) )
 	{
 		FX_AntlionImpact( vecOrigin, &tr );
 	}
@@ -339,6 +407,11 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 		VectorAngles( -shotDir, vecAngles );
 		DispatchParticleEffect( "warp_shield_impact", vecOrigin, vecAngles );
 	}
+
+	//---------------------------
+	// Do leak effect
+	//---------------------------
+	LeakEffect(tr);
 }
 
 //-----------------------------------------------------------------------------

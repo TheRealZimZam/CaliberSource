@@ -115,6 +115,49 @@ DECLARE_CLIENT_EFFECT( "Tracer", TracerCallback );
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+void BigTracerCallback( const CEffectData &data )
+{
+	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
+	if ( !player )
+		return;
+
+	// Grab the data
+	Vector vecStart = GetTracerOrigin( data );
+	float flVelocity = data.m_flScale;
+	bool bWhiz = (data.m_fFlags & TRACER_FLAG_WHIZ);
+	int iEntIndex = data.entindex();
+
+	if ( iEntIndex && iEntIndex == player->index )
+	{
+		Vector	foo = data.m_vStart;
+		QAngle	vangles;
+		Vector	vforward, vright, vup;
+
+		engine->GetViewAngles( vangles );
+		AngleVectors( vangles, &vforward, &vright, &vup );
+
+		VectorMA( data.m_vStart, 4, vright, foo );
+		foo[2] -= 0.5f;
+
+		FX_BigPlayerTracer( foo, (Vector&)data.m_vOrigin );
+		return;
+	}
+	
+	// Use default velocity if none specified
+	if ( !flVelocity )
+	{
+		flVelocity = TRACER_SPEED;
+	}
+
+	// Do tracer effect
+	FX_BigTracer( (Vector&)vecStart, (Vector&)data.m_vOrigin, flVelocity, bWhiz );
+}
+
+DECLARE_CLIENT_EFFECT( "BigTracer", BigTracerCallback );
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
 void ParticleTracerCallback( const CEffectData &data )
 {
 	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();

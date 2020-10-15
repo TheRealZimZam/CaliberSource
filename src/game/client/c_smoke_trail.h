@@ -93,7 +93,7 @@ public:
 private:
 	C_SmokeTrail( const C_SmokeTrail & );
 
-	PMaterialHandle	m_MaterialHandle[2];
+	PMaterialHandle	m_MaterialHandle[3];
 	TimedEvent		m_ParticleSpawn;
 
 	CParticleMgr	*m_pParticleMgr;
@@ -172,7 +172,7 @@ public:
 private:
 	C_RocketTrail( const C_RocketTrail & );
 
-	PMaterialHandle	m_MaterialHandle[2];
+	PMaterialHandle	m_MaterialHandle[3];
 	TimedEvent		m_ParticleSpawn;
 
 	CParticleMgr	*m_pParticleMgr;

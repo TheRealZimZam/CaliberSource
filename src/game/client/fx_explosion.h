@@ -38,10 +38,10 @@ protected:
 
 	virtual void	PlaySound( void );
 
-	virtual void	CreateCore( void );
+	virtual void	CreateCore( float scale );
 	virtual void	CreateDebris( void );
 	virtual void	CreateMisc( void );
-	virtual void	CreateDynamicLight( void );
+	virtual void	CreateDynamicLight( float scale );
 
 	float			ScaleForceByDeviation( Vector &deviant, Vector &source, float spread, float *force = NULL );
 
@@ -58,6 +58,7 @@ protected:
 	PMaterialHandle	m_Material_Smoke;
 	PMaterialHandle m_Material_Embers[2];
 	PMaterialHandle m_Material_FireCloud;
+	PMaterialHandle m_Material_FireSpark;
 };
 
 //Singleton accessor
@@ -73,6 +74,7 @@ class CExplosionOverlay : public CWarpOverlay
 public:
 	
 	virtual bool Update( void );
+//	virtual void Draw( );
 
 public:
 
@@ -93,7 +95,7 @@ public:
 	virtual void	Create( const Vector &position, float force, float scale, int flags );
 
 protected:
-	virtual void	CreateCore( void );
+	virtual void	CreateCore( float scale );
 	virtual void	CreateDebris( void );
 	virtual void	CreateMisc( void );
 	virtual void	PlaySound( void );
@@ -111,7 +113,7 @@ private:
 extern C_WaterExplosionEffect &WaterExplosionEffect( void );
 
 //-----------------------------------------------------------------------------
-// Purpose: Water explosion
+// Purpose: The explosion the big bad-guy meets deadus maximus in
 //-----------------------------------------------------------------------------
 class C_MegaBombExplosionEffect : public C_BaseExplosionEffect
 {
@@ -122,6 +124,7 @@ public:
 protected:
 	virtual void	CreateCore( void );
 
+	//These need to be created??
 	virtual void	CreateDebris( void ) { };
 	virtual void	CreateMisc( void ) { };
 	virtual void	PlaySound( void ) { };

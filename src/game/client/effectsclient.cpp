@@ -207,6 +207,7 @@ void CEffectsClient::Ricochet( const Vector &position, const Vector &direction )
 	if ( !SuppressTE( filter ) )
 	{
 		FX_MetalSpark( position, direction, direction );
+		FX_RicochetSpark( position, direction, direction );	//Played ontop of metal spark
 
 		if ( !m_bSuppressSound )
 		{

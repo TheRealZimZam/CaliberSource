@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: This probably doesnt need to exist??
 //
 // $NoKeywords: $
 //=============================================================================//

@@ -128,7 +128,7 @@ void FX_ThumperDust( const CEffectData &data )
 
 		offset = ( RandomVector( -4.0f, 4.0f ) + data.m_vOrigin ) + ( forward * 128.0f );
 
-		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof(SimpleParticle), g_Mat_DustPuff[random->RandomInt(0,1)], offset );
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof(SimpleParticle), g_Mat_DustPuff[random->RandomInt(0,2)], offset );
 		if ( pParticle != NULL )
 		{	
 			pParticle->m_flLifetime		= 0.0f;

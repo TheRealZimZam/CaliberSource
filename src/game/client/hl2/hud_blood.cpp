@@ -14,7 +14,7 @@
 
 void BloodSplatCallback( const CEffectData & data )
 {
-/*
+
 	Msg("SPLAT!\n");
 
 	int		x,y;
@@ -28,7 +28,7 @@ void BloodSplatCallback( const CEffectData & data )
 	
   // FIXME:  This can only occur during vgui::Paint() stuff
 	pSplat->DrawSelf( x, y, gHUD.m_clrNormal);
-*/
+
 }
 
 DECLARE_CLIENT_EFFECT( "HudBloodSplat", BloodSplatCallback );

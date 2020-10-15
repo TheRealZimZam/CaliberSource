@@ -30,7 +30,6 @@ CLIENTEFFECT_MATERIAL( "effects/ar2_tracer" )
 CLIENTEFFECT_MATERIAL( "effects/ar2_tracer_player" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle2_nocull" )
-CLIENTEFFECT_MATERIAL( "effects/fire_cloud3_nocull" )
 CLIENTEFFECT_MATERIAL( "effects/ar2_impact" )
 CLIENTEFFECT_REGISTER_END()
 
@@ -84,6 +83,51 @@ void GaussTracerCallback( const CEffectData &data )
 }
 
 DECLARE_CLIENT_EFFECT( "GaussTracer", GaussTracerCallback );
+
+
+//-----------------------------------------------------------------------------
+// Purpose: Shotgun tracer
+//-----------------------------------------------------------------------------
+void ShotgunTracerCallback( const CEffectData &data )
+{
+	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
+	
+	if ( player == NULL )
+		return;
+
+	// Grab the data
+	Vector vecStart = GetTracerOrigin( data );
+	float flVelocity = data.m_flScale;
+	bool bWhiz = (data.m_fFlags & TRACER_FLAG_WHIZ);
+	int iEntIndex = data.entindex();
+
+	if ( iEntIndex && iEntIndex == player->index )
+	{
+		Vector	foo = data.m_vStart;
+		QAngle	vangles;
+		Vector	vforward, vright, vup;
+
+		engine->GetViewAngles( vangles );
+		AngleVectors( vangles, &vforward, &vright, &vup );
+
+		VectorMA( data.m_vStart, 4, vright, foo );
+		foo[2] -= 0.5f;
+
+		FX_PlayerShotgunTracer( foo, (Vector&)data.m_vOrigin );
+		return;
+	}
+	
+	// Use default velocity if none specified
+	if ( !flVelocity )
+	{
+		flVelocity = 5000;
+	}
+
+	// Do tracer effect
+	FX_ShotgunTracer( (Vector&)data.m_vStart, (Vector&)data.m_vOrigin, flVelocity, bWhiz );
+}
+
+DECLARE_CLIENT_EFFECT( "ShotgunTracer", ShotgunTracerCallback );
 
 
 //-----------------------------------------------------------------------------
@@ -194,7 +238,7 @@ DECLARE_CLIENT_EFFECT( "HelicopterTracer", HelicopterTracerCallback );
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : start - 
-//			end - 
+// TODO; This needs a Dlight
 //-----------------------------------------------------------------------------
 void FX_PlayerAR2Tracer( const Vector &start, const Vector &end )
 {
@@ -227,9 +271,7 @@ void FX_PlayerAR2Tracer( const Vector &start, const Vector &end )
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : start - 
-//			end - 
-//			velocity - 
-//			makeWhiz - 
+// TODO; This needs a Dlight
 //-----------------------------------------------------------------------------
 void FX_AR2Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 {
@@ -248,9 +290,9 @@ void FX_AR2Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 
 	float length = random->RandomFloat( 128.0f, 256.0f );
 	float life = ( dist + length ) / velocity;	//NOTENOTE: We want the tail to finish its run as well
-	
+
 	//Add it
-	FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 0.5f, 1.5f ), life, "effects/ar2_tracer" );
+	FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 1.0f, 1.5f ), life, "effects/ar2_tracer" );
 
 	if( makeWhiz )
 	{
@@ -259,7 +301,7 @@ void FX_AR2Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Callback the lil' mini rocket
 //-----------------------------------------------------------------------------
 void AR2TracerCallback( const CEffectData &data )
 {
@@ -419,10 +461,7 @@ void AR2ImpactCallback( const CEffectData &data )
 				random->RandomInt( 0, 360 ), 
 				0,
 				Vector( 1.0f, 1.0f, 1.0f ), 
-				0.25f, 
-//				"effects/combinemuzzle2_nocull",
-				// Too firey, needs more smoke instead
-//				"effects/fire_cloud3_nocull",
+				0.25f,
 				"effects/ar2_impact",
 				(FXQUAD_BIAS_SCALE|FXQUAD_BIAS_ALPHA) );
 	// Create an elight
@@ -712,13 +751,45 @@ void MuzzleFlash_Hunter( ClientEntityHandle_t hEntity, int attachmentIndex )
 	el->die = gpGlobals->curtime + 0.05f;
 }
 
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
 void HunterMuzzleFlashCallback( const CEffectData &data )
 {
 	MuzzleFlash_Hunter( data.m_hEntity, data.m_nAttachmentIndex );
 }
 
 DECLARE_CLIENT_EFFECT( "HunterMuzzleFlash", HunterMuzzleFlashCallback );
+
+//-----------------------------------------------------------------------------
+// AR2 muzzle flashes
+//-----------------------------------------------------------------------------
+void MuzzleFlash_AR2( ClientEntityHandle_t hEntity, int attachmentIndex )
+{
+	VPROF_BUDGET( "MuzzleFlash_AR2", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+
+	// If the client hasn't seen this entity yet, bail.
+	matrix3x4_t	matAttachment;
+	if ( !FX_GetAttachmentTransform( hEntity, attachmentIndex, matAttachment ) )
+		return;
+
+	// Grab the origin out of the transform for the attachment
+	Vector		origin;
+	MatrixGetColumn( matAttachment, 3, &origin );
+
+	dlight_t *dl = effects->CL_AllocDlight ( LIGHT_INDEX_MUZZLEFLASH );
+	dl->origin = origin;// + Vector( 12.0f, 0, 0 );
+
+	dl->color.r = 255;
+	dl->color.g = 175;
+	dl->color.b = 85;
+	dl->die = gpGlobals->curtime + 0.05f;
+	dl->radius = 256.0f;
+	dl->decay = 512.0f;
+	dl->color.exponent = 5;
+
+}
+
+void AR2MuzzleFlashCallback( const CEffectData &data )
+{
+	MuzzleFlash_AR2( data.m_hEntity, data.m_nAttachmentIndex );
+}
+
+DECLARE_CLIENT_EFFECT( "AR2MuzzleFlash", AR2MuzzleFlashCallback );

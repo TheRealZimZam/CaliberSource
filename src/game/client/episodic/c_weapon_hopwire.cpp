@@ -200,7 +200,7 @@ void C_HopwireExplosion::AddParticles( void )
 
 			offset = ( RandomVector( -4.0f, 4.0f ) + tr.endpos ) + ( forward * 512.0f );
 
-			sParticle = (SimpleParticle *) m_pSimpleEmitter->AddParticle( sizeof(SimpleParticle), g_Mat_DustPuff[random->RandomInt(0,1)], offset );
+			sParticle = (SimpleParticle *) m_pSimpleEmitter->AddParticle( sizeof(SimpleParticle), g_Mat_DustPuff[random->RandomInt(0,2)], offset );
 
 			if ( sParticle != NULL )
 			{

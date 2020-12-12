@@ -4288,6 +4288,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\episodic\prop_stickybomb.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\prop_thumper.cpp"
 					>
 				</File>
@@ -4576,6 +4580,10 @@
 					</File>
 					<File
 						RelativePath=".\hl2\weapon_cguard.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\hl2\weapon_sniperrifle.cpp"
 						>
 					</File>
 				</Filter>

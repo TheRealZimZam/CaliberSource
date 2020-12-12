@@ -906,8 +906,7 @@ void CAmbientGeneric::ToggleSound()
 	// m_fActive is true only if a looping sound is playing.
 	
 	if ( m_fActive )
-	{// turn sound off
-
+	{
 		if (m_dpv.cspinup)
 		{
 			// Don't actually shut off. Each toggle causes
@@ -956,8 +955,7 @@ void CAmbientGeneric::ToggleSound()
 		}
 	}
 	else 
-	{// turn sound on
-
+	{
 		// only toggle if this is a looping sound.  If not looping, each
 		// trigger will cause the sound to play.  If the sound is still
 		// playing from a previous trigger press, it will be shut off

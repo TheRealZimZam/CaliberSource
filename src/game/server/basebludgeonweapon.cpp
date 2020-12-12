@@ -70,7 +70,6 @@ int CBaseHLBludgeonWeapon::CapabilitiesGet()
 	return bits_CAP_WEAPON_MELEE_ATTACK1; 
 }
 
-
 int CBaseHLBludgeonWeapon::WeaponMeleeAttack1Condition( float flDot, float flDist )
 {
 	if (flDist > m_fMaxRange1)
@@ -120,11 +119,6 @@ void CBaseHLBludgeonWeapon::PrimaryAttack()
 	Swing( false );
 }
 
-//------------------------------------------------------------------------------
-// Purpose :
-// Input   :
-// Output  :
-//------------------------------------------------------------------------------
 void CBaseHLBludgeonWeapon::SecondaryAttack()
 {
 	Swing( true );
@@ -239,7 +233,7 @@ bool CBaseHLBludgeonWeapon::ImpactWater( const Vector &start, const Vector &end 
 {
 	//FIXME: This doesn't handle the case of trying to splash while being underwater, but that's not going to look good
 	//		 right now anyway...
-	
+
 	// We must start outside the water
 	if ( UTIL_PointContents( start ) & (CONTENTS_WATER|CONTENTS_SLIME))
 		return false;
@@ -282,8 +276,8 @@ void CBaseHLBludgeonWeapon::ImpactEffect( trace_t &traceHit )
 	if ( ImpactWater( traceHit.startpos, traceHit.endpos ) )
 		return;
 
-	//FIXME: need new decals
-	UTIL_ImpactTrace( &traceHit, DMG_CLUB );
+	//FIXME: need new decals, currently does none as stopgap
+	UTIL_ImpactTrace( &traceHit, DMG_CLUB, "MeleeImpact" );
 }
 
 

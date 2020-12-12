@@ -38,7 +38,6 @@ bool CAI_BaseNPC::OccupyStrategySlotRange( int slotIDStart, int slotIDEnd )
 {
 	// If I'm not in a squad a I don't fill slots
 	return ( !m_pSquad || m_pSquad->OccupyStrategySlotRange( GetEnemy(), slotIDStart, slotIDEnd, &m_iMySquadSlot ) );
-
 }
 
 //-----------------------------------------------------------------------------
@@ -101,16 +100,16 @@ bool CAI_BaseNPC::IsValidCover( const Vector &vecCoverLocation, CAI_Hint const *
 		}
 	}
 
-	/*
-	// If I'm in a squad don't pick cover node it other squad member
+#if 0
+	// If I'm in a squad don't pick cover node if other squad member
 	// is already nearby
 	if (m_pSquad)
 	{
 		return m_pSquad->IsValidCover( vecCoverLocation, pHint );
 	}
-	*/
-	
+#endif 
 	// UNDONE: Do we really need this test?
+
 	// ----------------------------------------------------------------
 	// Make sure my hull can fit at this node before accepting it. 
 	// Could be another NPC there or it could be blocked
@@ -147,6 +146,13 @@ bool CAI_BaseNPC::IsValidShootPosition( const Vector &vecShootLocation, CAI_Node
 				return false;
 		}
 	}
+
+#if 0
+	if ( m_pSquad )
+	{
+		return m_pSquad->IsValidShootPosition( vecShootLocation, pHint );
+	}
+#endif
 
 	return true;
 }

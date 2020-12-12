@@ -667,7 +667,7 @@ float CAI_BlendedMotor::OverrideMaxYawSpeed( Activity activity )
 		{
 			return 15;
 		}
-		return 45; // too fast?
+		return 30;
 		break;
 	}
 #endif
@@ -1647,7 +1647,7 @@ bool CAI_BlendedMotor::AddTurnGesture( float flYD )
 			return false;
 		}
 
-		if ( GetOuter()->IsMoving() || GetOuter()->IsCrouching() )
+		if ( GetOuter()->IsMoving() )	//|| GetOuter()->IsCrouching()
 		{
 			return false;
 		}
@@ -1656,7 +1656,7 @@ bool CAI_BlendedMotor::AddTurnGesture( float flYD )
 		{
 			return false;
 		}
-		else if (flYD < -45)
+		else if (flYD <= -45)
 		{
 			activity = ACT_GESTURE_TURN_RIGHT90;
 			weight = flYD / -90;

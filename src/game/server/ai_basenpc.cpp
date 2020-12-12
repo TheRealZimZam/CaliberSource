@@ -1,7 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
-// TODO's; Reduce aim-twitching(delay switching targets)
+// Purpose:	Base NPC character with AI
+//
 //=============================================================================//
 
 #include "cbase.h"
@@ -720,7 +720,7 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 	// REVISIT: Combine soldiers shoot each other a lot and then talk about it
 	// this improves that case a bunch, but it seems kind of harsh.
-	if ( !m_pSquad->SquadIsMember( info.GetAttacker() ) )	//!m_pSquad ||
+	if ( !m_pSquad->SquadIsMember( info.GetAttacker() ) )
 	{
 		PainSound( info );// "Ouch!"
 	}
@@ -2316,8 +2316,8 @@ CSound* CAI_BaseNPC::GetBestSound( int validTypes )
 	if ( m_pLockedBestSound->m_iType != SOUND_NONE )
 		return m_pLockedBestSound;
 	CSound *pResult = GetSenses()->GetClosestSound( false, validTypes );
-	if ( pResult == NULL)
-		DevMsg( "Warning: NULL Return from GetBestSound\n" ); // condition previously set now no longer true. Have seen this when play too many sounds...
+//	if ( pResult == NULL)
+//		DevMsg( "Warning: NULL Return from GetBestSound\n" ); // condition previously set now no longer true. Have seen this when play too many sounds...
 	return pResult;
 }
 
@@ -2328,8 +2328,8 @@ CSound* CAI_BaseNPC::GetBestSound( int validTypes )
 CSound* CAI_BaseNPC::GetBestScent( void )
 {
 	CSound *pResult = GetSenses()->GetClosestSound( true );
-	if ( pResult == NULL)
-		DevMsg("Warning: NULL Return from GetBestScent\n" );
+//	if ( pResult == NULL)
+//		DevMsg("Warning: NULL Return from GetBestScent\n" );
 	return pResult;
 }
 
@@ -4586,7 +4586,8 @@ bool CAI_BaseNPC::CanFlinch( void )
 	if ( IsActiveDynamicInteraction() )
 		return false;
 
-//	if ( HasCondition(COND_PHYSICS_DAMAGE) )
+	//Fisiks uses a different flinch system
+//	if ( HasCondition( COND_PHYSICS_DAMAGE ) )
 //		return false;
 
 	return true;
@@ -4605,7 +4606,7 @@ void CAI_BaseNPC::CheckFlinches( void )
 	}
 
 	// If we've taken heavy damage, try to do a full schedule flinch
-	if ( HasCondition(COND_HEAVY_DAMAGE) )
+	if ( HasCondition( COND_HEAVY_DAMAGE ) )
  	{
 #if 0
 		// If we've already flinched recently, gesture flinch instead.
@@ -4617,7 +4618,7 @@ void CAI_BaseNPC::CheckFlinches( void )
 			ClearCondition( COND_HEAVY_DAMAGE );
 		}
 #endif
-		//!!! Big Flinches can stun-lock enemies
+
 		if ( !HasInterruptCondition( COND_HEAVY_DAMAGE ) )
 		{
 			// If we have taken heavy damage, but the current schedule doesn't 

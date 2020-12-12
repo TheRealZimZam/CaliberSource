@@ -1886,6 +1886,7 @@ void CBaseCombatCharacter::Weapon_Drop( CBaseCombatWeapon *pWeapon, const Vector
 		{
 			pWeapon->m_iClip1 = pWeapon->GetDefaultClip1();
 
+#if 0
 			if( FClassnameIs( pWeapon, "weapon_smg1" ) )
 			{
 				// Drop enough ammo to kill 2 of me.
@@ -1893,6 +1894,7 @@ void CBaseCombatCharacter::Weapon_Drop( CBaseCombatWeapon *pWeapon, const Vector
 				float flAmmoDamage = g_pGameRules->GetAmmoDamage( UTIL_PlayerByIndex(1), this, pWeapon->GetPrimaryAmmoType() );
 				pWeapon->m_iClip1 = (GetMaxHealth() / flAmmoDamage) * 2;
 			}
+#endif
 		}
 		if ( pWeapon->UsesClipsForAmmo2() )
 		{
@@ -2133,6 +2135,8 @@ void CBaseCombatCharacter::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 // Purpose:	Leaves weapon, giving only ammo to the character
 // Input  : Weapon
+// TODO; This needs an option to take all ammo, not just from the same
+// weapon type that is already owned
 //-----------------------------------------------------------------------------
 bool CBaseCombatCharacter::Weapon_EquipAmmoOnly( CBaseCombatWeapon *pWeapon )
 {

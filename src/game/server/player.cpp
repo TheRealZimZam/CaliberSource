@@ -6084,7 +6084,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_slam" );
 		GiveNamedItem( "weapon_smg1" );
 		GiveNamedItem( "weapon_smg2" );
-//!		GiveNamedItem( "weapon_sniperrifle" );	//TBA
+		GiveNamedItem( "weapon_sniperrifle" );
 		GiveNamedItem( "weapon_stab" );
 		GiveNamedItem( "weapon_stun" );
 //		GiveNamedItem( "weapon_stunstick" );

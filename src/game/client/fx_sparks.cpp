@@ -29,6 +29,7 @@ CLIENTEFFECT_MATERIAL( "effects/energyball" )
 CLIENTEFFECT_MATERIAL( "sprites/rico1" )
 CLIENTEFFECT_MATERIAL( "sprites/rico1_noz" )
 CLIENTEFFECT_MATERIAL( "sprites/richo1" )
+CLIENTEFFECT_MATERIAL( "sprites/dot" )
 CLIENTEFFECT_MATERIAL( "sprites/blueflare1" )
 CLIENTEFFECT_MATERIAL( "effects/yellowflare" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1_nocull" )
@@ -714,10 +715,9 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 // Input  : &position - origin of effect
 //			&normal - normal of the surface struck
 //-----------------------------------------------------------------------------
-#define	RICOCHET_SPARK_SPREAD	0.5f
-#define	RICOCHET_SPARK_MINSPEED	128.0f
-#define	RICOCHET_SPARK_MAXSPEED	512.0f
-#define	RICOCHET_SPARK_GRAVITY	600.0f	// The initial force sends it up, and the high gravity brings it quickly down in a nice arc
+#define	RICOCHET_SPARK_MINSPEED	384.0f
+#define	RICOCHET_SPARK_MAXSPEED	768.0f
+#define	RICOCHET_SPARK_GRAVITY	300.0f
 
 void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal )
 {
@@ -729,65 +729,6 @@ void FX_RicochetSpark( const Vector &position, const Vector &direction, const Ve
 
 	Vector offset = position + ( surfaceNormal * 1.0f );
 
-#if 0
-	CSmartPtr<CTrailParticles> sparkEmitter = CTrailParticles::Create( "FX_RicochetSpark 1" );
-
-	if ( sparkEmitter == NULL )
-		return;
-
-	//Setup our information
-	sparkEmitter->SetSortOrigin( offset );
-	sparkEmitter->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
-	sparkEmitter->SetVelocityDampen( 8.0f );
-	sparkEmitter->SetGravity( METAL_SPARK_GRAVITY );
-	sparkEmitter->SetCollisionDamped( 0.25f );
-	sparkEmitter->GetBinding().SetBBox( offset - Vector( 32, 32, 32 ), offset + Vector( 32, 32, 32 ) );
-	
-	if ( g_Material_Spark == NULL )
-	{
-		g_Material_Spark = sparkEmitter->GetPMaterial( "sprites/dot" );
-	}
-
-	TrailParticle	*pParticle;
-	Vector	dir;
-	float	length	= 0.1f;
-
-	// Send the bullet and smoketrail
-	for ( int i = 0; i < 1; i++ )
-	{
-		pParticle = (TrailParticle *) sparkEmitter->AddParticle( sizeof(TrailParticle), g_Material_Spark, offset );
-
-		if ( pParticle == NULL )
-			return;
-
-		pParticle->m_flLifetime	= 0.0f;
-		
-		if( iScale > 1 && i%3 == 0 )
-		{
-			// Every third spark goes flying far if we're having a big batch of sparks.
-			pParticle->m_flDieTime	= random->RandomFloat( 0.15f, 0.25f );
-		}
-		else
-		{
-			pParticle->m_flDieTime	= random->RandomFloat( 0.05f, 0.1f );
-		}
-
-		float	spreadOfs = random->RandomFloat( 0.0f, 2.0f );
-
-		dir[0] = direction[0] + random->RandomFloat( -(METAL_SPARK_SPREAD*spreadOfs), (METAL_SPARK_SPREAD*spreadOfs) );
-		dir[1] = direction[1] + random->RandomFloat( -(METAL_SPARK_SPREAD*spreadOfs), (METAL_SPARK_SPREAD*spreadOfs) );
-		dir[2] = direction[2] + random->RandomFloat( -(METAL_SPARK_SPREAD*spreadOfs), (METAL_SPARK_SPREAD*spreadOfs) );
-	
-		VectorNormalize( dir );
-
-		pParticle->m_flWidth		= random->RandomFloat( 1.0f, 4.0f );
-		pParticle->m_flLength		= random->RandomFloat( length*0.25f, length );
-		
-		pParticle->m_vecVelocity	= dir * random->RandomFloat( (METAL_SPARK_MINSPEED*(2.0f-spreadOfs)), (METAL_SPARK_MAXSPEED*(2.0f-spreadOfs)) );
-		
-		Color32Init( pParticle->m_color, 255, 255, 255, 255 );
-	}
-#endif
 	FXQuadData_t data;
 
 	data.SetMaterial( "sprites/rico1" );
@@ -802,6 +743,48 @@ void FX_RicochetSpark( const Vector &position, const Vector &direction, const Ve
 	data.SetScale( scale, 0 );
 
 	FX_AddQuad( data );
+
+#if 1
+	CSmartPtr<CTrailParticles> sparkEmitter = CTrailParticles::Create( "FX_RicochetSpark" );
+
+	if ( sparkEmitter == NULL )
+		return;
+
+	//Setup our information
+	sparkEmitter->SetSortOrigin( offset );
+	sparkEmitter->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN | bitsPARTICLE_TRAIL_FADE );
+	sparkEmitter->SetVelocityDampen( 4.0f );
+	sparkEmitter->SetGravity( RICOCHET_SPARK_GRAVITY );
+	sparkEmitter->SetCollisionDamped( 0.25f );
+	sparkEmitter->GetBinding().SetBBox( offset - Vector( 32, 32, 32 ), offset + Vector( 32, 32, 32 ) );
+
+	TrailParticle	*pParticle;
+	Vector	dir;
+	float	length	= 0.2f;
+
+	// Send the bullet and trail
+	pParticle = (TrailParticle *) sparkEmitter->AddParticle( sizeof(TrailParticle), sparkEmitter->GetPMaterial( "sprites/dot" ), offset );
+
+	if ( pParticle == NULL )
+			return;
+
+	pParticle->m_flLifetime	= 0.0f;
+	pParticle->m_flDieTime	= random->RandomFloat( 0.25f, 0.4f );
+
+	float	spreadOfs = random->RandomFloat( 0.0f, 2.0f );
+
+	dir[0] = direction[0] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
+	dir[1] = direction[1] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
+	dir[2] = direction[2] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
+
+	VectorNormalize( dir );
+
+	pParticle->m_flWidth		= random->RandomFloat( 0.5f, 1.0f );
+	pParticle->m_flLength		= random->RandomFloat( length*0.25f, length );
+	pParticle->m_vecVelocity	= dir * random->RandomFloat( (RICOCHET_SPARK_MINSPEED*(2.0f-spreadOfs)), (RICOCHET_SPARK_MAXSPEED*(2.0f-spreadOfs)) );
+
+	Color32Init( pParticle->m_color, 224, 192, 128, 192 );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1032,18 +1015,17 @@ void FX_EnergySplash( const Vector &pos, const Vector &normal, int nFlags )
 
 
 //-----------------------------------------------------------------------------
-// Purpose: Micro-Explosion effect
+// Purpose: Micro-Explosion effect - for big explosive bullets
 // Input  : &position - origin of effect
 //			&normal - normal of the surface struck
 //-----------------------------------------------------------------------------
-
 #define	MICRO_EXPLOSION_MINSPEED	100.0f
 #define MICRO_EXPLOSION_MAXSPEED	150.0f
 #define MICRO_EXPLOSION_SPREAD		1.0f
 #define MICRO_EXPLOSION_GRAVITY		0.0f
 #define MICRO_EXPLOSION_DAMPEN		0.4f
 
-void FX_MicroExplosion( Vector &position, Vector &normal )
+void FX_MicroExplosion( const Vector &position, const Vector &normal )
 {
 	VPROF_BUDGET( "FX_MicroExplosion", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	Vector	offset = position + ( normal * 2.0f );
@@ -1112,16 +1094,16 @@ void FX_MicroExplosion( Vector &position, Vector &normal )
 	if ( sParticle )
 	{
 		sParticle->m_flLifetime		= 0.0f;
-		sParticle->m_flDieTime		= 0.3f;
+		sParticle->m_flDieTime		= 0.2f;
 		
 		sParticle->m_vecVelocity.Init();
 
 		sParticle->m_uchColor[0]	= 255;
 		sParticle->m_uchColor[1]	= 255;
 		sParticle->m_uchColor[2]	= 255;
-		sParticle->m_uchStartAlpha	= random->RandomInt( 128, 255 );
+		sParticle->m_uchStartAlpha	= random->RandomInt( 192, 224 );
 		sParticle->m_uchEndAlpha	= 0;
-		sParticle->m_uchStartSize	= random->RandomInt( 12, 16 );
+		sParticle->m_uchStartSize	= random->RandomInt( 20, 28 );
 		sParticle->m_uchEndSize		= sParticle->m_uchStartSize;
 		sParticle->m_flRoll			= random->RandomInt( 0, 360 );
 		sParticle->m_flRollDelta	= 0.0f;

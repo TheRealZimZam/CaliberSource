@@ -5009,6 +5009,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\shared\terrainmodmgr_shared.h"
+				>
+			</File>
+			<File
 				RelativePath="..\shared\touchlink.h"
 				>
 			</File>

@@ -274,21 +274,21 @@ static ImpactEffect_t s_pImpactEffect[26] =
 	{ NULL,					NULL },							// CHAR_TEX_GRATE			
 	{ NULL,					NULL },							// CHAR_TEX_ALIENFLESH		
 	{ NULL,					NULL },							// CHAR_TEX_CLIP			
-	{ NULL,					NULL },							// CHAR_TEX_UNUSED		
-	{ NULL,					NULL },							// CHAR_TEX_UNUSED		
+	{ NULL,					NULL },							// CHAR_TEX_GRASS		
+	{ NULL,					NULL },							// CHAR_TEX_SNOW		
 	{ NULL,					NULL },							// CHAR_TEX_PLASTIC		
 	{ "impact_metal",		NULL },							// CHAR_TEX_METAL			
 	{ "impact_dirt",		NULL },							// CHAR_TEX_SAND			
 	{ NULL,					NULL },							// CHAR_TEX_FOLIAGE		
 	{ "impact_computer",	NULL },							// CHAR_TEX_COMPUTER		
 	{ NULL,					NULL },							// CHAR_TEX_UNUSED		
-	{ NULL,					NULL },							// CHAR_TEX_UNUSED		
+	{ NULL,					NULL },							// CHAR_TEX_BRICK		
 	{ NULL,					NULL },							// CHAR_TEX_SLOSH			
 	{ "impact_concrete",	"impact_concrete_noflecks" },	// CHAR_TEX_TILE			
-	{ NULL,					NULL },							// CHAR_TEX_UNUSED		
+	{ NULL,					NULL },							// CHAR_TEX_CARDBOARD		
 	{ "impact_metal",		NULL },							// CHAR_TEX_VENT			
 	{ "impact_wood",		"impact_wood_noflecks" },		// CHAR_TEX_WOOD			
-	{ NULL,					NULL },							// CHAR_TEX_UNUSED		
+	{ NULL,					NULL },							// CHAR_TEX_FAKE (DO NOT USE)		
 	{ "impact_glass",		NULL },							// CHAR_TEX_GLASS			
 	{ "warp_shield_impact", NULL },							// CHAR_TEX_WARPSHIELD		
 };
@@ -366,22 +366,69 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 		bNoFlecks = ( ( nFlags & FLAGS_CUSTIOM_EFFECTS_NOFLECKS ) != 0  );
 	}
 
-	// TODO; CHAR_TEX_FLESH, CHAR_TEX_FOLIAGE
+	//---------------------------
+	// Grab the material type
+	//---------------------------
+
+#if 0
+	switch( iMaterial )
+	{
+	case CHAR_TEX_CONCRETE:
+	case CHAR_TEX_TILE:
+	case CHAR_TEX_WOOD:
+		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
+		break;
+
+	case CHAR_TEX_FOLIAGE:
+		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
+		break;
+
+	case CHAR_TEX_DIRT:
+	case CHAR_TEX_SAND:
+//!	case CHAR_TEX_SNOW:
+		FX_DustImpact( vecOrigin, &tr, iScale );
+		break;
+
+	case CHAR_TEX_METAL:
+	case CHAR_TEX_VENT:
+		Vector	reflect;
+		float	dot = shotDir.Dot( tr.plane.normal );
+		reflect = shotDir + ( tr.plane.normal * ( dot*-2.0f ) );
+
+		reflect[0] += random->RandomFloat( -0.2f, 0.2f );
+		reflect[1] += random->RandomFloat( -0.2f, 0.2f );
+		reflect[2] += random->RandomFloat( -0.2f, 0.2f );
+
+		FX_MetalSpark( vecOrigin, reflect, tr.plane.normal, iScale );
+		break;
+
+	case CHAR_TEX_COMPUTER:
+		Vector	offset = vecOrigin + ( tr.plane.normal * 1.0f );
+		g_pEffects->Sparks( offset );
+		break;
+
+	case CHAR_TEX_ANTLION:
+	case CHAR_TEX_EGGSHELL:
+		FX_AntlionImpact( vecOrigin, &tr );
+		break;
+
+	default:
+//		DevWarning( 2, "Unknown hit material!\n" );
+		break;
+	}
+#endif
+
 	if ( ( iMaterial == CHAR_TEX_CONCRETE ) || ( iMaterial == CHAR_TEX_TILE ) )
 	{
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
 	}
-	else if ( iMaterial == CHAR_TEX_WOOD )
+	else if ( iMaterial == CHAR_TEX_WOOD || ( iMaterial == CHAR_TEX_FOLIAGE ) )
 	{
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
 	}
-	else if ( ( iMaterial == CHAR_TEX_DIRT ) || ( iMaterial == CHAR_TEX_SAND ) )
+	else if ( ( iMaterial == CHAR_TEX_DIRT ) || ( iMaterial == CHAR_TEX_SAND ) || ( iMaterial == CHAR_TEX_SNOW ) )
 	{
 		FX_DustImpact( vecOrigin, &tr, iScale );
-	}
-	else if ( ( iMaterial == CHAR_TEX_ANTLION ) || ( iMaterial == CHAR_TEX_EGGSHELL ) )
-	{
-		FX_AntlionImpact( vecOrigin, &tr );
 	}
 	else if ( ( iMaterial == CHAR_TEX_METAL ) || ( iMaterial == CHAR_TEX_VENT ) )
 	{
@@ -401,12 +448,18 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 
 		g_pEffects->Sparks( offset );
 	}
+#ifdef HL2_DLL
+	else if ( ( iMaterial == CHAR_TEX_ANTLION ) || ( iMaterial == CHAR_TEX_EGGSHELL ) )
+	{
+		FX_AntlionImpact( vecOrigin, &tr );
+	}
 	else if ( iMaterial == CHAR_TEX_WARPSHIELD )
 	{
 		QAngle vecAngles;
 		VectorAngles( -shotDir, vecAngles );
 		DispatchParticleEffect( "warp_shield_impact", vecOrigin, vecAngles );
 	}
+#endif// HL2_DLL
 
 	//---------------------------
 	// Do leak effect

@@ -146,7 +146,7 @@ void BigTracerCallback( const CEffectData &data )
 	// Use default velocity if none specified
 	if ( !flVelocity )
 	{
-		flVelocity = TRACER_SPEED;
+		flVelocity = random->RandomFloat( TRACER_SPEED, 7000 );
 	}
 
 	// Do tracer effect

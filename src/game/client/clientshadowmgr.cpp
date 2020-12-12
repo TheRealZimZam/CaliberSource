@@ -1312,9 +1312,12 @@ bool CClientShadowMgr::Init()
 
 	SetShadowBlobbyCutoffArea( 0.005 );
 
+#if 0
 	bool bTools = CommandLine()->CheckParm( "-tools" ) != NULL;
 	m_nMaxDepthTextureShadows = bTools ? 4 : 1;	// Just one shadow depth texture in games, more in tools
-
+#endif
+	//Maximum amount of projected textures
+	m_nMaxDepthTextureShadows = 4;
 	bool bLowEnd = ( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 );
 
 	if ( !bLowEnd && r_shadowrendertotexture.GetBool() )
@@ -2650,7 +2653,7 @@ void CClientShadowMgr::BuildFlashlight( ClientShadowHandle_t handle )
 	VPROF_BUDGET( "CClientShadowMgr::BuildFlashlight", VPROF_BUDGETGROUP_SHADOW_DEPTH_TEXTURING );
 
 	//!!!TEST
-#if 0
+#if 1
 	// Don't project the flashlight if the frustum AABB is not in our view
 	Vector mins, maxs;
 	CalculateAABBFromProjectionMatrix(shadow.m_WorldToShadow, &mins, &maxs);

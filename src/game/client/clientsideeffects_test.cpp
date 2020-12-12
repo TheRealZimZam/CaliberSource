@@ -174,7 +174,7 @@ void FX_PlayerTracer( Vector& start, Vector& end )
 }
 
 //TODO; This should be able to take color-values
-void FX_BigPlayerTracer( Vector& start, Vector& end )
+void FX_BigPlayerTracer( Vector& start, Vector& end, unsigned char *pTracerColor )
 {
 	VPROF_BUDGET( "FX_BigPlayerTracer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	Vector	shotDir, dStart, dEnd;
@@ -185,7 +185,7 @@ void FX_BigPlayerTracer( Vector& start, Vector& end )
 	length = VectorNormalize( shotDir );
 
 	//We don't want to draw them if they're too close to us
-	if ( length < 256 )
+	if ( length < 192 )
 		return;
 
 	//Randomly place the tracer along this line, with a random length
@@ -195,10 +195,10 @@ void FX_BigPlayerTracer( Vector& start, Vector& end )
 	//Create the line
 	CFXStaticLine	*t;
 	const char		*materialName;
-
 	materialName = "effects/tracer_middle";
+	float width = random->RandomFloat( 0.5f, 0.75f );
 
-	t = new CFXStaticLine( "Tracer", dStart, dEnd, random->RandomFloat( 0.5f, 0.75f ), 0.01f, materialName, 0 );
+	t = new CFXStaticLine( "Tracer", dStart, dEnd, width, 0.01f, materialName, 0 );
 	assert( t );
 
 	//Throw it into the list
@@ -361,8 +361,8 @@ void FX_Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 	}
 }
 
-//TODO; This should be able to take color-values
-void FX_BigTracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
+//TODO; This should be able to take color-values... somehow
+void FX_BigTracer( Vector& start, Vector& end, int velocity, bool makeWhiz, unsigned char *pTracerColor )
 {
 	VPROF_BUDGET( "FX_BigTracer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	float dist;
@@ -372,16 +372,17 @@ void FX_BigTracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 	dist = VectorNormalize( dir );
 
 	// Don't make short tracers.
-	if ( dist >= 256 )
+	if ( dist >= 192 )
 	{
-		float length = random->RandomFloat( 64.0f, 128.0f );
+		float length = max( 64, random->RandomFloat( 128.0f, 192.0f ) );
 		float life = ( dist + length ) / velocity;	//NOTENOTE: We want the tail to finish its run as well
+		float width = random->RandomFloat( 0.75f, 0.85f );
 		
 		//Add it
 		const char		*materialName;
-
 		materialName = ( random->RandomInt( 0, 1 ) ) ? "effects/tracer_middle" : "effects/tracer_middle2";
-		FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 0.75f, 0.85f ), life, materialName );
+
+		FX_AddDiscreetLine( start, dir, velocity, length, dist, width, life, materialName );
 	}
 
 	if( makeWhiz )

@@ -19,11 +19,12 @@ class ConVar;
 struct Ammo_t 
 {
 	char 				*pName;
-	int					nDamageType;
-	int					eTracerType;
-	float				physicsForceImpulse;
-	int					nMinSplashSize;
-	int					nMaxSplashSize;
+	int					nDamageType;			//Damage type
+	int					eTracerType;			//Tracer fx
+	float				fVelocity;				//Speed of the projectile - 0 means instant impact, like default hl2
+	float				physicsForceImpulse;	//Force of the impact - use the bullet impulse function when possible
+	int					nMinSplashSize;			//Minimum size of water splash
+	int					nMaxSplashSize;			//Maximum size of water splash
 
 	int					nFlags;
 
@@ -78,19 +79,20 @@ public:
 	int					MaxCarry(int nAmmoIndex);
 	int					DamageType(int nAmmoIndex);
 	int					TracerType(int nAmmoIndex);
+	float				Velocity(int nAmmoIndex);
 	float				DamageForce(int nAmmoIndex);
 	int					MinSplashSize(int nAmmoIndex);
 	int					MaxSplashSize(int nAmmoIndex);
 	int					Flags(int nAmmoIndex);
 
-	void				AddAmmoType(char const* name, int damageType, int tracerType, int plr_dmg, int npc_dmg, int carry, float physicsForceImpulse, int nFlags, int minSplashSize = 4, int maxSplashSize = 8 );
-	void				AddAmmoType(char const* name, int damageType, int tracerType, char const* plr_cvar, char const* npc_var, char const* carry_cvar, float physicsForceImpulse, int nFlags, int minSplashSize = 4, int maxSplashSize = 8 );
+	void				AddAmmoType(char const* name, int damageType, int tracerType, /*float velocity = 0,*/ int plr_dmg, int npc_dmg, int carry, float physicsForceImpulse, int nFlags, int minSplashSize = 4, int maxSplashSize = 8 );
+	void				AddAmmoType(char const* name, int damageType, int tracerType, /*float velocity = 0,*/ char const* plr_cvar, char const* npc_var, char const* carry_cvar, float physicsForceImpulse, int nFlags, int minSplashSize = 4, int maxSplashSize = 8 );
 
 	CAmmoDef(void);
 	virtual ~CAmmoDef( void );
 
 private:
-	bool				AddAmmoType(char const* name, int damageType, int tracerType, int nFlags, int minSplashSize, int maxSplashSize );
+	bool				AddAmmoType(char const* name, int damageType, int tracerType, /*float velocity,*/ int nFlags, int minSplashSize, int maxSplashSize );
 };
 
 

@@ -111,6 +111,7 @@ namespace vgui2
 #define VECTOR_CONE_9DEGREES		Vector( 0.07846, 0.07846, 0.07846 )
 #define VECTOR_CONE_10DEGREES		Vector( 0.08716, 0.08716, 0.08716 )
 #define VECTOR_CONE_12DEGREES		Vector( 0.10461, 0.10461, 0.10461 )
+#define VECTOR_CONE_14DEGREES		Vector( 0.12206, 0.12206, 0.12206 )
 #define VECTOR_CONE_15DEGREES		Vector( 0.13053, 0.13053, 0.13053 )
 // Anything above 15 cant hit the broad side of a barn, only use for huge amounts of projectiles,
 // Something like canister/grape shot with at least 20 projectiles.

@@ -209,6 +209,7 @@ public:
 #define ITEM_FLAG_DOHITLOCATIONDMG	(1<<5)	// This weapon take hit location into account when applying damage
 #define ITEM_FLAG_NOAMMOPICKUPS		(1<<6)	// Don't draw ammo pickup sprites/sounds when ammo is received
 #define ITEM_FLAG_NOITEMPICKUP		(1<<7)	// Don't draw weapon pickup when this weapon is picked up by the player
+//#define ITEM_FLAG_DROPWHENEMPTY		(1<<8)	// Similar to exhaustible, but for non-consumables
 // NOTE: KEEP g_ItemFlags IN WEAPON_PARSE.CPP UPDATED WITH THESE
 
 
@@ -589,6 +590,7 @@ struct FireBulletsInfo_t
 		m_vecSpread.Init( 0, 0, 0 );
 		m_flDistance = 8192;
 		m_iTracerFreq = 3;
+		m_flVelocity = 0;
 		m_iDamage = 0;
 		m_iPlayerDamage = 0;
 		m_pAttacker = NULL;
@@ -613,6 +615,7 @@ struct FireBulletsInfo_t
 		m_flDistance = flDistance;
 		m_iAmmoType = nAmmoType;
 		m_iTracerFreq = 4;
+		m_flVelocity = 0;
 		m_iDamage = 0;
 		m_iPlayerDamage = 0;
 		m_pAttacker = NULL;
@@ -629,6 +632,7 @@ struct FireBulletsInfo_t
 	float m_flDistance;
 	int m_iAmmoType;
 	int m_iTracerFreq;
+	float m_flVelocity;
 	int m_iDamage;
 	int m_iPlayerDamage;	// Damage to be used instead of m_iDamage if we hit a player
 	int m_nFlags;			// See FireBulletsFlags_t

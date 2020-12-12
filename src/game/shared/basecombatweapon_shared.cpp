@@ -550,6 +550,12 @@ bool CBaseCombatWeapon::CanBeSelected( void )
 	if ( !VisibleInWeaponSelection() )
 		return false;
 
+	if ( GetWeaponFlags() & ITEM_FLAG_EXHAUSTIBLE && !HasAmmo() )
+		return false;
+
+//	if ( hl2_single_primary_weapon_mode.GetBool() )
+//		return true;
+	
 	return HasAmmo();
 }
 

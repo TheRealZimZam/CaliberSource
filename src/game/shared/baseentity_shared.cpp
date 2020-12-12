@@ -1562,7 +1562,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		{
 			if( rumbleEffect == RUMBLE_SHOTGUN_SINGLE )
 			{
-				if( info.m_iShots == 12 )
+				if( info.m_iShots >= 12 )
 				{
 					// Upgrade to double barrel rumble effect
 					rumbleEffect = RUMBLE_SHOTGUN_DOUBLE;

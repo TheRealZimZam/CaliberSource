@@ -791,8 +791,7 @@ CBaseHandle CGameMovement::TestPlayerPosition( const Vector& pos, int collisionG
 }
 
 
-/*
-
+#if 0
 // FIXME FIXME:  Does this need to be hooked up?
 bool CGameMovement::IsWet() const
 {
@@ -821,12 +820,14 @@ void CGameMovement::PlantFootprint( surfacedata_t *psurface )
 		{	   
 			// FIXME: Activate this once we decide to pull the trigger on it.
 			// NOTE: We could add in snow, mud, others here
-//			switch(psurface->gameMaterial)
-//			{
-//			case 'D':
-//				footprintDecal = DECAL_FOOTPRINT_DIRT;
-//				break;
-//			}
+#if 0
+			switch(psurface->gameMaterial)
+			{
+			case 'D':
+				footprintDecal = DECAL_FOOTPRINT_DIRT;
+				break;
+			}
+#endif
 		}
 
 		if (footprintDecal != -1)
@@ -906,7 +907,7 @@ void CBasePlayer::UpdateWetness()
 		}
 	}
 }
-*/
+#endif
 
 
 //-----------------------------------------------------------------------------

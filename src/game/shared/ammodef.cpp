@@ -183,6 +183,20 @@ int	CAmmoDef::TracerType(int nAmmoIndex)
 	return m_AmmoType[nAmmoIndex].eTracerType;
 }
 
+float CAmmoDef::Velocity(int nAmmoIndex)
+{
+	if (nAmmoIndex < 1 || nAmmoIndex >= m_nAmmoIndex)
+		return 0;
+
+	return m_AmmoType[nAmmoIndex].fVelocity;
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
 float CAmmoDef::DamageForce(int nAmmoIndex)
 {
 	if ( nAmmoIndex < 1 || nAmmoIndex >= m_nAmmoIndex )
@@ -206,6 +220,7 @@ bool CAmmoDef::AddAmmoType(char const* name, int damageType, int tracerType, int
 	Q_strncpy(m_AmmoType[m_nAmmoIndex].pName, name,len+1);
 	m_AmmoType[m_nAmmoIndex].nDamageType	= damageType;
 	m_AmmoType[m_nAmmoIndex].eTracerType	= tracerType;
+//!	m_AmmoType[m_nAmmoIndex].fVelocity		= velocity;
 	m_AmmoType[m_nAmmoIndex].nMinSplashSize	= minSplashSize;
 	m_AmmoType[m_nAmmoIndex].nMaxSplashSize	= maxSplashSize;
 	m_AmmoType[m_nAmmoIndex].nFlags	= nFlags;

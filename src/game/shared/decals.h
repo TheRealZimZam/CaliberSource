@@ -22,7 +22,7 @@
 #define CHAR_TEX_ALIENFLESH		'H'
 #define CHAR_TEX_CLIP			'I'
 //#define CHAR_TEX_GRASS		'J'
-//#define CHAR_TEX_SNOW			'K'
+#define CHAR_TEX_SNOW			'K'
 #define CHAR_TEX_PLASTIC		'L'
 #define CHAR_TEX_METAL			'M'
 #define CHAR_TEX_SAND			'N'

@@ -18,8 +18,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define DECAL_LIST_FILE "scripts/decals_subrect.txt"
-//#define DECAL_LIST_FILE "scripts/decals.txt"
+//#define DECAL_LIST_FILE "scripts/decals_subrect.txt"
+#define DECAL_LIST_FILE "scripts/decals.txt"
 #define TRANSLATION_DATA_SECTION "TranslationData"
 
 //-----------------------------------------------------------------------------

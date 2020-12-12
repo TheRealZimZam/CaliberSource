@@ -630,6 +630,9 @@ void CBasePlayer::PlayStepSound( Vector &vecOrigin, surfacedata_t *psurface, flo
 		}
 	}
 
+// TODO:  See note above, should this be hooked up?
+//	PlantFootprint( psurface );
+
 	CRecipientFilter filter;
 	filter.AddRecipientsByPAS( vecOrigin );
 

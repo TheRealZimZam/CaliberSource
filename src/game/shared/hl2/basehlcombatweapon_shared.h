@@ -4,13 +4,15 @@
 //
 //=============================================================================//
 
-#include "basecombatweapon_shared.h"
-
 #ifndef BASEHLCOMBATWEAPON_SHARED_H
 #define BASEHLCOMBATWEAPON_SHARED_H
 #ifdef _WIN32
 #pragma once
 #endif
+
+#include "baseplayer_shared.h"
+#include "hl2_player_shared.h"
+#include "basecombatweapon_shared.h"
 
 #if defined( CLIENT_DLL )
 #define CBaseHLCombatWeapon C_BaseHLCombatWeapon
@@ -42,6 +44,10 @@ public:
 	virtual bool	Holster( CBaseCombatWeapon *pSwitchingTo );
 	virtual void	WeaponIdle( void );
 	virtual void	DryFire( void );
+
+	// FIXME: why are these virtual?
+	virtual float	SequenceDuration( int iSequence );
+	virtual float	SequenceDuration( void ) { return SequenceDuration( GetSequence() ); }
 
 	virtual void	AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles );
 	virtual	float	CalcViewmodelBob( void );

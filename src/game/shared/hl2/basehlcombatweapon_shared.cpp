@@ -5,9 +5,8 @@
 //=============================================================================//
 
 #include "cbase.h"
-#include "basehlcombatweapon_shared.h"
-
 #include "hl2_player_shared.h"
+#include "basehlcombatweapon_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -239,13 +238,22 @@ void CBaseHLCombatWeapon::DryFire( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Factor in the player's anim speed to the sequence duration for weapons
+//-----------------------------------------------------------------------------
+float CBaseHLCombatWeapon::SequenceDuration( int iSequence )
+{
+	float flDuration = BaseClass::SequenceDuration( iSequence );
+	CHL2_Player *pOwner = dynamic_cast<CHL2_Player*>(GetOwner());
+	if ( pOwner )
+	{
+		flDuration /= pOwner->GetDefaultAnimSpeed();
+	}
+
+	return flDuration;
+}
 
 
-#if 0
-float	g_lateralBob;
-float	g_verticalBob;
-float	g_bob;
-#endif
+//-----------------------------------------------------------------------------
 
 #if defined( CLIENT_DLL ) && ( !defined( HL2MP ) && !defined( PORTAL ) )
 
@@ -255,7 +263,7 @@ float	g_bob;
 #define	HL2_BOB_UP		0.5f
 
 // Defaults, can be changed ingame
-static ConVar	cl_bob( "cl_bob","0.0015" );
+static ConVar	cl_bob( "cl_bob","0.001" );
 static ConVar	cl_bobcycle( "cl_bobcycle","0.8" );
 static ConVar	cl_bobidle( "cl_bobidle","0.4" );
 static ConVar	cl_bobup( "cl_bobup","0.5" );
@@ -273,100 +281,10 @@ static ConVar	v_kickroll( "v_kickroll", "0.6"/*, FCVAR_UNREGISTERED*/ );
 static ConVar	v_kicktime( "v_kicktime", "0.5"/*, FCVAR_UNREGISTERED*/ );
 #endif
 
-#if 0
-//-----------------------------------------------------------------------------
-// Credit to: 95Navigator on the HL2 Beta.ru
-// Purpose: Calculate viewmodel bob
-// TODO: Add lateral bob when strafing (side to side)
-// Output : float
-//-----------------------------------------------------------------------------
-float CBaseHLCombatWeapon::CalcViewmodelBob( void )
-{
-   static  float bob;
-   static   float bobtime;
-   static   float lastbobtime;
-   float   cycle;
-   
-   CBasePlayer *player = ToBasePlayer( GetOwner() );
-
-   //NOTENOTE: For now, let this cycle continue when in the air, because it snaps badly without it
-
-   if ( ( !gpGlobals->frametime ) || ( player == NULL ) )
-   {
-      //NOTENOTE: We don't use this return value in our case (need to restructure the calculation function setup!)
-      return 0.0f;// just use old value
-   }
-
-   lastbobtime = gpGlobals->curtime;
-
-   bobtime += gpGlobals->frametime;
-
-   //Calculate the vertical bob
-   cycle = bobtime - (int)(bobtime / cl_bobcycle.GetFloat()) * cl_bobcycle.GetFloat();
-   cycle /= cl_bobcycle.GetFloat();
-
-   if (cycle < cl_bobup.GetFloat())
-   {
-      cycle = M_PI * cycle / cl_bobup.GetFloat();
-   }
-   else
-   {
-      cycle = M_PI + M_PI * (cycle - cl_bobup.GetFloat()) / (1.0 - cl_bobup.GetFloat());
-   }
-
-   //Find the speed of the player
-   Vector2D vel = player->GetLocalVelocity().AsVector2D();
-   
-   bob = sqrt(vel[0] * vel[0] + vel[1] * vel[1]) * cl_bob.GetFloat();
-   bob = bob * 0.3 + bob * 0.7 * sin(cycle);
-   bob = min(bob, 4);
-   bob = max(bob, -7);
-
-   g_bob = bob;
-   
-   //NOTENOTE: We don't use this return value in our case (need to restructure the calculation function setup!)
-   return 0.0f;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: This function controls the bob effect of the viewmodel, with code copied from the WON version of HL1 to give that nice "sideways" effect
-// Input  : &origin -
-//         &angles -
-//         viewmodelindex -
-//-----------------------------------------------------------------------------
-void CBaseHLCombatWeapon::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles )
-{
-   Vector   forward, right;
-   QAngle oldAngles = angles;
-   AngleVectors( angles, &forward, &right, NULL );
-
-   CalcViewmodelBob();
-
-   // Apply bob, but scaled down to 40%
-   for (int i = 0; i < 3; i++)
-   {
-      origin += g_bob * 0.4 * forward;
-   }
-   
-   origin[2] += g_bob;
-   
-   // throw in a little tilt.
-   angles[YAW] -= g_bob  * 0.5f;
-   angles[ROLL] -= g_bob * 1.0f;
-   angles[PITCH] -= g_bob * 0.3f;
-
-   VectorMA( origin, g_lateralBob * 0.8f, right, origin );
-
-   // pushing the view origin down off of the same X/Z plane as the ent's origin will give the
-   // gun a very nice 'shifting' effect when the player looks up/down. If there is a problem
-   // with view model distortion, this may be a cause. (SJB).
-   origin[2] -= 1;
-}
-#endif
-
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Output : float
+// TODO; Jumping kinda breaks this
 //-----------------------------------------------------------------------------
 float CBaseHLCombatWeapon::CalcViewmodelBob( void )
 {
@@ -399,14 +317,13 @@ float CBaseHLCombatWeapon::CalcViewmodelBob( void )
 
 	// bob is proportional to simulated velocity in the xy plane
 	// (don't count Z, or jumping messes it up)
-	bob = player->GetAbsVelocity().Length2D() * cl_bob.GetFloat();
-	
+	bob = player->GetAbsVelocity().Length2D() * cl_bob.GetFloat();	//GetLocalVelocity()
+
 	bob = bob*0.3 + bob*0.7*sin(cycle);
 
 	bob = min( 4.0, bob );
 	bob = max( -7.0, bob );
 	return bob;
-	
 }
 
 //-----------------------------------------------------------------------------
@@ -422,7 +339,7 @@ void CBaseHLCombatWeapon::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &or
 	CBasePlayer *player = ToBasePlayer( GetOwner() );
 	if ( player->GetFlags() & FL_DUCKING )
 	{
-		fIdleScale = cl_bobidle.GetFloat() / 2;
+		fIdleScale = cl_bobidle.GetFloat() * 0.5;
 	}
 #endif
 

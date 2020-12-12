@@ -75,6 +75,7 @@ ConVar	sv_funmode( "sv_funmode","1", FCVAR_CHEAT | FCVAR_REPLICATED );
 
 // Controls the application of the robus radius damage model.
 ConVar	sv_robust_explosions( "sv_robust_explosions","1", FCVAR_REPLICATED );
+ConVar	r_burningproplight( "r_burningproplight","0", FCVAR_REPLICATED );
 
 // Damage scale for damage inflicted by the player on each skill level.
 ConVar	sk_dmg_inflict_scale1( "sk_dmg_inflict_scale1", "1.25", FCVAR_REPLICATED );
@@ -93,7 +94,7 @@ ConVar	sk_allow_autoaim( "sk_allow_autoaim", "1", FCVAR_REPLICATED | FCVAR_ARCHI
 // Autoaim scale
 ConVar	sk_autoaim_scale1( "sk_autoaim_scale1", "1.0", FCVAR_REPLICATED );
 ConVar	sk_autoaim_scale2( "sk_autoaim_scale2", "0.5", FCVAR_REPLICATED );
-//~ConVar	sk_autoaim_scale3( "sk_autoaim_scale3", "0.0", FCVAR_REPLICATED ); NOT CURRENTLY OFFERED ON SKILL 3
+ConVar	sk_autoaim_scale3( "sk_autoaim_scale3", "0.0", FCVAR_REPLICATED );
 
 // Quantity scale for ammo received by the player.
 // Easy
@@ -1625,6 +1626,15 @@ void CHalfLife2::AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo )
 		return;
 	}
 
+	// Random crits!
+	if ( !sv_funmode.GetBool() )
+	{
+		// Do a random scale
+	//!	pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() * random->RandomFloat( 1.0f, 1.5f ) );
+		pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() );
+		return;
+	}
+
 	switch( GetSkillLevel() )
 	{
 	case SKILL_EASY:
@@ -1649,6 +1659,14 @@ void CHalfLife2::AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo )
 //---------------------------------------------------------
 float CHalfLife2::AdjustPlayerDamageInflicted( float damage )
 {
+	// Random crits!
+	if ( !sv_funmode.GetBool() )
+	{
+		// Do a random scale
+	//!	return damage * (sk_dmg_inflict_scale4.GetFloat() * random->RandomFloat( 0.85f, 1.25f ));
+		return damage * sk_dmg_inflict_scale4.GetFloat();
+	}
+
 	switch( GetSkillLevel() ) 
 	{
 	case SKILL_EASY:
@@ -1751,7 +1769,7 @@ float CHalfLife2::GetAmmoQuantityScale( int iAmmoIndex )
 		return sk_ammo_qty_scale4.GetFloat();
 
 	default:
-		return 0.0f;
+		return 1.0f;
 	}
 }
 
@@ -1795,7 +1813,7 @@ bool CHalfLife2::ShouldBurningPropsEmitLight()
 #ifdef HL2_EPISODIC
 	return IsAlyxInDarknessMode();
 #else
-	return false;
+	return r_burningproplight.GetBool();
 #endif
 }
 
@@ -1828,7 +1846,7 @@ CAmmoDef *GetAmmoDef()
 	{
 		bInitted = true;
 		// Newton says; Get PWned NooB
-		def.AddAmmoType("Gravity",			DMG_CLUB,					TRACER_NONE,			0,	0, 8, 0, 0 );
+		def.AddAmmoType("Gravity",			DMG_CLUB,					TRACER_NONE,			0, 0, 8, 0, 0 );
 		def.AddAmmoType("AR2",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_ar2",			"sk_npc_dmg_ar2",			"sk_max_ar2",			BULLET_IMPULSE(300, 1500), 0 );
 //		def.AddAmmoType("AR2Sniper",		DMG_BULLET,					TRACER_NONE,			"sk_plr_dmg_ar2_sniper",	"sk_npc_dmg_ar2",			"sk_max_ar2",			BULLET_IMPULSE(400, 1600), 0 );
 		def.AddAmmoType("AlyxGun",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE,			"sk_plr_dmg_alyxgun",		"sk_npc_dmg_alyxgun",		"sk_max_alyxgun",		BULLET_IMPULSE(200, 1225), 0 );

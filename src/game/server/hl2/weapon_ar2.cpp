@@ -40,6 +40,7 @@ ConVar sk_weapon_ar2_lerp( "sk_weapon_ar2_lerp", "5.0" );
 ConVar sk_weapon_ar2_alt_fire_radius( "sk_weapon_ar2_alt_fire_radius", "10" );
 ConVar sk_weapon_ar2_alt_fire_duration( "sk_weapon_ar2_alt_fire_duration", "2" );
 ConVar sk_weapon_ar2_alt_fire_mass( "sk_weapon_ar2_alt_fire_mass", "150" );
+ConVar sk_weapon_ar2_ducking_bonus( "sk_weapon_ar2_ducking_bonus", "0.25");
 
 #define AR2_ZOOM_RATE	0.5f	// Interval between zoom levels in seconds.
 
@@ -234,7 +235,7 @@ Activity CWeaponAR2::GetPrimaryAttackActivity( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Rocket shatter
 // Input  : &tr - 
 //			nDamageType - 
 //-----------------------------------------------------------------------------
@@ -349,9 +350,7 @@ void CWeaponAR2::SecondaryAttack( void )
 	// Cannot fire underwater
 	if ( GetOwner() && GetOwner()->GetWaterLevel() == 3 )
 	{
-		SendWeaponAnim( ACT_VM_DRYFIRE );
-		BaseClass::WeaponSound( EMPTY );
-		m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
+		DryFire();
 		return;
 	}
 
@@ -476,15 +475,15 @@ void CWeaponAR2::Zoom( void )
 		}
 		else
 		{
-		SendWeaponAnim( ACT_VM_FIDGET );
+			SendWeaponAnim( ACT_VM_FIDGET );
 
-		WeaponSound(SPECIAL1);
-		pPlayer->SetFOV( this, 35, 0.1f );
-		m_bZoomed = true;
+			WeaponSound(SPECIAL1);
+			pPlayer->SetFOV( this, 35, 0.1f );
+			m_bZoomed = true;
 
-		// Change this to an overlay (cus its fugly)
-		// sprites/reticle1
-		UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT) );	
+			// Change this to an overlay (cus its fugly)
+			// sprites/reticle1
+			UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT) );	
 		}
 	}
 }
@@ -496,6 +495,7 @@ void CWeaponAR2::Zoom( void )
 float CWeaponAR2::GetMinRestTime()
 {
 	//Default is 0.3
+#if 0
 	Class_T OwnerClass = GetOwner()->Classify();
 
 	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
@@ -503,8 +503,9 @@ float CWeaponAR2::GetMinRestTime()
 		 OwnerClass == CLASS_PLAYER_ALLY	||
 		 OwnerClass == CLASS_METROPOLICE	)
 		 return 0.5f;
+#endif
 
-	return 0.4f;
+	return 0.5f;
 }
 
 //-----------------------------------------------------------------------------
@@ -513,15 +514,10 @@ float CWeaponAR2::GetMaxRestTime()
 	// Default is 0.6
 	Class_T OwnerClass = GetOwner()->Classify();
 
-	if ( OwnerClass == CLASS_PLAYER_ALLY	||
-		 OwnerClass == CLASS_METROPOLICE	)
-		 return 0.9f;
+	if ( OwnerClass == CLASS_COMBINE )
+		 return 0.8f;
 
-	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
-		 OwnerClass == CLASS_CITIZEN_REBEL	)
-		 return 1.0f;
-
-	return 0.7f;
+	return 1.0f;
 }
 
 //-----------------------------------------------------------------------------
@@ -536,6 +532,22 @@ float CWeaponAR2::GetFireRate( void )
 	return BaseClass::GetCycleTime();
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Faster reload when crouched/stationary
+//-----------------------------------------------------------------------------
+float CWeaponAR2::GetDefaultAnimSpeed( void )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	if ( GetOwner() && GetOwner()->IsPlayer() )
+	{
+		if ( pPlayer->GetAbsVelocity().Length2D() > 120 )
+			return 1.0 - 0.25;
+		else if ( FBitSet( pPlayer->GetFlags(), FL_DUCKING ) )	//GetOwner()->GetFlags() & FL_DUCKING
+			return 1.0 + sk_weapon_ar2_ducking_bonus.GetFloat();
+	}
+
+	return 1.0;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Override if we're waiting to release a shot

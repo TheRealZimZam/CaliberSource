@@ -5,42 +5,42 @@
 // Valve, L.L.C., or in accordance with the terms and conditions stipulated in
 // the agreement/contract under which the contents have been supplied.
 //
-// Purpose: TF2 Accuracy system
+// Purpose: Spread system
 //
 // TODO's; implement this with just the movement modifers
 //
 //=============================================================================
 #include "cbase.h"
 #include "player.h"
-#include "tf_player.h"
+#include "hl2_player.h"
 #include "basecombatweapon.h"
 #include "vstdlib/random.h"
-
 
 
 // Accuracy is measured as the weapons spread in inches at 1024 units (~85 feet)
 // Accuracy is sent to the client, where it's used to generate the size of the accuracy representation.
 // Accuracy is a "floating" value, in that it's always moving towards a target accuracy, and takes some time to change
 
-// Accuracy Multipliers
+// Spread Multipliers
 // < 1 increases accuracy, > 1 decreases
 #define ACCMULT_DUCKING				0.75			// Player is ducking
-#define ACCMULT_RUNNING				1.25			// Player is moving >50% of his max speed
+#define ACCMULT_WALKING				0.85			// Player is walking/crouchwalking
+#define ACCMULT_RUNNING				1.0				// Player is moving normally
+#define ACCMULT_SPRINTING			1.5				// Player is sprinting
 
 // Ricochet Multiplier
 // This works differently to other acc multipliers.
-/*
 #define ACCMULT_RICOCHET			1.0				// Player is being suppressed by bullet fire
 #define ACC_RICOCHET_TIME			1.0				// Amount of time accuracy is affected by a ricochet near the player
 #define ACC_RICOCHET_MULTIPLE		0.25			// The effect of ricochets on accuracy is multiplied by this by the number of ricochets nearby
 #define ACC_RICOCHET_CAP			10				// Maximum number of bullets to register for suppression fire
-*/
+
 #define ACCURACY_CHANGE_SPEED		5
 
 //-----------------------------------------------------------------------------
 // Purpose: Calculates the players "accuracy" level
 //-----------------------------------------------------------------------------
-void CBaseTFPlayer::CalculateAccuracy( void )
+void CHL2_Player::CalculateAccuracy( void )
 {
 	static flLastTime = 0;
 
@@ -48,34 +48,41 @@ void CBaseTFPlayer::CalculateAccuracy( void )
 	float flTimeSlice = (gpGlobals->curtime - flLastTime);
 	m_flTargetAccuracy = 0;
 
-	if ( !GetPlayerClass()  )
+	CBasePlayer* pPlayer = UTIL_GetCommandClient();
+	if ( pPlayer == NULL )
 		return;
+
+	// TODO; This only works for hitscans, might need a case here for projectile based weapons,
+	// like rocket-launchers and such
 
 	// Get the base accuracy from the current weapon
 	if ( m_hActiveWeapon )
 	{
-		m_flTargetAccuracy = m_hActiveWeapon->GetAccuracy();
+		m_flTargetAccuracy = m_hActiveWeapon->GetBulletSpread();
 
-		// Accuracy is increased if the player's crouching
+		// Spread is decreased if the player's crouching
 		if ( GetFlags() & FL_DUCKING )
-			m_flTargetAccuracy *= m_hActiveWeapon->GetDuckingMultiplier();
+			m_flTargetAccuracy *= ACCMULT_DUCKING;
 
-		// Accuracy is decreased if the player's moving
-		if ( m_vecVelocity.Length2D() > ( GetPlayerClass()->GetMaxSpeed() * 0.5 ) )
-			m_flTargetAccuracy *= m_hActiveWeapon->GetRunningMultiplier();
+		// Spread is decreased if the player's walking
+		if ( m_vecVelocity.Length2D() <= HL2_WALK_SPEED )
+			m_flTargetAccuracy *= ACCMULT_WALKING;
+
+#if 0
+		// Spread is increased if the player's moving
+		if ( m_vecVelocity.Length2D() >= HL2_NORM_SPEED )
+			m_flTargetAccuracy *= ACCMULT_RUNNING;
+#endif
+
+		// Spread is heavily increased if the player's sprinting or otherwise flying fast
+		if ( m_vecVelocity.Length2D() >= HL2_SPRINT_SPEED )
+			m_flTargetAccuracy *= ACCMULT_SPRINTING;
 	}
 
-	// Accuracy is decreased if the player's arms are injured
-
-	// Accuracy is increased if there's an Officer nearby
-
-	// Accuracy is decreased if this player's being supressed (bullets/explosions impacting nearby)
-/*
+	// Spread is increased if this player's being supressed (bullets/explosions impacting nearby)
 	float flFarTime = (m_flLastRicochetNearby + ACC_RICOCHET_TIME);
 	if ( gpGlobals->curtime <= flFarTime )
 		m_flTargetAccuracy *= 1 + (m_flNumberOfRicochets * ACC_RICOCHET_MULTIPLE) * (ACCMULT_RICOCHET * ((flFarTime - gpGlobals->curtime) / ACC_RICOCHET_TIME));
-*/
-	// Accuracy is decreased if the player's just been hit by a bullet/explosion
 
 	// Now float towards the target accuracy
 	if ( m_bSnapAccuracy )
@@ -109,7 +116,7 @@ void CBaseTFPlayer::CalculateAccuracy( void )
 //-----------------------------------------------------------------------------
 // Purpose: Snap the players accuracy immediately
 //-----------------------------------------------------------------------------
-void CBaseTFPlayer::SnapAccuracy( void )
+void CHL2_Player::SnapAccuracy( void )
 {
 	m_bSnapAccuracy = true;
 }
@@ -117,15 +124,15 @@ void CBaseTFPlayer::SnapAccuracy( void )
 //-----------------------------------------------------------------------------
 // Purpose: Return the player's current accuracy
 //-----------------------------------------------------------------------------
-float CBaseTFPlayer::GetAccuracy( void )
+float CHL2_Player::GetAccuracy( void )
 {
 	return m_flAccuracy;
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Bullets / Explosions are hitting near the player. Reduce his/her accuracy.
+// Purpose: Bullets/Explosions are hitting near the player. Reduce thou accuracy
 //-----------------------------------------------------------------------------
-void CBaseTFPlayer::Suppress( void )
+void CHL2_Player::Suppress( void )
 {
 	if ( gpGlobals->curtime <= (m_flLastRicochetNearby + ACC_RICOCHET_TIME) )
 	{
@@ -142,7 +149,7 @@ void CBaseTFPlayer::Suppress( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-Vector CBaseTFPlayer::GenerateFireVector( Vector *viewVector )
+Vector CHL2_Player::GenerateFireVector( Vector *viewVector )
 {
 	// Calculate the weapon spread from the player's accuracy
 	float flAcc = (GetAccuracy() * 0.5) / ACCURACY_DISTANCE;

@@ -28,6 +28,7 @@
 #define	MAGNUM_ACCURACY_MAXIMUM_PENALTY_TIME	2.0f	// Maximum penalty to deal out
 
 ConVar	magnum_use_new_accuracy( "magnum_use_new_accuracy", "1" );
+extern ConVar sv_funmode;
 
 //-----------------------------------------------------------------------------
 // CWeapon357
@@ -130,20 +131,21 @@ END_DATADESC()
 
 acttable_t	CWeapon357::m_acttable[] = 
 {
-	{ ACT_IDLE,						ACT_IDLE_PISTOL,				true },
-	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_PISTOL,			true },
 	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_PISTOL,		true },
 	{ ACT_RELOAD,					ACT_RELOAD_PISTOL,				true },
+	{ ACT_IDLE,						ACT_IDLE_PISTOL,				true },
+	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_PISTOL,			true },
+
+	{ ACT_WALK,						ACT_WALK_PISTOL,				true },
 	{ ACT_WALK_AIM,					ACT_WALK_AIM_PISTOL,			true },
+	{ ACT_RUN,						ACT_RUN_PISTOL,					true },
 	{ ACT_RUN_AIM,					ACT_RUN_AIM_PISTOL,				true },
-	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_PISTOL,true },
-	{ ACT_RELOAD_LOW,				ACT_RELOAD_PISTOL_LOW,			false },
-	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_PISTOL_LOW,	false },
-	{ ACT_COVER_LOW,				ACT_COVER_PISTOL_LOW,			false },
-	{ ACT_RANGE_AIM_LOW,			ACT_RANGE_AIM_PISTOL_LOW,		false },
-	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_PISTOL,		false },
-	{ ACT_WALK,						ACT_WALK_PISTOL,				false },
-	{ ACT_RUN,						ACT_RUN_PISTOL,					false },
+
+	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_PISTOL,	false },
+	{ ACT_RANGE_AIM_LOW,			ACT_RANGE_AIM_PISTOL_LOW,			false },
+	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_PISTOL_LOW,		false },
+	{ ACT_RELOAD_LOW,				ACT_RELOAD_PISTOL_LOW,				false },
+	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_PISTOL,			false },
 };
 
 
@@ -160,6 +162,10 @@ CWeapon357::CWeapon357( void )
 	m_fMinRange1		= 16;
 	m_fMaxRange1		= 1500;
 
+	if ( !sv_funmode.GetBool() )
+	{
+		m_bCanJam			= true;
+	}
 	m_bReloadsSingly	= false;
 	m_bFiresUnderwater	= false;
 }

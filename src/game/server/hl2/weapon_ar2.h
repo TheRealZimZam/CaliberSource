@@ -23,8 +23,8 @@ public:
 	DECLARE_CLASS( CWeaponAR2, CHLMachineGun );
 
 	CWeaponAR2();
-
 	DECLARE_SERVERCLASS();
+	DECLARE_DATADESC();
 
 	void	ItemPostFrame( void );
 	void	Precache( void );
@@ -39,16 +39,12 @@ public:
 
 	void	AddViewKick( void );
 
-	void	FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
-	void	FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
-	void	Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
-	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-
 	int		GetMinBurst( void ) { return 2; }
 	int		GetMaxBurst( void ) { return 5; }
 	virtual float	GetMinRestTime();
 	virtual float	GetMaxRestTime();
 	float	GetFireRate( void );
+	float	GetDefaultAnimSpeed( void );
 
 	bool	CanHolster( void );
 	bool	Reload( void );
@@ -77,18 +73,21 @@ public:
 
 	const WeaponProficiencyInfo_t *GetProficiencyValues();
 
-protected:
+	void	FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
+	void	FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
+	void	Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
+	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
-	float					m_flDelayedFire;
-	bool					m_bShotDelayed;
+	DECLARE_ACTTABLE();
+
+protected:
+	float			m_flDelayedFire;
+	bool			m_bShotDelayed;
 
 	void			Zoom( void );
 	bool			m_bZoomed;
 
-	int						m_nVentPose;
-	
-	DECLARE_ACTTABLE();
-	DECLARE_DATADESC();
+	int				m_nVentPose;
 };
 
 

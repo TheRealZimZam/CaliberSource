@@ -6,10 +6,9 @@
 //			Secondary attack: cycles sniper scope through zoom levels.
 //
 // TODO: Circular mask around crosshairs when zoomed in.
-// TODO: Shell ejection.
 // TODO: Finalize kickback.
 // TODO: Animated zoom effect?
-//
+// NOTENOTE; This can be used as a baseclass for weapons that have a zoom
 //=============================================================================//
 
 #include "cbase.h"
@@ -22,6 +21,7 @@
 #include "in_buttons.h"
 #include "soundent.h"
 #include "vstdlib/random.h"
+#include "te_effect_dispatch.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -46,7 +46,6 @@ static int g_nZoomFOV[] =
 	5
 };
 
-
 class CWeaponSniperRifle : public CBaseHLCombatWeapon
 {
 	DECLARE_DATADESC();
@@ -59,7 +58,7 @@ public:
 
 	void Precache( void );
 
-	int CapabilitiesGet( void ) const;
+	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
 	const Vector &GetBulletSpread( void );
 
@@ -68,7 +67,7 @@ public:
 	void PrimaryAttack( void );
 	bool Reload( void );
 	void Zoom( void );
-	virtual float GetFireRate( void ) { return 1; };
+	virtual float GetFireRate( void ) { return 0.9f; };
 
 	void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
@@ -98,7 +97,22 @@ END_DATADESC()
 //-----------------------------------------------------------------------------
 acttable_t	CWeaponSniperRifle::m_acttable[] = 
 {
-	{	ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_SNIPER_RIFLE, true }
+	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_SNIPER_RIFLE,	true },
+	{ ACT_RELOAD,					ACT_RELOAD_AR2,					true },
+	{ ACT_IDLE,						ACT_IDLE_AR2,					true },
+	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_AR2,				true },
+
+	{ ACT_WALK,						ACT_WALK_RIFLE,					true },
+	{ ACT_WALK_AIM,					ACT_WALK_AIM_RIFLE,				true },
+	{ ACT_RUN,						ACT_RUN_RIFLE,					true },
+	{ ACT_RUN_AIM,					ACT_RUN_AIM_RIFLE,				true },
+
+	{ ACT_WALK_CROUCH,				ACT_WALK_CROUCH_RIFLE,			true },
+	{ ACT_WALK_CROUCH_AIM,			ACT_WALK_CROUCH_AIM_RIFLE,		true },
+	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RIFLE,			true },
+	{ ACT_RUN_CROUCH_AIM,			ACT_RUN_CROUCH_AIM_RIFLE,		true },
+	{ ACT_GESTURE_RANGE_ATTACK1,	ACT_GESTURE_RANGE_ATTACK_SNIPER_RIFLE,	true },
+	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_AR2,			true }
 };
 
 IMPLEMENT_ACTTABLE(CWeaponSniperRifle);
@@ -120,16 +134,28 @@ CWeaponSniperRifle::CWeaponSniperRifle( void )
 	m_fMaxRange2		= 2048;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CWeaponSniperRifle::Precache( void )
+{
+	BaseClass::Precache();
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-// Output : int
+// Output : virtual const Vector&
 //-----------------------------------------------------------------------------
-int CWeaponSniperRifle::CapabilitiesGet( void ) const
+const Vector &CWeaponSniperRifle::GetBulletSpread( void )
 {
-	return bits_CAP_WEAPON_RANGE_ATTACK1;
-}
+	static Vector cone;
+	cone = SNIPER_CONE_PLAYER;
 
+	if ( GetOwner() && GetOwner()->IsNPC() )
+		cone = SNIPER_CONE_NPC;
+
+	return cone;
+}
 
 
 //-----------------------------------------------------------------------------
@@ -152,7 +178,6 @@ bool CWeaponSniperRifle::Holster( CBaseCombatWeapon *pSwitchingTo )
 
 	return BaseClass::Holster(pSwitchingTo);
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Overloaded to handle the zoom functionality.
@@ -248,15 +273,6 @@ void CWeaponSniperRifle::ItemPostFrame( void )
 
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CWeaponSniperRifle::Precache( void )
-{
-	BaseClass::Precache();
-}
-
-
-//-----------------------------------------------------------------------------
 // Purpose: Same as base reload but doesn't change the owner's next attack time. This
 //			lets us zoom out while reloading. This hack is necessary because our
 //			ItemPostFrame is only called when the owner's next attack time has
@@ -338,7 +354,7 @@ void CWeaponSniperRifle::PrimaryAttack( void )
 
 		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 600, 0.2 );
 
-		QAngle vecPunch(random->RandomFloat( -SNIPER_KICKBACK, SNIPER_KICKBACK ), 0, 0);
+		QAngle vecPunch(-SNIPER_KICKBACK, random->RandomFloat( -SNIPER_KICKBACK, SNIPER_KICKBACK ), 0);
 		pPlayer->ViewPunch(vecPunch);
 
 		// Indicate out of ammo condition if we run out of ammo.
@@ -385,23 +401,11 @@ void CWeaponSniperRifle::Zoom( void )
 			}
 
 			WeaponSound(SPECIAL1);
-			
 			m_nZoomLevel++;
 		}
 	}
 
 	m_fNextZoom = gpGlobals->curtime + SNIPER_ZOOM_RATE;
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Output : virtual const Vector&
-//-----------------------------------------------------------------------------
-const Vector &CWeaponSniperRifle::GetBulletSpread( void )
-{
-	static Vector cone = SNIPER_CONE_PLAYER;
-	return cone;
 }
 
 
@@ -434,6 +438,22 @@ void CWeaponSniperRifle::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCom
 			WeaponSound( SINGLE_NPC );
 			pOperator->FireBullets( SNIPER_BULLET_COUNT_NPC, vecShootOrigin, vecShootDir, vecSpread, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, SNIPER_TRACER_FREQUENCY_NPC );
 			pOperator->DoMuzzleFlash();
+			break;
+		}
+
+		case EVENT_WEAPON_RELOAD:
+		{
+			CEffectData data;
+
+			// Emit a shell
+			for ( int i = 0; i < GetDefaultClip1(); i++ )
+			{
+				data.m_vOrigin = pOperator->WorldSpaceCenter() + RandomVector( -4, 4 );
+				data.m_vAngles = QAngle( 90, random->RandomInt( 0, 360 ), 0 );
+				data.m_nEntIndex = entindex();
+
+				DispatchEffect( "RifleShellEject", data );
+			}
 			break;
 		}
 

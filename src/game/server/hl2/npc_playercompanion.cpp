@@ -1,11 +1,9 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
-// This class should really be renamed, but eh thats more than 10 seconds of work soooo
-// SCREW THAT SCOOBIEDOO YABBADABBADO
+// This class should really be renamed
 //
 // Purpose: Default Human AI
 // For the most part, squads are not needed as each entity has most of its AI act independently
 //
-// TODO'S; Fix weapon pickup, optimize.
 //=============================================================================//
 
 #include "cbase.h"
@@ -113,6 +111,7 @@ BEGIN_DATADESC( CNPC_PlayerCompanion )
 	DEFINE_FIELD( m_bReadinessCapable,		FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flReadinessLockedUntil, FIELD_TIME ),
 	DEFINE_FIELD( m_bFirstEncounter,		FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bAnnoyed,				FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fLastBarrelExploded,	FIELD_TIME ),
 	DEFINE_FIELD( m_iNumConsecutiveBarrelsExploded, FIELD_INTEGER ),
 	DEFINE_FIELD( m_fLastPlayerKill, FIELD_TIME ),
@@ -241,7 +240,8 @@ void CNPC_PlayerCompanion::Spawn()
 	SetReadinessValue( 0.0f );
 	SetReadinessSensitivity( random->RandomFloat( 0.7, 1.3 ) );
 	m_flReadinessLockedUntil = 0.0f;
-	m_bFirstEncounter	= true;	// this is true when the grunt spawns, because he hasn't encountered an enemy yet.
+	m_bFirstEncounter	= true;		// Have I encounted ANY enemies yet?
+	m_bAnnoyed			= false;	// The current enemy is my nemesis (not relation-wise, but annoyance-wise)
 
 	m_AnnounceAttackTimer.Set( 10, 30 );
 
@@ -1007,16 +1007,36 @@ bool CNPC_PlayerCompanion::IgnorePlayerPushing( void )
 int CNPC_PlayerCompanion::SelectCombatSchedule()
 {
 	// -----------
+	// Dead Enemy
+	// -----------
+	if ( HasCondition( COND_ENEMY_DEAD ) )
+	{
+		// call base class, all code to handle dead enemies is centralized there.
+		m_bAnnoyed = false;
+		return SCHED_NONE;
+	}
+
+	// -----------
 	// New Enemy
 	// -----------
 	if ( HasCondition( COND_NEW_ENEMY ) )
 	{
 		if ( m_pSquad && GetEnemy() )
 		{
-			// Alert the squad when first going into combat
+			float flTimeSinceFirstSeen = gpGlobals->curtime - GetEnemies()->FirstTimeSeen( GetEnemy() );
 			if ( m_bFirstEncounter && OccupyStrategySlot( SQUAD_SLOT_ATTACK1 ) )
 			{
+				// Alert the squad when first going into combat
 				return SCHED_PC_SPOT_ENEMY;
+			}
+			else if ( flTimeSinceFirstSeen > 3.0f )
+			{
+				// This is an enemy ive seen before, start being more aggressive!
+				m_bAnnoyed = true;
+				if( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) || Classify()==CLASS_PLAYER_ALLY_VITAL )
+				{
+					return SCHED_ESTABLISH_LINE_OF_FIRE;
+				}
 			}
 		}
 	}
@@ -1029,14 +1049,10 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 	// Only hide and reload if you're injured, Otherwise just reload on the spot.
 	if ( CanReload() && HasCondition( COND_NO_PRIMARY_AMMO ) && !HasCondition( COND_CAN_MELEE_ATTACK1 ) )
 	{
-		if( !bHighHealth )
-		{
-			return SCHED_HIDE_AND_RELOAD;
-		}
-		else
-		{
+		if( bHighHealth )
 			return SCHED_RELOAD;
-		}
+
+		return SCHED_HIDE_AND_RELOAD;
 	}
 	
 	// ----------------------
@@ -1058,9 +1074,18 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 			else if ( !IsCrouching() )
 			{
 				// If my enemy is shooting at me from a distance, crouch for protection
-				if ( iPercent >= 5 && CouldShootIfCrouching( GetEnemy() ) )
+				if ( iPercent >= 6 && CouldShootIfCrouching( GetEnemy() ) )
 					DesireCrouch();
 
+#if 0
+				bool bCriticalHealth = ((float)GetHealth() / (float)GetMaxHealth() < 0.25f);
+				if ( !m_bAnnoyed && iPercent >= 7 && bCriticalHealth )
+				{
+					// The guy must be toying with me!
+					m_bAnnoyed = true;
+					return SCHED_CHASE_ENEMY;
+				}
+#endif
 			}
 		}
 		else
@@ -1093,9 +1118,11 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 	{
 		// Get into range!
 		if ( HasCondition( COND_TOO_FAR_TO_ATTACK ) )
-		{
 			return SCHED_MOVE_TO_WEAPON_RANGE;
-		}
+
+		if ( m_bAnnoyed )
+			return SCHED_ESTABLISH_LINE_OF_FIRE;
+
 		return SCHED_PC_ESTABLISH_LOF_WAIT;
 	}
 
@@ -1118,7 +1145,7 @@ int CNPC_PlayerCompanion::SelectNonCombatSchedule()
 	}
 
 	// React to/Investigate nearby sounds
-	if ( !HasCondition( COND_SEE_ENEMY ) )
+	if ( GetEnemy() == NULL )
 	{
 		if ( HasCondition( COND_HEAR_COMBAT ) || HasCondition( COND_HEAR_PLAYER ) )
 		{
@@ -1137,6 +1164,7 @@ int CNPC_PlayerCompanion::SelectNonCombatSchedule()
 		}
 	}
 
+	//!!! This should be defined in the subclass-Story characters really shouldnt do this
 #if 0
 	// Scan around for new enemies
 	if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
@@ -4216,7 +4244,7 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"		 TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FLEE_FROM_BEST_SOUND"
 		"		 TASK_STOP_MOVING					0"
 		"		 TASK_SET_TOLERANCE_DISTANCE		24"
-		"		 TASK_STORE_BESTSOUND_REACTORIGIN_IN_SAVEPOSITION	0"
+//		"		 TASK_STORE_BESTSOUND_REACTORIGIN_IN_SAVEPOSITION	0"
 		"		 TASK_FIND_COVER_FROM_BEST_SOUND	0"
 		"		 TASK_RUN_PATH_TIMED				3.5" //Maximum of three seconds to take cover
 		"		 TASK_STOP_MOVING					0"
@@ -4387,8 +4415,8 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"	Tasks"
 		"		TASK_STOP_MOVING					0"
 		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
-		"		TASK_WAIT_FACE_ENEMY				0.2" // give the guy some time to come out on his own
-		"		TASK_WAIT_RANDOM					4" // Wait up to 4 seconds
+		"		TASK_WAIT_FACE_ENEMY				0.2"	// give the guy some time to come out on his own
+		"		TASK_WAIT_FACE_ENEMY_RANDOM			4"		// Wait up to 4 seconds
 		"		TASK_SET_SCHEDULE					SCHEDULE:SCHED_ESTABLISH_LINE_OF_FIRE"
 		""
 		"	Interrupts"
@@ -4465,10 +4493,8 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
 		"		TASK_FACE_ENEMY				0"
 		"		TASK_WAIT					0.3"
-//		"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_COMBAT_SWEEP"
 		""
 		"	Interrupts"
-//		"		COND_NEW_ENEMY"
 		"		COND_ENEMY_DEAD"
 		"		COND_HEAVY_DAMAGE"
 		"		COND_CAN_MELEE_ATTACK1"
@@ -4489,7 +4515,7 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"		TASK_WAIT_RANDOM			1.0"
 		""
 		"	Interrupts"
-		"		"
+		""
 	)
 
  //---------------------------------------------------------
@@ -4503,6 +4529,8 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 
 		"	Tasks"
 		"		TASK_STOP_MOVING				0"
+		"		TASK_STORE_BESTSOUND_REACTORIGIN_IN_SAVEPOSITION	0"
+		"		TASK_FACE_SAVEPOSITION			0"
 		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE_PRONE"
 		"		TASK_WAIT						1"
 		"		TASK_WAIT_RANDOM				3"

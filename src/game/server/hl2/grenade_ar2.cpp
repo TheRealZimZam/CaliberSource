@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: SMG-Launched Grenade
+// Purpose: Launched Grenade
 //
-// TODO's: Fix smoke-trail orientation, when bounced face direction of new trajectory
+// TODO's: Fix smoke-trail orientation, airburst variant
 // $NoKeywords: $
 //=============================================================================//
 
@@ -207,7 +207,6 @@ void CGrenadeAR2::Detonate(void)
 
 	CPASFilter filter( GetAbsOrigin() );
 
-	//TODO; Use FX_MicroExplosion
 	te->Explosion( filter, 0.0,
 		&GetAbsOrigin(), 
 		g_sModelIndexFireball,
@@ -239,7 +238,7 @@ void CGrenadeAR2::Detonate(void)
 
 	UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
 
-	RadiusDamage ( CTakeDamageInfo( this, GetThrower(), m_flDamage, DMG_BLAST ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
+	RadiusDamage( CTakeDamageInfo( this, GetThrower(), m_flDamage, DMG_BLAST ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 
 	UTIL_Remove( this );
 }
@@ -258,8 +257,9 @@ CGrenadeAR2::CGrenadeAR2(void)
 
 //=============================================================================
 // Purpose:  Airburst variant - goes live when near a target/impact point
+// OR when the command is given by a player
 // NOTENOTE; This nade creates two explosions - one in the center and one
-// in-front of the grenade as distacted by the airburst dist
+// in-front of the grenade as dictacted by the airburst dist
 //=============================================================================
 LINK_ENTITY_TO_CLASS( grenade_ar2_airburst, CGrenadeAR2Airburst );
 
@@ -293,8 +293,10 @@ void CGrenadeAR2Airburst::GrenadeAR2Think( void )
 	// If I'm just about to hit an enemy, or the world, blow up!
 	if (m_bIsLive)
 	{
+		//TODO; If the player has given the command
+
 		//FIXME; This is temp and doesnt work, just here to stop errors really
-		//Do a trace infront of me, if theres ANYTHING solid then detonate
+		//Do a trace infront of me, if theres ANYTHING there then detonate
 		Vector vecForward = GetAbsVelocity();
 		VectorNormalize(vecForward);
 		trace_t		tr;

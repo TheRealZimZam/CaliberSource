@@ -23,6 +23,9 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#define VECTOR_CONE_SHOTGUN		Vector( 0.10461, 0.10461, 0.09589 )
+//ConVar sk_weapon_shotgun_lerp( "sk_weapon_shotgun_lerp", "3.0" );	//NOT USED
+
 extern ConVar sk_auto_reload_time;
 extern ConVar sk_plr_num_shotgun_pellets;
 extern ConVar sk_npc_num_shotgun_pellets;
@@ -48,8 +51,8 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector AllyCone = VECTOR_CONE_3DEGREES;
-		static Vector cone = VECTOR_CONE_10DEGREES;
+		static Vector AllyCone = VECTOR_CONE_4DEGREES;
+		static Vector cone = VECTOR_CONE_SHOTGUN;
 
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
@@ -60,9 +63,6 @@ public:
 
 		return cone;
 	}
-
-	virtual int				GetMinBurst() { return 1; }
-	virtual int				GetMaxBurst() { return 1; }
 
 	virtual float			GetMinRestTime();
 	virtual float			GetMaxRestTime();
@@ -176,7 +176,7 @@ CWeaponShotgun::CWeaponShotgun( void )
 	m_fMinRange1		= 0.0;
 	m_fMaxRange1		= 768;
 	m_fMinRange2		= 0.0;
-	m_fMaxRange2		= 256;
+	m_fMaxRange2		= 256;	//This is secondary attack range for ai, if its ever implemented (god forbid)
 }
 
 void CWeaponShotgun::Precache( void )
@@ -297,7 +297,7 @@ float CWeaponShotgun::GetFireRate()
 	}
 	if( GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
 	{
-		return 1.0f;
+		return 1.2f;
 	}
 #endif
 	//TODO; this should really just grab the duration of the pump animation
@@ -449,7 +449,7 @@ void CWeaponShotgun::Pump( void )
 		return;
 
 	m_bNeedPump = false;
-	
+
 	WeaponSound( SPECIAL1 );
 
 	// Finish reload animation
@@ -495,7 +495,7 @@ void CWeaponShotgun::PrimaryAttack( void )
 	// Fire the bullets, and force the first shot to be perfectly accuracy
 	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, true, true );
 
-	pPlayer->ViewPunch( QAngle( random->RandomFloat( -2, 2 ), random->RandomFloat( -3, 3 ), 0 ) );
+	pPlayer->ViewPunch( QAngle( random->RandomFloat( -3, -1 ), random->RandomFloat( -2, 2 ), 0 ) );
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
 
@@ -553,7 +553,7 @@ void CWeaponShotgun::SecondaryAttack( void )
 
 	// Fire the bullets
 	int NumPellets = sk_plr_num_shotgun_pellets.GetInt() * 2;
-	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, VECTOR_CONE_12DEGREES, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, false, false );
+	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, VECTOR_CONE_SHOTGUN * 1.25, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, false, false );
 
 	pPlayer->ViewPunch( QAngle( -8, random->RandomFloat( -4, 4 ), 0 ) );
 
@@ -801,7 +801,7 @@ void CWeaponShotgun::ItemHolsterFrame( void )
 // Purpose: 
 //==================================================
 #if 0
-void CWeaponSuperShotgun::WeaponIdle( void )
+void CWeaponShotgun::WeaponIdle( void )
 {
 	//Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = GetOwner()

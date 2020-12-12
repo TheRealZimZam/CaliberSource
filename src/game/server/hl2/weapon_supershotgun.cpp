@@ -23,7 +23,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-//ConVar sk_weapon_supershotgun_lerp( "sk_weapon_supershotgun_lerp", "5.0" );	//NOT USED
+#define VECTOR_CONE_SUPERSHOTGUN		Vector( 0.12206, 0.12206, 0.11334 )
+ConVar sk_weapon_supershotgun_lerp( "sk_weapon_supershotgun_lerp", "5.0" );
 
 extern ConVar sk_auto_reload_time;
 extern ConVar sk_plr_num_shotgun_pellets;
@@ -45,7 +46,7 @@ public:
 	virtual const Vector& GetBulletSpread( void )
 	{
 		static Vector AllyCone = VECTOR_CONE_4DEGREES;
-		static Vector cone = VECTOR_CONE_12DEGREES;
+		static Vector cone = VECTOR_CONE_SUPERSHOTGUN;
 
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
@@ -57,7 +58,7 @@ public:
 	}
 
 	virtual int				GetMinBurst() { return 2; }
-	virtual int				GetMaxBurst() { return 3; }
+	virtual int				GetMaxBurst() { return 2; }
 
 	virtual float			GetMinRestTime();
 	virtual float			GetMaxRestTime();
@@ -67,7 +68,6 @@ public:
 	bool	Reload( void );
 //	void	WeaponIdle( void );
 	void	ItemHolsterFrame( void );
-//	void	ItemPostFrame( void );
 	void	PrimaryAttack( void );
 
 	const char *GetTracerType( void ) { return "ShotgunTracer"; }

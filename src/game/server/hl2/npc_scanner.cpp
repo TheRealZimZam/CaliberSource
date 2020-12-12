@@ -14,6 +14,7 @@
 #include "globalstate.h"
 #include "soundent.h"
 #include "npc_citizen17.h"
+#include "steamjet.h"
 #include "gib.h"
 #include "spotlightend.h"
 #include "IEffects.h"
@@ -53,9 +54,9 @@ extern IMaterialSystemHardwareConfig *g_pMaterialSystemHardwareConfig;
 #define SCANNER_SPOTLIGHT_FLY_HEIGHT	72
 #define SCANNER_NOSPOTLIGHT_FLY_HEIGHT	72
 
+#define SCANNER_GAS_DAMAGE_DIST			500
 #define SCANNER_FLASH_MIN_DIST			900		// How far does flash effect enemy
 #define SCANNER_FLASH_MAX_DIST			1200	// How far does flash effect enemy
-
 #define	SCANNER_FLASH_MAX_VALUE			240		// How bright is maximum flash
 
 #define SCANNER_PHOTO_NEAR_DIST			64
@@ -69,6 +70,7 @@ extern IMaterialSystemHardwareConfig *g_pMaterialSystemHardwareConfig;
 #define SCANNER_SCOUT_MAX_SPEED			150
 
 ConVar	sk_scanner_health( "sk_scanner_health","0");
+ConVar	sk_scanner_dmg_gas( "sk_scanner_dmg_gas","0");
 ConVar	g_debug_cscanner( "g_debug_cscanner", "0" );
 
 //-----------------------------------------------------------------------------
@@ -157,6 +159,8 @@ BEGIN_DATADESC( CNPC_CScanner )
 	DEFINE_FIELD( m_flFlyNoiseBase,			FIELD_FLOAT ),
 	DEFINE_FIELD( m_flEngineStallTime,		FIELD_TIME ),
 
+	DEFINE_FIELD( m_vGasDirection,			FIELD_VECTOR ),
+
 	DEFINE_FIELD( m_vecDiveBombDirection,	FIELD_VECTOR ),
 	DEFINE_FIELD( m_flDiveBombRollForce,	FIELD_FLOAT ),
 
@@ -199,6 +203,7 @@ CNPC_CScanner::CNPC_CScanner()
 	m_vSpotlightCurrentPos.Init();
 	m_vSpotlightDir.Init();
 	m_vSpotlightAngVelocity.Init();
+	m_vGasDirection.Init();
 #endif
 	m_bShouldInspect = true;
 	m_bOnlyInspectPlayers = false;
@@ -279,6 +284,7 @@ void CNPC_CScanner::Spawn(void)
 	m_fNextSpotlightTime	= 0;
 	m_nFlyMode				= SCANNER_FLY_PATROL;
 	m_vCurrentBanking		= m_vSpotlightDir;
+	m_vGasDirection			= m_vSpotlightDir;
 	m_flSpotlightCurLength	= m_flSpotlightMaxLength;
 
 	m_nPoseTail = LookupPoseParameter( "tail_control" );
@@ -550,6 +556,7 @@ void CNPC_CScanner::Precache(void)
 		PrecacheScriptSound( "NPC_SScanner.Pain" );
 		PrecacheScriptSound( "NPC_SScanner.TakePhoto" );
 		PrecacheScriptSound( "NPC_SScanner.AttackFlash" );
+		PrecacheScriptSound( "NPC_SScanner.AttackGas" );
 		PrecacheScriptSound( "NPC_SScanner.DiveBombFlyby" );
 		PrecacheScriptSound( "NPC_SScanner.DiveBomb" );
 		PrecacheScriptSound( "NPC_SScanner.DeployMine" );
@@ -575,8 +582,10 @@ void CNPC_CScanner::Precache(void)
 		PrecacheScriptSound( "NPC_CScanner.Pain" );
 		PrecacheScriptSound( "NPC_CScanner.TakePhoto" );
 		PrecacheScriptSound( "NPC_CScanner.AttackFlash" );
+		PrecacheScriptSound( "NPC_CScanner.AttackGas" );
 		PrecacheScriptSound( "NPC_CScanner.DiveBombFlyby" );
 		PrecacheScriptSound( "NPC_CScanner.DiveBomb" );
+		PrecacheScriptSound( "NPC_CScanner.Illuminate" );
 		PrecacheScriptSound( "NPC_CScanner.DeployMine" );
 
 		PrecacheScriptSound( "NPC_CScanner.FlyLoop" );
@@ -1364,6 +1373,25 @@ void CNPC_CScanner::RunTask( const Task_t *pTask )
 			}
 			break;
 		}
+		case TASK_CSCANNER_ATTACK_PRE_GAS:
+		{
+			AttackPreGas();
+
+			if (IsWaitFinished())
+			{
+				TaskComplete();
+			}
+			break;
+		}
+		case TASK_CSCANNER_ATTACK_GAS:
+		{
+			if (IsWaitFinished())
+			{
+				AttackGasDamage();
+				TaskComplete();
+			}
+			break;
+		}
 		default:
 		{
 			BaseClass::RunTask(pTask);
@@ -1426,13 +1454,13 @@ int CNPC_CScanner::SelectSchedule(void)
 	}
 
 	// I'm being held by the physcannon... struggle!
-	if ( IsHeldByPhyscannon( ) ) 
+	if ( IsHeldByPhyscannon( ) )
 		return SCHED_SCANNER_HELD_BY_PHYSCANNON;
 
 	// ----------------------------------------------------------
 	//  If I have an enemy
 	// ----------------------------------------------------------
-	if ( GetEnemy() != NULL && GetEnemy()->IsAlive() && m_bShouldInspect )
+	if ( GetEnemy() != NULL && GetEnemy()->IsAlive() )	//&& m_bShouldInspect
 	{
 		// Always chase the enemy
 		SetInspectTargetToEnt( GetEnemy(), 9999 );
@@ -1440,7 +1468,7 @@ int CNPC_CScanner::SelectSchedule(void)
 		// Patrol if the enemy has vanished
 		if ( HasCondition( COND_LOST_ENEMY ) )
 			return SCHED_SCANNER_PATROL;
-		
+
 		// Chase via route if we're directly blocked
 		if ( HasCondition( COND_SCANNER_FLY_BLOCKED ) )
 			return SCHED_SCANNER_CHASE_ENEMY;
@@ -1451,22 +1479,31 @@ int CNPC_CScanner::SelectSchedule(void)
 
 		// Melee attack if possible
 		if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
-		{ 
+		{
+			//TODO; If the player is being swarmed by 2+ scanners, try to dish out each attack
+			// role evenly
 			if ( random->RandomInt(0,1) )
+			{
 				return SCHED_CSCANNER_ATTACK_FLASH;
-
+			}
+			else
+			{
+				return SCHED_CSCANNER_ATTACK_GAS;
+			}
 			// TODO: a schedule where he makes an alarm sound?
 			return SCHED_SCANNER_CHASE_ENEMY;
 		}
+		else
+		{
+			// If I'm far from the enemy, stay up high and approach in spotlight mode
+			float fAttack2DDist = ( GetEnemyLKP() - GetAbsOrigin() ).Length2D();
 
-		// If I'm far from the enemy, stay up high and approach in spotlight mode
-		float fAttack2DDist = ( GetEnemyLKP() - GetAbsOrigin() ).Length2D();
+			if ( fAttack2DDist > SCANNER_ATTACK_FAR_DIST )
+				return SCHED_CSCANNER_SPOTLIGHT_HOVER;
 
-		if ( fAttack2DDist > SCANNER_ATTACK_FAR_DIST )
-			return SCHED_CSCANNER_SPOTLIGHT_HOVER;
-
-		// Otherwise fly in low for attack
-		return SCHED_SCANNER_ATTACK_HOVER;
+			// Otherwise fly in low for attack
+			return SCHED_SCANNER_ATTACK_HOVER;
+		}
 	}
 
 	// ----------------------------------------------------------
@@ -1917,6 +1954,25 @@ void CNPC_CScanner::AttackPreFlash(void)
 	}
 }
 
+//------------------------------------------------------------------------------
+// Purpose:
+//------------------------------------------------------------------------------
+void CNPC_CScanner::AttackPreGas(void)
+{
+	ScannerEmitSound( "TakePhoto" );
+
+	// If off turn on, if on turn off
+	if (m_pEyeFlash->GetBrightness() == 0)
+	{
+		m_pEyeFlash->SetScale( 0.5 );
+		m_pEyeFlash->SetBrightness( 255 );
+		m_pEyeFlash->SetColor(234,191,17);
+	}
+	else
+	{
+		m_pEyeFlash->SetBrightness( 0 );
+	}
+}
 
 //------------------------------------------------------------------------------
 // Purpose:
@@ -2014,15 +2070,93 @@ void CNPC_CScanner::AttackFlashBlind(void)
 	m_pEyeFlash->SetBrightness( 0 );
 
 	float fAttackDelay = random->RandomFloat(SCANNER_ATTACK_MIN_DELAY,SCANNER_ATTACK_MAX_DELAY);
-
 	if( IsStriderScout() )
 	{
 		// Make strider scouts more snappy.
 		fAttackDelay *= 0.5;
 	}
-
 	m_flNextAttack	= gpGlobals->curtime + fAttackDelay;
 	m_fNextSpotlightTime = gpGlobals->curtime + 1.0f;
+}
+
+//------------------------------------------------------------------------------
+// Purpose :
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void CNPC_CScanner::AttackGas(void)
+{
+	if ( GetEnemy() )
+	{
+		ScannerEmitSound( "AttackGas" );
+
+		CSteamJet *pJet= (CSteamJet *)CreateEntityByName("env_steamjet");
+		pJet->Spawn();
+		pJet->SetLocalOrigin( GetLocalOrigin() );
+		pJet->m_bEmit		= true;
+		pJet->m_SpreadSpeed	= 30;
+		pJet->m_Speed		= 400;
+		pJet->m_StartSize	= 5;
+		pJet->m_EndSize		= 100;
+		pJet->m_JetLength	= 700;
+		//pJet->m_Color		= Vector(110/255.0,82/255.0,9/255.0); // Mustard gas orange
+		pJet->SetRenderColor( 110, 82, 9, 255 );
+		//NOTENOTE: Set pJet->m_clrRender->a here for translucency
+
+		pJet->SetParent(this);
+		pJet->SetLifetime(1.0);
+
+		Vector	vEnemyPos	= GetEnemy()->EyePosition() + GetEnemy()->GetAbsVelocity();
+		m_vGasDirection		= GetLocalOrigin() - vEnemyPos;
+
+		QAngle angles;
+		VectorAngles(m_vGasDirection, angles );
+		angles.y += 90;
+
+		pJet->SetLocalAngles( angles );
+
+		float fAttackDelay = random->RandomFloat(SCANNER_ATTACK_MIN_DELAY,SCANNER_ATTACK_MAX_DELAY);
+		if( IsStriderScout() )
+		{
+			// Make strider scouts more snappy.
+			fAttackDelay *= 0.5;
+		}
+		m_flNextAttack = gpGlobals->curtime + fAttackDelay;
+		m_fNextSpotlightTime = gpGlobals->curtime + 1.0f;
+	}
+}
+
+//------------------------------------------------------------------------------
+// Purpose:
+//------------------------------------------------------------------------------
+void CNPC_CScanner::AttackGasDamage(void)
+{
+	// Note: Don't use CheckTraceHullAttack as other scanners can get in the way
+	if (GetEnemy() == NULL)
+	{
+		return;
+	}
+
+	float fEnemyDist = (GetEnemy()->GetLocalOrigin() - GetLocalOrigin()).Length();
+	if (fEnemyDist > SCANNER_GAS_DAMAGE_DIST)
+	{
+		return;
+	}
+
+	Vector	vEnemyDir	= GetLocalOrigin() - GetEnemy()->GetLocalOrigin();
+	Vector gasDir = m_vGasDirection;
+	VectorNormalize(vEnemyDir);
+	VectorNormalize(gasDir);
+	float	dotPr		= DotProduct(vEnemyDir,gasDir);
+	if (dotPr > 0.90)
+	{
+		GetEnemy()->TakeDamage( CTakeDamageInfo( this, this, sk_scanner_dmg_gas.GetFloat(), DMG_NERVEGAS ) );
+	}
+
+	if (GetEnemy()->GetFlags() & FL_CLIENT)
+	{
+		GetEnemy()->ViewPunch(QAngle(random->RandomInt(-10,10), 0, random->RandomInt(-10,10)));
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -2227,6 +2361,29 @@ void CNPC_CScanner::StartTask( const Task_t *pTask )
 		AttackFlash();
 		// Blinding occurs slightly later
 		SetWait( 0.05 );
+		break;
+	}
+
+	case TASK_CSCANNER_ATTACK_PRE_GAS:
+	{
+		if (m_pEyeFlash)
+		{
+			AttackPreGas();
+			// Flash red for a while
+			SetWait( 0.5f );
+		}
+		else
+		{
+			TaskFail("No Flash");
+		}
+		break;
+	}
+
+	case TASK_CSCANNER_ATTACK_GAS:
+	{
+		AttackGas();
+		// Damage occurs slightly later, so player can avoid it
+		SetWait( 0.25 );
 		break;
 	}
 
@@ -2963,8 +3120,26 @@ AI_BEGIN_CUSTOM_NPC( npc_cscanner, CNPC_CScanner )
 		"	Tasks"
 		"		TASK_SCANNER_SET_FLY_ATTACK			0"
 		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
-		"		TASK_CSCANNER_ATTACK_PRE_FLASH		0 "
+		"		TASK_CSCANNER_ATTACK_PRE_FLASH		0"
 		"		TASK_CSCANNER_ATTACK_FLASH			0"
+		"		TASK_WAIT							0.5"
+		""
+		"	Interrupts"
+		"		COND_NEW_ENEMY"
+		"		COND_ENEMY_DEAD"
+		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
+	)
+
+	// > SCHED_CSCANNER_ATTACK_GAS
+	DEFINE_SCHEDULE
+	(
+		SCHED_CSCANNER_ATTACK_GAS,
+
+		"	Tasks"
+		"		TASK_SCANNER_SET_FLY_ATTACK			0"
+		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
+		"		TASK_CSCANNER_ATTACK_PRE_GAS		0"
+		"		TASK_CSCANNER_ATTACK_GAS			0"
 		"		TASK_WAIT							0.5"
 		""
 		"	Interrupts"

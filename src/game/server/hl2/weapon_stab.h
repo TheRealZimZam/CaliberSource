@@ -34,14 +34,14 @@ public:
 
 	CWeaponStab();
 
-	float		GetRange( void )		{	return	STAB_RANGE;	}
+	float		GetRange( void )		{	return STAB_RANGE;	}
 	float		GetFireRate( void )		{	return BaseClass::GetCycleTime();	}	//STAB_REFIRE
 
 	void		AddViewKick( void );
 	float		GetDamageForActivity( Activity hitActivity );
 
 	virtual int WeaponMeleeAttack1Condition( float flDot, float flDist );
-	void		SecondaryAttack( void )	{	return;	}
+	void		SecondaryAttack( void )	{ return; }	//No secondary (for now)
 
 	// Animation event
 	virtual void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );

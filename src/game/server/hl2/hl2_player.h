@@ -54,8 +54,9 @@ struct commandgoal_t
 #define	WEAPON_MELEE_SLOT			0
 #define	WEAPON_SECONDARY_SLOT		1
 #define	WEAPON_PRIMARY_SLOT			2
-#define	WEAPON_EXPLOSIVE_SLOT		3
-#define	WEAPON_TOOL_SLOT			4
+#define	WEAPON_SPECIAL_SLOT			3
+#define	WEAPON_EXPLOSIVE_SLOT		4
+#define	WEAPON_TOOL_SLOT			5
 
 //=============================================================================
 //=============================================================================
@@ -240,6 +241,7 @@ public:
 	virtual bool		Weapon_Ready( void );
 	virtual bool		Weapon_Switch( CBaseCombatWeapon *pWeapon, int viewmodelindex = 0 );
 	virtual bool		Weapon_CanSwitchTo( CBaseCombatWeapon *pWeapon );
+	float				GetDefaultAnimSpeed( void );
 
 	void FirePlayerProxyOutput( const char *pszOutputName, variant_t variant, CBaseEntity *pActivator, CBaseEntity *pCaller );
 
@@ -364,6 +366,17 @@ private:
 	float				m_flMoveTime;		//Amount of time we've been in motion
 	float				m_flLastDamageTime;	//Last time we took damage
 	float				m_flTargetFindTime;
+
+	// Accuracy
+//!!!TBA
+/*
+	bool	m_bSnapAccuracy;
+	float	m_flAccuracy;
+	float	m_flTargetAccuracy;
+	float	m_flLastRicochetNearby;
+	float	m_flNumberOfRicochets;
+	float	m_flLastExplosionNearby;
+*/
 
 	EHANDLE				m_hPlayerProxy;
 

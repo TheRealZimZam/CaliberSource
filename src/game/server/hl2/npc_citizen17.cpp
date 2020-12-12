@@ -1223,10 +1223,16 @@ int CNPC_Citizen::SelectSchedule()
 	if ( !IsInPlayerSquad() && HasCondition( COND_LIGHT_DAMAGE ) && bCriticalHealth )
 	{
 		//TODO; This needs a counter, stop doing this after 2 or 3 times
-		if ( GetEnemy() != NULL && !(m_Type == CT_REBEL || m_Type == CT_UNIQUE) )
+		if ( GetEnemy() != NULL && !(m_Type == CT_REBEL || m_Type == CT_UNIQUE) )	//TODO; instead of checking type every tick, maybe do a spawn value instead?
 		{
 			FearSound();
 			return SCHED_CITIZEN_FLEE;
+		}
+		else if ( !m_bAnnoyed && random->RandomInt( 0, 2 ) == 1 )
+		{
+			// The guy must be toying with me!
+			m_bAnnoyed = true;
+			return SCHED_CHASE_ENEMY;
 		}
 	}
 
@@ -1273,7 +1279,8 @@ int CNPC_Citizen::SelectScheduleHeal()
 					return SCHED_CITIZEN_HEAL_TOSS;
 				}
 			}
-			else if ( PlayerInRange( GetLocalOrigin(), HEAL_MOVE_RANGE ) )
+			// If the above hasnt returned, then try to use the default 
+			if ( PlayerInRange( GetLocalOrigin(), HEAL_MOVE_RANGE ) )
 			{
 				// use old mechanism for ammo
 				if ( ShouldHealTarget( pEntity, HasCondition( COND_CIT_PLAYERHEALREQUEST ) ) )
@@ -1318,7 +1325,7 @@ int CNPC_Citizen::SelectScheduleHeal()
 	else
 	{
 		if ( HasCondition( COND_CIT_PLAYERHEALREQUEST ) )
-			DevMsg( "Would say: sorry, need to recharge\n" );
+			DevMsg( "Sorry, need to recharge\n" );
 	}
 	
 	return SCHED_NONE;

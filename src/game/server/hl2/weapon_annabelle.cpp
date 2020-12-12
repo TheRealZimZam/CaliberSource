@@ -45,7 +45,7 @@ public:
 	}
 
 	virtual int				GetMinBurst() { return 1; }
-	virtual int				GetMaxBurst() { return 3; }
+	virtual int				GetMaxBurst() { return 1; }
 
 	void ItemHolsterFrame( void );
 	bool StartReload( void );
@@ -55,8 +55,8 @@ public:
 	void CheckHolsterReload( void );
 	void Pump( void );
 	virtual float GetFireRate( void ) { return 1.5; };
-	virtual float			GetMinRestTime() { return 1.0; }
-	virtual float			GetMaxRestTime() { return 1.5; }
+	virtual float GetMinRestTime() { return 0.75; }
+	virtual float GetMaxRestTime() { return 1.25; }
 
 	const char *GetTracerType( void ) { return "ShotgunTracer"; }
 	void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );

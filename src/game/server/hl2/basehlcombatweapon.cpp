@@ -2,7 +2,7 @@
 //
 // Purpose: 
 //
-// TODO; Fix burst firing (only fires one bullet)
+// TODO; Fix burst firing (only fires one bullet), Looping sound for continuous fire
 //=============================================================================//
 
 #include "cbase.h"
@@ -371,8 +371,7 @@ void CHLSelectFireMachineGun::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 void CHLSelectFireMachineGun::SecondaryAttack( void )
 {
-	// change fire modes.
-
+	// change fire modes
 	switch( m_iFireMode )
 	{
 	case FIREMODE_FULLAUTO:
@@ -472,11 +471,11 @@ int CHLSelectFireMachineGun::WeaponRangeAttack1Condition( float flDot, float flD
 	{
 		return COND_TOO_CLOSE_TO_ATTACK;
 	}
-	else if (flDist > m_fMaxRange1) 
+	else if ( flDist > m_fMaxRange1) 
 	{
 		return COND_TOO_FAR_TO_ATTACK;
 	}
-	else if (flDot < 0.5)	// UNDONE: Why check this here? Isn't the AI checking this already?
+	else if ( flDot < 0.5)	// UNDONE: Why check this here? Isn't the AI checking this already?
 	{
 		return COND_NOT_FACING_ATTACK;
 	}
@@ -487,8 +486,11 @@ int CHLSelectFireMachineGun::WeaponRangeAttack1Condition( float flDot, float flD
 //-----------------------------------------------------------------------------
 int CHLSelectFireMachineGun::WeaponRangeAttack2Condition( float flDot, float flDist )
 {
-	return COND_NONE; // FIXME: disabled for now
+	// NOTENOTE; This needs to be defined on a per-weapon basis
+	return COND_NONE;
 
+	// Default conds
+#if 0
 	// m_iClip2 == -1 when no secondary clip is used
 	if ( m_iClip2 == 0 && UsesSecondaryAmmo() )
 	{
@@ -499,7 +501,7 @@ int CHLSelectFireMachineGun::WeaponRangeAttack2Condition( float flDot, float flD
 		// Don't return	COND_TOO_CLOSE_TO_ATTACK only for primary attack
 		return COND_NONE;
 	}
-	else if (flDist > m_fMaxRange2 )
+	else if ( flDist > m_fMaxRange2 )
 	{
 		// Don't return COND_TOO_FAR_TO_ATTACK only for primary attack
 		return COND_NONE;
@@ -510,6 +512,7 @@ int CHLSelectFireMachineGun::WeaponRangeAttack2Condition( float flDot, float flD
 	}
 
 	return COND_CAN_RANGE_ATTACK2;
+#endif
 }
 
 //-----------------------------------------------------------------------------

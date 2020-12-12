@@ -1,6 +1,5 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
-// This class should really be renamed, but eh thats more than 10 seconds of work soooo
-// SCREW THAT SCOOBIEDOO YABBADABBADO
+// This class should really be renamed
 //
 // Purpose: Base class for humanoid NPCs intended to fight along side player.
 // For the most part, squads are not needed as each entity has most of its AI act independently
@@ -287,6 +286,7 @@ public:
 	//---------------------------------
 	int 			OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	void 			OnFriendDamaged( CBaseCombatCharacter *pSquadmate, CBaseEntity *pAttacker );
+//	bool			m_bAnnoyed;			// I lost this enemy before, but he just reappeared - start being more aggressive!
 
 	//---------------------------------
 	// Hints
@@ -409,6 +409,7 @@ protected:
 	float	m_fLastPlayerKill;
 	int		m_iNumConsecutiveBarrelsExploded;  // Companions keep track of the # of consecutive barrels exploded by the player and speaks a response as it increases
 	int		m_iNumConsecutivePlayerKills;  // Alyx keeps track of the # of consecutive kills by the player and speaks a response as it increases
+	bool	m_bAnnoyed;			// I lost this enemy before, but he just reappeared - start being more aggressive!
 
 	//-----------------------------------------------------
 

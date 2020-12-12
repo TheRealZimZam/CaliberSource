@@ -1,6 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 	Police enemy for city
+// Not as cowardly as the civilians, but also not as aggressive as the soldiers
 //
 //=============================================================================//
 
@@ -26,12 +27,13 @@
 #include "ai_sentence.h"
 #include "props.h"
 
-class CNPC_MetroPolice;
+//class CNPC_MetroPolice;
 
 class CNPC_MetroPolice : public CAI_BaseActor
 {
-	DECLARE_CLASS( CNPC_MetroPolice, CAI_BaseActor );
 	DECLARE_DATADESC();
+	DEFINE_CUSTOM_AI;
+	DECLARE_CLASS( CNPC_MetroPolice, CAI_BaseActor );
 
 public:
 	CNPC_MetroPolice();
@@ -144,6 +146,8 @@ private:
 
 	void		PrescheduleThink( void );
 	
+	void 		OnStateChange( NPC_STATE OldState, NPC_STATE NewState );
+	
 	void		SetPlayerCriminalDuration( float time );
 
 	void		IncrementPlayerCriminalStatus( void );
@@ -171,10 +175,9 @@ private:
 
 	// Normal schedule selection 
 	int SelectCombatSchedule();
+	int SelectNonCombatSchedule();	//Cant be named to alert because of conflicts
 	int SelectScheduleNewEnemy();
 	int SelectScheduleArrestEnemy();
-//	int SelectRangeAttackSchedule();
-	int SelectAlertSchedule();
 	int SelectShoveSchedule( void );
 
 	bool TryToEnterPistolSlot( int nSquadSlot );
@@ -183,7 +186,7 @@ private:
 	bool IsHeavyDamage( const CTakeDamageInfo &info );
 
 	// Is my enemy currently in an airboat?
-	bool IsEnemyInAnVehicle() const;
+	bool IsEnemyInAVehicle() const;
 
 	// Returns the airboat
 	CBaseEntity *GetEnemyVehicle() const;
@@ -229,13 +232,11 @@ private:
 		COND_METROPOLICE_PLAYER_TOO_CLOSE,
 		COND_METROPOLICE_CHANGE_BATON_STATE,
 		COND_METROPOLICE_PHYSOBJECT_ASSAULT,
-
 	};
 
 	enum
 	{
-		SCHED_METROPOLICE_WALK = BaseClass::NEXT_SCHEDULE,
-		SCHED_METROPOLICE_WAKE_ANGRY,
+		SCHED_METROPOLICE_WAKE_ANGRY = BaseClass::NEXT_SCHEDULE,
 		SCHED_METROPOLICE_HARASS,
 		SCHED_METROPOLICE_CHASE_ENEMY,
 		SCHED_METROPOLICE_ESTABLISH_LINE_OF_FIRE,
@@ -284,10 +285,10 @@ private:
 	};
 
 private:
-
 	int				m_iPistolClips;		// How many clips the cop has in reserve
 	int				m_iManhacks;		// How many manhacks the cop has
 	bool			m_fWeaponDrawn;		// Is my weapon drawn? (ready to use)
+	bool			m_fCanPoint;		// Can only point once per time spent in combat state.
 	bool			m_bSimpleCops;		// The easy version of the cops
 	int				m_LastShootSlot;
 	CRandSimTimer	m_TimeYieldShootSlot;
@@ -344,9 +345,6 @@ private:
 	float			m_flLastHitYaw;
 
 	static float	gm_flTimeLastSpokePeek;
-
-public:
-	DEFINE_CUSTOM_AI;
 };
 
 #endif // NPC_METROPOLICE_H

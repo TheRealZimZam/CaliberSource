@@ -166,5 +166,15 @@ void InstallGameRules()
 		// generic half-life
 		CreateGameRulesObject( "CHalfLife2" );
 	}
+
+/*
+	if ( teamplay.GetInt() > 0 )
+	{
+		// teamplay
+		return new CTeamplayRules;
+	}
+	// vanilla deathmatch
+	return new CMultiplayRules;
+*/
 }
 

@@ -48,8 +48,8 @@ enum ScannerInspectAct_t
 #define SCANNER_ATTACK_NEAR_DIST		150		// Fly attack min distance
 #define SCANNER_ATTACK_FAR_DIST			300		// Fly attack max distance
 #define SCANNER_ATTACK_RANGE			360		// Attack max distance
-#define	SCANNER_ATTACK_MIN_DELAY		8		// Min time between attacks
-#define	SCANNER_ATTACK_MAX_DELAY		12		// Max time between attacks
+#define	SCANNER_ATTACK_MIN_DELAY		6		// Min time between attacks
+#define	SCANNER_ATTACK_MAX_DELAY		10		// Max time between attacks
 #define	SCANNER_EVADE_TIME				1		// How long to evade after take damage
 
 // Scanner movement vars
@@ -57,7 +57,7 @@ enum ScannerInspectAct_t
 #define	SCANNER_MAX_SPEED				250
 #define	SCANNER_MAX_DIVE_BOMB_SPEED		2500
 #define SCANNER_SQUAD_FLY_DIST			500		// How far to scanners stay apart
-#define SCANNER_SQUAD_HELP_DIST			4000	// How far will I fly to help
+#define SCANNER_SQUAD_HELP_DIST			3000	// How far will I fly to help
 
 //-----------------------------------------------------------------------------
 // Purpose: 

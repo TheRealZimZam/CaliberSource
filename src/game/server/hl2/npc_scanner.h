@@ -157,10 +157,15 @@ private:
 	// Attacks
 	bool				m_bNoLight;
 	bool				m_bPhotoTaken;
+	Vector				m_vGasDirection;
 
 	void				AttackPreFlash(void);
 	void				AttackFlash(void);
 	void				AttackFlashBlind(void);
+
+	void				AttackPreGas(void);
+	void				AttackGas(void);
+	void				AttackGasDamage(void);
 
 	virtual void		AttackDivebomb(void);
 
@@ -186,6 +191,7 @@ private:
 		SCHED_CSCANNER_PHOTOGRAPH_HOVER,
 		SCHED_CSCANNER_PHOTOGRAPH,
 		SCHED_CSCANNER_ATTACK_FLASH,
+		SCHED_CSCANNER_ATTACK_GAS,
 		SCHED_CSCANNER_MOVE_TO_INSPECT,
 		SCHED_CSCANNER_PATROL,
 
@@ -200,6 +206,8 @@ private:
 		TASK_CSCANNER_PHOTOGRAPH,
 		TASK_CSCANNER_ATTACK_PRE_FLASH,
 		TASK_CSCANNER_ATTACK_FLASH,
+		TASK_CSCANNER_ATTACK_PRE_GAS,
+		TASK_CSCANNER_ATTACK_GAS,
 		TASK_CSCANNER_SPOT_INSPECT_ON,
 		TASK_CSCANNER_SPOT_INSPECT_WAIT,
 		TASK_CSCANNER_SPOT_INSPECT_OFF,

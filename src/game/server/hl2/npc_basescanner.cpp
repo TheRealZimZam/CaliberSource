@@ -423,7 +423,6 @@ void CNPC_BaseScanner::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 	{
 		g_pEffects->Ricochet(ptr->endpos,ptr->plane.normal);
 	}
-
 	BaseClass::TraceAttack( info, vecDir, ptr );
 }
 
@@ -1202,24 +1201,62 @@ void CNPC_BaseScanner::MoveToAttack(float flInterval)
 		return;
 
 	Vector vTargetPos = GetEnemyLKP();
+	Vector vFlyDirection = vec3_origin;
 
-	//float flDesiredDist = m_flAttackNearDist + ( ( m_flAttackFarDist - m_flAttackNearDist ) / 2 );
+	// -----------------------------------------
+	//  Keep within range of enemy
+	// -----------------------------------------
+	//float flDesiredDist = SCANNER_ATTACK_NEAR_DIST + ( ( SCANNER_ATTACK_FAR_DIST - SCANNER_ATTACK_NEAR_DIST ) / 2 );
+	Vector idealPos = IdealGoalForMovement( vTargetPos, GetAbsOrigin(), GetGoalDistance(), SCANNER_ATTACK_NEAR_DIST );
 
-	Vector idealPos = IdealGoalForMovement( vTargetPos, GetAbsOrigin(), GetGoalDistance(), m_flAttackNearDist );
+	if ( (m_flLastDamageTime + SCANNER_EVADE_TIME) > gpGlobals->curtime )
+	{
+		idealPos = idealPos + VelocityToEvade(GetEnemyCombatCharacterPointer());
+	}
 
 	MoveToTarget( flInterval, idealPos );
 
-	//FIXME: Re-implement?
 
-	/*
+#if 0
+	// -----------------------------------------
+	//  Keep within range of enemy
+	// -----------------------------------------
+	float  fAttack2DDist = (vTargetPos - GetLocalOrigin()).Length2D();
+	float  fAttackVtDist = fabs(vTargetPos.z - GetLocalOrigin().z);
+	Vector vAttackDir  = vTargetPos - GetLocalOrigin();
+	VectorNormalize(vAttackDir);
+
+	if (fAttack2DDist < SCANNER_ATTACK_NEAR_DIST)
+	{
+		vFlyDirection.x = -vAttackDir.x;
+		vFlyDirection.y = -vAttackDir.y;
+		vFlyDirection.z = -vAttackDir.z;
+	}
+	else if (fAttack2DDist > SCANNER_ATTACK_FAR_DIST)
+	{
+		vFlyDirection.x = vAttackDir.x;
+		vFlyDirection.y = vAttackDir.y;
+	}
+
+	if (fAttackVtDist > 100)
+	{
+		vFlyDirection.z = vAttackDir.z;
+	}
+
 	// ---------------------------------------------------------
 	//  Add evasion if I have taken damage recently
 	// ---------------------------------------------------------
-	if ((m_flLastDamageTime + SCANNER_EVADE_TIME) > gpGlobals->curtime)
+	if ( (m_flLastDamageTime + SCANNER_EVADE_TIME) > gpGlobals->curtime )
 	{
-	vFlyDirection = vFlyDirection + VelocityToEvade(GetEnemyCombatCharacterPointer());
+		vFlyDirection = vFlyDirection + VelocityToEvade(GetEnemyCombatCharacterPointer());
 	}
-	*/
+
+	float myAccel = SCANNER_MAX_SPEED * 2;
+	float myDecay = 0.35f; // decay to 35% in 1 second
+
+	// Set net velocity
+	MoveInDirection( flInterval, vFlyDirection, myAccel, 2 * myAccel, myDecay);
+#endif
 }
 
 //-----------------------------------------------------------------------------

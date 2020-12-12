@@ -3,8 +3,8 @@
 // Purpose:	Pistol - hand gun - 10mm of fun!
 //
 //			Primary attack: single accurate shot(s).
-//			Secondary attack: innaccurate 4 round burst.
-// TODO's:  Change secondary fire to burst
+//			Secondary attack: innaccurate burst.
+// TODO's:  Fix burst
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -150,6 +150,8 @@ CWeaponPistol::CWeaponPistol( void )
 
 	m_fMinRange1		= 24;
 	m_fMaxRange1		= 1024;
+
+	//Burst range for ai
 //	m_fMinRange2		= 24;
 //	m_fMaxRange2		= 200;
 
@@ -235,17 +237,17 @@ void CWeaponPistol::SecondaryAttack( void )
 //-----------------------------------------------------------------------------
 void CWeaponPistol::PistolFire( float flSpread, float flCycleTime, bool bBurstFire )
 {
+	// Only the player fires this way so we can cast
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	if ( !pPlayer )
+		return;
+
 	// If my clip is empty (and I use clips) start reload
 	if ( UsesClipsForAmmo1() && !m_iClip1 ) 
 	{
 		Reload();
 		return;
 	}
-
-	// Only the player fires this way so we can cast
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	if ( !pPlayer )
-		return;
 
 	WeaponSound( SINGLE );
 	pPlayer->DoMuzzleFlash();
@@ -257,7 +259,7 @@ void CWeaponPistol::PistolFire( float flSpread, float flCycleTime, bool bBurstFi
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, GetOwner() );
 
-	//TEMP; This needs improvement
+	//TEMP/TODO; This needs improvement
 	if ( bBurstFire )
 	{
 		m_nNumShotsFired++;

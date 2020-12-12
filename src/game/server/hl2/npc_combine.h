@@ -46,13 +46,12 @@ public:
 	void			Precache( void );
 	void			Activate();
 
-//!	bool			GetGrenadeConditions( const Vector &vecTarget );
-	int				GetGrenadeConditions( float flDot, float flDist );
+	int				GetGrenadeConditions( float flDot, float flDist, const Vector &vecTarget );
 	int				CheckCanThrowGrenade( const Vector &vecTarget );
 	int				RangeAttack2Conditions( float flDot, float flDist ); // For innate grenade attack
 	int				MeleeAttack1Conditions( float flDot, float flDist ); // For kick/punch
 
-	virtual bool	CanAltFireEnemy();
+	virtual bool	CanAltFireEnemy();	// For weapon altfire
 	bool			CanLaunchGrenade( const Vector &vecTarget );
 
 	bool			FVisible( CBaseEntity *pEntity, int traceMask = MASK_BLOCKLOS, CBaseEntity **ppBlocker = NULL );
@@ -67,7 +66,8 @@ public:
 
 
 	void SetActivity( Activity NewActivity );
-	NPC_STATE		SelectIdealState ( void );
+	NPC_STATE		SelectIdealState( void );
+	void			OnStateChange( NPC_STATE OldState, NPC_STATE NewState );
 
 	// Input handlers.
 	void InputLookOn( inputdata_t &inputdata );
@@ -166,11 +166,13 @@ private:
 		SCHED_COMBINE_COMBAT_FAIL,
 		SCHED_COMBINE_VICTORY_DANCE,
 		SCHED_COMBINE_COMBAT_FACE,
+		SCHED_COMBINE_ALERT_FACE,
 		SCHED_COMBINE_HIDE_AND_RELOAD,
 		SCHED_COMBINE_SIGNAL_SUPPRESS,
 //		SCHED_COMBINE_ENTER_OVERWATCH,
 //		SCHED_COMBINE_OVERWATCH,
 		SCHED_COMBINE_ASSAULT,
+		SCHED_COMBINE_GRENADE_ASSAULT,
 		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE,
 		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE_FACE,
 		SCHED_COMBINE_PRESS_ATTACK,
@@ -230,7 +232,6 @@ private:
 	enum Combine_Conds
 	{
 		COND_COMBINE_NO_FIRE = BaseClass::NEXT_CONDITION,
-		COND_COMBINE_DEAD_FRIEND,
 		COND_COMBINE_SHOULD_PATROL,
 		COND_COMBINE_HIT_BY_BUGBAIT,
 		COND_COMBINE_DROP_GRENADE,
@@ -293,7 +294,7 @@ private:
 	float			m_flNextAltFireTime;		// Elites only. Next time to begin considering alt-fire attack.
 //	float			m_flNextNewEnemyTime;		// Clock until the new enemy logic can be used again
 
-//	int				m_iNewEnemies;				// When this hits three, new enemy logic is deactivated for 10 seconds.
+	int				m_iNewEnemies;				// When this hits three, new enemy logic is deactivated until combat is over.
 	int				m_nShots;
 	float			m_flShotDelay;
 	float			m_flStopMoveShootTime;

@@ -2,7 +2,7 @@
 //
 // Purpose: Burn things funly
 //
-// TODO's; Change from "beam" to cloud. Add ammo counter, a full clip should last about 10 seconds. Fix sound. Optimize.
+// TODO's; Code the bloody thing
 // $NoKeywords: $
 //=============================================================================//
 

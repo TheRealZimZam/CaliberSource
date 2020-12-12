@@ -175,8 +175,8 @@ int CWeaponStunStick::WeaponMeleeAttack1Condition( float flDot, float flDist )
 void CWeaponStunStick::ImpactEffect( trace_t &traceHit )
 {
 	//Glowing spark effect for hit
-	//UTIL_DecalTrace( &m_trLineHit, "PlasmaGlowFade" );
-	
+	UTIL_DecalTrace( &traceHit, "PlasmaGlowFade" );
+
 	//FIXME: need new decals
 	UTIL_ImpactTrace( &traceHit, DMG_CLUB );
 }

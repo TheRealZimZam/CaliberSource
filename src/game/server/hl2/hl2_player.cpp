@@ -2711,19 +2711,6 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 		// ----------------------------------------
 		if (Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType())) 
 		{
-#if 0
-			//Only remove the weapon if we attained ammo from it
-			if ( Weapon_EquipAmmoOnly( pWeapon ) == false )
-				return false;
-
-			// Only remove me if I have no ammo left
-			// Can't just check HasAnyAmmo because if I don't use clips, I still want to be removed, 
-			if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
-				return false;
-
-			UTIL_Remove( pWeapon );
-			return false;
-#endif
 			//Only remove the weapon if we attained ammo from it
 			if( Weapon_EquipAmmoOnly( pWeapon ) )
 			{
@@ -2745,23 +2732,43 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 		// -------------------------
 		else 
 		{
-			//Make sure we're not trying to take a new weapon when the slots occupied, just take the ammo
+			// Make sure we're not trying to take a new weapon when the slots occupied, just take the ammo
+			// If the weapon in the slot is empty, drop it for a new gun by default
 			if ( Weapon_SlotOccupied( pWeapon ) && !(pWeapon->GetWpnData().iFlags & ITEM_FLAG_EXHAUSTIBLE) )	//FIXME; Temp exhaustible check - need proper thingy here!!
 			{
+				CBaseCombatWeapon *pEmptyWeapon = Weapon_GetSlot( pWeapon->GetSlot() );
 				if (hl2_single_primary_weapon_mode.GetBool())
 				{
 					CBaseCombatWeapon *pActiveWeapon = Weapon_GetSlot( WEAPON_PRIMARY_SLOT );
-
 					if ( pActiveWeapon != NULL && pActiveWeapon->HasAnyAmmo() == false && Weapon_CanSwitchTo( pWeapon ) )
 					{
 						Weapon_Equip( pWeapon );
 						return true;
 					}
 				}
+				else if ( pEmptyWeapon != NULL && pEmptyWeapon->HasAnyAmmo() == false && Weapon_CanSwitchTo( pWeapon ) )
+				{
+					// If the slot thats occupied has an empty weapon, (by default) throw it away and grab the new one
+					Weapon_Drop( pEmptyWeapon, NULL, NULL );
+					Weapon_Equip( pWeapon );
+					EmitSound( "HL2Player.PickupWeapon" );
+					return true;
+				}
 
-				//TODO; This isnt working... Why???
-				Weapon_EquipAmmoOnly( pWeapon );
-//				EmitSound( "HL2Player.PickupAmmo" );
+				// TODO; This only seems to consider weapons of the same type,
+				// This isnt bad for weapons with differing ammo types, but for similar weapons
+				// that share ammotype (smg1,smg2) this is not working at all.
+				// Fix it??? Pls.
+				if( Weapon_EquipAmmoOnly( pWeapon ) )
+				{
+//					EmitSound( "HL2Player.PickupAmmo" );
+
+					if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
+						return false;
+
+					UTIL_Remove( pWeapon );
+					return true;
+				}
 				return false;
 			}
 
@@ -2785,7 +2792,6 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 	{
 		return BaseClass::BumpWeapon( pWeapon );
 	}
-
 }
 
 //-----------------------------------------------------------------------------
@@ -2798,15 +2804,19 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	//Drop primary weapon
 	if ( !Q_stricmp( args[0], "DropPrimary" ) )
 	{
-		if( hl2_single_primary_weapon_mode.GetBool() )
+		// Dont go around dropping exhaustibles
+		if ( !(GetActiveWeapon()->GetWpnData().iFlags & ITEM_FLAG_EXHAUSTIBLE) )
 		{
-			Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
+			if( hl2_single_primary_weapon_mode.GetBool() )
+			{
+				Weapon_DropSlot( WEAPON_PRIMARY_SLOT );
+			}
+			else
+			{
+				Weapon_Drop( GetActiveWeapon(), NULL, NULL );
+			}
+			return true;
 		}
-		else
-		{
-			Weapon_Drop( GetActiveWeapon(), NULL, NULL );
-		}
-		return true;
 	}
 
 	if ( !Q_stricmp( args[0], "emit" ) )
@@ -2830,7 +2840,7 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 // Purpose: 
 // Output : void CBasePlayer::PlayerUse
 //-----------------------------------------------------------------------------
-void CHL2_Player::PlayerUse ( void )
+void CHL2_Player::PlayerUse( void )
 {
 	// Was use pressed or released?
 	if ( ! ((m_nButtons | m_afButtonPressed | m_afButtonReleased) & IN_USE) )
@@ -3161,6 +3171,22 @@ bool CHL2_Player::Weapon_CanSwitchTo( CBaseCombatWeapon *pWeapon )
 	return true;
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose: Return the player's anim speed multiplier
+//-----------------------------------------------------------------------------
+float CHL2_Player::GetDefaultAnimSpeed( void )
+{
+	// Weapons may modify animation times
+	if ( GetActiveWeapon() )
+		return GetActiveWeapon()->GetDefaultAnimSpeed();
+
+	return 1.0;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
 void CHL2_Player::PickupObject( CBaseEntity *pObject, bool bLimitMassAndSize )
 {
 	// can't pick up what you're standing on

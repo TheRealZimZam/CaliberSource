@@ -26,6 +26,13 @@ public:
 	DECLARE_CLIENTCLASS();
 };
 
+class C_HLGrenadeLauncher : public C_HLMachineGun
+{
+public:
+	DECLARE_CLASS( C_HLGrenadeLauncher, C_HLMachineGun );
+	DECLARE_CLIENTCLASS();
+};
+
 class C_BaseHLBludgeonWeapon : public C_BaseHLCombatWeapon
 {
 public:

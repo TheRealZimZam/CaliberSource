@@ -51,7 +51,7 @@ STUB_WEAPON_CLASS( weapon_shotgun, WeaponShotgun, C_BaseHLCombatWeapon );				//E
 STUB_WEAPON_CLASS( weapon_slam, Weapon_SLAM, C_BaseHLCombatWeapon );					//SLAM'd
 STUB_WEAPON_CLASS( weapon_smg1, WeaponSMG1, C_HLSelectFireMachineGun );					//Small-Machine Gun
 STUB_WEAPON_CLASS( weapon_smg2, WeaponSMG2, C_HLSelectFireMachineGun );					//Small-Machine Gun 2
-//STUB_WEAPON_CLASS( weapon_sniperrifle, WeaponSniperRifle, C_HLSelectFireMachineGun );	//Snooper Rifle
+STUB_WEAPON_CLASS( weapon_sniperrifle, WeaponSniperRifle, C_BaseHLCombatWeapon );		//Snooper Rifle
 STUB_WEAPON_CLASS( weapon_stab, WeaponStab, C_BaseHLBludgeonWeapon );
 STUB_WEAPON_CLASS( weapon_stun, WeaponStun, C_BaseHLCombatWeapon );						//Stun 'Nade
 STUB_WEAPON_CLASS( weapon_supershotgun, WeaponSuperShotgun, C_BaseHLCombatWeapon );		//Auto-Shotgun

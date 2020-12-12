@@ -345,7 +345,7 @@ void AR2TracerCallback( const CEffectData &data )
 DECLARE_CLIENT_EFFECT( "AR2Tracer", AR2TracerCallback );
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Airburst Explosion
 // Input  : &data - 
 //-----------------------------------------------------------------------------
 void AR2ExplosionCallback( const CEffectData &data )
@@ -443,32 +443,6 @@ void AR2ExplosionCallback( const CEffectData &data )
 }
 
 DECLARE_CLIENT_EFFECT( "AR2Explosion", AR2ExplosionCallback );
-
-//-----------------------------------------------------------------------------
-// Purpose: Creates the AR2 impact fx
-// Input  : &data - 
-//-----------------------------------------------------------------------------
-void AR2ImpactCallback( const CEffectData &data )
-{
-	FX_AddQuad( data.m_vOrigin, 
-				data.m_vNormal, 
-				random->RandomFloat( 24, 32 ),
-				0,
-				0.75f, 
-				1.0f,
-				0.0f,
-				0.4f,
-				random->RandomInt( 0, 360 ), 
-				0,
-				Vector( 1.0f, 1.0f, 1.0f ), 
-				0.25f,
-				"effects/ar2_impact",
-				(FXQUAD_BIAS_SCALE|FXQUAD_BIAS_ALPHA) );
-	// Create an elight
-
-}
-
-DECLARE_CLIENT_EFFECT( "AR2Impact", AR2ImpactCallback );
 
 //-----------------------------------------------------------------------------
 // Creates a muzzleflash elight

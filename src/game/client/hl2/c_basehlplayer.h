@@ -28,6 +28,7 @@ public:
 	virtual void		OnDataChanged( DataUpdateType_t updateType );
 
 	void				Weapon_DropPrimary( void );
+	virtual float		GetDefaultAnimSpeed( void );
 		
 	float				GetFOV();
 	void				Zoom( float FOVOffset, float time );

@@ -96,6 +96,21 @@ void C_BaseHLPlayer::Weapon_DropPrimary( void )
 	engine->ServerCmd( "DropPrimary" );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+float C_BaseHLPlayer::GetDefaultAnimSpeed( void )
+{
+	// Weapons may modify animation times
+	if ( GetActiveWeapon() )
+		return GetActiveWeapon()->GetDefaultAnimSpeed();
+
+	return 1.0;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
 float C_BaseHLPlayer::GetFOV()
 {
 	//Find our FOV with offset zoom value

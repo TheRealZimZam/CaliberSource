@@ -49,6 +49,80 @@ DECLARE_CLIENT_EFFECT( "ImpactJeep", ImpactJeepCallback );
 
 
 //-----------------------------------------------------------------------------
+// Purpose: Handle crowbar impacts
+// TODO; Why is this in here??? Move this up a level, other games might
+// want to use this
+//-----------------------------------------------------------------------------
+void MeleeImpactCallback( const CEffectData &data )
+{
+	trace_t tr;
+	Vector vecOrigin, vecStart, vecShotDir;
+	int iMaterial, iDamageType, iHitbox;
+	short nSurfaceProp;
+	C_BaseEntity *pEntity = ParseImpactData( data, &vecOrigin, &vecStart, &vecShotDir, nSurfaceProp, iMaterial, iDamageType, iHitbox );
+
+	if ( !pEntity )
+	{
+		// This happens for impacts that occur on an object that's then destroyed.
+		// Clear out the fraction so it uses the server's data
+		tr.fraction = 1.0;
+		PlayImpactSound( pEntity, tr, vecOrigin, nSurfaceProp );
+		return;
+	}
+
+	// If we hit, perform our custom effects and play the sound
+	if ( Impact( vecOrigin, vecStart, iMaterial, iDamageType, iHitbox, pEntity, tr, IMPACT_NODECAL ) )
+	{
+		// Check for custom effects based on the Decal index
+		PerformCustomEffects( vecOrigin, tr, vecShotDir, iMaterial, 1 );
+	}
+
+	PlayImpactSound( pEntity, tr, vecOrigin, nSurfaceProp );
+}
+
+DECLARE_CLIENT_EFFECT( "MeleeImpact", MeleeImpactCallback );
+
+//-----------------------------------------------------------------------------
+// Purpose: Creates the AR2 impact fx
+// Input  : &data - 
+//-----------------------------------------------------------------------------
+void AR2ImpactCallback( const CEffectData &data )
+{
+#if 0
+	VPROF_BUDGET( "ImpactAR2Callback", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+
+	trace_t tr;
+	Vector vecOrigin;
+
+	//
+	// Fast Lines
+	//
+	FX_MicroExplosion( vecOrigin, tr.plane.normal );
+#endif
+	//
+	// Impact sprite
+	//
+	FX_AddQuad( data.m_vOrigin, 
+				data.m_vNormal, 
+				random->RandomFloat( 24, 32 ),
+				0,
+				0.75f, 
+				1.0f,
+				0.0f,
+				0.4f,
+				random->RandomInt( 0, 360 ), 
+				0,
+				Vector( 1.0f, 1.0f, 1.0f ), 
+				0.25f,
+				"effects/ar2_impact",
+				(FXQUAD_BIAS_SCALE|FXQUAD_BIAS_ALPHA) );
+	// Create an elight
+
+}
+
+DECLARE_CLIENT_EFFECT( "AR2Impact", AR2ImpactCallback );
+
+//-----------------------------------------------------------------------------
 // Purpose: Handle gauss impacts
 //-----------------------------------------------------------------------------
 void ImpactGaussCallback( const CEffectData &data )

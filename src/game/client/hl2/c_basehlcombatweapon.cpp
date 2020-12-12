@@ -17,5 +17,8 @@ END_RECV_TABLE()
 IMPLEMENT_CLIENTCLASS_DT( C_HLSelectFireMachineGun, DT_HLSelectFireMachineGun, CHLSelectFireMachineGun )
 END_RECV_TABLE()
 
+IMPLEMENT_CLIENTCLASS_DT( C_HLGrenadeLauncher, DT_HLGrenadeLauncher, CHLGrenadeLauncher )
+END_RECV_TABLE()
+
 IMPLEMENT_CLIENTCLASS_DT( C_BaseHLBludgeonWeapon, DT_BaseHLBludgeonWeapon, CBaseHLBludgeonWeapon )
 END_RECV_TABLE()

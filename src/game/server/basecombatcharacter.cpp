@@ -242,7 +242,7 @@ bool CBaseCombatCharacter::HasHumanGibs( void )
 
 #elif defined( CSPORT_DLL )
 	Class_T myClass = Classify();
-	if (	 myClass == CLASS_PLAYER )	
+	if ( myClass == CLASS_PLAYER )
 	{
 		return true;
 	}
@@ -836,22 +836,7 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 	EmitSound( "BaseCombatCharacter.CorpseGib" );
 	CSoundEnt::InsertSound( SOUND_MEAT, GetAbsOrigin(), 256, 25, this );
 
-	//Create a big explosion of blood
-#if 0
-	CEffectData	data;
-	
-	data.m_vOrigin = WorldSpaceCenter();
-	data.m_vNormal = data.m_vOrigin - info.GetDamagePosition();
-	VectorNormalize( data.m_vNormal );
-	
-	data.m_flScale = RemapVal( m_iHealth, 0, -500, 1, 3 );
-	data.m_flScale = clamp( data.m_flScale, 1, 3 );
-	data.m_nColor = BloodColor();
-
-	// Big blood splat
-	DispatchEffect( "Gib", data );
-#endif
-
+	//Create a big puff of blood
 	Vector vecDamageDir = WorldSpaceCenter() - info.GetDamagePosition();
 	VectorNormalize( vecDamageDir );
 
@@ -877,11 +862,11 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 		gibbed = true;
 	}
 #ifdef HL2_DLL
-//	else if ( HasMechGibs() )
-//	{
-//		CGib::SpawnRandomGibs( this, 4, GIB_MECH );		// Throw general machine gibs
-//		gibbed = true;
-//	}
+	else if ( HasMechGibs() )
+	{
+		CGib::SpawnRandomGibs( this, 4, GIB_MECH );		// Throw general machine gibs
+		gibbed = true;
+	}
 #endif
 
 	return gibbed;
@@ -1607,7 +1592,7 @@ void CBaseCombatCharacter::Event_Killed( const CTakeDamageInfo &info )
 	{
 		Weapon_Drop( m_hActiveWeapon );
 	}
-	
+
 	// if flagged to drop a health kit
 	if (HasSpawnFlags(SF_NPC_DROP_HEALTHKIT))
 	{
@@ -1651,13 +1636,6 @@ void CBaseCombatCharacter::Event_Killed( const CTakeDamageInfo &info )
 			{
 				pDroppedWeapon->Dissolve( NULL, gpGlobals->curtime, false, ENTITY_DISSOLVE_NORMAL );
 			}
-		}
-#endif
-#if 0
-		// Tell my killer that he got me!
-		if( info.GetAttacker() )
-		{
-			g_EventQueue.AddEvent( info.GetAttacker(), "KilledNPC", 0.3, this, this );
 		}
 #endif
 		if ( !bRagdollCreated && ( info.GetDamageType() & DMG_REMOVENORAGDOLL ) == 0 )
@@ -2113,7 +2091,7 @@ void CBaseCombatCharacter::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 		// If SF_NPC_LONG_RANGE spawn flags is set let weapon work from any distance
 		if ( HasSpawnFlags(SF_NPC_LONG_RANGE) )
 		{
-			m_hActiveWeapon->m_fMaxRange1 = 999999999;
+			m_hActiveWeapon->m_fMaxRange1 = 999999999;	//Nice
 			m_hActiveWeapon->m_fMaxRange2 = 999999999;
 		}
 	}
@@ -2777,9 +2755,9 @@ bool CBaseCombatCharacter::Weapon_IsOnGround( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 {
+#if 0
 	bool bConservative = false;
 
-#ifdef HL2_DLL
 	if( hl2_episodic.GetBool() && !GetActiveWeapon() )
 	{
 		// Unarmed citizens are conservative in their weapon finding
@@ -2825,12 +2803,13 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 				// No, I'm already using this type of weapon.
 				continue;
 			}
-
+#ifdef HL2_DLL
 			if( FClassnameIs( pWeapon, "weapon_pistol" ) )
 			{
 				// No, it's a pistol.
 				continue;
 			}
+#endif
 		}
 
 		float fCurDist = (pWeapon->GetLocalOrigin() - GetLocalOrigin()).Length();
@@ -2846,12 +2825,13 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			// UNDONE: Better heuristic needed here
 			//			Need to pick by power of weapons
 			//			Don't want to pick a weapon right next to a NPC!
-
+#ifdef HL2_DLL
 			// Give the AR2 a bonus to be selected by making it seem closer.
 			if( FClassnameIs( pWeapon, "weapon_ar2" ) )
 			{
-				fCurDist *= 0.5;
+				fCurDist *= 0.5f;
 			}
+#endif
 
 			// choose the last range attack weapon you find or the first available other weapon
 			if ( ! (pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
@@ -2876,11 +2856,13 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			if ( tr.startsolid || (tr.fraction < 1.0) )
 				continue;
 		}
+#if 0
 		else if( bConservative )
 		{
 			// Skip it.
 			continue;
 		}
+#endif
 
 		if( FVisible(pWeapon) )
 		{
@@ -2937,9 +2919,6 @@ int CBaseCombatCharacter::GiveAmmo( int iCount, int iAmmoIndex, bool bSuppressSo
 	return iAdd;
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: Give the player some ammo.
-//-----------------------------------------------------------------------------
 int CBaseCombatCharacter::GiveAmmo( int iCount, const char *szName, bool bSuppressSound )
 {
 	int iAmmoType = GetAmmoDef()->Index(szName);
@@ -2952,6 +2931,9 @@ int CBaseCombatCharacter::GiveAmmo( int iCount, const char *szName, bool bSuppre
 }
 
 
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
 ConVar	phys_stressbodyweights( "phys_stressbodyweights", "5.0" );
 void CBaseCombatCharacter::VPhysicsUpdate( IPhysicsObject *pPhysics )
 {
@@ -2983,7 +2965,7 @@ void CBaseCombatCharacter::ApplyStressDamage( IPhysicsObject *pPhysics, bool bRe
 #ifdef HL2_DLL
 	if( Classify() == CLASS_PLAYER_ALLY_VITAL )
 	{
-		// Bypass stress completely for allies and vitals.
+		// Bypass stress completely for vitals.
 		if( hl2_episodic.GetBool() )
 			return;
 	}
@@ -3017,7 +2999,7 @@ const impactdamagetable_t &CBaseCombatCharacter::GetPhysicsImpactDamageTable( vo
 // This is to account for the ragdolls responding differently than
 // the shadow objects.  Also this makes the impacts more dramatic.
 ConVar	phys_impactforcescale( "phys_impactforcescale", "1.0" ); 
-ConVar	phys_upimpactforcescale( "phys_upimpactforcescale", "0.375" ); 
+ConVar	phys_upimpactforcescale( "phys_upimpactforcescale", "0.5" ); 
 
 void CBaseCombatCharacter::VPhysicsShadowCollision( int index, gamevcollisionevent_t *pEvent )
 {
@@ -3209,9 +3191,11 @@ CBaseEntity *CBaseCombatCharacter::FindMissTarget( void )
 			break;
 
 		//See if it's a good target candidate
+		//TODO; Func_breakable/func_physbox???
 		if ( FClassnameIs( pEnts[i], "prop_dynamic" ) || 
 			 FClassnameIs( pEnts[i], "prop_physics" ) || 
-			 FClassnameIs( pEnts[i], "physics_prop" ) )
+			 FClassnameIs( pEnts[i], "physics_prop" ) || 
+			 FClassnameIs( pEnts[i], "func_physbox" ) )
 		{
 			pMissCandidates[numMissCandidates++] = pEnts[i];
 			continue;

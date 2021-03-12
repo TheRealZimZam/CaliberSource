@@ -39,6 +39,7 @@ public:
 
 	virtual	float	GetFireRate( void )								{	return	0.2f;	}
 	virtual float	GetRange( void )								{	return	32.0f;	}
+	virtual	int		GetDamageType( void )							{	return	DMG_CLUB;	}
 	virtual	float	GetDamageForActivity( Activity hitActivity )	{	return	1.0f;	}
 
 	virtual int		CapabilitiesGet( void );

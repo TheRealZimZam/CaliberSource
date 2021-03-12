@@ -59,7 +59,6 @@ void CAI_BaseHumanoid::CheckAmmo( void )
 {
 	BaseClass::CheckAmmo();
 
-	// FIXME: put into GatherConditions()?
 	// FIXME: why isn't this a baseclass function?
 	if (!GetActiveWeapon())
 		return;
@@ -186,13 +185,13 @@ bool CAI_BaseHumanoid::ShouldGib( const CTakeDamageInfo &info )
 }
 
 #define SNEAK_ATTACK_DIST	144.0f // 16 feet -- orig; 360.0f
-ConVar	sk_backstab_multiplier( "sk_backstab_multiplier", "3.0" );
+ConVar	sk_backstab_multiplier( "sk_backstab_multiplier", "5.0" );
 void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
 	bool bSneakAttacked = false;
 
 	// Always drop if its a melee attack, regardless of hitgroup
-	if( ptr->hitgroup == HITGROUP_HEAD || info.GetDamageType() & (DMG_SLASH|DMG_CLUB|DMG_SHOCK) )	//DMG_SHOCK is iffy here, as that applies to both the tazer and the lectric-rod
+	if( ptr->hitgroup == HITGROUP_HEAD || info.GetDamageType() & (DMG_SLASH|DMG_CLUB|DMG_SHOCK) )
 	{
 		if ( info.GetAttacker() && info.GetAttacker()->IsPlayer() && info.GetAttacker() != GetEnemy() && !IsInAScript() )
 		{
@@ -224,7 +223,6 @@ void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 	{
 		CTakeDamageInfo newInfo = info;
 
-	//	newInfo.SetDamage( GetHealth() );
 		newInfo.ScaleDamage( sk_backstab_multiplier.GetFloat() );
 		BaseClass::TraceAttack( newInfo, vecDir, ptr );
 		return;
@@ -241,7 +239,7 @@ int CAI_BaseHumanoid::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	if ( m_NPCState != NPC_STATE_SCRIPT && m_NPCState != NPC_STATE_PRONE && !m_bKnockedDown )
 	{
 		bool bKnockdownDamage = (info.GetDamage() >= (GetMaxHealth() / 2));
-		if ( bKnockdownDamage || (info.GetDamageType() & (DMG_BLAST|DMG_ALWAYSGIB) && IsHeavyDamage( info )) ) 
+		if ( bKnockdownDamage || (info.GetDamageType() & (DMG_BLAST|DMG_ALWAYSGIB) && IsHeavyDamage( info )) )
 		{
 			// Get blasted!
 			m_bKnockedDown = true;

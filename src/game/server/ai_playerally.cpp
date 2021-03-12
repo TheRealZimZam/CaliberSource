@@ -487,7 +487,6 @@ void CAI_PlayerAlly::GatherEnemyConditions( CBaseEntity *pEnemy )
 
 				if( pPlayer )
 				{
-				
 					// If I can see the player, and the player would see this enemy if he turned around...
 					if( !pPlayer->FInViewCone(pEnemy) && FVisible( pPlayer ) && pPlayer->FVisible(pEnemy) )
 					{
@@ -1119,8 +1118,11 @@ Disposition_t CAI_PlayerAlly::IRelationType( CBaseEntity *pTarget )
 {
 #ifdef ALLIES_CAN_BE_PROVOKED
 	if ( pTarget->IsPlayer() )
+	{
+		//TODO; This really needs some polishing, but it *kinda* works for now
 		if ( m_afMemory & bits_MEMORY_PROVOKED )
 			return D_NU;
+	}
 #endif 
 	return BaseClass::IRelationType( pTarget );
 }
@@ -1208,7 +1210,7 @@ int CAI_PlayerAlly::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 			}
 #endif
 		}
-		//TODO; A friendly npc just blasted me, should say something and move out of the way
+		//TODO; A friendly npc just blasted me, should say something and try to move out of the way
 
 	}
 

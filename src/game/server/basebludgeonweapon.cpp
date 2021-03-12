@@ -150,7 +150,7 @@ void CBaseHLBludgeonWeapon::Hit( trace_t &traceHit, Activity nHitActivity, bool 
 		pPlayer->EyeVectors( &hitDirection, NULL, NULL );
 		VectorNormalize( hitDirection );
 
-		CTakeDamageInfo info( GetOwner(), GetOwner(), GetDamageForActivity( nHitActivity ), DMG_CLUB );
+		CTakeDamageInfo info( GetOwner(), GetOwner(), GetDamageForActivity( nHitActivity ), GetDamageType() );
 
 		if( pPlayer && pHitEntity->IsNPC() )
 		{
@@ -277,7 +277,7 @@ void CBaseHLBludgeonWeapon::ImpactEffect( trace_t &traceHit )
 		return;
 
 	//FIXME: need new decals, currently does none as stopgap
-	UTIL_ImpactTrace( &traceHit, DMG_CLUB, "MeleeImpact" );
+	UTIL_ImpactTrace( &traceHit, GetDamageType(), "MeleeImpact" );
 }
 
 
@@ -306,7 +306,7 @@ void CBaseHLBludgeonWeapon::Swing( int bIsSecondary )
 	Activity nHitActivity = ACT_VM_HITCENTER;
 
 	// Like bullets, bludgeon traces have to trace against triggers.
-	CTakeDamageInfo triggerInfo( GetOwner(), GetOwner(), GetDamageForActivity( nHitActivity ), DMG_CLUB );
+	CTakeDamageInfo triggerInfo( GetOwner(), GetOwner(), GetDamageForActivity( nHitActivity ), GetDamageType() );
 	triggerInfo.SetDamagePosition( traceHit.startpos );
 	triggerInfo.SetDamageForce( forward );
 	TraceAttackToTriggers( triggerInfo, traceHit.startpos, traceHit.endpos, forward );

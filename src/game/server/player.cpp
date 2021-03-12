@@ -4198,7 +4198,7 @@ void CBasePlayer::SetSuitUpdate(char *name, int fgroup, int iNoRepeatTime)
 // UpdatePlayerSound - updates the position of the player's
 // reserved sound slot in the sound list.
 //=========================================================
-void CBasePlayer::UpdatePlayerSound ( void )
+void CBasePlayer::UpdatePlayerSound( void )
 {
 	int iBodyVolume;
 	int iVolume;
@@ -5461,7 +5461,6 @@ void CBasePlayer::LeaveVehicle( const Vector &vecExitPoint, const QAngle &vecExi
 	// Just cut all of the rumble effects. 
 	RumbleEffect( RUMBLE_STOP_ALL, 0, RUMBLE_FLAGS_NONE );
 }
-
 
 //==============================================
 // !!!UNDONE:ultra temporary SprayCan entity to apply

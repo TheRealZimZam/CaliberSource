@@ -327,13 +327,11 @@ void CGib::SpawnRandomGibs( CBaseEntity *pVictim, int cGibs, GibType_e eGibType 
 				pGib->Spawn( "models/gibs/agibs.mdl", 20 );
 				pGib->m_nBody = random->RandomInt(0,ALIEN_GIB_COUNT-1);
 				break;
-#ifdef HL2_DLL
 			case GIB_MECH:
 				// machine pieces
 				pGib->Spawn( "models/gibs/mgibs.mdl", 20 );
 				pGib->m_nBody = random->RandomInt(0,GERMAN_GIB_COUNT-1);
 				break;
-#endif
 			}
 		}
 		pGib->InitGib( pVictim, 300, 400);

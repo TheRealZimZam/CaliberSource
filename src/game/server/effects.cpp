@@ -1497,6 +1497,7 @@ public:
 	DECLARE_SERVERCLASS();
 
 	CPrecipitation();
+//	int UpdateTransmitState();
 	void	Spawn( void );
 
 	CNetworkVar( PrecipitationType_t, m_nPrecipType );
@@ -1527,9 +1528,22 @@ void CPrecipitation::Spawn( void )
 	PrecacheMaterial( "effects/ember_swirling001" );
 
 	Precache();
-	SetSolid( SOLID_NONE );							// Remove model & collisions
 	SetMoveType( MOVETYPE_NONE );
 	SetModel( STRING( GetModelName() ) );		// Set size
+#if 0
+	if ( m_nPrecipType == PRECIPITATION_TYPE_PARTICLERAIN )
+	{
+		SetSolid( SOLID_VPHYSICS );
+		AddSolidFlags( FSOLID_NOT_SOLID );
+		AddSolidFlags( FSOLID_FORCE_WORLD_ALIGNED );
+		VPhysicsInitStatic();
+	}
+	else
+	{
+		SetSolid( SOLID_NONE );							// Remove model & collisions
+	}
+#endif
+	SetSolid( SOLID_NONE );							// Remove model & collisions
 
 	// Default to rain.
 	if ( m_nPrecipType < 0 || m_nPrecipType > NUM_PRECIPITATION_TYPES )
@@ -1538,6 +1552,65 @@ void CPrecipitation::Spawn( void )
 	m_nRenderMode = kRenderEnvironmental;
 }
 #endif
+
+
+//-----------------------------------------------------------------------------
+// func_precipitation_blocker - prevents precipitation from happening in the volume
+//-----------------------------------------------------------------------------
+class CPrecipitationBlocker : public CBaseEntity
+{
+public:
+	DECLARE_CLASS( CPrecipitationBlocker, CBaseEntity );
+	DECLARE_DATADESC();
+	DECLARE_SERVERCLASS();
+
+	CPrecipitationBlocker();
+	void	Spawn( void );
+	int		UpdateTransmitState( void );
+};
+
+LINK_ENTITY_TO_CLASS( func_precipitation_blocker, CPrecipitationBlocker );
+
+BEGIN_DATADESC( CPrecipitationBlocker )
+END_DATADESC()
+
+// Just send the normal entity crap
+IMPLEMENT_SERVERCLASS_ST( CPrecipitationBlocker, DT_PrecipitationBlocker )
+END_SEND_TABLE()
+
+
+CPrecipitationBlocker::CPrecipitationBlocker()
+{
+}
+
+int CPrecipitationBlocker::UpdateTransmitState()
+{
+	return SetTransmitState( FL_EDICT_ALWAYS );
+}
+
+
+void CPrecipitationBlocker::Spawn( void )							   
+{
+	SetTransmitState( FL_EDICT_ALWAYS );
+	Precache();
+	SetSolid( SOLID_NONE );							// Remove model & collisions
+	SetMoveType( MOVETYPE_NONE );
+	SetModel( STRING( GetModelName() ) );		// Set size
+
+	m_nRenderMode = kRenderEnvironmental;
+}
+
+//--------------------------------------------------------------------------------------------------------
+class CDetailBlocker : public CServerOnlyEntity
+{
+	DECLARE_CLASS( CDetailBlocker, CServerOnlyEntity );
+public:
+
+	CDetailBlocker() : CServerOnlyEntity() {}
+	virtual ~CDetailBlocker() {}
+};
+
+LINK_ENTITY_TO_CLASS( func_detail_blocker, CDetailBlocker );
 
 //-----------------------------------------------------------------------------
 // EnvWind - global wind info

@@ -110,7 +110,7 @@ enum sharedtasks_e
 		// Wait until the player enters the same PVS as this character.
 		TASK_WAIT_PVS,
 
-		// DON'T use this, it needs to go away. 
+		// Set the npc state. 
 		TASK_SUGGEST_STATE,
 
 		// Set m_hTargetEnt to nearest player
@@ -241,7 +241,7 @@ enum sharedtasks_e
 		// Walk the current path until for x units
 		TASK_WALK_PATH_FOR_UNITS,
 
-		// Rung the current path until you are x units from the goal.
+		// Run the current path until you are x units from the goal.
 		TASK_RUN_PATH_FLEE,
 
 		// Run the current path for a specified number of seconds
@@ -334,7 +334,7 @@ enum sharedtasks_e
 		// Emit an idle sound
 		TASK_SOUND_IDLE,
 
-		// Emit a sound because you are pissed off because you just saw someone you don't like
+		// Emit a alert sound because you are pissed off because you just saw someone you don't like
 		TASK_SOUND_WAKE,
 
 		// Emit a pain sound

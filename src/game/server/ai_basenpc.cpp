@@ -1288,6 +1288,12 @@ bool CAI_BaseNPC::PlayerInSpread( const Vector &sourcePos, const Vector &targetP
 
 		if ( pPlayer && ( !ignoreHatedPlayers || IRelationType( pPlayer ) != D_HT ) )
 		{
+#ifdef HL2_EPISODIC
+			//If the player is being lifted by a barnacle then go ahead and ignore the player and shoot.
+			if ( pPlayer->IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) )
+				return false;
+#endif
+
 			if ( PointInSpread( pPlayer, sourcePos, targetPos, pPlayer->WorldSpaceCenter(), flSpread, maxDistOffCenter ) )
 				return true;
 		}
@@ -4739,7 +4745,7 @@ void CAI_BaseNPC::GatherConditions( void )
 			CheckTarget( GetTarget() );
 		}
 
-		CheckAmmo();	//There's nothing in this??
+		CheckAmmo();
 
 		CheckFlinches();
 
@@ -5934,41 +5940,6 @@ Activity CAI_BaseNPC::NPC_TranslateActivity( Activity eNewActivity )
 {
 	Assert( eNewActivity != ACT_INVALID );
 
-#if 0
-	if (eNewActivity == ACT_RANGE_ATTACK1)
-	{
-		if ( IsCrouching() )
-		{
-			eNewActivity = ACT_RANGE_ATTACK1_LOW;
-		}
-	}
-	else if (eNewActivity == ACT_RELOAD)
-	{
-		if (IsCrouching())
-		{
-			eNewActivity = ACT_RELOAD_LOW;
-		}
-	}
-	else if ( eNewActivity == ACT_IDLE )
-	{
-		if ( IsCrouching() )
-		{
-			eNewActivity = ACT_COVER_LOW; //ACT_CROUCHIDLE
-		}
-	}
-	// ====
-	// HACK : LEIPZIG 06 -	The underlying problem is that the AR2 and SMG1 cannot map IDLE_ANGRY to a crouched equivalent automatically
-	//						which causes the current anims to pop up and down in their idle state of firing while crouched. -- jdw
-	else if ( eNewActivity == ACT_IDLE_ANGRY ) //ACT_IDLE_ANGRY_SMG1
-	{
-		if ( IsCrouching() )
-		{
-			eNewActivity = ACT_RANGE_AIM_LOW;
-		}
-	}
-	// ====
-#endif
-
 	switch ( eNewActivity )
 	{
 		case ACT_RANGE_ATTACK1:
@@ -5989,17 +5960,15 @@ Activity CAI_BaseNPC::NPC_TranslateActivity( Activity eNewActivity )
 			if (IsCrouching())
 			{
 				eNewActivity = ACT_COVER_LOW; //ACT_CROUCHIDLE
+				// This should be crouchidle (coverlow is for standoff and the like),
+				// but since most models are missing crouchidle anims, gotta use this instead for now
 			}
 		break;
 
 		case ACT_IDLE_ANGRY:
 			if ( IsCrouching() )
 			{
-	// ====
-	// HACK : LEIPZIG 06 -	The underlying problem is that the AR2 and SMG1 cannot map IDLE_ANGRY to a crouched equivalent automatically
-	//						which causes the current anims to pop up and down in their idle state of firing while crouched. -- jdw
 				eNewActivity = ACT_RANGE_AIM_LOW;
-	// ====
 			}
 		break;
 	}
@@ -10192,7 +10161,6 @@ void CAI_BaseNPC::SetTarget( CBaseEntity *pTarget )
 //=========================================================
 // Choose Enemy - tries to find the best suitable enemy for the npc.
 //=========================================================
-
 bool CAI_BaseNPC::ShouldChooseNewEnemy()
 {
 	CBaseEntity *pEnemy = GetEnemy();
@@ -13394,16 +13362,13 @@ void CAI_BaseNPC::StartScriptedNPCInteraction( CAI_BaseNPC *pOtherNPC, ScriptedN
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::CanRunAScriptedNPCInteraction( bool bForced )
 {
-  	if ( m_NPCState != NPC_STATE_IDLE && m_NPCState != NPC_STATE_ALERT && m_NPCState != NPC_STATE_COMBAT  )
+  	if ( m_NPCState != NPC_STATE_IDLE && m_NPCState != NPC_STATE_ALERT && m_NPCState != NPC_STATE_COMBAT )
  		return false;
 
 	if ( !IsAlive() )
 		return false;
 
 	if ( IsOnFire() )
-		return false;
-
-	if ( IsCrouching() )
 		return false;
 
 	// Not while running scripted sequences
@@ -13417,6 +13382,9 @@ bool CAI_BaseNPC::CanRunAScriptedNPCInteraction( bool bForced )
 	}
 	else
 	{
+		if ( IsCrouching() )
+			return false;
+
 		if ( m_hForcedInteractionPartner || m_hInteractionPartner )
 			return false;
 		if ( IsInAScript() || !HasCondition(COND_IN_PVS) )
@@ -14091,16 +14059,20 @@ bool CAI_BaseNPC::IsCrouchedActivity( Activity activity )
 
 	switch ( realActivity )
 	{
+		case ACT_CROUCHIDLE:
 		case ACT_RELOAD_LOW:
 		case ACT_COVER_LOW:
+// This is DISGOSTANG and should never be in the baseclass
+#if 0
 		case ACT_COVER_PISTOL_LOW:
 		case ACT_COVER_RIFLE_LOW:
 		case ACT_COVER_SMG1_LOW:
 		case ACT_RELOAD_PISTOL_LOW:
 		case ACT_RELOAD_SMG1_LOW:
-		case ACT_RANGE_AIM_LOW:
 		case ACT_RANGE_AIM_SMG1_LOW:
 		case ACT_RANGE_AIM_PISTOL_LOW:
+#endif
+		case ACT_RANGE_AIM_LOW:
 		case ACT_RANGE_ATTACK1_LOW:
 		case ACT_RANGE_ATTACK2_LOW:
 			return true;

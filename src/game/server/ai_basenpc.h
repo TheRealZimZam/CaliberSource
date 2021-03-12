@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		Base NPC character with AI
+// Purpose:	Base NPC character with AI
 //
 //=============================================================================//
 
@@ -1182,14 +1182,14 @@ public:
 	virtual bool		FOkToMakeSound( int soundPriority = 0 );
 	virtual void		JustMadeSound( int soundPriority = 0, float flSoundLength = 0.0f );
 
-	virtual void		DeathSound( const CTakeDamageInfo &info )	{ return; };
-	virtual void		AlertSound( void )							{ return; };
-	virtual void		IdleSound( void )							{ return; };
-	virtual void		PainSound( const CTakeDamageInfo &info )	{ return; };
-	virtual void		FearSound( void )				 			{ return; };
-	virtual void		LostEnemySound( void ) 						{ return; };
-	virtual void		FoundEnemySound( void ) 					{ return; };
-	virtual void		TauntSound( void ) 							{ return; };
+	virtual void		DeathSound( const CTakeDamageInfo &info )	{ return; };	//MEIN LEBEN
+	virtual void		AlertSound( void )							{ return; };	//I just saw somebody I dont like
+	virtual void		AngrySound( void ) 							{ return; };	//I'm attacking somebody I dont like
+	virtual void		IdleSound( void )							{ return; };	//I'm not doing anything in particular
+	virtual void		PainSound( const CTakeDamageInfo &info )	{ return; };	//I just took damage
+	virtual void		FearSound( void )				 			{ return; };	//I'm scared of something
+	virtual void		LostEnemySound( void ) 						{ return; };	//I have lost sight of my enemy
+	virtual void		FoundEnemySound( void ) 					{ return; };	//I just regained sight on a lost enemy
 	virtual void		BarnacleDeathSound( void )					{ CTakeDamageInfo info;	PainSound( info ); }
 
 	virtual void		SpeakSentence( int sentenceType ) 			{ return; };

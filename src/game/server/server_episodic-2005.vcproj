@@ -4156,6 +4156,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\npc_insect.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\npc_kleiner.cpp"
 					>
 				</File>

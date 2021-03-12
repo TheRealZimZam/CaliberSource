@@ -27,9 +27,9 @@ enum SCOND_t
 	COND_NO_PRIMARY_AMMO,
 	COND_NO_SECONDARY_AMMO,
 	COND_NO_WEAPON,
-	COND_SEE_HATE,	// A hated/normal priority enemy
-	COND_SEE_FEAR,
-	COND_SEE_DISLIKE,	// A somewhat hated/low priority enemy
+	COND_SEE_HATE,			// A hated/normal priority enemy
+	COND_SEE_FEAR,			// A feared enemy
+	COND_SEE_DISLIKE,		// A somewhat hated/low priority enemy
 	COND_SEE_ENEMY,
 	COND_LOST_ENEMY,
 	COND_ENEMY_WENT_NULL,	// What most people think COND_LOST_ENEMY is: This condition is set in the edge case where you had an enemy last think, but don't have one this think.
@@ -38,8 +38,8 @@ enum SCOND_t
 	COND_HAVE_ENEMY_LOS,
 	COND_HAVE_TARGET_LOS,
 
-	COND_LIGHT_DAMAGE,	// Any damage that is under islightdamage (default ALL)
-	COND_HEAVY_DAMAGE,	// Any damage that is under isheavydamage (default >20)
+	COND_LIGHT_DAMAGE,		// Any damage that is under islightdamage (default ALL)
+	COND_HEAVY_DAMAGE,		// Any damage that is under isheavydamage (default >20)
 	COND_PHYSICS_DAMAGE,	// Physics based damage
 	COND_REPEATED_DAMAGE,	// Damaged several times in a row
 	COND_ON_FIRE,			// Is currently on-fire
@@ -61,10 +61,10 @@ enum SCOND_t
 
 	COND_SEE_PLAYER,
 	COND_LOST_PLAYER,
-	COND_SEE_NEMESIS,	// An extremely hated/high priority enemy
+	COND_SEE_NEMESIS,		// An extremely hated/high priority enemy
 	COND_TASK_FAILED,
 	COND_SCHEDULE_DONE,
-	COND_SMELL,			// Something is really stanky
+	COND_SMELL,				// Something is really stanky
 	COND_TOO_CLOSE_TO_ATTACK, // FIXME: most of this next group are meaningless since they're shared between all attack checks!
 	COND_TOO_FAR_TO_ATTACK,
 	COND_NOT_FACING_ATTACK,

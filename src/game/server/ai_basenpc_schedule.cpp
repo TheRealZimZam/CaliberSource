@@ -2721,14 +2721,14 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 		{
 			Remember(bits_MEMORY_FLINCHED);
 			SetIdealActivity( GetFlinchActivity( false, false ) );
-			m_flNextFlinchTime = gpGlobals->curtime; //+ random->RandomFloat( 1, 2 );
+			m_flNextFlinchTime = gpGlobals->curtime; //+ random->RandomFloat( 0.5, 1.0 );
 			break;
 		}
 	case TASK_BIG_FLINCH:
 		{
 			Remember(bits_MEMORY_FLINCHED);
 			SetIdealActivity( GetFlinchActivity( true, false ) );
-			m_flNextFlinchTime = gpGlobals->curtime; //+ random->RandomFloat( 1, 2 );
+			m_flNextFlinchTime = gpGlobals->curtime; //+ random->RandomFloat( 1.0, 2.0 );
 			break;
 		}
 	case TASK_DIE:
@@ -2768,7 +2768,8 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 	case TASK_SOUND_ANGRY:
 		{
 			// sounds are complete as soon as we get here, cause we've already played them.
-			DevMsg( 2, "SOUND\n" );			
+			DevMsg( 2, "SOUND\n" );		
+			AngrySound();			
 			TaskComplete();
 			break;
 		}
@@ -4558,7 +4559,7 @@ int CAI_BaseNPC::SelectCombatSchedule()
 	if ( nSched != SCHED_NONE )
 		return nSched;
 
-	if ( HasCondition( COND_ENEMY_DEAD ) )
+	if ( HasCondition(COND_ENEMY_DEAD) )
 	{
 		// Clear the current (dead) enemy and try to find another.
 		SetEnemy( NULL );
@@ -4573,7 +4574,7 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		return SelectSchedule();
 	}
 #if 0
-	if ( ( HasCondition(COND_LIGHT_DAMAGE) || HasCondition(COND_HEAVY_DAMAGE) ) && !HasMemory( bits_MEMORY_FLINCHED) && SelectWeightedSequence( ACT_SMALL_FLINCH ) != ACTIVITY_NOT_AVAILABLE )
+	if ( ( HasCondition(COND_LIGHT_DAMAGE) || HasCondition(COND_HEAVY_DAMAGE) ) && !HasMemory( bits_MEMORY_FLINCHED ) && SelectWeightedSequence( ACT_SMALL_FLINCH ) != ACTIVITY_NOT_AVAILABLE )
 	{
 		return SCHED_SMALL_FLINCH;
 	}
@@ -4604,14 +4605,9 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		}
 	}
 
-	// Check if need to reload
-	if ( HasCondition( COND_NO_PRIMARY_AMMO ) )
+	// Do I have anything to shoot with?
+	if ( HasCondition(COND_NO_PRIMARY_AMMO) )
 	{
-#if 0
-		//If you cant see the enemy (and he cant see you), dont bother moving and just reload on the spot
-		if ( HasCondition( COND_SEE_ENEMY ) )
-			return SCHED_HIDE_AND_RELOAD;
-#endif
 		return SCHED_RELOAD;
 	}
 
@@ -4631,10 +4627,10 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		else
 			return SCHED_TAKE_COVER_FROM_ENEMY;
 	}
-	
+
 	if ( HasCondition(COND_TOO_CLOSE_TO_ATTACK) ) 
 		return SCHED_BACK_AWAY_FROM_ENEMY;
-	
+
 	if ( HasCondition( COND_WEAPON_PLAYER_IN_SPREAD ) || 
 			HasCondition( COND_WEAPON_BLOCKED_BY_FRIEND ) || 
 			HasCondition( COND_WEAPON_SIGHT_OCCLUDED ) )
@@ -4642,6 +4638,7 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		return SCHED_ESTABLISH_LINE_OF_FIRE;
 	}
 
+	// Is my active weapon in cooldown?
 	if ( GetShotRegulator()->IsInRestInterval() )
 	{
 		// If I could still shoot the target, keep looking tacticool-otherwise do a combat idle animation
@@ -4730,7 +4727,7 @@ int CAI_BaseNPC::SelectScriptSchedule()
 	return SCHED_IDLE_STAND;
 }
 
-ConVar ai_full_gesture_flinch( "ai_full_gesture_flinch", "0" );
+ConVar scene_full_gesture_flinch( "scene_full_gesture_flinch", "0" );
 //-----------------------------------------------------------------------------
 // Purpose: Select a gesture to play in response to damage we've taken
 // Output : int
@@ -4753,7 +4750,7 @@ void CAI_BaseNPC::PlayFlinchGesture()
 			RestartGesture( iFlinchActivity );
 		}
 
-		Remember(bits_MEMORY_FLINCHED);
+		Remember( bits_MEMORY_FLINCHED );
 	}
 	else
 	{
@@ -4761,14 +4758,13 @@ void CAI_BaseNPC::PlayFlinchGesture()
 		if ( HaveSequenceForActivity( iFlinchActivity ) )
 		{
 			RestartGesture( iFlinchActivity );
-		//	AddGesture( iFlinchActivity );
 		}
 	}
 
 	if ( iFlinchActivity != ACT_INVALID )
 	{
 		// Get the duration of the flinch and delay the next one by that (plus a bit more)
-		if ( ai_full_gesture_flinch.GetBool() )
+		if ( scene_full_gesture_flinch.GetBool() )
 		{
 			int iSequence = GetLayerSequence( FindGestureLayer( iFlinchActivity ) );
 
@@ -4792,29 +4788,25 @@ int CAI_BaseNPC::SelectFlinchSchedule()
 		return SCHED_NONE;
 
 	// If we've flinched recently, don't do it again. A gesture flinch will be played instead.
- 	if ( HasMemory(bits_MEMORY_FLINCHED) )
+ 	if ( HasMemory( bits_MEMORY_FLINCHED ) )
 		return SCHED_NONE;
 
 	if ( !CanFlinch() )
 		return SCHED_NONE;
 
 	// Robin: This was in the original HL1 flinch code. Do we still want it?
-	//if ( fabs( GetMotor()->DeltaIdealYaw() ) < (1.0 - m_flFieldOfView) * 60 ) // roughly in the correct direction
-	//	return SCHED_TAKE_COVER_FROM_ORIGIN;
+//	if ( fabs( GetMotor()->DeltaIdealYaw() ) < (1.0 - m_flFieldOfView) * 60 ) // roughly in the correct direction
+//		return SCHED_TAKE_COVER_FROM_ORIGIN;
 
 	// Heavy damage. Break out of my current schedule and flinch.
 	Activity iFlinchActivity = GetFlinchActivity( true, false );
 	if ( HaveSequenceForActivity( iFlinchActivity ) )
 		return SCHED_BIG_FLINCH;
 
-	/*
-	// Not used anymore, because gesture flinches are played instead for light damage
-	// taken shortly after we've already flinched full.
-	//
+	// If theres no act for the big flinch, resort to small
 	iFlinchActivity = GetFlinchActivity( false, false );
 	if ( HaveSequenceForActivity( iFlinchActivity ) )
 		return SCHED_SMALL_FLINCH;
-	*/
 
 	return SCHED_NONE;
 }

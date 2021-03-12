@@ -1,7 +1,7 @@
 //===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: 
-//
+// TODO; Better weapon spread system
 //===========================================================================//
 
 #ifndef COMBATWEAPON_SHARED_H
@@ -304,10 +304,14 @@ public:
 	virtual const char		*GetWorldModel( void ) const;
 	virtual const char		*GetAnimPrefix( void ) const;
 	virtual float			GetCycleTime( void ) const;
+	virtual float			GetHSpread( void ) const;
+	virtual float			GetVSpread( void ) const;
 	virtual int				GetMaxClip1( void ) const;
 	virtual int				GetMaxClip2( void ) const;
 	virtual int				GetDefaultClip1( void ) const;
 	virtual int				GetDefaultClip2( void ) const;
+	virtual bool			UsesClipsForAmmo1( void ) const;
+	virtual bool			UsesClipsForAmmo2( void ) const;
 	virtual int				GetWeight( void ) const;
 	virtual bool			AllowsAutoSwitchTo( void ) const;
 	virtual bool			AllowsAutoSwitchFrom( void ) const;
@@ -318,8 +322,6 @@ public:
 	virtual char const		*GetPrintName( void ) const;
 	virtual char const		*GetShootSound( int iIndex ) const;
 	virtual int				GetRumbleEffect() const;
-	virtual bool			UsesClipsForAmmo1( void ) const;
-	virtual bool			UsesClipsForAmmo2( void ) const;
 	bool					IsMeleeWeapon() const;
 
 	// derive this function if you mod uses encrypted weapon info files

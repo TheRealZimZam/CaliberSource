@@ -2,7 +2,7 @@
 //
 // Purpose: Weapon data file parsing, shared by game & client dlls.
 //
-// $NoKeywords: $
+// TODO; Better weapon spread system
 //=============================================================================//
 #include "cbase.h"
 #include <KeyValues.h>
@@ -313,6 +313,8 @@ FileWeaponInfo_t::FileWeaponInfo_t()
 	iSlot = 0;
 	iPosition = 0;
 	flCycleTime = 0;
+	flHSpread = 0;
+	flVSpread = 0;
 	iMaxClip1 = 0;
 	iMaxClip2 = 0;
 	iDefaultClip1 = 0;
@@ -373,6 +375,8 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 		iPosition = pKeyValuesData->GetInt( "bucket_position_360", iPosition );
 	}
 	flCycleTime = pKeyValuesData->GetFloat( "cycle_time", flCycleTime );			// How long it takes to fire a boolet
+	flHSpread = pKeyValuesData->GetFloat( "h_spread", flHSpread );					// The horizontal spread of the weapon
+	flVSpread = pKeyValuesData->GetFloat( "v_spread", flVSpread );					// The vertical spread of the weapon
 	iMaxClip1 = pKeyValuesData->GetInt( "clip_size", WEAPON_NOCLIP );				// Max primary clips gun can hold (assume they don't use clips by default)
 	iMaxClip2 = pKeyValuesData->GetInt( "clip2_size", WEAPON_NOCLIP );				// Max secondary clips gun can hold (assume they don't use clips by default)
 	iDefaultClip1 = pKeyValuesData->GetInt( "default_clip", iMaxClip1 );			// amount of primary ammo placed in the primary clip when it's picked up

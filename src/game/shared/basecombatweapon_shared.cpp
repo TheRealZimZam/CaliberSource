@@ -2,7 +2,7 @@
 //
 // Purpose: 
 //
-// $NoKeywords: $
+// TODO; Better weapon spread system
 //=============================================================================//
 #include "cbase.h"
 #include "in_buttons.h"
@@ -302,7 +302,7 @@ const char *CBaseCombatWeapon::GetPrintName( void ) const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Default Firerate
 //-----------------------------------------------------------------------------
 float CBaseCombatWeapon::GetCycleTime( void ) const
 {
@@ -310,7 +310,20 @@ float CBaseCombatWeapon::GetCycleTime( void ) const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Default Spread
+//-----------------------------------------------------------------------------
+float CBaseCombatWeapon::GetHSpread( void ) const
+{
+	return GetWpnData().flHSpread;
+}
+
+float CBaseCombatWeapon::GetVSpread( void ) const
+{
+	return GetWpnData().flVSpread;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Max Clipsize
 //-----------------------------------------------------------------------------
 int CBaseCombatWeapon::GetMaxClip1( void ) const
 {
@@ -318,7 +331,7 @@ int CBaseCombatWeapon::GetMaxClip1( void ) const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Secondary Clipsize
 //-----------------------------------------------------------------------------
 int CBaseCombatWeapon::GetMaxClip2( void ) const
 {
@@ -326,7 +339,7 @@ int CBaseCombatWeapon::GetMaxClip2( void ) const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Default Clipsize
 //-----------------------------------------------------------------------------
 int CBaseCombatWeapon::GetDefaultClip1( void ) const
 {
@@ -334,7 +347,7 @@ int CBaseCombatWeapon::GetDefaultClip1( void ) const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Secondary Clipsize
 //-----------------------------------------------------------------------------
 int CBaseCombatWeapon::GetDefaultClip2( void ) const
 {
@@ -349,6 +362,9 @@ bool CBaseCombatWeapon::UsesClipsForAmmo1( void ) const
 	return ( GetMaxClip1() != WEAPON_NOCLIP );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
 bool CBaseCombatWeapon::IsMeleeWeapon() const
 {
 	return GetWpnData().m_bMeleeWeapon;
@@ -1697,7 +1713,14 @@ int CBaseCombatWeapon::GetBulletType( void )
 //-----------------------------------------------------------------------------
 const Vector& CBaseCombatWeapon::GetBulletSpread( void )
 {
-	static Vector cone = VECTOR_CONE_15DEGREES;
+	static Vector cone = VECTOR_CONE_10DEGREES;
+
+	if ( GetHSpread() != NULL )
+	{
+		// We got a weaponscript cone, use that instead
+		cone = Vector( GetHSpread(), ((GetHSpread() / 2) + (GetVSpread() / 2)), GetVSpread() );
+	}
+
 	return cone;
 }
 

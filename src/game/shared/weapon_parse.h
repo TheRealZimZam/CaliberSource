@@ -2,7 +2,7 @@
 //
 // Purpose: Weapon data file parsing, shared by game & client dlls.
 //
-// $NoKeywords: $
+// TODO; Better weapon spread system
 //=============================================================================//
 
 #ifndef WEAPON_PARSE_H
@@ -88,6 +88,8 @@ public:
 	int						iSlot;									// inventory slot.
 	int						iPosition;								// position in the inventory slot.
 	float					flCycleTime;							// Amount of bullet fired per think
+	float					flHSpread;								// The horizontal spread of the weapon
+	float					flVSpread;								// The vertical spread of the weapon
 	int						iMaxClip1;								// max primary clip size (-1 if no clip)
 	int						iMaxClip2;								// max secondary clip size (-1 if no clip)
 	int						iDefaultClip1;							// amount of primary ammo in the gun when it's created

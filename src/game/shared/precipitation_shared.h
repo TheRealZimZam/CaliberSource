@@ -1,7 +1,10 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
-//
+// RAIN = Watery stuff from the sky
+// SNOW = Hail/fast moving snow
+// ASH = Ash and embers used in ep1
+// SNOWFALL = More traditional, slow falling snow
 //=============================================================================//
 
 #ifndef PRECIPITATION_SHARED_H
@@ -18,6 +21,10 @@ enum PrecipitationType_t
 	PRECIPITATION_TYPE_SNOW,
 	PRECIPITATION_TYPE_ASH,
 	PRECIPITATION_TYPE_SNOWFALL,
+//!	PRECIPITATION_TYPE_PARTICLERAIN,
+//!	PRECIPITATION_TYPE_PARTICLEASH,
+//!	PRECIPITATION_TYPE_PARTICLERAINSTORM,
+//!	PRECIPITATION_TYPE_PARTICLESNOW,
 	NUM_PRECIPITATION_TYPES
 };
 

@@ -215,16 +215,15 @@ void C_BaseCombatWeapon::DrawCrosshair()
 		return;
 
 	Color clr = gHUD.m_clrNormal;
-/*
 
+#if 0
 	// TEST: if the thing under your crosshair is on a different team, light the crosshair with a different color.
 	Vector vShootPos, vShootAngles;
 	GetShootPosition( vShootPos, vShootAngles );
 
 	Vector vForward;
 	AngleVectors( vShootAngles, &vForward );
-	
-	
+
 	// Change the color depending on if we're looking at a friend or an enemy.
 	CPartitionFilterListMask filter( PARTITION_ALL_CLIENT_EDICTS );	
 	trace_t tr;
@@ -241,7 +240,7 @@ void C_BaseCombatWeapon::DrawCrosshair()
 			}
 		}
 	}		 
-*/
+#endif
 
 	CHudCrosshair *crosshair = GET_HUDELEMENT( CHudCrosshair );
 	if ( !crosshair )

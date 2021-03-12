@@ -26,10 +26,11 @@ CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectSparks )
 CLIENTEFFECT_MATERIAL( "effects/spark" )
 CLIENTEFFECT_MATERIAL( "effects/energysplash" )
 CLIENTEFFECT_MATERIAL( "effects/energyball" )
+CLIENTEFFECT_MATERIAL( "effects/fleck_metal1" )
 CLIENTEFFECT_MATERIAL( "sprites/rico1" )
 CLIENTEFFECT_MATERIAL( "sprites/rico1_noz" )
 CLIENTEFFECT_MATERIAL( "sprites/richo1" )
-CLIENTEFFECT_MATERIAL( "sprites/dot" )
+//CLIENTEFFECT_MATERIAL( "sprites/dot" )
 CLIENTEFFECT_MATERIAL( "sprites/blueflare1" )
 CLIENTEFFECT_MATERIAL( "effects/yellowflare" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1_nocull" )
@@ -686,8 +687,9 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 		pParticle->m_flLength		= random->RandomFloat( length*0.25f, length );
 		
 		pParticle->m_vecVelocity	= dir * random->RandomFloat( (METAL_SPARK_MINSPEED*(2.0f-spreadOfs)), (METAL_SPARK_MAXSPEED*(2.0f-spreadOfs)) );
-		
-		Color32Init( pParticle->m_color, 255, 255, 255, 255 );
+
+		//TODO; This needs an input
+		Color32Init( pParticle->m_color, 255, 236, 196, 255 );
 	}
 
 	//
@@ -711,7 +713,7 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Ricochet bullet - Addon to metalspark, bullet and small smoke trail
+// Purpose: Ricochet spark for bouncing bullets
 // Input  : &position - origin of effect
 //			&normal - normal of the surface struck
 //-----------------------------------------------------------------------------
@@ -719,12 +721,16 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 #define	RICOCHET_SPARK_MAXSPEED	768.0f
 #define	RICOCHET_SPARK_GRAVITY	300.0f
 
+//TODO; This needs a scale - 1 for bullets, 2 for shells, 3 for ludicrous shells
 void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal )
 {
 	VPROF_BUDGET( "FX_RicochetSpark", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 
+//!	if ( !fx_drawmetalspark.GetBool() )
+//!		return;
+
 	//
-	// Bullet
+	// Impact point fireball
 	//
 
 	Vector offset = position + ( surfaceNormal * 1.0f );
@@ -739,11 +745,14 @@ void FX_RicochetSpark( const Vector &position, const Vector &direction, const Ve
 	data.SetLifeTime( 0.15f );
 	data.SetYaw( random->RandomInt( 0, 360 ) );
 	
-	int scale = random->RandomInt( 16, 24 );
+	int scale = random->RandomInt( 16, 20 );	//* iScale
 	data.SetScale( scale, 0 );
 
 	FX_AddQuad( data );
 
+	//
+	// Small flecks of metal
+	//
 #if 1
 	CSmartPtr<CTrailParticles> sparkEmitter = CTrailParticles::Create( "FX_RicochetSpark" );
 
@@ -758,32 +767,39 @@ void FX_RicochetSpark( const Vector &position, const Vector &direction, const Ve
 	sparkEmitter->SetCollisionDamped( 0.25f );
 	sparkEmitter->GetBinding().SetBBox( offset - Vector( 32, 32, 32 ), offset + Vector( 32, 32, 32 ) );
 
+	int	numMetals = random->RandomInt( 1, 3 );	//* iScale
+
 	TrailParticle	*pParticle;
 	Vector	dir;
-	float	length	= 0.2f;
+	float	length	= 0.1f;	//* iScale
 
-	// Send the bullet and trail
-	pParticle = (TrailParticle *) sparkEmitter->AddParticle( sizeof(TrailParticle), sparkEmitter->GetPMaterial( "sprites/dot" ), offset );
+	// Send the ember and trail
+	for ( int i = 0; i < numMetals; i++ )
+	{
+		pParticle = (TrailParticle *) sparkEmitter->AddParticle( sizeof(TrailParticle), sparkEmitter->GetPMaterial( "effects/fleck_metal1" ), offset );
 
-	if ( pParticle == NULL )
-			return;
+		if ( pParticle == NULL )
+				return;
 
-	pParticle->m_flLifetime	= 0.0f;
-	pParticle->m_flDieTime	= random->RandomFloat( 0.25f, 0.4f );
+		pParticle->m_flLifetime	= 0.0f;
+		pParticle->m_flDieTime	= random->RandomFloat( 0.25f, 0.4f );
 
-	float	spreadOfs = random->RandomFloat( 0.0f, 2.0f );
+		float	spreadOfs = random->RandomFloat( 0.0f, 2.0f );
 
-	dir[0] = direction[0] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
-	dir[1] = direction[1] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
-	dir[2] = direction[2] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
+		dir[0] = direction[0] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
+		dir[1] = direction[1] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
+		dir[2] = direction[2] + random->RandomFloat( -(0.5f*spreadOfs), (0.5f*spreadOfs) );
 
-	VectorNormalize( dir );
+		VectorNormalize( dir );
 
-	pParticle->m_flWidth		= random->RandomFloat( 0.5f, 1.0f );
-	pParticle->m_flLength		= random->RandomFloat( length*0.25f, length );
-	pParticle->m_vecVelocity	= dir * random->RandomFloat( (RICOCHET_SPARK_MINSPEED*(2.0f-spreadOfs)), (RICOCHET_SPARK_MAXSPEED*(2.0f-spreadOfs)) );
+		pParticle->m_flWidth		= random->RandomFloat( 0.75f, 1.25f );
+		pParticle->m_flLength		= random->RandomFloat( length*0.5f, length );
+		pParticle->m_vecVelocity	= dir * random->RandomFloat( (RICOCHET_SPARK_MINSPEED*(2.0f-spreadOfs)), (RICOCHET_SPARK_MAXSPEED*(2.0f-spreadOfs)) );
 
-	Color32Init( pParticle->m_color, 224, 192, 128, 192 );
+		int	ColorRandom = random->RandomInt( 0, 32 );
+
+		Color32Init( pParticle->m_color, 212+ColorRandom, 196+ColorRandom, 164+ColorRandom, 192 );	//224, 192, 128, 192 w/dot
+	}
 #endif
 }
 

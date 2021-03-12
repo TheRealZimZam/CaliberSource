@@ -131,7 +131,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 		//
 		// Long stringy drops of blood.
 		//
-		for ( i = 0; i < 14; i++ )
+		for ( i = 0; i < 14; i++ )	//TODO; Callback to perf
 		{
 			// Originate from within a circle 'scale' inches in diameter.
 			offset = origin;
@@ -160,7 +160,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 		//
 		// Shorter droplets.
 		//
-		for ( i = 0; i < 24; i++ )
+		for ( i = 0; i < 24; i++ )	//TODO; Callback to perf
 		{
 			// Originate from within a circle 'scale' inches in diameter.
 			offset = origin;
@@ -291,10 +291,6 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 			}
 		}
 	}
-
-	// TODO: Play a sound?
-	//CLocalPlayerFilter filter;
-	//C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, CHAN_VOICE, "Physics.WaterSplash", 1.0, ATTN_NORM, 0, 100, &origin );
 }
 
 //-----------------------------------------------------------------------------
@@ -392,7 +388,7 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 			pParticle->m_flDieTime	= random->RandomFloat( 0.5f, 0.75f);
 
 			pParticle->m_vecVelocity	= dir * random->RandomFloat( 16.0f, 32.0f )*(i+1);
-			pParticle->m_vecVelocity[2] -= random->RandomFloat( 32.0f, 64.0f )*(i+1);
+			pParticle->m_vecVelocity[2] -= random->RandomFloat( 16.0f, 48.0f )*(i+1);
 
 			colorRamp = random->RandomFloat( 0.75f, 2.0f );
 
@@ -436,7 +432,7 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 	//
 	// Shorter droplets
 	//
-	for ( int i = 0; i < 8; i++ )
+	for ( int i = 0; i < 8; i++ )	//TODO; Callback to perf
 	{
 		// Originate from within a circle 'scale' inches in diameter
 		offset = origin;
@@ -458,10 +454,6 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 
 		FloatToColor32( tParticle->m_color, color[0], color[1], color[2], 1.0f );
 	}
-
-	// TODO: Play a sound?
-	//CLocalPlayerFilter filter;
-	//C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, CHAN_VOICE, "Physics.WaterSplash", 1.0, ATTN_NORM, 0, 100, &origin );
 }
 
 
@@ -662,15 +654,14 @@ void BloodImpactCallback( const CEffectData & data )
 	{
 #endif
 // Until there's some better PFX available, use the old system
-		Vector vecPosition;
-		vecPosition = data.m_vOrigin;
-		
-		// Fetch the blood color.
-		colorentry_t color;
-		GetBloodColor( data.m_nColor, color );
+	Vector vecPosition;
+	vecPosition = data.m_vOrigin;
 
-		FX_BloodBulletImpact( vecPosition, data.m_vNormal, data.m_flScale, color.r, color.g, color.b );
-//	}
+	// Fetch the blood color.
+	colorentry_t color;
+	GetBloodColor( data.m_nColor, color );
+
+	FX_BloodBulletImpact( vecPosition, data.m_vNormal, data.m_flScale, color.r, color.g, color.b );
 }
 
 DECLARE_CLIENT_EFFECT( "BloodImpact", BloodImpactCallback );

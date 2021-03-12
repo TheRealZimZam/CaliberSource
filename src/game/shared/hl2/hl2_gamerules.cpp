@@ -1848,14 +1848,14 @@ CAmmoDef *GetAmmoDef()
 		// Newton says; Get PWned NooB
 		def.AddAmmoType("Gravity",			DMG_CLUB,					TRACER_NONE,			0, 0, 8, 0, 0 );
 		def.AddAmmoType("AR2",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_ar2",			"sk_npc_dmg_ar2",			"sk_max_ar2",			BULLET_IMPULSE(300, 1500), 0 );
-//		def.AddAmmoType("AR2Sniper",		DMG_BULLET,					TRACER_NONE,			"sk_plr_dmg_ar2_sniper",	"sk_npc_dmg_ar2",			"sk_max_ar2",			BULLET_IMPULSE(400, 1600), 0 );
-		def.AddAmmoType("AlyxGun",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE,			"sk_plr_dmg_alyxgun",		"sk_npc_dmg_alyxgun",		"sk_max_alyxgun",		BULLET_IMPULSE(200, 1225), 0 );
+//		def.AddAmmoType("AR2Sniper",		DMG_BULLET,					TRACER_LINE,			"sk_plr_dmg_ar2_sniper",	"sk_npc_dmg_ar2",			"sk_max_ar2",			BULLET_IMPULSE(400, 1600), 0 );
+		def.AddAmmoType("AlyxGun",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_alyxgun",		"sk_npc_dmg_alyxgun",		"sk_max_alyxgun",		BULLET_IMPULSE(200, 1225), 0 );
 		def.AddAmmoType("Pistol",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_pistol",		"sk_npc_dmg_pistol",		"sk_max_pistol",		BULLET_IMPULSE(200, 1225), 0 );
 		def.AddAmmoType("SMG1",				DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_smg1",			"sk_npc_dmg_smg1",			"sk_max_smg1",			BULLET_IMPULSE(200, 1225), 0 );
 		def.AddAmmoType("HMG",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_hmg",			"sk_npc_dmg_hmg",			"sk_max_hmg",			BULLET_IMPULSE(300, 2000), 0 );
 		def.AddAmmoType("357",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_357",			"sk_npc_dmg_357",			"sk_max_357",			BULLET_IMPULSE(800, 5000), 0 );
 		def.AddAmmoType("XBowBolt",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE,			"sk_plr_dmg_crossbow",		"sk_npc_dmg_crossbow",		"sk_max_crossbow",		BULLET_IMPULSE(800, 8000), 0 );
-		def.AddAmmoType("FlareRound",		DMG_BURN,					TRACER_LINE, 			"sk_plr_dmg_flare_round",	"sk_npc_dmg_flare_round",	"sk_max_flare_round",	BULLET_IMPULSE(1500, 600), 0 );
+		def.AddAmmoType("FlareRound",		DMG_BURN,					TRACER_NONE, 			"sk_plr_dmg_flare_round",	"sk_npc_dmg_flare_round",	"sk_max_flare_round",	BULLET_IMPULSE(1500, 600), 0 );
 
 		def.AddAmmoType("Buckshot",			DMG_BULLET | DMG_BUCKSHOT,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_buckshot",		"sk_npc_dmg_buckshot",		"sk_max_buckshot",		BULLET_IMPULSE(400, 1200), 0 );
 		def.AddAmmoType("RPG_Round",		DMG_BURN,					TRACER_NONE,			"sk_plr_dmg_rpg_round",		"sk_npc_dmg_rpg_round",		"sk_max_rpg_round",		0, 0 );

@@ -1,10 +1,18 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Your classic malicious-military-marauders.
-// TODO's: Fix RangeAttack2 (not triggering on lost sight), Auto-squadding, COND_COMBINE_DROP_GRENADE for tripmines
+// TODO's: Auto-squadding, COND_COMBINE_DROP_GRENADE for tripmines, looping radio sound while talking, integrate with metropolice somehow??
 // Note; Hard actually has slightly worse AI squad-wise, but can move and shoot more often
 //=============================================================================//
 
+//-----------------------------------------------------------------------------
+// Heres a rundown - 
+// The most aggressive enemy in the game, at least by hitscan standards
+// Works best as a squad, can throw grenades and easily eliminate isolated
+// targets - comes in second place in terms of intelligence, barely being
+// one-upped by citizen17 - can be an extremely tough enemy, so use
+// sparingly
+//-----------------------------------------------------------------------------
 #include "cbase.h"
 #include "ai_hull.h"
 #include "ai_navigator.h"
@@ -37,23 +45,25 @@
 
 int g_fCombineQuestion;				// true if an idle grunt asked a question. Cleared when someone answers. YUCK old global from grunt code
 extern ConVar sk_npc_dmg_smg1_grenade;
-extern ConVar sk_smg_grenade_radius;
+extern ConVar sk_ar2_grenade_radius;
 
 #define COMBINE_SKIN_DEFAULT		0
 #define COMBINE_SKIN_SHOTGUNNER		1
 
-#define COMBINE_GRENADE_THROW_SPEED 650
-#define COMBINE_GRENADE_LAUNCH_SPEED 650	//This needs to grab the weapons speed
-#define COMBINE_GRENADE_TIMER		3.5
+ConVar	sk_combine_grenadespeed( "sk_combine_grenadespeed", "650");
+#define COMBINE_GRENADE_THROW_SPEED sk_combine_grenadespeed.GetFloat()
+ConVar	sk_combine_launchspeed( "sk_combine_launchspeed", "650");
+#define COMBINE_GRENADE_LAUNCH_SPEED sk_combine_launchspeed.GetFloat()	//This needs to grab the weapons speed
+#define COMBINE_GRENADE_TIMER		3.5	//TODO; Skill this
 #define	COMBINE_MIN_GRENADE_CLEAR_DIST	250
 
-ConVar	npc_combine_grenade_chance	( "npc_combine_grenade_chance",	"50");
+ConVar	npc_combine_grenade_chance( "npc_combine_grenade_chance",	"50");
 #define COMBINE_GRENADE_CHANCE		npc_combine_grenade_chance.GetFloat()		// Chance of throwing a grenade (in most situations).
 ConVar npc_combine_grenade_time( "npc_combine_grenade_time", "5" );	//This should not be changed, its only here if some very minor adjustments need to be made
-//ConVar npc_combine_altfire_time( "npc_combine_altfire_time", "8" );	//NOT USED
+#define COMBINE_GRENADE_TIME		npc_combine_grenade_time.GetFloat()		// Chance of throwing a grenade (in most situations).
 
-ConVar	npc_combine_limp_health		( "npc_combine_limp_health",	"20");
-#define COMBINE_LIMP_HEALTH			npc_combine_limp_health.GetFloat()
+ConVar	npc_combine_limp_health( "npc_combine_limp_health",	"20");
+#define COMBINE_LIMP_HEALTH		npc_combine_limp_health.GetFloat()
 
 #define COMBINE_EYE_STANDING_POSITION	Vector( 0, 0, 66 )
 #define COMBINE_GUN_STANDING_POSITION	Vector( 0, 0, 57 )
@@ -65,7 +75,7 @@ ConVar	npc_combine_limp_health		( "npc_combine_limp_health",	"20");
 #define COMBINE_MIN_SIGNAL_DIST			256.0
 
 //Whether or not the combine should spawn health on death
-ConVar	combine_drop_health( "combine_drop_health", "1" );
+ConVar	npc_combine_drop_health( "npc_combine_drop_health", "1" );
 
 //-----------------------------------------------------------------------------
 // Static stuff local to this file.
@@ -180,6 +190,7 @@ DEFINE_INPUTFUNC( FIELD_VOID,	"HitByBugbait",		InputHitByBugbait ),
 DEFINE_INPUTFUNC( FIELD_STRING,	"ThrowGrenadeAtTarget",	InputThrowGrenadeAtTarget ),
 
 DEFINE_FIELD( m_iLastAnimEventHandled, FIELD_INTEGER ),
+DEFINE_FIELD( m_fIsDemolition, FIELD_BOOLEAN ),
 DEFINE_FIELD( m_fIsElite, FIELD_BOOLEAN ),
 DEFINE_FIELD( m_vecAltFireTarget, FIELD_VECTOR ),
 
@@ -298,10 +309,10 @@ void CNPC_Combine::Precache()
 
 #if 0
 	// get voice pitch
-	if (random->RandomInt(0,1))
-		SetVoicePitch( 109 + random->RandomInt(0,7) );
+	if (m_fIsDemolition)
+		SetVoicePitch( 90 );
 	else
-		SetVoicePitch( 100 );
+		SetVoicePitch( 96 + random->RandomInt(0,12) );
 #endif
 
 	BaseClass::Precache();
@@ -342,18 +353,13 @@ void CNPC_Combine::Spawn( void )
 	m_bShouldPatrol			= false;
 
 	CapabilitiesAdd( bits_CAP_TURN_HEAD | bits_CAP_MOVE_GROUND | bits_CAP_MOVE_CLIMB);
-
-	CapabilitiesAdd( bits_CAP_AIM_GUN );
-
-	// Innate range attack for grenade
-//	CapabilitiesAdd(bits_CAP_INNATE_RANGE_ATTACK2 );
+	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_AIM_GUN );
 
 	// Innate range attack for kicking
 	CapabilitiesAdd(bits_CAP_INNATE_MELEE_ATTACK1 );
 
 	// Can be in a squad
-	CapabilitiesAdd( bits_CAP_SQUAD);
-	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_NO_HIT_SQUADMATES );
+	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_NO_HIT_SQUADMATES );
 
 	CapabilitiesAdd( bits_CAP_DUCK );				// In reloading and cover
 
@@ -396,6 +402,7 @@ void CNPC_Combine::GatherConditions()
 
 	ClearCondition( COND_COMBINE_ATTACK_SLOT_AVAILABLE );
 
+#if 0
 	ClearCondition( COND_COMBINE_SAFE_FROM_MORTAR );
 	if ( IsCurSchedule( SCHED_TAKE_COVER_FROM_BEST_SOUND ) )
 	{
@@ -408,6 +415,7 @@ void CNPC_Combine::GatherConditions()
 				SetCondition( COND_COMBINE_SAFE_FROM_MORTAR );
 		}
 	}
+#endif
 
 	if( GetState() == NPC_STATE_COMBAT )
 	{
@@ -503,7 +511,7 @@ void CNPC_Combine::DelaySquadAltFireAttack( float flDelay )
 	{
 		CNPC_Combine *pCombine = dynamic_cast<CNPC_Combine*>(pSquadmate);
 
-		if( pCombine && pCombine->IsElite() )
+		if( pCombine && pCombine->IsDemolition() )
 		{
 			pCombine->DelayAltFireAttack( flDelay );
 		}
@@ -562,7 +570,7 @@ bool CNPC_Combine::ShouldMoveAndShoot()
 	if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 		return false;
 
-	if( HasCondition( COND_NO_PRIMARY_AMMO, false ) )
+	if( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_TOO_FAR_TO_ATTACK ) )
 		return false;
 
 	if( HasCondition( COND_BEHIND_ENEMY, false ) && g_pGameRules->IsSkillLevel( SKILL_EASY ) )
@@ -575,14 +583,18 @@ bool CNPC_Combine::ShouldMoveAndShoot()
 	if( IsCurSchedule( SCHED_RANGE_ATTACK1, false ) )
 		return true;
 
+#if 1
+	if( IsCurSchedule( SCHED_COMBINE_TAKE_COVER2, false ) )
+		return true;
+#endif
+
+#ifdef HL2_EPISODIC
 	if( IsCurSchedule( SCHED_COMBINE_PRESS_ATTACK, false ) )
 		return true;
 
 	if( IsCurSchedule( SCHED_COMBINE_CHARGE_PLAYER, false ) )
 		return true;
-
-	if( IsCurSchedule( SCHED_COMBINE_TAKE_COVER2, false ) )
-		return true;
+#endif	// HL2_EPISODIC
 
 	return BaseClass::ShouldMoveAndShoot();
 }
@@ -854,7 +866,7 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 				{
 					m_flLastAttackTime = gpGlobals->curtime;
 
-					if ( m_pSquad && m_pSquad->IsLeader( this )
+					if ( m_pSquad && m_pSquad->IsLeader( this ) )
 					{
 						m_Sentences.Speak( "COMBINE_ANNOUNCE_LEADER", SENTENCE_PRIORITY_MEDIUM );
 					}
@@ -873,7 +885,7 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 					}
 					else
 					{
-						SetActivity(ACT_COWER); // This is really crouch idle
+						SetActivity(ACT_COWER); // This is really crouch idle???
 					}
 				}
 				// -------------------------------------------------------------
@@ -1032,7 +1044,9 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 							m_pSquad->SquadRemember(bits_MEMORY_PLAYER_HURT);
 						}
 
-						m_Sentences.Speak( "COMBINE_PLAYERHIT", SENTENCE_PRIORITY_INVALID );
+						const char *pSentenceName = GetSentencePrefix( "PLAYERHIT" );
+
+						m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_INVALID );
 						JustMadeSound( SENTENCE_PRIORITY_HIGH );
 					}
 					if ( pEntity->MyNPCPointer() )
@@ -1306,14 +1320,12 @@ void CNPC_Combine::RunTask( const Task_t *pTask )
 				{
 					if (--m_nShots > 0)
 					{
-						// DevMsg("ACT_RANGE_ATTACK1\n");
 						ResetIdealActivity( ACT_RANGE_ATTACK1 );
 						m_flLastAttackTime = gpGlobals->curtime;
 						m_flNextAttack = gpGlobals->curtime + m_flShotDelay - 0.1;
 					}
 					else
 					{
-						// DevMsg("TASK_RANGE_ATTACK1 complete\n");
 						TaskComplete();
 					}
 				}
@@ -1422,10 +1434,11 @@ int CNPC_Combine::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	CBaseCombatCharacter *dumbo = info.GetAttacker()->MyCombatCharacterPointer();
 	if ( m_pSquad->SquadIsMember(info.GetAttacker()) || !IsMoving() && (dumbo && dumbo->IRelationType( this ) == D_LI) )
 	{
-		Crouch();
 		DesireCrouch();
+		Crouch();
 	}
 
+	//Should this be in here???
 #if 1
 	if( info.GetDamageType() & DMG_BURN )
 	{
@@ -1484,21 +1497,12 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 	if ( HasCondition( COND_ON_FIRE ) )
 		return BaseClass::NPC_TranslateActivity( ACT_COMBINE_BUGBAIT );
 
-#if 0
-	if (eNewActivity == ACT_RELOAD_SMG1 || eNewActivity == ACT_RELOAD_PISTOL)
-	{
-		// Combine doesn't handle these activities
-		eNewActivity = ACT_RELOAD;
-	}
-#endif
-
 	switch ( eNewActivity )
 	{
 		case ACT_RANGE_ATTACK2:
 			// grunt is going to a secondary long range attack. This may be a thrown 
 			// grenade or fired grenade, we must determine which and pick proper sequence
-			// FIXME; Need a better check
-			if ( IsCurSchedule( SCHED_COMBINE_AR2_ALTFIRE ) )	//Weapon_OwnsThisType( "weapon_grenadelauncher" )
+			if ( IsCurSchedule( SCHED_COMBINE_AR2_ALTFIRE ) || Weapon_OwnsThisType( "weapon_grenadelauncher" ) )
 			{
 				return ( Activity )ACT_RANGE_ATTACK2;	//ACT_COMBINE_LAUNCH_GRENADE -- Use the weapon anim instead
 			}
@@ -1509,20 +1513,25 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 		break;
 
 		case ACT_RUN:
-//			m_bStanding = true;
 			if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 			{
 				// limp!
-				return ACT_RUN_HURT;
+				eNewActivity = ACT_RUN_HURT;
 			}
+#if 0
+			else if ( IsCurSchedule( SCHED_TAKE_COVER_FROM_BEST_SOUND ) || IsCurSchedule( SCHED_FLEE_FROM_BEST_SOUND ) )
+			{
+				if ( random->RandomInt( 0, 1 ) && HaveSequenceForActivity( ACT_RUN_PROTECTED ) )
+					eNewActivity = ACT_RUN_PROTECTED;
+			}
+#endif
 		break;
 
 		case ACT_WALK:
-//			m_bStanding = true;
 			if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 			{
 				// limp!
-				return ACT_WALK_HURT;
+				eNewActivity = ACT_WALK_HURT;
 			}
 		break;
 
@@ -1589,7 +1598,7 @@ bool CNPC_Combine::QueryHearSound( CSound *pSound )
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-void CNPC_Combine::AnnounceAssault(void)
+void CNPC_Combine::AnnounceAssault( void )
 {
 	if (!m_pSquad)
 		return;
@@ -1599,8 +1608,10 @@ void CNPC_Combine::AnnounceAssault(void)
 
 	if (random->RandomInt(0,1))
 		return;
-	
-	m_Sentences.Speak( "COMBINE_ASSAULT", SENTENCE_PRIORITY_HIGH );
+
+	const char *pSentenceName = GetSentencePrefix( "ASSAULT" );
+
+	m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_HIGH );
 }
 
 
@@ -1609,7 +1620,7 @@ void CNPC_Combine::AnnounceEnemyType( CBaseEntity *pEnemy )
 	if ( gpGlobals->curtime > m_flNextAlertSoundTime )
 	{
 		const char *pSentenceName = "COMBINE_MONST";
-		if (random->RandomInt(0,1))
+		if ( random->RandomInt(0,1) )
 		{
 			//This would be done with the sentences just refering to COMBINE_MONST,
 			//But that doesnt seem to work, so this is hardcoded for now
@@ -1649,6 +1660,10 @@ void CNPC_Combine::AnnounceEnemyType( CBaseEntity *pEnemy )
 				break;
 			}
 		}
+		if ( IsElite() )
+		{
+			pSentenceName = "COMBINE_ELITE_ALERT";
+		}
 		m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_HIGH );
 		m_flNextAlertSoundTime = gpGlobals->curtime + random->RandomFloat( 15, 25 );
 	}
@@ -1657,6 +1672,9 @@ void CNPC_Combine::AnnounceEnemyType( CBaseEntity *pEnemy )
 void CNPC_Combine::AnnounceEnemyKill( CBaseEntity *pEnemy )
 {
 	if (!pEnemy )
+		return;
+
+	if ( IsElite() )
 		return;
 
 	// 50% chance
@@ -1732,7 +1750,7 @@ int CNPC_Combine::SelectSchedule( void )
 
 			// If we can, throw a grenade at the target. 
 			// Ignore grenade count / distance / etc
-			if ( IsElite() )
+			if ( IsDemolition() )
 			{
 				if ( FVisible( m_hForcedGrenadeTarget ) && CanLaunchGrenade( vecTarget ) )
 				{
@@ -1802,40 +1820,37 @@ int CNPC_Combine::SelectSchedule( void )
 						CBaseGrenade *pGrenade = dynamic_cast<CBaseGrenade *>(pSoundOwner);
 						if ( pGrenade && pGrenade->GetThrower() )
 						{
-							//Absolute Buffoon
-						//!	pSentenceName = "COMBINE_FRIENDLY_FIRE";
+							// Absolute Buffoon
+							pSentenceName = "COMBINE_FRIENDLY_FIRE";
 
 							if ( IRelationType( pGrenade->GetThrower() ) != D_LI )
 							{
 								// Its not a completely botched throw
-#if 0
-								if ( m_pSquad->IsLeader( this )
-								{
-									pSentenceName = "COMBINE_GREN_LEADER";
-								}
-								else
-								{
-									pSentenceName = "COMBINE_GREN";
-								}
-#endif
 								pSentenceName = "COMBINE_GREN";
 							}
 						}
 					}
-
+					if ( IsElite() )
+					{
+						pSentenceName = "COMBINE_ELITE_DANGER";
+					}
 					m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_MEDIUM );
 
 					// If the sound is approaching danger, I have no enemy, and I don't see it, turn to face.
-					if( !GetEnemy() && pSound->IsSoundType(SOUND_CONTEXT_DANGER_APPROACH) && pSound->m_hOwner && !FInViewCone(pSound->GetSoundReactOrigin()) )
+					if( !GetEnemy() && pSound->IsSoundType(SOUND_CONTEXT_DANGER_APPROACH) && !FInViewCone(pSound->GetSoundReactOrigin()) )
 					{
 						GetMotor()->SetIdealYawToTarget( pSound->GetSoundReactOrigin() );
+						// If I can get out of the way of the incoming danger, do so!
+					//	return SCHED_COMBINE_EVADE;
 					}
-						
+
+#if 0
 					if ( HasCondition( COND_COMBINE_SAFE_FROM_MORTAR ) )
 					{
 						// Just duck and cover if not in the blast radius.
 						return SCHED_COWER;
 					}
+#endif
 
 					return SCHED_TAKE_COVER_FROM_BEST_SOUND;
 				}
@@ -1882,8 +1897,7 @@ int CNPC_Combine::SelectSchedule( void )
 				{
 					if( m_pSquad && m_pSquad->GetSquadMemberNearestTo( pSound->GetSoundReactOrigin() ) == this && OccupyStrategySlot( SQUAD_SLOT_INVESTIGATE_SOUND ) )
 					{
-						m_Sentences.Speak( "COMBINE_INVESTIGATE", SENTENCE_PRIORITY_MEDIUM );
-						return SCHED_INVESTIGATE_SOUND;
+						return SCHED_INVESTIGATE_SOUND;	//TODO; new sched for walk+speaksentence
 					}
 					return SCHED_ALERT_FACE_BESTSOUND;
 				}
@@ -1939,7 +1953,7 @@ int CNPC_Combine::SelectCombatSchedule()
 		CBaseEntity *pEnemy = GetEnemy();
 		if ( m_pSquad && pEnemy && m_iNewEnemies < 4 )
 		{
-		//	m_iNewEnemies++;
+		//	m_iNewEnemies++;	//Why isnt this working??
 			m_iNewEnemies = m_iNewEnemies + 1;
 
 			if ( HasCondition( COND_SEE_ENEMY ) )
@@ -1975,7 +1989,7 @@ int CNPC_Combine::SelectCombatSchedule()
 				// I'm the leader, but I didn't get the job suppressing the enemy. We know this because
 				// this code only runs if the code above didn't assign me SCHED_COMBINE_SUPPRESS. If thats the case,
 				// ease the restrictions to make sure I can do my first contact hand-signal.
-				if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+				if ( HasCondition( COND_WEAPON_HAS_LOS ) && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 				{
 					return SCHED_COMBINE_SUPPRESS;
 				}
@@ -2036,24 +2050,25 @@ int CNPC_Combine::SelectCombatSchedule()
 			// no cover around, thus, this is really just to determine if
 			// the soldier should immediately crouch or not. Crouching
 			// soldiers stay "dug in", and do not move for light damage
+			int iPercent = random->RandomInt(0,10);
 
 			// FIXME: need to take cover for enemy dealing the damage
 			if( !IsCrouching() )
 			{
-				if( random->RandomInt( 0, 3 ) == 3 && CouldShootIfCrouching( GetEnemy() ) )	//25% chance
+				if( iPercent <= 2 && CouldShootIfCrouching( GetEnemy() ) )	//25% chance
 				{
 					DesireCrouch();
 				}
 				else
 				{
-					if( random->RandomInt( 0, 2 ) != 0 || m_iHealth <= COMBINE_LIMP_HEALTH )	//66% chance normally, but if I'm hurt, always run!
+					if( iPercent >= 4 || m_iHealth <= COMBINE_LIMP_HEALTH )	//66% chance normally, but if I'm hurt, always run!
 					{
 						//!!!KELLY - this grunt was hit and is going to run to cover.
-						m_Sentences.Speak( "COMBINE_COVER", SENTENCE_PRIORITY_MEDIUM );
+					//!	m_Sentences.Speak( "COMBINE_COVER", SENTENCE_PRIORITY_MEDIUM );
 						return SCHED_TAKE_COVER_FROM_ENEMY;
 					}
 #if 0
-					else if ( GetEnemy()->IsPlayer() )
+					else if ( GetEnemy()->IsPlayer() && iPercent >= 9 )	//15% chance
 					{
 						// If I'm not going to run, at least try to shake the enemy's aim
 						return SCHED_COMBINE_EVADE;
@@ -2107,21 +2122,6 @@ int CNPC_Combine::SelectCombatSchedule()
 		// Stand up, just in case
 		DesireStand();
 
-#if 0
-		if ( OccupyStrategySlotRange( SQUAD_SLOT_GRENADE1, SQUAD_SLOT_GRENADE2 ) )
-		{
-			if ( HasCondition( COND_CAN_RANGE_ATTACK2 ) )
-			{
-				// Try to give the enemy a suprise before moving in!
-				return SCHED_RANGE_ATTACK2;
-			}
-			else if ( CanAltFireEnemy() )
-			{
-				// Try to give the enemy a suprise before moving in!
-				return SCHED_RANGE_ATTACK2;
-			}
-		}
-#endif
 		if( GetEnemy() && !(GetEnemy()->GetFlags() & FL_NOTARGET) && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 		{
 			// Charge in and break the enemy's cover!
@@ -2158,7 +2158,6 @@ int CNPC_Combine::SelectCombatSchedule()
 		}
 		else if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 		{
-			AnnounceAssault();
 			// Run in shooting!
 			return SCHED_COMBINE_ASSAULT;
 		}
@@ -2185,17 +2184,13 @@ bool CNPC_Combine::ShouldChargePlayer()
 
 int CNPC_Combine::SelectScheduleAttack()
 {
-	// Kick attack?
-	if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
-	{
-		return SCHED_MELEE_ATTACK1;
-	}
-
 	// Drop a grenade?
 	if ( HasCondition( COND_COMBINE_DROP_GRENADE ) )
-	{
 		return SCHED_COMBINE_DROP_GRENADE;
-	}
+
+	// Kick attack?
+	if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
+		return SCHED_MELEE_ATTACK1;
 
 	// If I'm fighting a turret, I can't really hurt it with bullets, so become grenade happy.
 	if ( GetEnemy() && FClassnameIs(GetEnemy(), "npc_turret_floor") )
@@ -2239,6 +2234,21 @@ int CNPC_Combine::SelectScheduleAttack()
 	// Can I shoot?
 	if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
 	{
+// JAY: HL1 behavior missing?
+#if 0
+		if ( m_pSquad )
+		{
+			// if the enemy has eluded the squad and a squad member has just located the enemy
+			// and the enemy does not see the squad member, issue a call to the squad to waste a 
+			// little time and give the player a chance to turn.
+			if ( MySquadLeader()->m_fEnemyEluded && HasCondition( COND_BEHIND_ENEMY ) )
+			{
+				MySquadLeader()->m_fEnemyEluded = FALSE;
+				return SCHED_COMBINE_FOUND_ENEMY;
+			}
+		}
+#endif
+
 		//!!!TODO; This isnt working right now
 #if 0
 		// Fully engage if allowed, otherwise give a short burst then hide
@@ -2271,9 +2281,8 @@ int CNPC_Combine::SelectScheduleAttack()
 	// Can't fire our weapon... can we throw a grenade?
 	if ( HasCondition( COND_CAN_RANGE_ATTACK2 )  )
 	{
-		if( OccupyStrategySlotRange( SQUAD_SLOT_GRENADE1, SQUAD_SLOT_GRENADE2 ) || !m_pSquad )
+		if( OccupyStrategySlotRange( SQUAD_SLOT_GRENADE1, SQUAD_SLOT_GRENADE2 ) )	//|| !m_pSquad
 		{
-		//	DevMsg( "Tossing a grenade!\n");
 			return SCHED_RANGE_ATTACK2;
 		}
 	}
@@ -2322,7 +2331,7 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 				if ( ShouldChargePlayer() && !IsUnreachable( GetEnemy() ) )
 					return TranslateSchedule( SCHED_COMBINE_CHARGE_PLAYER );
 
-				if ( GetEnemy() != NULL && m_pSquad->IsLeader( this ) && CanDoSignal() ) //&& GetEnemy()->IsPlayer() && m_bFirstEncounter )
+				if ( GetEnemy() != NULL && m_pSquad->IsLeader( this ) && CanDoSignal() )
 				{
 					m_flNextSignalTime = gpGlobals->curtime + random->RandomFloat( 8, 15 );
 					return SCHED_COMBINE_SIGNAL_TAKE_COVER;
@@ -2335,7 +2344,7 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 				if ( ShouldChargePlayer() && !IsUnreachable( GetEnemy() ) )
 					return TranslateSchedule( SCHED_COMBINE_CHARGE_PLAYER );
 
-				return SCHED_COMBINE_TAKE_COVER2;
+				return SCHED_COMBINE_TAKE_COVER1;	//SCHED_COMBINE_TAKE_COVER2
 			}
 		}
 
@@ -2354,7 +2363,6 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 				}
 				return TranslateSchedule( SCHED_RANGE_ATTACK1 );
 			}
-
 			return TranslateSchedule( SCHED_FAIL );
 		}
 
@@ -2396,8 +2404,8 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 
 	case SCHED_ESTABLISH_LINE_OF_FIRE:
 		{
-			// Combine dont flush the player out with grenades on easy, only throw when you cant shoot
-			if ( m_pSquad && !g_pGameRules->IsSkillLevel( SKILL_EASY ) && random->RandomInt( 0, 2 ) > 0 )
+			// Combine dont flush enemies out with grenades on easy, they only throw when shooting isnt possible/reloading
+			if ( m_pSquad && !g_pGameRules->IsSkillLevel( SKILL_EASY ) && (g_pGameRules->IsSkillLevel( SKILL_HARD ) || random->RandomInt( 0, 2 ) > 0) )
 			{
 				// This is where the magic happens
 				/*
@@ -2412,7 +2420,7 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 				CBaseEntity *pEnemy = GetEnemy();
 				Vector vecEnemyLKP = GetEnemyLKP();
 
-//				float flDist = UTIL_DistApprox2D( Center(), vecEnemyLKP );
+//!				float flDist = UTIL_DistApprox2D( Center(), vecEnemyLKP );
 				float flDist = EnemyDistance(pEnemy);
 
 				Vector vecTarget = vecEnemyLKP + pEnemy->GetAbsVelocity();
@@ -2420,21 +2428,20 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 				{
 					// If I could throw a grenade where I think the enemy is,
 					// do so first, then move into LOS!
-				//	DevMsg( "Get out of there and fight you cheeky bugger!\n");
 					if( OccupyStrategySlot( SQUAD_SLOT_ATTACK1 ) || OccupyStrategySlot( SQUAD_SLOT_GRENADE1 ) )
-						return SCHED_COMBINE_GRENADE_ASSAULT;
+						return SCHED_COMBINE_GRENADE_ASSAULT;	//SCHED_RANGE_ATTACK2
 				}
 				else if( CanAltFireEnemy() && OccupyStrategySlot( SQUAD_SLOT_SPECIAL_ATTACK ) )
 				{
 					// If somebody could fire a grenade at the enemy's last known position,
 					// do so first, then move into LOS!
-				//	DevMsg( "Get out of there and fight you cheeky bugger!\n");
 					return SCHED_COMBINE_AR2_ALTFIRE;
 				}
 			}
 			return SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE;
 		}
 
+#if 0
 	case SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE_FACE:
 		{
 			// If I still cant see my enemy after completing this schedule, the enemy in question
@@ -2448,12 +2455,13 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 			}
 			return TranslateSchedule( SCHED_COMBAT_FACE );
 		}
+#endif
 
 	case SCHED_COMBINE_PRESS_ATTACK:
 		{
 			if ( m_pSquad )
 			{
-				if ( GetEnemy() != NULL && m_pSquad->IsLeader( this ) && CanDoSignal() ) //&& GetEnemy()->IsPlayer() && m_bFirstEncounter )
+				if ( GetEnemy() != NULL && m_pSquad->IsLeader( this ) && CanDoSignal() )
 				{
 					m_flNextSignalTime = gpGlobals->curtime + random->RandomFloat( 8, 15 );
 					return SCHED_COMBINE_SIGNAL_CHARGE_PLAYER;
@@ -2466,9 +2474,9 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 		{
 			if ( m_pSquad )
 			{
-				if ( GetEnemy() != NULL && m_pSquad->IsLeader( this ) && CanDoSignal() ) //&& GetEnemy()->IsPlayer() && m_bFirstEncounter )
+				if ( GetEnemy() != NULL && m_pSquad->IsLeader( this ) && CanDoSignal() )
 				{
-					m_flNextSignalTime = gpGlobals->curtime + random->RandomFloat( 8, 15 );
+					m_flNextSignalTime = gpGlobals->curtime + random->RandomFloat( 5, 10 );
 					return SCHED_COMBINE_SIGNAL_CHARGE_PLAYER;
 				}
 			}
@@ -2660,26 +2668,23 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 		}
 		else if ( pEvent->event == COMBINE_AE_ALTFIRE )
 		{
-			if( IsElite() )
-			{
-				animevent_t fakeEvent;
+			animevent_t fakeEvent;
 
-				fakeEvent.pSource = this;
-				fakeEvent.event = EVENT_WEAPON_AR2_ALTFIRE;
-				GetActiveWeapon()->Operator_HandleAnimEvent( &fakeEvent, this );
+			fakeEvent.pSource = this;
+			fakeEvent.event = EVENT_WEAPON_AR2_ALTFIRE;
+			GetActiveWeapon()->Operator_HandleAnimEvent( &fakeEvent, this );
 
-				// Stop other squad members from combine balling for a while.
-				DelaySquadAltFireAttack( 10.0f );
+			// Stop other squad members from combine balling for a while.
+			DelaySquadAltFireAttack( 10.0f );
 
-				// I'm disabling this decrementor. At the time of this change, the elites
-				// don't bother to check if they have grenades anyway. This means that all
-				// elites have infinite combine balls, even if the designer marks the elite
-				// as having 0 grenades. By disabling this decrementor, yet enabling the code
-				// that makes sure the elite has grenades in order to fire a combine ball, we
-				// preserve the legacy behavior while making it possible for a designer to prevent
-				// elites from shooting combine balls by setting grenades to '0' in hammer. (sjb) EP2_OUTLAND_10
-				// m_iNumGrenades--;
-			}
+			// I'm disabling this decrementor. At the time of this change, the elites
+			// don't bother to check if they have grenades anyway. This means that all
+			// elites have infinite combine balls, even if the designer marks the elite
+			// as having 0 grenades. By disabling this decrementor, yet enabling the code
+			// that makes sure the elite has grenades in order to fire a combine ball, we
+			// preserve the legacy behavior while making it possible for a designer to prevent
+			// elites from shooting combine balls by setting grenades to '0' in hammer. (sjb) EP2_OUTLAND_10
+			// m_iNumGrenades--;
 
 			handledEvent = true;
 		}
@@ -2697,6 +2702,7 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 				handledEvent = true;
 				break;
 			}
+
 		case COMBINE_AE_RELOAD:
 			// We never actually run out of ammo, just need to refill the clip
 			if (GetActiveWeapon())
@@ -2741,9 +2747,9 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 				m_lastGrenadeCondition = COND_NONE;
 				ClearCondition( COND_CAN_RANGE_ATTACK2 );
 				if ( g_pGameRules->IsSkillLevel( SKILL_HARD ) )
-					m_flNextGrenadeCheck = gpGlobals->curtime + (npc_combine_grenade_time.GetFloat() * random->RandomFloat(0.5f, 0.75f));// Cut down the default time before considering another throw
+					m_flNextGrenadeCheck = gpGlobals->curtime + (COMBINE_GRENADE_TIME * random->RandomFloat(0.5f, 0.75f));// Cut down the default time before considering another throw
 				else
-					m_flNextGrenadeCheck = gpGlobals->curtime + (npc_combine_grenade_time.GetFloat() * random->RandomFloat(0.75f, 1.25f));// wait five seconds before considering another throw
+					m_flNextGrenadeCheck = gpGlobals->curtime + (COMBINE_GRENADE_TIME * random->RandomFloat(0.75f, 1.25f));// wait five seconds before considering another throw
 
 			//	DevMsg( "Throwing a grenade!\n");
 			}
@@ -2794,7 +2800,7 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 
 				m_lastGrenadeCondition = COND_NONE;
 				ClearCondition( COND_CAN_RANGE_ATTACK2 );
-				m_flNextGrenadeCheck = gpGlobals->curtime + 4;
+				m_flNextGrenadeCheck = gpGlobals->curtime + (COMBINE_GRENADE_TIME * random->RandomFloat(0.75f, 1.25f));
 
 			//	DevMsg( "Dropping a grenade!\n");
 			}
@@ -2826,11 +2832,10 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 						EmitSound( "NPC_Combine.WeaponBash" );
 					}
 				}
-
 				m_Sentences.Speak( "COMBINE_KICK", SENTENCE_PRIORITY_INVALID );
-				handledEvent = true;
-				break;
 			}
+			handledEvent = true;
+			break;
 
 		case COMBINE_AE_CAUGHT_ENEMY:
 			m_Sentences.Speak( "COMBINE_ALERT" );
@@ -2908,6 +2913,24 @@ Vector CNPC_Combine::Weapon_ShootPosition( )
 // may still fail but in most cases, well after the grunt has 
 // started moving.
 //=========================================================
+char *CNPC_Combine::GetSentencePrefix( const char *pszSoundName )
+{
+	char *Prefix = "COMBINE";
+
+	if( IsElite() )
+		Prefix = "COMBINE_ELITE";
+
+#if 0
+	if( IsDemolition() )
+		Prefix = "COMBINE_LEADER";
+#endif
+
+	CFmtStr snd;
+	snd.sprintf("%s_%s", Prefix, pszSoundName );
+
+	return snd;
+}
+
 void CNPC_Combine::SpeakSentence( int sentenceType )
 {
 	switch( sentenceType )
@@ -2920,24 +2943,35 @@ void CNPC_Combine::SpeakSentence( int sentenceType )
 		// If I'm moving more than 20ft, I need to talk about it
 		if ( GetNavigator()->GetPath()->GetPathLength() > 20 * 12.0f )
 		{
+			const char *pSentenceName = "COMBINE_MOVE";
 			if ( m_pSquad )
 			{
-				if ( m_pSquad->IsLeader( this )
+				if ( m_pSquad->IsLeader( this ) )
 				{
-					m_Sentences.Speak( "COMBINE_FLANK_LEADER" );
+					pSentenceName = "COMBINE_FLANK_LEADER";
 				}
 				else
 				{
-					m_Sentences.Speak( "COMBINE_FLANK" );
+					pSentenceName = "COMBINE_FLANK";
 				}
-//				m_Sentences.Speak( "COMBINE_FLANK" );
 			}
-			else
+			if ( IsElite() )
 			{
-				m_Sentences.Speak( "COMBINE_MOVE" );
+				pSentenceName = "COMBINE_ELITE_FLANK";
 			}
+			m_Sentences.Speak( pSentenceName );
 		}
 		break;
+
+#if 0
+	case 2: // press attack
+		AnnounceAssault();
+		break;
+
+	case 3: // Investigate
+		m_Sentences.Speak( "COMBINE_INVESTIGATE", SENTENCE_PRIORITY_MEDIUM, SENTENCE_CRITERIA_IN_SQUAD );
+		break;
+#endif
 	}
 }
 
@@ -2956,20 +2990,20 @@ void CNPC_Combine::PainSound( const CTakeDamageInfo &info )
 	float healthRatio = (float)GetHealth() / (float)GetMaxHealth();
 	if ( healthRatio > 0.0f )
 	{
-		const char *pSentenceName = "COMBINE_PAIN";
+		const char *pSentenceName = GetSentencePrefix( "PAIN" );
 		if ( m_pSquad )
 		{
 			if ( !HasMemory(bits_MEMORY_PAIN_LIGHT_SOUND) && healthRatio > 0.8f )
 			{
 				// Shouts like "Target ineffective" and "Hes on me"
 				Remember( bits_MEMORY_PAIN_LIGHT_SOUND );
-				pSentenceName = "COMBINE_TAUNT";
+				pSentenceName = GetSentencePrefix( "TAUNT" );
 			}
 			else if ( !HasMemory(bits_MEMORY_PAIN_HEAVY_SOUND) && healthRatio < 0.3f )
 			{
 				// Shouts like "Medic" and "Falling back"
 				Remember( bits_MEMORY_PAIN_HEAVY_SOUND );
-				pSentenceName = "COMBINE_COVER";
+				pSentenceName = GetSentencePrefix( "COVER" );
 			}
 		}
 		
@@ -2993,13 +3027,13 @@ void CNPC_Combine::LostEnemySound( void )
 	const char *pSentence;
 	if (!(CBaseEntity*)GetEnemy() || gpGlobals->curtime - GetEnemyLastTimeSeen() >= 15)
 	{
-		pSentence = "COMBINE_LOST_LONG";
+		pSentence = GetSentencePrefix( "LOST_LONG" );
 	}
 	else
 	{
-		pSentence = "COMBINE_LOST_SHORT";
+		pSentence = GetSentencePrefix( "LOST_SHORT" );
 	}
-
+				
 	if ( m_Sentences.Speak( pSentence ) >= 0 )
 	{
 		m_flNextLostSoundTime = gpGlobals->curtime + random->RandomFloat(5.0,15.0);
@@ -3014,14 +3048,18 @@ void CNPC_Combine::LostEnemySound( void )
 //-----------------------------------------------------------------------------
 void CNPC_Combine::FoundEnemySound( void )
 {
-	m_Sentences.Speak( "COMBINE_REFIND_ENEMY", SENTENCE_PRIORITY_HIGH );
+	const char *pSentenceName = GetSentencePrefix( "REFIND_ENEMY" );
+
+	m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_HIGH );
 }
 
 void CNPC_Combine::AlertSound( void )
 {
 	if ( gpGlobals->curtime > m_flNextAlertSoundTime )
 	{
-		m_Sentences.Speak( "COMBINE_GO_ALERT", SENTENCE_PRIORITY_HIGH );
+		const char *pSentenceName = GetSentencePrefix( "GO_ALERT" );
+
+		m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_HIGH );
 		m_flNextAlertSoundTime = gpGlobals->curtime + 10.0f;
 	}
 }
@@ -3032,13 +3070,18 @@ void CNPC_Combine::AlertSound( void )
 void CNPC_Combine::NotifyDeadFriend( CBaseEntity* pFriend )
 {
 	BaseClass::NotifyDeadFriend(pFriend);
+
 	if ( GetSquad()->NumMembers() < 2 )
 	{
-		m_Sentences.Speak( "COMBINE_LAST_OF_SQUAD", SENTENCE_PRIORITY_HIGH, SENTENCE_CRITERIA_NORMAL );
+		const char *pSentenceName = GetSentencePrefix( "LAST_OF_SQUAD" );
+		m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_HIGH, SENTENCE_CRITERIA_NORMAL );
 		JustMadeSound();
 		return;
 	}
-	
+
+	if ( IsElite() )
+		return;
+
 	// relaxed visibility test so that guys say this more often, as it gets interrupted alot
 	if( FInViewCone( pFriend ) )
 	{
@@ -3049,13 +3092,20 @@ void CNPC_Combine::NotifyDeadFriend( CBaseEntity* pFriend )
 //=========================================================
 // DeathSound 
 //=========================================================
-void CNPC_Combine::DeathSound( void )
+void CNPC_Combine::DeathSound( const CTakeDamageInfo &info )
 {
 	// NOTE: The response system deals with this at the moment
 	if ( GetFlags() & FL_DISSOLVING )
 		return;
 
-	m_Sentences.Speak( "COMBINE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
+	const char *pSentenceName = "COMBINE_DIE";
+	// If im gibbing, dont make a long, drawn-out, bone-chilling, almost shakespearean death rattle
+	if ( ShouldGib( info ) )
+	{
+		pSentenceName = "COMBINE_GIB";
+	}
+
+	m_Sentences.Speak( pSentenceName, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
 }
 
 //=========================================================
@@ -3063,6 +3113,15 @@ void CNPC_Combine::DeathSound( void )
 //=========================================================
 void CNPC_Combine::IdleSound( void )
 {
+	if ( IsElite() )
+	{
+		if (random->RandomInt(0,1))
+		{
+			m_Sentences.Speak( "COMBINE_ELITE_IDLE" );
+		}
+		return;
+	}
+
 	if (g_fCombineQuestion || random->RandomInt(0,1))
 	{
 		if (!g_fCombineQuestion)
@@ -3121,11 +3180,11 @@ bool CNPC_Combine::CanDoSignal()
 		return false;
 	}
 
-	if( gpGlobals->curtime <= m_flNextSignalTime )
+	if ( gpGlobals->curtime <= m_flNextSignalTime )
 		return false;
 
 #if 0
-	if( random->RandomInt( 0, 1 ) )
+	if ( random->RandomInt( 0, 1 ) )
 		return false;
 #endif
 
@@ -3148,7 +3207,7 @@ int CNPC_Combine::RangeAttack2Conditions( float flDot, float flDist )
 {
 	if ( npc_combine_altfire_supercede.GetBool() )
 	{
-		if( IsElite() && FClassnameIs( GetActiveWeapon(), "weapon_smg*" ) )
+		if( IsDemolition() && FClassnameIs( GetActiveWeapon(), "weapon_smg*" ) || Weapon_OwnsThisType( "weapon_grenadelauncher" ) )
 		{
 			// Only use launched grenades
 			return 0;
@@ -3171,10 +3230,12 @@ int CNPC_Combine::RangeAttack2Conditions( float flDot, float flDist )
 	// Toss it to where you last saw them
 	vecTarget = GetEnemyLKP() + (pEnemy->BodyTarget( GetAbsOrigin() ) - pEnemy->GetAbsOrigin());	//GetEnemies()->LastSeenPosition( pEnemy )
 	// Estimate position
+#if 0
 	if ( CBaseEntity::FVisible( vecTarget ) )
 	{
 		vecTarget = vecTarget + pEnemy->GetAbsVelocity();
 	}
+#endif
 
 	m_lastGrenadeCondition = GetGrenadeConditions( flDot, flDist, vecTarget );
 	return m_lastGrenadeCondition;
@@ -3289,14 +3350,12 @@ int CNPC_Combine::CheckCanThrowGrenade( const Vector &vecTarget )
 			return COND_NONE;
 		}
 
-	//	vecToss = VecCheckToss( this, Weapon_ShootPosition() + Vector(0,0,16), vecTarget, -1, 1.0, true, &vecMins, &vecMaxs );
 		vecToss = VecCheckToss( this, EyePosition(), vecTarget, -1, 1.0, true, &vecMins, &vecMaxs );
 	}
 
 	if ( vecToss != vec3_origin )
 	{
 		m_vecTossVelocity = vecToss;
-	//	DevMsg( "Grenade throw approved!\n");
 
 		m_flNextGrenadeCheck = gpGlobals->curtime + 0.3; // 1/3 second.
 		return COND_CAN_RANGE_ATTACK2;
@@ -3319,7 +3378,7 @@ bool CNPC_Combine::CanAltFireEnemy( )
 	if ( !npc_combine_altfire.GetBool() )
 		return false;
 
-	if ( !IsElite() )
+	if ( !IsDemolition() )
 		return false;
 
 	if ( m_iNumGrenades < 1 )
@@ -3401,7 +3460,7 @@ bool CNPC_Combine::CanLaunchGrenade( const Vector &vecTarget )
 	float flDist;
 	flDist = ( vecTarget - GetAbsOrigin() ).Length();
 
-	if( flDist > 1280 || flDist < sk_smg_grenade_radius.GetFloat() )
+	if( flDist > 1280 || flDist < sk_ar2_grenade_radius.GetFloat() )
 	{
 		// Too close or too far!
 		m_flNextGrenadeCheck = gpGlobals->curtime + 1; // one full second.
@@ -3525,7 +3584,7 @@ Vector CNPC_Combine::EyePosition( void )
 //-----------------------------------------------------------------------------
 Vector CNPC_Combine::GetAltFireTarget()
 {
-	Assert( IsElite() );
+	Assert( IsDemolition() );
 
 	return m_vecAltFireTarget;
 }
@@ -3649,7 +3708,7 @@ WeaponProficiency_t CNPC_Combine::CalcWeaponProficiency( CBaseCombatWeapon *pWea
 
 		return WEAPON_PROFICIENCY_AVERAGE;
 	}
-	else if( FClassnameIs( pWeapon, "weapon_smg1" ) )
+	else if( FClassnameIs( pWeapon, "weapon_smg1" ) || FClassnameIs( pWeapon, "weapon_smg2" ) )
 	{
 		if( IsElite() )
 		{
@@ -3659,10 +3718,6 @@ WeaponProficiency_t CNPC_Combine::CalcWeaponProficiency( CBaseCombatWeapon *pWea
 		{
 			return WEAPON_PROFICIENCY_GOOD;
 		}
-	}
-	else if( FClassnameIs( pWeapon, "weapon_smg2" ) )
-	{
-		return WEAPON_PROFICIENCY_VERY_GOOD;
 	}
 	else if( FClassnameIs( pWeapon, "weapon_pistol" ) )
 	{
@@ -3793,7 +3848,7 @@ bool CNPC_Combine::IsRunningApproachEnemySchedule()
 //
 // Schedules
 //
-// SCHED_COMBINE_EVADE; Simple side-step/jump to the left/right, like the hunter
+// SCHED_COMBINE_EVADE; Simple side-step/jump to the left/right
 // SCHED_COMBINE_ASSAULT; Establish line of fire but shoot while you're doing it
 // SCHED_COMBINE_PRESS_ATTACK; Get the last seen postion of the enemy and run
 // to it. Most of the time results in a mindless charge. Different from ELOF
@@ -3832,12 +3887,11 @@ DECLARE_SQUADSLOT( SQUAD_SLOT_GRENADE1 )
 DECLARE_SQUADSLOT( SQUAD_SLOT_GRENADE2 )
 
 DECLARE_CONDITION( COND_COMBINE_NO_FIRE )
+//DECLARE_CONDITION( COND_COMBINE_DEAD_FRIEND )
 DECLARE_CONDITION( COND_COMBINE_SHOULD_PATROL )
 DECLARE_CONDITION( COND_COMBINE_HIT_BY_BUGBAIT )
 DECLARE_CONDITION( COND_COMBINE_DROP_GRENADE )
-//DECLARE_CONDITION( COND_COMBINE_ON_FIRE )
 DECLARE_CONDITION( COND_COMBINE_ATTACK_SLOT_AVAILABLE )
-DECLARE_CONDITION( COND_COMBINE_SAFE_FROM_MORTAR )
 
 DECLARE_INTERACTION( g_interactionCombineBash );
 
@@ -3863,7 +3917,6 @@ DEFINE_SCHEDULE
  "		 TASK_FACE_REASONABLE				0"
  ""
  "	Interrupts"
- "		COND_COMBINE_SAFE_FROM_MORTAR"
  )
 
  DEFINE_SCHEDULE	
@@ -3879,7 +3932,6 @@ DEFINE_SCHEDULE
  "		 TASK_FACE_SAVEPOSITION				0"
  ""
  "	Interrupts"
- "		COND_COMBINE_SAFE_FROM_MORTAR"
  )
 
  //=========================================================
@@ -3960,18 +4012,6 @@ DEFINE_SCHEDULE
  "		COND_HEAR_MOVE_AWAY"
  )
 
- DEFINE_SCHEDULE
- (
- SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE_FACE,
-
- "	Tasks"
- "		TASK_STOP_MOVING			0"
- "		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
- "		TASK_FACE_ENEMY				0"
- ""
- "	Interrupts"
- )
-
  //=========================================================
  // SCHED_COMBINE_ASSAULT
  //
@@ -3988,7 +4028,7 @@ DEFINE_SCHEDULE
  "		TASK_COMBINE_SET_STANDING		1"
  "		TASK_GET_PATH_TO_ENEMY_LKP_LOS	0"
  "		TASK_RUN_PATH					0"
-//"		TASK_SPEAK_SENTENCE				0"
+ "		TASK_SPEAK_SENTENCE				0"
  "		TASK_WAIT_FOR_MOVEMENT			0"
  "		TASK_COMBINE_IGNORE_ATTACKS		0.0"
  "		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
@@ -4004,6 +4044,7 @@ DEFINE_SCHEDULE
 //"		COND_HEAR_MOVE_AWAY"
  )
 
+//TODO; This really shouldnt be needed - just replace with range_attack2
  DEFINE_SCHEDULE
  (
  SCHED_COMBINE_GRENADE_ASSAULT,
@@ -4035,6 +4076,7 @@ DEFINE_SCHEDULE
  "		TASK_COMBINE_SET_STANDING		1"
  "		TASK_GET_PATH_TO_ENEMY_LKP		0"
  "		TASK_RUN_PATH					0"
+//"		TASK_SPEAK_SENTENCE				2"
  "		TASK_WAIT_FOR_MOVEMENT			0"
  "		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
  ""
@@ -4050,6 +4092,20 @@ DEFINE_SCHEDULE
 //"		COND_HEAR_MOVE_AWAY"
  )
 
+/*
+ DEFINE_SCHEDULE
+ (
+ SCHED_COMBINE_SIGNAL_PRESS_ATTACK,
+
+ "	Tasks"
+ "	 	TASK_STOP_MOVING			0"
+ "		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_SIGNAL_ADVANCE"
+ "		TASK_SET_SCHEDULE			SCHEDULE:SCHED_COMBINE_PRESS_ATTACK"
+ ""
+ "	Interrupts"
+ "		COND_HEAVY_DAMAGE"
+ )
+*/
  //=========================================================
  // SCHED_COMBINE_COMBAT_FACE
  //=========================================================
@@ -4072,6 +4128,7 @@ DEFINE_SCHEDULE
  "		COND_CAN_RANGE_ATTACK2"
  "		COND_CAN_MELEE_ATTACK1"
  "		COND_CAN_MELEE_ATTACK2"
+//"		COND_HEAR_DANGER"
  )
 
  DEFINE_SCHEDULE
@@ -4082,7 +4139,7 @@ DEFINE_SCHEDULE
  "		TASK_STOP_MOVING			0"
  "		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
  "		TASK_FACE_IDEAL				0"
- "		TASK_WAIT					0.2"
+ "		TASK_WAIT					0.3"
 //"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_ALERT_SCAN"
  ""
  "	Interrupts"
@@ -4162,10 +4219,33 @@ DEFINE_SCHEDULE
  )
 
  //=========================================================
+ // GruntFoundEnemy - grunt established sight with an enemy
+ // that was hiding from the squad.
+ //=========================================================
+/*
+ DEFINE_SCHEDULE
+ (
+ SCHED_COMBINE_FOUND_ENEMY,
+
+ "	Tasks"
+ "		TASK_STOP_MOVING				0"
+ "		TASK_FACE_IDEAL					0"
+ "		TASK_PLAY_SEQUENCE_FACE_ENEMY	ACTIVITY:ACT_SIGNAL_GROUP"
+ ""
+ "	Interrupts"
+ "		COND_HEAVY_DAMAGE"
+ "		COND_HEAR_DANGER"
+ "		COND_HEAR_MOVE_AWAY"
+ "		COND_COMBINE_NO_FIRE"
+ "		COND_WEAPON_BLOCKED_BY_FRIEND"
+ )
+*/
+
+ //=========================================================
  // SCHED_COMBINE_WAIT_IN_COVER
  //	we don't allow danger or the ability
- //	to attack to break a combine's run to cover schedule but
- //	when a combine is in cover we do want them to attack if they can.
+ //	to attack to break a grunt's run to cover schedule but
+ //	when a grunt is in cover we do want them to attack if they can.
  //=========================================================
  DEFINE_SCHEDULE
  (
@@ -4173,7 +4253,7 @@ DEFINE_SCHEDULE
 
  "	Tasks"
  "		TASK_STOP_MOVING				0"
- "		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"	//FIXME; Hook to cover anim
+ "		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"
  "		TASK_WAIT_FACE_ENEMY			1"
  ""
  "	Interrupts"
@@ -4246,7 +4326,7 @@ DEFINE_SCHEDULE
 
  "	Tasks"
  "	 	TASK_STOP_MOVING			0"
- "		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_SIGNAL_GROUP"
+ "		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_SIGNAL_TAKECOVER"
  "		TASK_SET_SCHEDULE			SCHEDULE:SCHED_COMBINE_TAKE_COVER1"
  ""
  "	Interrupts"
@@ -4256,7 +4336,7 @@ DEFINE_SCHEDULE
  //=========================================================
  // SCHED_COMBINE_GRENADE_COVER1
  //
- // Drop grenade then run to cover.
+ // Roll grenade then run to cover.
  //=========================================================
  DEFINE_SCHEDULE
  (
@@ -4378,8 +4458,8 @@ DEFINE_SCHEDULE
  "		TASK_STOP_MOVING					0"
  "		TASK_COMBINE_FACE_TOSS_DIR			0"
  "		TASK_ANNOUNCE_ATTACK				2"
+//"		TASK_RANGE_ATTACK2					0"
  "		TASK_PLAY_SEQUENCE					ACTIVITY:ACT_RANGE_ATTACK2"
-// "		TASK_RANGE_ATTACK2									0"
  "		TASK_SET_SCHEDULE					SCHEDULE:SCHED_COMBINE_WAIT_IN_COVER"	// don't run immediately after launching grenade.
  ""
  "	Interrupts"
@@ -4549,7 +4629,7 @@ DEFINE_SCHEDULE
  "	Tasks"
  "	 	TASK_STOP_MOVING			0"
  "		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_SIGNAL_ADVANCE"
- "		TASK_SET_SCHEDULE			SCHEDULE:SCHED_COMBINE_CHARGE_PLAYER"
+ "		TASK_SET_SCHEDULE			SCHEDULE:SCHED_COMBINE_PRESS_ATTACK"
  ""
  "	Interrupts"
  "		COND_HEAVY_DAMAGE"
@@ -4641,7 +4721,7 @@ DEFINE_SCHEDULE
  //=========================================================
  // SCHED_COMBINE_EVADE
  //
- // Side-step/Duck away from enemy.
+ // Duck away from incoming enemy or fire.
  //=========================================================
  /*
  DEFINE_SCHEDULE
@@ -4649,20 +4729,11 @@ DEFINE_SCHEDULE
  SCHED_COMBINE_EVADE,
 
  "	Tasks"
- "		TASK_STOP_MOVING	0"
- //"		TASK_FACE_ENEMY		0"
- "		TASK_PLAY_SEQUENCE	ACTIVITY:ACT_DUCK_DODGE"
- "		TASK_DEFER_DODGE	30"
+ "		TASK_STOP_MOVING						0"
+ "		TASK_FIND_DODGE_POSITION				0"
+ "		TASK_DODGE								0"
  ""
  "	Interrupts"
- "		COND_CAN_MELEE_ATTACK1"
- "		COND_CAN_MELEE_ATTACK2"
- "		COND_TOO_CLOSE_TO_ATTACK"
- "		COND_GIVE_WAY"
- "		COND_HEAR_DANGER"
- "		COND_HEAR_MOVE_AWAY"
- "		COND_COMBINE_NO_FIRE"
- ""
  )
  */
 

@@ -22,7 +22,7 @@
 class SmokeTrail;
 class CWeaponAR2;
 
-class CGrenadeAR2 : public CBaseGrenade
+class CGrenadeAR2 : public CBaseGrenade	//CBaseGrenadeContact
 {
 public:
 	DECLARE_CLASS( CGrenadeAR2, CBaseGrenade );
@@ -30,7 +30,6 @@ public:
 	CHandle< SmokeTrail > m_hSmokeTrail;
 	float				 m_fSpawnTime;
 	float				m_fDangerRadius;
-
 
 	void		Spawn( void );
 	void		Precache( void );
@@ -45,7 +44,7 @@ public:
 	DECLARE_DATADESC();
 };
 
-//Airburst variant
+//Airburst/player variant
 class CGrenadeAR2Airburst : public CGrenadeAR2
 {
 public:

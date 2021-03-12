@@ -32,7 +32,7 @@ public:
 	// -----------------------------------------------------------------------------------
 	// -----------------------------------------------------------------------------------
 	void		DeathSound( const CTakeDamageInfo &info );
-	int			SelectSchedule ( void );
+	int			SelectSchedule( void );
 	void		HandleAnimEvent( animevent_t *pEvent );
 	void		OnChangeActivity( Activity eNewActivity );
 	void		OnListened();
@@ -43,9 +43,6 @@ public:
 	bool		IsHeavyDamage( const CTakeDamageInfo &info );
 
 	virtual	bool		AllowedToIgnite( void ) { return true; }
-
-private:
-	bool		ShouldHitPlayer( const Vector &targetDir, float targetDist );
 
 #if HL2_EPISODIC
 public:

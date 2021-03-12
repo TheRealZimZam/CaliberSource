@@ -49,7 +49,7 @@ enum HeadcrabRelease_t
 	RELEASE_NO,
 	RELEASE_IMMEDIATE,		// release the headcrab right now!
 	RELEASE_SCHEDULED,		// release the headcrab through the AI schedule.
-	RELEASE_VAPORIZE,		// just destroy the crab.	
+	RELEASE_VAPORIZE,		// just destroy the crab
 	RELEASE_RAGDOLL,		// release a dead crab
 	RELEASE_RAGDOLL_SLICED_OFF	// toss the crab up a bit
 };
@@ -147,7 +147,7 @@ public:
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	virtual float	GetReactionDelay( CBaseEntity *pEnemy ) { return 0.0; }
 
-	virtual int SelectSchedule ( void );
+	virtual int SelectSchedule( void );
 	virtual int	SelectFailSchedule( int failedSchedule, int failedTask, AI_TaskFailureCode_t taskFailCode );
 	virtual void BuildScheduleTestBits( void );
 

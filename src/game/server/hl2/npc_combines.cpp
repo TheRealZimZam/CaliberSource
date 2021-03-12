@@ -37,7 +37,7 @@ ConVar	sk_combine_guard_kick( "sk_combine_guard_kick", "0");
 
 extern ConVar sk_plr_dmg_buckshot;
 extern ConVar sk_plr_num_shotgun_pellets;
-extern ConVar combine_drop_health;
+extern ConVar npc_combine_drop_health;
 
 LINK_ENTITY_TO_CLASS( npc_combine_s, CNPC_CombineS );
 LINK_ENTITY_TO_CLASS( npc_ancorp_s, CNPC_CombineS );
@@ -55,7 +55,7 @@ void CNPC_CombineS::Spawn( void )
 	Precache();
 	SetModel( STRING( GetModelName() ) );
 
-	if( IsElite() )
+	if( IsDemolition() )
 	{
 		// Stronger, tougher.
 		SetHealth( sk_combine_guard_health.GetFloat() );
@@ -97,23 +97,12 @@ void CNPC_CombineS::Precache()
 
 	if( !Q_stricmp( pModelName, "models/combine_super_soldier.mdl" ) )
 	{
-		m_fIsElite = true;
+		m_fIsDemolition = true;
 	}
 	else
 	{
-		m_fIsElite = false;
+		m_fIsDemolition = false;
 	}
-
-/*
-	if( !Q_stricmp( pModelName, "models/combine_shock_soldier.mdl" ) )
-	{
-		m_fIsShock = true;
-	}
-	else
-	{
-		m_fIsShock = false;
-	}
-*/
 
 	if( !GetModelName() )
 	{
@@ -136,19 +125,14 @@ void CNPC_CombineS::Precache()
 
 void CNPC_CombineS::DeathSound( const CTakeDamageInfo &info )
 {
-	// NOTE: The response system deals with this at the moment
-	if ( GetFlags() & FL_DISSOLVING )
-		return;
-
 	if ( GlobalEntity_GetState("iwhbyd") == GLOBAL_ON && random->RandomInt( 0, 10 ) == 10 )
 	{
 		// IWHBYD
 		EmitSound( "NPC_Combine.DieIWHBYD" );
+		return;
 	}
-	else
-	{
-		GetSentences()->Speak( "COMBINE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
-	}
+
+	BaseClass::DeathSound( info );
 }
 
 
@@ -262,7 +246,7 @@ void CNPC_CombineS::OnListened()
 void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 {
 	// Don't bother if we've been told not to, or the player has a megaphyscannon
-	if ( combine_drop_health.GetBool() == false || PlayerHasMegaPhysCannon() )
+	if ( npc_combine_drop_health.GetBool() == false || PlayerHasMegaPhysCannon() )
 	{
 		BaseClass::Event_Killed( info );
 		return;
@@ -282,7 +266,7 @@ void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 	if ( pPlayer != NULL )
 	{
 		// Elites drop armor/altfire ammo, so long as they weren't killed by dissolving.
-		if( IsElite() )
+		if( IsDemolition() )
 		{
 			if ( HasSpawnFlags( SF_COMBINE_NO_AR2DROP ) == false )
 			{
@@ -323,7 +307,7 @@ void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 		// Attempt to drop health
 		if ( pHL2GameRules->NPC_ShouldDropHealth( pPlayer ) )
 		{
-			if ( IsElite() && !(info.GetDamageType() & DMG_DISSOLVE) )
+			if ( IsDemolition() && !(info.GetDamageType() & DMG_DISSOLVE) )
 			{
 				DropItem( "item_battery", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
 			}

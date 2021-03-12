@@ -5,9 +5,12 @@
 //=============================================================================//
 
 #include "cbase.h"
+#include "npc_combinee.h"
 #include "ai_hull.h"
 #include "ai_motor.h"
-#include "npc_combinee.h"
+#include "ai_squadslot.h"
+#include "ai_squad.h"
+#include "ai_route.h"
 #include "bitstring.h"
 #include "engine/IEngineSound.h"
 #include "soundent.h"
@@ -35,11 +38,12 @@ extern ConVar npc_combine_limp_health;
 
 ConVar	sk_combine_e_health( "sk_combine_e_health","0");
 ConVar	sk_combine_e_kick( "sk_combine_e_kick","0");
+ConVar	sk_combine_e_jump( "sk_combine_e_jump","1");	//Is jumping allowed?
 
 extern ConVar sk_plr_dmg_buckshot;	
 extern ConVar sk_plr_num_shotgun_pellets;
 extern ConVar sk_plr_dmg_ar2;
-extern ConVar combine_drop_health;
+extern ConVar npc_combine_drop_health;
 
 LINK_ENTITY_TO_CLASS( npc_combine_e, CNPC_CombineE );
 LINK_ENTITY_TO_CLASS( npc_ancorp_e, CNPC_CombineE );
@@ -53,17 +57,23 @@ void CNPC_CombineE::Spawn( void )
 	Precache();
 	SetModel( STRING( GetModelName() ) );
 
-	m_iHealth = sk_combine_e_health.GetFloat();
+	SetHealth( sk_combine_e_health.GetFloat() );
+	SetMaxHealth( sk_combine_e_health.GetFloat() );
 	SetKickDamage( sk_combine_e_kick.GetFloat() );
 	m_flFieldOfView			= 0.2;	//*150
 
 	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
+	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
+	// Sniper elites dont use grenades
 //	if ( !FClassnameIs( GetActiveWeapon(), "weapon_sniperrifle" ) )
 //	{
 		CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
+		CapabilitiesAdd( bits_CAP_DOORS_GROUP );
 //	}
-	CapabilitiesAdd( bits_CAP_MOVE_SHOOT | bits_CAP_MOVE_JUMP );
-	CapabilitiesAdd( bits_CAP_DOORS_GROUP );
+	if ( sk_combine_e_jump.GetBool() )
+	{
+		CapabilitiesAdd( bits_CAP_MOVE_JUMP );
+	}
 
 	m_flStopMoveShootTime = FLT_MAX; // Move and shoot defaults on.
 	m_MoveAndShootOverlay.SetInitialDelay( 0.75 ); // But with a bit of a delay.
@@ -79,12 +89,17 @@ void CNPC_CombineE::Spawn( void )
 //-----------------------------------------------------------------------------
 void CNPC_CombineE::Precache()
 {
+	m_fIsElite = true;
+
 	if( !GetModelName() )
 	{
 		SetModelName( MAKE_STRING( "models/combine_elite.mdl" ) );
 	}
 
 	PrecacheModel( STRING( GetModelName() ) );
+
+//	PrecacheScriptSound( "NPC_Combine.Die" );
+	PrecacheScriptSound( "NPC_Combine.DieIWHBYD" );
 
 	UTIL_PrecacheOther( "item_healthvial" );
 	UTIL_PrecacheOther( "weapon_frag" );
@@ -101,14 +116,21 @@ void CNPC_CombineE::DeathSound( const CTakeDamageInfo &info )
 	if ( GetFlags() & FL_DISSOLVING )
 		return;
 
-	GetSentences()->Speak( "COMBINE_ELITE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
+	const char *pSentenceName = "COMBINE_ELITE_DIE";
+	if ( ShouldGib( info ) )
+	{
+		pSentenceName = "COMBINE_GIB";
+	}
+
+	GetSentences()->Speak( pSentenceName, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
 }
 
+#if 0
 void CNPC_CombineE::PainSound( const CTakeDamageInfo &info )
 {
 	if ( gpGlobals->curtime < m_flNextPainSoundTime )
 		return;
-	
+
 	// NOTE: The response system deals with this at the moment
 	if ( GetFlags() & FL_DISSOLVING )
 		return;
@@ -117,8 +139,161 @@ void CNPC_CombineE::PainSound( const CTakeDamageInfo &info )
 	if ( healthRatio > 0.0f )
 	{
 		// This causes it to speak it no matter what; doesn't bother with setting sounds.
-		GetSentences()->Speak( "COMBINE_ELITE_PAIN", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
+		m_Sentences.Speak( COMBINE_ELITE_PAIN, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
 		m_flNextPainSoundTime = gpGlobals->curtime + 1;
+	}
+}
+#endif
+
+#if 0
+void CNPC_CombineE::IdleSound( void )
+{
+	if (random->RandomInt(0,1))
+	{
+		GetSentences()->Speak( "COMBINE_ELITE_IDLE" );
+	}
+}
+
+void CNPC_CombineE::AlertSound( void )
+{
+	if ( gpGlobals->curtime > m_flNextAlertSoundTime )
+	{
+		GetSentences()->Speak( "COMBINE_ELITE_ALERT", SENTENCE_PRIORITY_HIGH );
+		m_flNextAlertSoundTime = gpGlobals->curtime + random->RandomFloat( 15, 25 );
+	}
+}
+
+void CNPC_CombineE::LostEnemySound( void )
+{
+	if ( gpGlobals->curtime <= m_flNextLostSoundTime )
+		return;
+
+	if (!(CBaseEntity*)GetEnemy() || gpGlobals->curtime - GetEnemyLastTimeSeen() >= 15)
+	{
+		GetSentences()->Speak( "COMBINE_ELITE_LOST_SHORT" );
+		m_flNextLostSoundTime = gpGlobals->curtime + random->RandomFloat( 5, 15 );
+	}
+}
+
+void CNPC_CombineE::AnnounceAssault( void )
+{
+	if (!m_pSquad)
+		return;
+
+	if (!FOkToMakeSound())
+		return;
+
+	GetSentences()->Speak( "COMBINE_ELITE_ASSAULT", SENTENCE_PRIORITY_MEDIUM );
+}
+
+void CNPC_CombineE::AnnounceEnemyType( CBaseEntity *pEnemy )
+{
+	AlertSound();
+}
+
+void CNPC_CombineE::AnnounceEnemyKill( CBaseEntity *pEnemy )
+{
+	if (!pEnemy )
+		return;
+
+	// 50% chance
+	if (random->RandomInt(0,1))
+		return;
+
+	GetSentences()->Speak( "COMBINE_ELITE_KILL", SENTENCE_PRIORITY_MEDIUM );
+}
+
+void CNPC_CombineE::NotifyDeadFriend( CBaseEntity* pFriend )
+{
+	if ( GetSquad()->NumMembers() < 2 )
+	{
+		GetSentences()->Speak( "COMBINE_ELITE_LAST_OF_SQUAD", SENTENCE_PRIORITY_HIGH, SENTENCE_CRITERIA_NORMAL );
+		JustMadeSound();
+		return;
+	}
+	BaseClass::NotifyDeadFriend(pFriend);
+}
+
+void CNPC_CombineE::SpeakSentence( int sentenceType )
+{
+	switch( sentenceType )
+	{
+	case 0: // assault
+		AnnounceAssault();
+		break;
+
+	case 1: // Flanking the player
+		// If I'm moving more than 20ft, I need to talk about it
+		if ( GetNavigator()->GetPath()->GetPathLength() > 20 * 12.0f )
+		{
+			if ( m_pSquad )
+			{
+				AnnounceAssault();
+			}
+		}
+		break;
+	}
+}
+#endif
+
+//-----------------------------------------------------------------------------
+// Purpose: StartTask
+//-----------------------------------------------------------------------------
+void CNPC_CombineE::StartTask( const Task_t *pTask )
+{
+	// NOTE: This reset is required because we change it in TASK_COMBINE_CHASE_ENEMY_CONTINUOUSLY
+	m_MoveAndShootOverlay.SetInitialDelay( 0.75 );
+
+	switch ( pTask->iTask )
+	{
+	case TASK_ANNOUNCE_ATTACK:
+		{
+			// If Primary Attack
+			if ((int)pTask->flTaskData == 1)
+			{
+				// -----------------------------------------------------------
+				// If enemy isn't facing me and I haven't attacked in a while
+				// annouce my attack before I start wailing away
+				// -----------------------------------------------------------
+				CBaseCombatCharacter *pBCC = GetEnemyCombatCharacterPointer();
+
+				if	(pBCC && pBCC->IsPlayer() && (!pBCC->FInViewCone( this )) &&
+					(gpGlobals->curtime - m_flLastAttackTime > 3.0) )
+				{
+					m_flLastAttackTime = gpGlobals->curtime;
+
+					// Wait one second
+					SetWait( 1.0 );
+
+					//TODO; Is this bit necessary?
+					if ( !IsCrouching() )
+					{
+						SetActivity(ACT_IDLE);
+					}
+					else
+					{
+						SetActivity(ACT_COWER); // This is really crouch idle???
+					}
+				}
+				else
+				{
+					TaskComplete();
+				}
+			}
+			else
+			{
+				GetSentences()->Speak( "COMBINE_ELITE_THROW", SENTENCE_PRIORITY_HIGH );
+				SetActivity(ACT_IDLE);
+
+				// Wait two seconds
+				SetWait( 2.0 );
+			}
+			break;
+		}
+
+	default: 
+		BaseClass:: StartTask( pTask );
+		break;
 	}
 }
 
@@ -195,7 +370,7 @@ void CNPC_CombineE::HandleAnimEvent( animevent_t *pEvent )
 void CNPC_CombineE::Event_Killed( const CTakeDamageInfo &info )
 {
 	// Don't bother if we've been told not to, or the player has a megaphyscannon
-	if ( combine_drop_health.GetBool() == false || PlayerHasMegaPhysCannon() )
+	if ( npc_combine_drop_health.GetBool() == false || PlayerHasMegaPhysCannon() )
 	{
 		BaseClass::Event_Killed( info );
 		return;
@@ -240,13 +415,6 @@ bool CNPC_CombineE::IsLightDamage( const CTakeDamageInfo &info )
 
 bool CNPC_CombineE::IsHeavyDamage( const CTakeDamageInfo &info )
 {
-	// AR2 fire to chest/head is always heavy damage
-	if ( info.GetAmmoType() == GetAmmoDef()->Index("AR2") )
-	{
-		if ( info.GetDamage() >= sk_plr_dmg_ar2.GetFloat() )
-			return true;
-	}
-
 	// Shotgun blasts where at least half the pellets hit me are heavy damage
 	if ( info.GetDamageType() & DMG_BUCKSHOT )
 	{
@@ -316,6 +484,6 @@ bool CNPC_CombineE::ShouldMoveAndShoot()
 	// If you hear danger, focus on running for the first second or two
 	if( HasCondition( COND_HEAR_DANGER, false ) )
 		m_flStopMoveShootTime = gpGlobals->curtime + random->RandomFloat( 1.0f, 2.0f );
-	
+
 	return BaseClass::ShouldMoveAndShoot();
 }

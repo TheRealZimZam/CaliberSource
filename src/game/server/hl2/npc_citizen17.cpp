@@ -5,10 +5,18 @@
 // Weapon priority/rating script, Optimize
 //=============================================================================//
 
+//-----------------------------------------------------------------------------
+// Heres a rundown - 
+// The most cowardly and weak enemy in the game, at least by hitscan standards
+// However, making up for that is force of numbers and (for the most part)
+// the best intelligence by design - These guys have the most states/variants
+// out of all the npc classes, and are able to overcome any foe in the right
+// conditions - they become marginally better when switched to allies after
+// chapter 3, and can easily hold their own against both enemy shooters and
+// aliens
+//-----------------------------------------------------------------------------
 #include "cbase.h"
-
 #include "npc_citizen17.h"
-
 #include "ammodef.h"
 #include "globalstate.h"
 #include "soundent.h"
@@ -17,7 +25,6 @@
 #include "hl2_player.h"
 #include "items.h"
 
-
 #ifdef HL2MP
 #include "hl2mp/weapon_crowbar.h"
 #else
@@ -25,7 +32,6 @@
 #endif
 
 #include "eventqueue.h"
-
 #include "ai_squad.h"
 #include "ai_pathfinder.h"
 #include "ai_route.h"
@@ -296,8 +302,9 @@ static const char *g_ppszModelLocs[] =
 int ACT_CIT_HANDSUP;
 int	ACT_CIT_BLINDED;		// Blinded by scanner photo
 int ACT_CIT_SHOWARMBAND;
-int ACT_CIT_HEAL;
+int ACT_CIT_HEAL;			// Giving an item
 int	ACT_CIT_STARTLED;		// Startled by sneaky scanner
+int	ACT_CIT_ANNOYED;		// Extremely pissed off
 
 //---------------------------------------------------------
 
@@ -408,8 +415,10 @@ void CNPC_Citizen::Precache()
 	PrecacheScriptSound( "NPC_Citizen.FootstepLeft" );
 	PrecacheScriptSound( "NPC_Citizen.FootstepRight" );
 	PrecacheScriptSound( "NPC_Citizen.Die" );
+	PrecacheScriptSound( "NPC_Citizen.DieFall" );
+	PrecacheScriptSound( "NPC_Citizen.Gib" );
+//	PrecacheScriptSound( "NPC_Citizen.OnFire" );
 	PrecacheScriptSound( "NPC_Citizen.DieIWHBYD" );
-	PrecacheScriptSound( "NPC_Citizen.OnFireScream" );
 
 	PrecacheInstancedScene( "scenes/Expressions/CitizenIdle.vcd" );
 	PrecacheInstancedScene( "scenes/Expressions/CitizenAlert_loop.vcd" );
@@ -492,7 +501,7 @@ void CNPC_Citizen::Spawn()
 	m_bRPGAvoidPlayer = false;
 	m_bShouldPatrol = false;
 
-	// NuHealth - "Leader" citizens (anybody who picks up a supershotgun, rpg, or is flagged as one in hammer) have more health
+	// Rebel citizens (anybody who picks up a decent weapon, or is flagged as one in hammer) have more health
 	if( HasSpawnFlags( SF_CITIZEN_LEADER ) || m_Type == CT_REBEL )
 	{
 		// Stronger, tougher.
@@ -1200,8 +1209,8 @@ int CNPC_Citizen::SelectSchedule()
 	if ( HasCondition( COND_ON_FIRE ) )
 	{
 		//TODO; Speak concept
-		EmitSound( "NPC_Citizen.OnFireScream" );
-		if ( random->RandomInt( 0, 1 ) == 1 )
+//		EmitSound( "NPC_Citizen.OnFire" );
+		if ( random->RandomInt( 0, 1 ) )
 		{
 			return SCHED_BURNING_RUN;
 		}
@@ -1218,21 +1227,38 @@ int CNPC_Citizen::SelectSchedule()
 		pRPG->StopGuiding();
 	}
 
-	// If im at critical health, run away!
-	bool bCriticalHealth = ((float)GetHealth() / (float)GetMaxHealth() < 0.25f);
-	if ( !IsInPlayerSquad() && HasCondition( COND_LIGHT_DAMAGE ) && bCriticalHealth )
+	// This is kinda gross, but works for now
+	if ( m_NPCState != NPC_STATE_SCRIPT && GetEnemy() != NULL )
 	{
-		//TODO; This needs a counter, stop doing this after 2 or 3 times
-		if ( GetEnemy() != NULL && !(m_Type == CT_REBEL || m_Type == CT_UNIQUE) )	//TODO; instead of checking type every tick, maybe do a spawn value instead?
+		// If im at critical health, run away!
+		if ( IsInPlayerSquad() )
 		{
-			FearSound();
-			return SCHED_CITIZEN_FLEE;
+			if ( !m_bAnnoyed && (HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_SEE_NEMESIS )) && IsInjured() )
+			{
+				if ( random->RandomInt( 0, 2 ) != 0 )
+				{
+					m_bAnnoyed = true;
+					return SCHED_CITIZEN_ANNOYED;
+				}
+			}
 		}
-		else if ( !m_bAnnoyed && random->RandomInt( 0, 2 ) == 1 )
+		else
 		{
-			// The guy must be toying with me!
-			m_bAnnoyed = true;
-			return SCHED_CHASE_ENEMY;
+			if ( HasCondition( COND_LIGHT_DAMAGE ) && IsInjured() )
+			{
+				//TODO; This needs a counter, stop doing this after 2 or 3 times
+				if ( !(m_Type == CT_REBEL || m_Type == CT_UNIQUE) )	//TODO; instead of checking type every tick, maybe do a spawn value instead?
+				{
+					FearSound();
+					return SCHED_CITIZEN_FLEE;
+				}
+				else if ( !m_bAnnoyed && random->RandomInt( 0, 2 ) == 1 )
+				{
+					// The guy must be toying with me - Get mad!
+					m_bAnnoyed = true;
+					return SCHED_CITIZEN_ANNOYED;
+				}
+			}
 		}
 	}
 
@@ -1516,7 +1542,7 @@ int CNPC_Citizen::TranslateSchedule( int scheduleType )
 	case SCHED_MOVE_TO_WEAPON_RANGE:
 		if( !IsMortar( GetEnemy() ) && HaveCommandGoal() )
 		{
-			if ( GetActiveWeapon() && ( GetActiveWeapon()->CapabilitiesGet() & bits_CAP_WEAPON_RANGE_ATTACK1 ) && random->RandomInt( 0, 1 ) && HasCondition(COND_SEE_ENEMY) && !HasCondition ( COND_NO_PRIMARY_AMMO ) )
+			if ( GetActiveWeapon() && ( GetActiveWeapon()->CapabilitiesGet() & bits_CAP_WEAPON_RANGE_ATTACK1 ) && random->RandomInt( 0, 1 ) && HasCondition( COND_CAN_RANGE_ATTACK1 ) )
 				return TranslateSchedule( SCHED_RANGE_ATTACK1 );
 
 			return SCHED_STANDOFF;
@@ -1540,10 +1566,6 @@ int CNPC_Citizen::TranslateSchedule( int scheduleType )
 				{
 					return SCHED_CITIZEN_STRIDER_RANGE_ATTACK1_RPG;
 				}
-//				else
-//				{
-//					return SCHED_STANDOFF;
-//				}
 			}
 			else
 			{
@@ -1895,6 +1917,7 @@ void CNPC_Citizen::TaskFail( AI_TaskFailureCode_t code )
 //-----------------------------------------------------------------------------
 Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 {
+#if 0
 	if ( activity == ACT_MELEE_ATTACK1 )
 	{
 		return ACT_MELEE_ATTACK_SWING;
@@ -1902,24 +1925,63 @@ Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 
 	if ( activity == ACT_RUN)
 	{
-		if ( m_iHealth <= 20 && HaveSequenceForActivity( ACT_RUN_HURT ) )
-		{
-			// limp!
-			return ACT_RUN_HURT;
-		}
-		else if ( IsOnFire() && HaveSequenceForActivity( ACT_RUN_ON_FIRE ) )
+		if ( IsOnFire() && HaveSequenceForActivity( ACT_RUN_ON_FIRE ) )
 		{
 			// flail around!
 			return ACT_RUN_ON_FIRE;
 		}
+		else if ( IsInjured() && HaveSequenceForActivity( ACT_RUN_HURT ) )
+		{
+			// limp!
+			return ACT_RUN_HURT;
+		}
 	}
 	else if ( activity == ACT_WALK)
 	{
-		if ( m_iHealth <= 20 && HaveSequenceForActivity( ACT_WALK_HURT ) )
+		if ( IsInjured() && HaveSequenceForActivity( ACT_WALK_HURT ) )
 		{
 			// limp!
 			return ACT_WALK_HURT;
 		}
+	}
+#endif
+
+	switch ( activity )
+	{
+		case ACT_MELEE_ATTACK1:
+			if ( Weapon_OwnsThisType( "weapon_stab" ) )
+			{
+				return ( Activity )ACT_MELEE_ATTACK_STAB;
+			}
+			else
+			{
+				return ( Activity )ACT_MELEE_ATTACK_SWING;
+			}
+		break;
+
+		//Allow aiming to be overridden by hurt - citizens will still move and shoot, but they'll limp while doing so
+		case ACT_RUN:
+		case ACT_RUN_AIM:
+			if ( IsOnFire() && HaveSequenceForActivity( ACT_RUN_ON_FIRE ) )
+			{
+				// flail around!
+				return ACT_RUN_ON_FIRE;
+			}
+			else if ( IsInjured() && HaveSequenceForActivity( ACT_RUN_HURT ) )
+			{
+				// limp!
+				return ACT_RUN_HURT;
+			}
+		break;
+
+		case ACT_WALK:
+		case ACT_WALK_AIM:
+			if ( IsInjured() && HaveSequenceForActivity( ACT_WALK_HURT ) )
+			{
+				// limp!
+				return ACT_WALK_HURT;
+			}
+		break;
 	}
 
 	// !!!HACK - Citizens don't have the required animations for shotguns, 
@@ -2140,31 +2202,6 @@ bool CNPC_Citizen::OnBeginMoveAndShoot()
 void CNPC_Citizen::OnEndMoveAndShoot()
 {
 	VacateStrategySlot();
-}
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-void CNPC_Citizen::LocateEnemySound()
-{
-#if 0
-	if ( !GetEnemy() )
-		return;
-
-	float flZDiff = GetLocalOrigin().z - GetEnemy()->GetLocalOrigin().z;
-
-	if( flZDiff < -128 )
-	{
-		EmitSound( "NPC_Citizen.UpThere" );
-	}
-	else if( flZDiff > 128 )
-	{
-		EmitSound( "NPC_Citizen.DownThere" );
-	}
-	else
-	{
-		EmitSound( "NPC_Citizen.OverHere" );
-	}
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -3952,30 +3989,67 @@ void CNPC_Citizen::DeathSound( const CTakeDamageInfo &info )
 {
 	// Sentences don't play on dead NPCs
 	SentenceStop();
-	//Dont do a death scream if you got gibbed
-//	if ( g_pGameRules->Damage_ShouldGibCorpse(info.GetDamageType()) )
-//	{
+
+	//TODO; Dont make sound on headshot
+	const char *pDeathsoundName = "NPC_Citizen.Die";
+
+	// If im gibbing, dont make a long, drawn-out, bone-chilling, almost shakespearean death rattle
+	if ( ShouldGib( info ) )
+	{
+		pDeathsoundName = "NPC_Citizen.Gib";
+	}
+	else
+	{
+		// If im falling, or a blast hasnt gibbed me, make the looney tunes
+		if ( info.GetDamageType() & (DMG_FALL|DMG_BLAST) )
+		{
+			pDeathsoundName = "NPC_Citizen.DieFall";
+		}
+		// IWHBYD
 		if ( GlobalEntity_GetState("iwhbyd") == GLOBAL_ON && random->RandomInt( 0, 10 ) == 10 )
 		{
-			// IWHBYD
-			EmitSound( "NPC_Citizen.DieIWHBYD" );
+			pDeathsoundName = "NPC_Citizen.DieIWHBYD";
 		}
-		else
-		{
-			EmitSound( "NPC_Citizen.Die" );
-		}
-//	}
-//	else
-//	{
-//		EmitSound( "NPC_Citizen.Gib" );
-//	}
+	}
+
+	EmitSound( pDeathsoundName );
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void CNPC_Citizen::LocateEnemySound( void )
+{
+#if 0
+	if ( !GetEnemy() )
+		return;
+
+	float flZDiff = GetLocalOrigin().z - GetEnemy()->GetLocalOrigin().z;
+
+	if( flZDiff < -128 )
+	{
+		EmitSound( "NPC_Citizen.UpThere" );
+	}
+	else if( flZDiff > 128 )
+	{
+		EmitSound( "NPC_Citizen.DownThere" );
+	}
+	else
+	{
+		EmitSound( "NPC_Citizen.OverHere" );
+	}
+#endif
 }
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 void CNPC_Citizen::FearSound( void )
 {
-//	SpeakIfAllowed( TLK_DANGER );
+	// Running away from something scary/extremely injured
+	if ( gpGlobals->curtime < m_flNextFearSoundTime )
+		return;
+
+	SpeakIfAllowed( TLK_HELP_ME );
+	m_flNextFearSoundTime = gpGlobals->curtime + random->RandomFloat( 5, 10 );
 }
 
 //-----------------------------------------------------------------------------
@@ -4012,6 +4086,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 	DECLARE_ACTIVITY( ACT_CIT_SHOWARMBAND )
 	DECLARE_ACTIVITY( ACT_CIT_HEAL )
 	DECLARE_ACTIVITY( ACT_CIT_STARTLED )
+	DECLARE_ACTIVITY( ACT_CIT_ANNOYED )
 
 	DECLARE_CONDITION( COND_CIT_PLAYERHEALREQUEST )
 	DECLARE_CONDITION( COND_CIT_COMMANDHEAL )
@@ -4037,7 +4112,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 //		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
 		"		TASK_CIT_HEAL							0"
 //		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
-		"	"
+		""
 		"	Interrupts"
 	)
 
@@ -4056,7 +4131,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 //	"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
 	"		TASK_CIT_HEAL_TOSS						0"
 //	"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
-	"	"
+	""
 	"	Interrupts"
 	)
 
@@ -4093,8 +4168,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		""
 		"	Interrupts"
 	)
-
-
+ 
 	//=========================================================
 	// > SCHED_CITIZEN_PATROL
 	//=========================================================
@@ -4113,11 +4187,12 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_CITIZEN_PATROL" // keep doing it
 		""
 		"	Interrupts"
+		"		COND_NEW_ENEMY"
+		"		COND_SEE_ENEMY"
 		"		COND_ENEMY_DEAD"
 		"		COND_LIGHT_DAMAGE"
 		"		COND_HEAVY_DAMAGE"
 		"		COND_HEAR_DANGER"
-		"		COND_NEW_ENEMY"
 	//	"		COND_BETTER_WEAPON_AVAILABLE"
 	)
 
@@ -4142,6 +4217,20 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		COND_HEAR_DANGER"
 	)
 
+	DEFINE_SCHEDULE
+	(
+		SCHED_CITIZEN_ANNOYED,
+
+		"	Tasks"
+		"		TASK_STOP_MOVING				0"
+		"		TASK_FACE_IDEAL					0"
+		"		TASK_PLAY_SEQUENCE_FACE_ENEMY	ACTIVITY:ACT_CIT_ANNOYED"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_CHASE_ENEMY"
+		""
+		"	Interrupts"
+		"		COND_WEAPON_BLOCKED_BY_FRIEND"
+	)
+
 	DEFINE_SCHEDULE	
 	(
 		SCHED_CITIZEN_PLAY_INSPECT_ACTIVITY,
@@ -4152,7 +4241,6 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_WAIT						2"
 		""
 		"	Interrupts"
-		"		"
 	)
 
 	DEFINE_SCHEDULE
@@ -4194,7 +4282,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"	Tasks"
 //		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CITIZEN_FLEE"
 		"		TASK_STOP_MOVING				0"
-		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_COWER"	//TEMP; USE ACT_IDLE_FEAR
+		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_COWER"
 		"		TASK_WAIT						2"
 		"		TASK_WAIT_RANDOM				4"
 		""

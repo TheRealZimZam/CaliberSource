@@ -245,7 +245,7 @@ void CPropJetski::Think(void)
 //-----------------------------------------------------------------------------
 void CPropJetski::OnTurn( CUserCmd *ucmd )
 {
-#if 0
+#if 1
 	// Check for lean and adjust the turning radius accordingly.
 	if ( ucmd->buttons & IN_JUMP )
 	{
@@ -255,8 +255,8 @@ void CPropJetski::OnTurn( CUserCmd *ucmd )
 	{
 		m_VehiclePhysics.SetSteeringDegrees( JETSKI_STEERING_NORMAL );
 	}
-
 #endif
+
 	float flSteering = m_VehiclePhysics.GetSteering();
 	bool bLeft = ( flSteering < -JETSKI_STEERING_EPS );
 	bool bRight = ( flSteering > JETSKI_STEERING_EPS );
@@ -367,7 +367,7 @@ float CPropJetski::CalculateDrag( CUserCmd *ucmd )
 
 	bool bLean = UpdateLean( ucmd );
 	
-#if 0
+#if 1
 	if ( bLean )
 	{
 		flDrag += JETSKI_DRAG_LEAN_ADD;
@@ -421,7 +421,7 @@ void CPropJetski::OnSpeed( CUserCmd *ucmd )
 	float flZero = 0.0f;
 	pPhysJetski->SetDragCoefficient( &flDrag, &flZero );
 
-#if 0
+#if 1
 	// Splash effects.
 	if ( flRatio > 0.1f )
 	{

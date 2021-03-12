@@ -249,6 +249,7 @@ public:
 	//---------------------------------
 	// Combat
 	//---------------------------------
+//	void			DeathSound( const CTakeDamageInfo &info );
 	virtual void 	LocateEnemySound() {};
 
 	bool			IsValidEnemy( CBaseEntity *pEnemy );
@@ -286,7 +287,6 @@ public:
 	//---------------------------------
 	int 			OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	void 			OnFriendDamaged( CBaseCombatCharacter *pSquadmate, CBaseEntity *pAttacker );
-//	bool			m_bAnnoyed;			// I lost this enemy before, but he just reappeared - start being more aggressive!
 
 	//---------------------------------
 	// Hints

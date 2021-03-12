@@ -34,10 +34,11 @@ extern ConVar    sk_plr_dmg_smg1_grenade;
 extern ConVar    sk_npc_dmg_smg1_grenade;
 //extern ConVar    sk_max_smg1_grenade;
 
-ConVar	  sk_smg_grenade_radius			( "sk_smg_grenade_radius","0");
-ConVar	  sk_smg_airburst_radius		( "sk_smg_airburst_radius","0");
+ConVar	  sk_ar2_grenade_radius			( "sk_ar2_grenade_radius","0");
+ConVar	  sk_ar2_airburst_radius		( "sk_ar2_airburst_radius","0");
+ConVar	  sk_ar2_airburst_cone			( "sk_ar2_airburst_cone","180");	//Cone of explosion - 360 and above creates a normal explosion
 
-ConVar g_CV_SmokeTrail("ar2_smoke_trail", "1", 0); // temporary dust explosion switch
+ConVar g_CV_SmokeTrail("ar2_grenade_smoke_trail", "1", 0); // temporary dust explosion switch
 
 BEGIN_DATADESC( CGrenadeAR2 )
 
@@ -80,7 +81,7 @@ void CGrenadeAR2::Spawn( void )
 		m_flDamage = sk_npc_dmg_smg1_grenade.GetFloat();
 	}
 
-	m_DmgRadius		= sk_smg_grenade_radius.GetFloat();
+	m_DmgRadius		= sk_ar2_grenade_radius.GetFloat();
 	m_takedamage	= DAMAGE_YES;
 	m_bIsLive		= false;
 	m_iHealth		= 1;		//Can be blown-up midair by other explosives n' such
@@ -237,6 +238,7 @@ void CGrenadeAR2::Detonate(void)
 	}
 
 	UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
+//	CSoundEnt::InsertSound ( SOUND_DANGER, GetAbsOrigin(), BASEGRENADE_EXPLOSION_VOLUME, 3.0 );
 
 	RadiusDamage( CTakeDamageInfo( this, GetThrower(), m_flDamage, DMG_BLAST ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 
@@ -258,8 +260,8 @@ CGrenadeAR2::CGrenadeAR2(void)
 //=============================================================================
 // Purpose:  Airburst variant - goes live when near a target/impact point
 // OR when the command is given by a player
-// NOTENOTE; This nade creates two explosions - one in the center and one
-// in-front of the grenade as dictacted by the airburst dist
+// NOTENOTE; This nade creates two explosions - one in the center at half
+// strength and one in-front of the grenade as dictacted by the airburst dist
 //=============================================================================
 LINK_ENTITY_TO_CLASS( grenade_ar2_airburst, CGrenadeAR2Airburst );
 
@@ -276,7 +278,7 @@ void CGrenadeAR2Airburst::GrenadeAR2Touch( CBaseEntity *pOther )
 	}
 }
 
-// Explode when near an enemy/the impact destination
+// Explode when near an enemy/the impact destination OR if given a signal by the player
 void CGrenadeAR2Airburst::GrenadeAR2Think( void )
 {
 	SetNextThink( gpGlobals->curtime + 0.05f );

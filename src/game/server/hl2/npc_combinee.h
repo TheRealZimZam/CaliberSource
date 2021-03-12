@@ -29,9 +29,21 @@ public:
 	// -----------------------------------------------------------------------------------
 	// -----------------------------------------------------------------------------------
 	void			DeathSound( const CTakeDamageInfo &info );
-	void			PainSound( const CTakeDamageInfo &info );
+//	void			PainSound( const CTakeDamageInfo &info );
+#if 0
+	void			IdleSound( void );
+	void			AlertSound( void );
+	void			LostEnemySound( void );
+	void			FoundEnemySound( void ) { return; };
+	void			AnnounceAssault( void );
+	void			AnnounceEnemyType( CBaseEntity *pEnemy );
+	void			AnnounceEnemyKill( CBaseEntity *pEnemy );
+	void			NotifyDeadFriend( CBaseEntity* pFriend );
+	void			SpeakSentence( int sentType );
+#endif
 
 	virtual void	PrescheduleThink();
+	void			StartTask( const Task_t *pTask );
 
 	bool		m_fIsBlocking;
 	void		HandleAnimEvent( animevent_t *pEvent );
@@ -41,11 +53,8 @@ public:
 	bool		IsLightDamage( const CTakeDamageInfo &info );
 	bool		IsHeavyDamage( const CTakeDamageInfo &info );
 
-private:
-	// Time Variables
-	float			m_flNextPainSoundTime;
-	float			m_flStopMoveShootTime;
-
+	//Nope
+//!	virtual	bool		AllowedToIgnite( void ) { return true; }
 };
 
 #endif	//NPC_COMBINEE_H

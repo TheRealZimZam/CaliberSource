@@ -66,6 +66,7 @@ int g_iGunshipEffectIndex = -1;
 #define SF_GUNSHIP_NO_GROUND_ATTACK		( 1 << 12 )	
 #define SF_GUNSHIP_USE_CHOPPER_MODEL	( 1 << 13 )
 
+ConVar sk_gunship_health( "sk_gunship_health","100");
 ConVar sk_gunship_burst_size("sk_gunship_burst_size", "15" );
 ConVar sk_gunship_burst_min("sk_gunship_burst_min", "800" );
 ConVar sk_gunship_burst_dist("sk_gunship_burst_dist", "768" );
@@ -117,7 +118,7 @@ Wedge's notes:
 
 #define GUNSHIP_WASH_ALTITUDE		1024.0f
 
-#define	GUNSHIP_MIN_DAMAGE_THRESHOLD	50.0f
+#define	GUNSHIP_MIN_DAMAGE_THRESHOLD	30.0f	//Any damage higher than this will apply
 
 #define GUNSHIP_INNER_NAV_DIST			400.0f
 #define GUNSHIP_OUTER_NAV_DIST			800.0f
@@ -550,7 +551,7 @@ void CNPC_CombineGunship::Spawn( void )
 	SetHullType(HULL_LARGE_CENTERED);
 	SetHullSizeNormal();
 
-	m_iMaxHealth = m_iHealth = 100;
+	m_iMaxHealth = m_iHealth = sk_gunship_health.GetInt();
 
 	m_flFieldOfView = -0.707; // 270 degrees
 
@@ -2914,16 +2915,18 @@ int	CNPC_CombineGunship::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	// Allow npc_kill to kill me
 	if ( inputInfo.GetDamageType() != DMG_GENERIC )
 	{
+		//Actually no, allow big guns/hmgs to damage me
+#if 0
 		// Ignore mundane bullet damage.
 		if ( ( inputInfo.GetDamageType() & DMG_BLAST ) == false )
 			return 0;
+#endif
 
 		// Ignore blasts less than this amount
 		if ( inputInfo.GetDamage() < GUNSHIP_MIN_DAMAGE_THRESHOLD )
 			return 0;
 	}
 
-	// Only take blast damage
 	CTakeDamageInfo info = inputInfo;
 
 	// Make a pain sound

@@ -58,7 +58,7 @@ public:
 	virtual const Vector& GetBulletSpread( void )
 	{
 		static Vector cone;
-		
+
 		if( GetOwner() && GetOwner()->IsPlayer() )
 		{
 			cone = ( m_bZoomed ) ? VECTOR_CONE_1DEGREES : VECTOR_CONE_3DEGREES;
@@ -67,7 +67,7 @@ public:
 		{
 			cone = VECTOR_CONE_4DEGREES;
 		}
-		
+
 		return cone;
 	}
 

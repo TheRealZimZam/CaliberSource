@@ -2882,17 +2882,6 @@ bool CNPC_Alyx::EnemyIsValidCrouchTarget( CBaseEntity *pEnemy )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: degrees to turn in 0.1 seconds
-//-----------------------------------------------------------------------------
-float CNPC_Alyx::MaxYawSpeed( void )
-{
-	if ( IsCrouching() )
-		return 10;
-
-	return BaseClass::MaxYawSpeed();
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: Tack on extra criteria for responses
 //-----------------------------------------------------------------------------
 void CNPC_Alyx::ModifyOrAppendCriteria( AI_CriteriaSet &set )
@@ -3062,6 +3051,7 @@ void CNPC_Alyx::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 	m_OnPlayerUse.FireOutput( pActivator, pCaller );
 }
 
+#if 0
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -3075,10 +3065,8 @@ bool CNPC_Alyx::PlayerInSpread( const Vector &sourcePos, const Vector &targetPos
 		if ( pPlayer && ( !ignoreHatedPlayers || IRelationType( pPlayer ) != D_HT ) )
 		{
 			//If the player is being lifted by a barnacle then go ahead and ignore the player and shoot.
-#ifdef HL2_EPISODIC
 			if ( pPlayer->IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) )
 				return false;
-#endif
 
 			if ( PointInSpread( pPlayer, sourcePos, targetPos, pPlayer->WorldSpaceCenter(), flSpread, maxDistOffCenter ) )
 				return true;
@@ -3086,6 +3074,7 @@ bool CNPC_Alyx::PlayerInSpread( const Vector &sourcePos, const Vector &targetPos
 	}
 	return false;
 }
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: 

@@ -1,7 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
-//
+// Purpose:  Your classic malicious-military-marauders.
+// TODO's: Auto-squadding, COND_COMBINE_DROP_GRENADE for tripmines, looping radio sound while talking, integrate with metropolice somehow??
 //=============================================================================//
 
 #ifndef NPC_COMBINE_H
@@ -82,6 +82,7 @@ public:
 	bool			UpdateEnemyMemory( CBaseEntity *pEnemy, const Vector &position, CBaseEntity *pInformer = NULL );
 
 	Class_T			Classify( void );
+	bool			IsDemolition() { return m_fIsDemolition; }
 	bool			IsElite() { return m_fIsElite; }
 	void			DelayAltFireAttack( float flDelay );
 	void			DelaySquadAltFireAttack( float flDelay );
@@ -129,7 +130,7 @@ public:
 	// -------------
 	// Sounds
 	// -------------
-	void			DeathSound( void );
+	void			DeathSound( const CTakeDamageInfo &info );
 	void			PainSound( const CTakeDamageInfo &info );
 	void			IdleSound( void );
 	void			AlertSound( void );
@@ -146,6 +147,7 @@ public:
 	virtual bool	QueryHearSound( CSound *pSound );
 
 	// Speaking
+	virtual char	*GetSentencePrefix( const char *pszSoundName );
 	void			SpeakSentence( int sentType );
 
 	virtual int		TranslateSchedule( int scheduleType );
@@ -153,6 +155,20 @@ public:
 //	virtual bool	ShouldPickADeathPose( void );
 
 protected:
+	// Time Variables
+	float			m_flNextPainSoundTime;
+	float			m_flNextAlertSoundTime;
+	float			m_flNextGrenadeCheck;	
+	float			m_flNextLostSoundTime;
+	float			m_flAlertPatrolTime;		// When to stop doing alert patrol
+	float			m_flNextSignalTime;			// Clock until a signal can be used
+	float			m_flNextAltFireTime;		// Elites only. Next time to begin considering alt-fire attack.
+
+	int				m_iNewEnemies;				// When this hits three, new enemy logic is deactivated until combat is over.
+	int				m_nShots;
+	float			m_flShotDelay;
+	float			m_flStopMoveShootTime;
+
 	void			SetKickDamage( int nDamage ) { m_nKickDamage = nDamage; }
 	CAI_Sentence< CNPC_Combine > *GetSentences() { return &m_Sentences; }
 
@@ -169,12 +185,10 @@ private:
 		SCHED_COMBINE_ALERT_FACE,
 		SCHED_COMBINE_HIDE_AND_RELOAD,
 		SCHED_COMBINE_SIGNAL_SUPPRESS,
-//		SCHED_COMBINE_ENTER_OVERWATCH,
-//		SCHED_COMBINE_OVERWATCH,
 		SCHED_COMBINE_ASSAULT,
 		SCHED_COMBINE_GRENADE_ASSAULT,
 		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE,
-		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE_FACE,
+//		SCHED_COMBINE_FOUND_ENEMY,
 		SCHED_COMBINE_PRESS_ATTACK,
 		SCHED_COMBINE_WAIT_IN_COVER,
 		SCHED_COMBINE_RANGE_ATTACK1,
@@ -232,12 +246,12 @@ private:
 	enum Combine_Conds
 	{
 		COND_COMBINE_NO_FIRE = BaseClass::NEXT_CONDITION,
+//		COND_COMBINE_DEAD_FRIEND,
 		COND_COMBINE_SHOULD_PATROL,
 		COND_COMBINE_HIT_BY_BUGBAIT,
 		COND_COMBINE_DROP_GRENADE,
 		COND_COMBINE_ON_FIRE,
 		COND_COMBINE_ATTACK_SLOT_AVAILABLE,
-		COND_COMBINE_SAFE_FROM_MORTAR,
 		NEXT_CONDITION
 	};
 
@@ -269,13 +283,12 @@ private:
 	virtual bool IsWaitingToRappel( void ) { return m_RappelBehavior.IsWaitingToRappel(); }
 	void BeginRappel() { m_RappelBehavior.BeginRappel(); }
 /*
-private:
 	void OnTossedTeleportProjectile( CBaseEntity *pProjectile );
 	void OnTeleportProjectileAction( CBaseEntity *pProjectile, bool bTeleport );
 
 	void FullyLoadWeaponClips();
 */
-private:
+
 	int				m_nKickDamage;
 	int				m_lastGrenadeCondition;
 	Vector			m_vecTossVelocity;
@@ -283,21 +296,6 @@ private:
 	bool			m_bShouldPatrol;
 	bool			m_bFirstEncounter;// only put on the handsign show in the squad's first encounter.
 //	float			flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
-
-	// Time Variables
-	float			m_flNextPainSoundTime;
-	float			m_flNextAlertSoundTime;
-	float			m_flNextGrenadeCheck;	
-	float			m_flNextLostSoundTime;
-	float			m_flAlertPatrolTime;		// When to stop doing alert patrol
-	float			m_flNextSignalTime;			// Clock until a signal can be used
-	float			m_flNextAltFireTime;		// Elites only. Next time to begin considering alt-fire attack.
-//	float			m_flNextNewEnemyTime;		// Clock until the new enemy logic can be used again
-
-	int				m_iNewEnemies;				// When this hits three, new enemy logic is deactivated until combat is over.
-	int				m_nShots;
-	float			m_flShotDelay;
-	float			m_flStopMoveShootTime;
 
 	CAI_Sentence< CNPC_Combine > m_Sentences;
 
@@ -311,6 +309,7 @@ private:
 
 public:
 	int				m_iLastAnimEventHandled;
+	bool			m_fIsDemolition;
 	bool			m_fIsElite;
 	Vector			m_vecAltFireTarget;
 

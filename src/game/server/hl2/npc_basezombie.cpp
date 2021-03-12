@@ -11,8 +11,9 @@
 // drag itself along the ground with its arms. It will try to claw the player.
 //
 // In either state, a severely injured Zombie will release its headcrab, which
-// will immediately go after the player. The Zombie will then die (ragdoll). 
+// will immediately go after the player. The Zombie will then die (ragdoll).
 //
+// TODO; TASK_ZOMBIE_RELEASE_HEADCRAB Should include the animation sequence in the task
 //=============================================================================//
 
 #include "cbase.h"
@@ -53,7 +54,7 @@
 
 extern ConVar sk_npc_head;
 
-#define ZOMBIE_BULLET_DAMAGE_SCALE 0.5f
+#define ZOMBIE_BULLET_DAMAGE_SCALE 0.6f
 
 int g_interactionZombieMeleeWarning;
 
@@ -729,28 +730,30 @@ bool CNPC_BaseZombie::ShouldBecomeTorso( const CTakeDamageInfo &info, float flDa
 	// Break in half IF:
 	// 
 	// Take half or more of max health in DMG_BLAST
-	if( (info.GetDamageType() & DMG_BLAST) && flDamageThreshold >= 0.5 )
+	if ( (info.GetDamageType() & DMG_BLAST) && flDamageThreshold >= 0.5 )
 	{
 		return true;
 	}
 
-	if ( hl2_episodic.GetBool() )
-	{
-		// Always split after a cannon hit
-		if ( info.GetAmmoType() == GetAmmoDef()->Index("CombineHeavyCannon") )
-			return true;
-	}
+	if ( m_bHeadShot )
+		return false;
 
-#if 0
-	if( info.GetDamageType() & DMG_BUCKSHOT )
+	// Got blasted with a shotgun and it was directed at the legs
+	if ( info.GetDamageType() & DMG_BUCKSHOT )
 	{
 		if( m_iHealth <= 0 || flDamageThreshold >= 0.5 )
 		{
 			return true;
 		}
 	}
-#endif 
-	
+
+	// Got hit by a cannon
+	if ( hl2_episodic.GetBool() )
+	{
+		if ( info.GetAmmoType() == GetAmmoDef()->Index("CombineHeavyCannon") )
+			return true;
+	}
+
 	return false;
 }
 
@@ -766,36 +769,40 @@ HeadcrabRelease_t CNPC_BaseZombie::ShouldReleaseHeadcrab( const CTakeDamageInfo 
 		if ( info.GetDamageType() & DMG_REMOVENORAGDOLL )
 			return RELEASE_NO;
 
-		if ( info.GetDamageType() & DMG_SNIPER )
+		// If I was killed by an explosion, send the crab flying.
+		if ( info.GetDamageType() & (DMG_BLAST|DMG_SNIPER) )
 			return RELEASE_RAGDOLL;
 
-		// If I was killed by a bullet...
-		if ( info.GetDamageType() & DMG_BULLET )
-		{
-			if( m_bHeadShot ) 
-			{
-				if( flDamageThreshold > 0.25 )
-				{
-					// Enough force to kill the crab.
-					return RELEASE_RAGDOLL;
-				}
-			}
-			else
-			{
-				// Killed by a shot to body or something. Crab is ok!
-				return RELEASE_IMMEDIATE;
-			}
-		}
-
-		// If I was killed by an explosion, release the crab.
-		if ( info.GetDamageType() & DMG_BLAST )
-		{
-			return RELEASE_RAGDOLL;
-		}
+		// If I was shocked or plasma'd, vaporize.
+		if ( info.GetDamageType() & (DMG_SHOCK|DMG_DISSOLVE) )
+			return RELEASE_VAPORIZE;
 
 		if ( m_fIsTorso && IsChopped( info ) )
 		{
 			return RELEASE_RAGDOLL_SLICED_OFF;
+		}
+
+#if 0
+		// If I was thwapped with a crowbar
+		if ( info.GetDamageType() & DMG_CLUB )
+			return RELEASE_RAGDOLL;
+#endif
+
+		// Finally, if I was killed by a bullet...
+		if ( info.GetDamageType() & DMG_BULLET )
+		{
+			if ( m_bHeadShot )
+			{
+				// Go limp
+				if ( flDamageThreshold > 0.25 )
+				{
+					// Enough force to kill the crab.
+					return RELEASE_RAGDOLL;
+				}
+				return RELEASE_IMMEDIATE;
+			}
+			// Seize and release the crab
+			return RELEASE_SCHEDULED;
 		}
 	}
 
@@ -1183,13 +1190,13 @@ bool CNPC_BaseZombie::ShouldIgnite( const CTakeDamageInfo &info )
 	if ( info.GetDamageType() & DMG_BURN )
 	{
 		//
-		// If we take more than ten percent of our health in burn damage within a five
+		// If we take more than fifteen percent of our health in burn damage within a five
 		// second interval, we should catch on fire.
 		//
 		m_flBurnDamage += info.GetDamage();
 		m_flBurnDamageResetTime = gpGlobals->curtime + 5;
 
-		if ( m_flBurnDamage >= m_iMaxHealth * 0.1 )
+		if ( m_flBurnDamage >= m_iMaxHealth * 0.15 )
 		{
 			return true;
 		}
@@ -1857,7 +1864,7 @@ int	CNPC_BaseZombie::SelectFailSchedule( int failedSchedule, int failedTask, AI_
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-int CNPC_BaseZombie::SelectSchedule ( void )
+int CNPC_BaseZombie::SelectSchedule( void )
 {
 	if ( HasCondition( COND_ZOMBIE_RELEASECRAB ) )
 	{
@@ -1902,10 +1909,6 @@ int CNPC_BaseZombie::SelectSchedule ( void )
 		{
 			ClearCondition( COND_LOST_ENEMY );
 			ClearCondition( COND_ENEMY_UNREACHABLE );
-
-#ifdef DEBUG_ZOMBIES
-			DevMsg("Wandering\n");
-#endif+
 
 			// Just lost track of our enemy. 
 			// Wander around a bit so we don't look like a dingus.
@@ -2130,7 +2133,7 @@ void CNPC_BaseZombie::StartTask( const Task_t *pTask )
 			Vector vecVelocity;
 
 			AngleVectors( GetAbsAngles(), &vecForward );
-			
+
 			vecVelocity = vecForward * 30;
 			vecVelocity.z += 100;
 
@@ -2600,10 +2603,10 @@ Activity CNPC_BaseZombie::NPC_TranslateActivity( Activity baseAct )
 	{
 		switch ( baseAct )
 		{
-			case ACT_RUN_ON_FIRE:
-			{
-				return ( Activity )ACT_WALK_ON_FIRE;
-			}
+		//	case ACT_RUN_ON_FIRE:
+		//	{
+		//		return ( Activity )ACT_WALK_ON_FIRE;
+		//	}
 
 			case ACT_WALK:
 			{
@@ -2867,12 +2870,13 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		SCHED_ZOMBIE_RELEASECRAB,
 
 		"	Tasks"
-		"		TASK_PLAY_PRIVATE_SEQUENCE_FACE_ENEMY		ACTIVITY:ACT_ZOM_RELEASECRAB"
+		"		TASK_PLAY_PRIVATE_SEQUENCE					ACTIVITY:ACT_ZOM_RELEASECRAB"
 		"		TASK_ZOMBIE_RELEASE_HEADCRAB				0"
 		"		TASK_ZOMBIE_DIE								0"
 		"	"
 		"	Interrupts"
 		"		COND_TASK_FAILED"
+	//	"		COND_NO_CUSTOM_INTERRUPTS"
 	)
 
 

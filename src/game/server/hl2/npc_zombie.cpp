@@ -21,9 +21,6 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-// ACT_FLINCH_PHYSICS
-
-
 ConVar	sk_zombie_health( "sk_zombie_health","0");
 
 envelopePoint_t envZombieMoanVolumeFast[] =
@@ -135,7 +132,7 @@ public:
 	void BuildScheduleTestBits( void );
 
 	void PrescheduleThink( void );
-	int SelectSchedule ( void );
+	int SelectSchedule( void );
 
 	void PainSound( const CTakeDamageInfo &info );
 	void DeathSound( const CTakeDamageInfo &info );
@@ -317,7 +314,7 @@ void CZombie::PrescheduleThink( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-int CZombie::SelectSchedule ( void )
+int CZombie::SelectSchedule( void )
 {
 	if( HasCondition( COND_PHYSICS_DAMAGE ) && !m_ActBusyBehavior.IsActive() )
 	{
@@ -833,7 +830,7 @@ int CZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 			AddGesture( ACT_GESTURE_FLINCH_HEAD );
 		}
 	}
-#endif // HL2_EPISODIC
+#endif // !HL2_EPISODIC
 
 	return BaseClass::OnTakeDamage_Alive( inputInfo );
 }
@@ -961,7 +958,6 @@ AI_BEGIN_CUSTOM_NPC( npc_zombie, CZombie )
 	DEFINE_SCHEDULE
 	(
 		SCHED_ZOMBIE_CHARGE_ENEMY,
-
 
 		"	Tasks"
 		"		TASK_ZOMBIE_CHARGE_ENEMY		0"

@@ -54,10 +54,14 @@ public:
 		static Vector AllyCone = VECTOR_CONE_4DEGREES;
 		static Vector cone = VECTOR_CONE_SHOTGUN;
 
+		if ( GetHSpread() != NULL )
+		{
+			// We got a cone, use that instead
+			cone = Vector( GetHSpread(), (GetHSpread() / 2) + (GetVSpread() / 2), GetVSpread() );
+		}
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
-			// Give Alyx's shotgun blasts more a more directed punch. She needs
-			// to be at least as deadly as she would be with her pistol to stay interesting (sjb)
+			// Story allies fire shots more akin to slugs. Leave room-clearing for the player.
 			return AllyCone;
 		}
 

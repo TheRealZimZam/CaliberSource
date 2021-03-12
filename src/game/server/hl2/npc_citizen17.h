@@ -147,7 +147,6 @@ public:
 	void 			OnEndMoveAndShoot();
 	
 //!!!virtual bool	UseAttackSquadSlots()	{ return false; }
-	void 			LocateEnemySound();
 
 	bool			IsManhackMeleeCombatant();
 	
@@ -163,6 +162,8 @@ public:
 	int 			OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	float			GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info );
 	virtual	bool	AllowedToIgnite( void ) { return true; }
+//	bool			bCriticalHealth = ((float)GetHealth() / (float)GetMaxHealth() < 0.25f);
+	bool			IsInjured() { return ((float)GetHealth() / (float)GetMaxHealth() <= 0.25f); }
 
 	//---------------------------------
 	// Commander mode
@@ -247,8 +248,10 @@ public:
 	//---------------------------------
 	//	Sounds & speech
 	//---------------------------------
-	void			FearSound( void );
 	void			DeathSound( const CTakeDamageInfo &info );
+	void 			LocateEnemySound( void );
+	void			FearSound( void );
+
 	bool			UseSemaphore( void );
 
 	virtual void	OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  CAI_BehaviorBase *pNewBehavior );
@@ -271,6 +274,7 @@ private:
 		SCHED_CITIZEN_RANGE_ATTACK1_RPG,
 		SCHED_CITIZEN_PATROL,
 		SCHED_CITIZEN_MOURN_PLAYER,
+		SCHED_CITIZEN_ANNOYED,
 		SCHED_CITIZEN_SIT_ON_TRAIN,
 		SCHED_CITIZEN_STRIDER_RANGE_ATTACK1_RPG,
 		SCHED_CITIZEN_HEAL_TOSS,
@@ -290,7 +294,7 @@ private:
 	};
 
 	//-----------------------------------------------------
-	
+
 	int				m_nInspectActivity;
 	float			m_flNextFearSoundTime;
 	float			m_flStopManhackFlinch;
@@ -303,7 +307,6 @@ private:
 	int				m_iAmmoAmount;
 	bool			m_bRPGAvoidPlayer;
 	bool			m_bShouldPatrol;
-//	bool			m_fIsRebel;
 	string_t		m_iszOriginalSquad;
 	float			m_flTimeJoinedPlayerSquad;
 	bool			m_bWasInPlayerSquad;

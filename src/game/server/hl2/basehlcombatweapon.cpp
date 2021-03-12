@@ -40,6 +40,13 @@ CHLMachineGun::CHLMachineGun( void )
 const Vector &CHLMachineGun::GetBulletSpread( void )
 {
 	static Vector cone = VECTOR_CONE_3DEGREES;
+
+	if ( GetHSpread() != NULL )
+	{
+		// We got a weaponscript cone, use that instead
+		cone = Vector( GetHSpread(), ((GetHSpread() / 2) + (GetVSpread() / 2)), GetVSpread() );
+	}
+
 	return cone;
 }
 

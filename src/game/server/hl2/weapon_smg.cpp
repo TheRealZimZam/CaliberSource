@@ -51,16 +51,16 @@ public:
 
 	virtual float GetFireRate( void ) 
 	{
+#if 0
 		if ( GetOwner() && GetOwner()->IsNPC() )
 		{
 			// NPC value
 			return BaseClass::GetCycleTime() + 0.025f;	//assuming default, addon 0.025 time (0.1f)
 		}
 		else
-		{
-			// Player(s) value
-			return BaseClass::GetCycleTime();	//0.075f - 13.3hz
-		}
+#endif
+		// Player(s) value
+		return BaseClass::GetCycleTime();	//0.075f - 13.3hz
 	}
 
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }	//bits_CAP_WEAPON_RANGE_ATTACK2
@@ -381,7 +381,7 @@ void CHLGrenadeLauncher::FireGrenade( void )
 
 	//Disorient the player
 	pPlayer->RumbleEffect( RUMBLE_357, 0, RUMBLE_FLAGS_NONE );
-	pPlayer->ViewPunch( QAngle( -4, random->RandomFloat( -1, 1 ), 0 ) );
+	pPlayer->ViewPunch( QAngle( -3, random->RandomFloat( -1, 1 ), 0 ) );
 
 	//Factor in the view kick
 	m_fFireDuration = m_fFireDuration + 1.0f;	// Increase the view kick for the primary fire aswell
@@ -557,11 +557,13 @@ public:
 
 	virtual void Equip( CBaseCombatCharacter *pOwner );
 
+#if 0
 	virtual const Vector& GetBulletSpread( void )
 	{
 		static const Vector cone = VECTOR_CONE_6DEGREES;
 		return cone;
 	}
+#endif
 };
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponSMG1, DT_WeaponSMG1)
@@ -687,11 +689,13 @@ public:
 
 	virtual void Equip( CBaseCombatCharacter *pOwner );
 
+#if 0
 	virtual const Vector& GetBulletSpread( void )
 	{
 		static const Vector cone = VECTOR_CONE_5DEGREES;
 		return cone;
 	}
+#endif
 };
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponSMG2, DT_WeaponSMG2)

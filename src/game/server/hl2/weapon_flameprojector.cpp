@@ -111,6 +111,9 @@ CWeaponFlameprojector::CWeaponFlameprojector( void )
 
 void CWeaponFlameprojector::StartImmolating()
 {
+	// Start flamesound
+//!	WeaponSound( SINGLE );
+
 	// Start the radius really tiny because we use radius == 0.0 to 
 	// determine whether the immolator is operating or not.
 	m_flBurnRadius = 0.1;
@@ -123,6 +126,9 @@ void CWeaponFlameprojector::StartImmolating()
 
 void CWeaponFlameprojector::StopImmolating()
 {
+	// Stop flamesound
+//!	WeaponSound( EMPTY );
+
 	m_flBurnRadius = 0.0;
 	SetThink( NULL );
 	m_vecFlameprojectorTarget= IMMOLATOR_TARGET_INVALID;
@@ -144,7 +150,8 @@ void CWeaponFlameprojector::Precache( void )
 //-----------------------------------------------------------------------------
 void CWeaponFlameprojector::PrimaryAttack( void )
 {
-	WeaponSound( SINGLE );
+	// Ignite sound
+	WeaponSound( SPECIAL1 );
 
 	if( !IsImmolating() )
 	{

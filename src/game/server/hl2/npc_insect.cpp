@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Rats, bugs, and crabs oh my!
+// Purpose: Rats, bugs, and crabs oh my! - Insects n' other small varmin
 //
 //
 // $NoKeywords: $
@@ -9,13 +9,13 @@
 #include "cbase.h"
 #include "game.h"
 #include "ai_basenpc.h"
-#include "ai_schedule.h"
 #include "ai_hull.h"
 #include "ai_hint.h"
 #include "ai_motor.h"
 #include "ai_navigator.h"
-#include "hl2_shareddefs.h"
 #include "ai_route.h"
+#include "ai_senses.h"
+#include "hl2_shareddefs.h"
 #include "npcevent.h"
 #include "gib.h"
 #include "ai_interactions.h"
@@ -26,7 +26,6 @@
 #include "movevars_shared.h"
 #include "ai_moveprobe.h"
 
-
 #define		ROACH_IDLE				0
 #define		ROACH_BORED				1
 #define		ROACH_SCARED_BY_ENT		2
@@ -34,21 +33,18 @@
 #define		ROACH_SMELL_FOOD		4
 #define		ROACH_EAT				5
 
-//=========================================================
-// Monster's Anim Events Go Here
-//=========================================================
 class CNPC_Insect : public CAI_BaseNPC
 {
 	DECLARE_CLASS( CNPC_Insect, CAI_BaseNPC );
 	
 public:
 
-	//
-	// CBaseEntity:
-	//
 	void Spawn( void );
 	void Precache( void );
 	float MaxYawSpeed( void );
+
+//	DEFINE_CUSTOM_AI;
+//	DECLARE_DATADESC();
 
 	void NPCThink ( void );
 	void PickNewDest ( int iCondition );
@@ -60,20 +56,19 @@ public:
 	void Touch ( CBaseEntity *pOther );
 
 	void Event_Killed( const CTakeDamageInfo &info );
-	int	GetSoundInterests ( void );
+	int GetSoundInterests ( void );
 
 	void Eat( float flFullDuration );
 	bool ShouldEat( void );
 
-	DEFINE_CUSTOM_AI;
-//	DECLARE_DATADESC();
+	bool ShouldGib( const CTakeDamageInfo &info ) { return false; }
 
-	float	m_flLastLightLevel;
-	float	m_flNextSmellTime;
+	float m_flLastLightLevel;
+	float m_flNextSmellTime;
 		
 	// UNDONE: These don't necessarily need to be save/restored, but if we add more data, it may
-	bool	m_fLightHacked;
-	int		m_iMode;
+	bool m_fLightHacked;
+	int m_iMode;
 
 	float m_flHungryTime;
 	// -----------------------------
@@ -87,20 +82,20 @@ class CNPC_Rat : public CNPC_Insect
 	DECLARE_CLASS( CNPC_Rat, CNPC_Insect );
 
 public:
-	
 	void Precache( void );
 	void Spawn( void )
 	{
-		SetModelName( AllocPooledString("models/rat.mdl") );
-		SetBloodColor( BLOOD_COLOR_RED );
 		BaseClass::Spawn();
 
+		SetModelName( AllocPooledString("models/rat.mdl") );
+		SetBloodColor( BLOOD_COLOR_RED );
 	}
 
 	void Event_Killed( const CTakeDamageInfo &info );
 };
 
 LINK_ENTITY_TO_CLASS( npc_cockroach, CNPC_Insect );
+LINK_ENTITY_TO_CLASS( npc_roach, CNPC_Insect );
 LINK_ENTITY_TO_CLASS( npc_rat, CNPC_Rat );
 
 //BEGIN_DATADESC( CNPC_Insect )
@@ -116,7 +111,7 @@ LINK_ENTITY_TO_CLASS( npc_rat, CNPC_Rat );
 void CNPC_Insect::Spawn()
 {
 	Precache( );
-	
+
 	BaseClass::Spawn();
 
 	SetModelName( AllocPooledString( "models/roach.mdl" ) );
@@ -127,8 +122,8 @@ void CNPC_Insect::Spawn()
 
 	SetMoveType( MOVETYPE_STEP );
 	SetBloodColor( BLOOD_COLOR_YELLOW );
+	ClearEffects();
 
-	m_fEffects			= 0;
 	m_iHealth			= 1;
 	m_flFieldOfView		= 0.5;// indicates the width of this monster's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
@@ -144,6 +139,8 @@ void CNPC_Insect::Spawn()
 	m_flLastLightLevel	= -1;
 	m_iMode				= ROACH_IDLE;
 	m_flNextSmellTime	= gpGlobals->curtime;
+
+	AddEffects( EF_NOSHADOW );
 }
 
 //=========================================================
@@ -151,7 +148,7 @@ void CNPC_Insect::Spawn()
 //=========================================================
 void CNPC_Insect::Precache()
 {
-	engine->PrecacheModel("models/roach.mdl");
+	PrecacheModel("models/roach.mdl");
 
 	PrecacheScriptSound( "npc_roach.die" );
 	PrecacheScriptSound( "npc_roach.walk" );
@@ -208,8 +205,8 @@ void CNPC_Insect::NPCThink( void )
 
 	switch ( m_iMode )
 	{
-	case	ROACH_IDLE:
-	case	ROACH_EAT:
+	case ROACH_IDLE:
+	case ROACH_EAT:
 		{
 			// if not moving, sample environment to see if anything scary is around. Do a radius search 'look' at random.
 			if ( random->RandomInt( 0, 3 ) == 1 )
@@ -222,14 +219,14 @@ void CNPC_Insect::NPCThink( void )
 					//ALERT ( at_aiconsole, "Scared\n" );
 					Eat( 30 +  ( random->RandomInt( 0, 14 ) ) );// roach will ignore food for 30 to 45 seconds
 					PickNewDest( ROACH_SCARED_BY_ENT );
-					SetActivity ( ACT_WALK );
+					SetActivity( ACT_RUN );
 				}
 				else if ( random->RandomInt( 0,149 ) == 1 )
 				{
 					// if roach doesn't see anything, there's still a chance that it will move. (boredom)
 					//ALERT ( at_aiconsole, "Bored\n" );
 					PickNewDest( ROACH_BORED );
-					SetActivity ( ACT_WALK );
+					SetActivity( ACT_WALK );
 
 					if ( m_iMode == ROACH_EAT )
 					{
@@ -244,7 +241,8 @@ void CNPC_Insect::NPCThink( void )
 			{
 				if ( ShouldEat() )
 				{
-					 GetSenses()->Listen();
+					GetSenses()->Listen();
+				//	GetSenses()->PerformSensing();
 				}
 
 				if ( 0 > m_flLastLightLevel )
@@ -252,7 +250,7 @@ void CNPC_Insect::NPCThink( void )
 					// someone turned on lights!
 					//ALERT ( at_console, "Lights!\n" );
 					PickNewDest( ROACH_SCARED_BY_LIGHT );
-					SetActivity ( ACT_WALK );
+					SetActivity( ACT_RUN );
 				}
 				else if ( HasCondition( COND_SMELL ) )
 				{
@@ -262,19 +260,19 @@ void CNPC_Insect::NPCThink( void )
 					if ( pSound && abs( pSound->GetSoundOrigin().z - GetAbsOrigin().z ) <= 3 )
 					{
 						PickNewDest( ROACH_SMELL_FOOD );
-						SetActivity ( ACT_WALK );
+						SetActivity( ACT_WALK );
 					}
 				}
 			}
 
 			break;
 		}
-	case	ROACH_SCARED_BY_LIGHT:
+	case ROACH_SCARED_BY_LIGHT:
 		{
 			// if roach was scared by light, then stop if we're over a spot at least as dark as where we started!
 			if ( 0 <= m_flLastLightLevel )
 			{
-				SetActivity ( ACT_IDLE );
+				SetActivity( ACT_IDLE );
 				m_flLastLightLevel = 0;// make this our new light level.
 			}
 			break;
@@ -308,7 +306,6 @@ void CNPC_Insect :: PickNewDest ( int iCondition )
 			return;
 		}
 	}
-
 	do 
 	{
 		// picks a random spot, requiring that it be at least 128 units away
@@ -343,7 +340,7 @@ void CNPC_Insect :: PickNewDest ( int iCondition )
 // Look - overriden for the roach, which can virtually see 
 // 360 degrees.
 //=========================================================
-void CNPC_Insect::Look ( int iDistance )
+void CNPC_Insect::Look( int iDistance )
 {
 	CBaseEntity	*pSightEnt = NULL;// the current visible entity that we're dealing with
 
@@ -361,24 +358,24 @@ void CNPC_Insect::Look ( int iDistance )
 	// Examine all entities within a reasonable radius
 	// !!!PERFORMANCE - let's trivially reject the ent list before radius searching!
 
-	for ( CEntitySphereQuery sphere( GetAbsOrigin(), iDistance ); pSightEnt = sphere.GetCurrentEntity(); sphere.NextEntity() )
+	for ( CEntitySphereQuery sphere( GetAbsOrigin(), iDistance ); ( pSightEnt = sphere.GetCurrentEntity() ) != NULL; sphere.NextEntity() )
 	{
 		// only consider ents that can be damaged. !!!temporarily only considering other monsters and clients
-		if (  pSightEnt->IsPlayer() || FBitSet ( pSightEnt->GetFlags(), FL_NPC ) )
+		if ( pSightEnt->IsPlayer() || FBitSet ( pSightEnt->GetFlags(), FL_NPC ) )
 		{
 			if ( /*FVisible( pSightEnt ) &&*/ !FBitSet( pSightEnt->GetFlags(), FL_NOTARGET ) && pSightEnt->m_iHealth > 0 )
 			{
 				// don't add the Enemy's relationship to the conditions. We only want to worry about conditions when
 				// we see monsters other than the Enemy.
-				switch ( IRelationType ( pSightEnt ) )
+				switch ( IRelationType( pSightEnt ) )
 				{
-				case	D_FR:		
+				case D_FR:		
 					SetCondition( COND_SEE_FEAR );
 					break;
-				case	D_NU:
+				case D_NU:
 					break;
 				default:
-					Msg ( "%s can't asses %s\n", STRING( pev->classname ), STRING( pSightEnt->pev->classname ) );
+					DevWarning( 2, "%s can't assess %s\n", GetClassname(), pSightEnt->GetClassname() );
 					break;
 				}
 			}
@@ -389,7 +386,7 @@ void CNPC_Insect::Look ( int iDistance )
 //=========================================================
 // roach's move function
 //=========================================================
-void CNPC_Insect::Move ( float flInterval ) 
+void CNPC_Insect::Move( float flInterval ) 
 {
 	float		flWaypointDist;
 	Vector		vecApex;
@@ -397,28 +394,31 @@ void CNPC_Insect::Move ( float flInterval )
 	// local move to waypoint.
 	flWaypointDist = ( GetNavigator()->GetGoalPos() - GetAbsOrigin() ).Length2D();
 	
-	float idealYaw;
-	idealYaw = UTIL_VecToYaw( GetNavigator()->GetGoalPos() );
-	GetMotor()->SetIdealYaw( idealYaw );
+	GetMotor()->SetIdealYawToTargetAndUpdate( GetNavigator()->GetGoalPos() );
+
+	float speed = 150 * flInterval;
+
+	Vector vToTarget = GetNavigator()->GetGoalPos() - GetAbsOrigin();
+	vToTarget.NormalizeInPlace();
+	Vector vMovePos = vToTarget * speed;
 
 	if ( random->RandomInt( 0,7 ) == 1 )
 	{
-		// randomly check for blocked path.(more random load balancing)
-		if ( !WalkMove( GetNavigator()->GetGoalPos() - GetAbsOrigin(), MASK_NPCSOLID ) )
-		{
-			// stuck, so just pick a new spot to run off to
-			PickNewDest( m_iMode );
-		}
+		// randomly change direction
+		PickNewDest( m_iMode );
 	}
-	
-	WalkMove( (GetNavigator()->GetGoalPos() - GetAbsOrigin()) * flInterval, MASK_NPCSOLID );
+
+	if( !WalkMove( vMovePos, MASK_NPCSOLID ) )
+	{
+		PickNewDest( m_iMode );
+	}
 
 	// if the waypoint is closer than step size, then stop after next step (ok for roach to overshoot)
 	if ( flWaypointDist <= m_flGroundSpeed * flInterval )
 	{
 		// take truncated step and stop
 
-		SetActivity ( ACT_IDLE );
+		SetActivity( ACT_IDLE );
 		m_flLastLightLevel = 0;// this is roach's new comfortable light level
 
 		if ( m_iMode == ROACH_SMELL_FOOD )
@@ -443,7 +443,7 @@ void CNPC_Insect::Touch( CBaseEntity *pOther )
 	Vector		vecSpot;
 	trace_t		tr;
 
-	if ( pOther->GetAbsVelocity() == vec3_origin )	//!pOther->IsPlayer()
+	if ( pOther->GetAbsVelocity() == vec3_origin || !pOther->IsPlayer() )
 	{
 		return;
 	}
@@ -487,47 +487,10 @@ int CNPC_Insect::GetSoundInterests ( void)
 			SOUND_MEAT;
 }
 
-//=========================================================
-// Spawn
-//=========================================================
-void CNPC_Insect::Spawn()
-{
-	Precache( );
-	
-	BaseClass::Spawn();
 
-	SetModelName( AllocPooledString( "models/roach.mdl" ) );
-	UTIL_SetSize( this, Vector( -1, -1, 0 ), Vector( 1, 1, 2 ) );
-
-	SetSolid( SOLID_BBOX );
-	AddSolidFlags( FSOLID_NOT_STANDABLE );
-
-	SetMoveType( MOVETYPE_STEP );
-	SetBloodColor( BLOOD_COLOR_YELLOW );
-
-	m_fEffects			= 0;
-	m_iHealth			= 1;
-	m_flFieldOfView		= 0.5;// indicates the width of this monster's forward view cone ( as a dotproduct result )
-	m_NPCState			= NPC_STATE_NONE;
-
-	SetRenderColor( 255, 255, 255, 255 );
-
-	NPCInit();
-	SetActivity ( ACT_IDLE );
-
-	SetViewOffset ( Vector ( 0, 0, 1 ) );// position of the eyes relative to monster's origin.
-	m_takedamage		= DAMAGE_YES;
-	m_fLightHacked		= FALSE;
-	m_flLastLightLevel	= -1;
-	m_iMode				= ROACH_IDLE;
-	m_flNextSmellTime	= gpGlobals->curtime;
-}
-
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
-//
-// Purpose: Rats, rats, we are the rats.
-//
-//=============================================================================//
+//-----------------------------------------------------------------------------
+// Purpose: Rat. Roach with a different model.
+//-----------------------------------------------------------------------------
 void CNPC_Rat::Precache()
 {
 	engine->PrecacheModel("models/rat.mdl");
@@ -548,4 +511,3 @@ void CNPC_Rat::Event_Killed( const CTakeDamageInfo &info )
 	//TODO; spawn dead model
 	UTIL_Remove( this );
 }
-

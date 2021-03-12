@@ -1319,7 +1319,7 @@ void CPropJeep::DriveVehicle( float flFrameTime, CUserCmd *ucmd, int iButtonsDow
 	int iButtons = ucmd->buttons;
 
 	//Adrian: No headlights on Superfly.
-#if 0
+#if 1
 	if ( ucmd->impulse == 100 )
 	{
 		if (HeadlightIsOn())
@@ -1467,7 +1467,8 @@ void CPropJeep::EnterVehicle( CBaseCombatCharacter *pPassenger )
 //-----------------------------------------------------------------------------
 void CPropJeep::ExitVehicle( int nRole )
 {
-	HeadlightTurnOff();
+	// Cars have batteries and its not 2004, keep it on.
+//!	HeadlightTurnOff();
 
 	BaseClass::ExitVehicle( nRole );
 

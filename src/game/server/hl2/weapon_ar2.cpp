@@ -4,7 +4,7 @@
 //
 //			Primary attack: Normal full-auto with decent accuracy.
 //			Secondary attack: Sniper mode - Single shots with perfect accuracy.
-// TODO's: Better scope-in effect, optimize
+// TODO's: Optimize
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -251,9 +251,10 @@ void CWeaponAR2::DoImpactEffect( trace_t &tr, int nDamageType )
 	BaseClass::DoImpactEffect( tr, nDamageType );
 }
 
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 #if 0
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
 void CWeaponAR2::DoMuzzleFlash( int nAttachment )
 {
 	BaseClass::DoMuzzleFlash();
@@ -341,9 +342,10 @@ void CWeaponAR2::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 // Purpose: Energy Ball
 //-----------------------------------------------------------------------------
-#if 0
 void CWeaponAR2::SecondaryAttack( void )
 {
+	//NOTENOTE: The zooming is handled by the post/busy frames
+#if 0
 	if ( m_bShotDelayed )
 		return;
 
@@ -368,12 +370,7 @@ void CWeaponAR2::SecondaryAttack( void )
 
 	m_iSecondaryAttacks++;
 	gamestats->Event_WeaponFired( pPlayer, false, GetClassname() );
-}
 #endif
-
-void CWeaponAR2::SecondaryAttack( void )
-{
-	//NOTENOTE: The zooming is handled by the post/busy frames
 }
 
 //-----------------------------------------------------------------------------
@@ -451,7 +448,8 @@ void CWeaponAR2::Zoom( void )
 	if ( pPlayer == NULL )
 		return;
 
-	color32 ScopeGreen = { 100, 225, 150, 32 };
+	//TODO; This might be good to put in the weaponscript?
+	color32 ScopeGreen = { 85, 100, 75, 64 };	//100, 225, 150, 32
 
 	if ( m_bZoomed )
 	{

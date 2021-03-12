@@ -3,13 +3,11 @@
 //
 // Purpose: Default Human AI
 // For the most part, squads are not needed as each entity has most of its AI act independently
-//
+// TODO; m_bAnnoyed needs some polishing, theres definitely a better way to implement it
 //=============================================================================//
 
 #include "cbase.h"
-
 #include "npc_playercompanion.h"
-
 #include "combine_mine.h"
 #include "fire.h"
 #include "func_tank.h"
@@ -17,7 +15,6 @@
 #include "npcevent.h"
 #include "props.h"
 #include "BasePropDoor.h"
-
 #include "ai_hint.h"
 #include "ai_localnavigator.h"
 #include "ai_memory.h"
@@ -241,7 +238,7 @@ void CNPC_PlayerCompanion::Spawn()
 	SetReadinessSensitivity( random->RandomFloat( 0.7, 1.3 ) );
 	m_flReadinessLockedUntil = 0.0f;
 	m_bFirstEncounter	= true;		// Have I encounted ANY enemies yet?
-	m_bAnnoyed			= false;	// The current enemy is my nemesis (not relation-wise, but annoyance-wise)
+	m_bAnnoyed			= false;	// My current enemy has really gotten on my nerves
 
 	m_AnnounceAttackTimer.Set( 10, 30 );
 
@@ -391,6 +388,9 @@ float CNPC_PlayerCompanion::MaxYawSpeed( void )
 	}
 	else
 	{
+		if ( IsCrouching() )
+			return 10;
+
 		switch( GetActivity() )
 		{
 		case ACT_IDLE:
@@ -555,7 +555,7 @@ void CNPC_PlayerCompanion::GatherConditions()
 				SetCondition( COND_PC_SAFE_FROM_MORTAR );
 		}
 	}
-	
+
 	// Handle speech AI. Don't do AI speech if we're in scripts unless permitted by the EnableSpeakWhileScripting input.
 	if ( m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT || m_NPCState == NPC_STATE_COMBAT ||
 		( ( m_NPCState == NPC_STATE_SCRIPT ) && CanSpeakWhileScripting() ) )
@@ -564,32 +564,31 @@ void CNPC_PlayerCompanion::GatherConditions()
 	}
 
 	// If we're supposed to be crouching, crouch
-	if ( CrouchIsDesired() && !HasCondition( COND_HEAVY_DAMAGE ) && !HasCondition( COND_REPEATED_DAMAGE ) )
+	if ( IsCrouching() || ( CrouchIsDesired() && !HasCondition( COND_HEAVY_DAMAGE ) && !HasCondition( COND_REPEATED_DAMAGE ) ) )
 	{
 		// See if we can crouch and shoot
-		if (GetEnemy() != NULL)
+		if ( GetEnemy() != NULL )
 		{
+			CBaseEntity *pEnemy = GetEnemy();
 			// Does my enemy have enough health to warrant crouching?
-			if ( GetEnemy()->GetHealth() > PC_MIN_ENEMY_HEALTH_TO_CROUCH )
+			if ( pEnemy->GetHealth() > PC_MIN_ENEMY_HEALTH_TO_CROUCH )
 			{
-				float dist = (GetLocalOrigin() - GetEnemy()->GetLocalOrigin()).Length();
 				// only crouch if they are relatively far away
-				if (dist > PC_MIN_CROUCH_DISTANCE)
+				if ( EnemyDistance( pEnemy ) > PC_MIN_CROUCH_DISTANCE && (pEnemy->GetFlags() & FL_ONGROUND) )
 				{
-					// try crouching
-					Crouch();
-
-					Vector targetPos = GetEnemy()->BodyTarget(GetActiveWeapon()->GetLocalOrigin());
-
-					// if we can't see the enemy crouched, stand up
-					if (!WeaponLOSCondition(GetLocalOrigin(),targetPos,false))
+					// See if they're a valid crouch target
+					if ( CouldShootIfCrouching( pEnemy ) )
 					{
+						Crouch();
+					}
+					else
+					{
+						//Warning("CROUCH: Standing, enemy not valid crouch target.\n" );
 						Stand();
 					}
 				}
 			}
 		}
-		// only crouch idle if in a squad
 		else if ( m_pSquad )
 		{
 			// No enemy, crouch anyway
@@ -598,7 +597,7 @@ void CNPC_PlayerCompanion::GatherConditions()
 	}
 	else
 	{
-		// always assume standing
+		//Warning("CROUCH: Standing, no enemy.\n" );
 		Stand();
 	}
 
@@ -640,7 +639,7 @@ void CNPC_PlayerCompanion::GatherConditions()
 void CNPC_PlayerCompanion::DoCustomSpeechAI( void )
 {
 	CBasePlayer *pPlayer = AI_GetSinglePlayer();
-	
+
 	// Don't allow this when we're getting in the car
 #ifdef HL2_EPISODIC
 	bool bPassengerInTransition = ( IsInAVehicle() && ( m_PassengerBehavior.GetPassengerState() == PASSENGER_STATE_ENTERING || m_PassengerBehavior.GetPassengerState() == PASSENGER_STATE_EXITING ) );
@@ -660,7 +659,7 @@ void CNPC_PlayerCompanion::DoCustomSpeechAI( void )
 	else
 	{
 		m_SpeechWatch_PlayerLooking.Start( 1.0f );
-	}	
+	}
 
 	// Mention the player is dead -- Why isnt this in the baseclass???
 	if ( HasCondition( COND_TALKER_PLAYER_DEAD ) )
@@ -716,7 +715,18 @@ void CNPC_PlayerCompanion::BuildScheduleTestBits()
 	}
 }
 
+#if 0
 //-----------------------------------------------------------------------------
+void CNPC_PlayerCompanion::DeathSound( const CTakeDamageInfo &info )
+{
+	// Dont do a deathsound if its a headshot
+	if( info->hitgroup == HITGROUP_HEAD && info.GetDamageType() & DMG_BULLET )
+		return;
+
+	return BaseClass::DeathSound( info )
+}
+#endif
+
 //-----------------------------------------------------------------------------
 CSound *CNPC_PlayerCompanion::GetBestSound( int validTypes )
 {
@@ -740,7 +750,6 @@ CSound *CNPC_PlayerCompanion::GetBestSound( int validTypes )
 	return BaseClass::GetBestSound( validTypes );
 }
 
-//-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 bool CNPC_PlayerCompanion::QueryHearSound( CSound *pSound )
 {
@@ -767,7 +776,6 @@ bool CNPC_PlayerCompanion::QueryHearSound( CSound *pSound )
 }
 
 //-----------------------------------------------------------------------------
-
 bool CNPC_PlayerCompanion::QuerySeeEntity( CBaseEntity *pEntity, bool bOnlyHateOrFearIfNPC )
 {
 	CAI_BaseNPC *pOther = pEntity->MyNPCPointer(); 
@@ -780,7 +788,6 @@ bool CNPC_PlayerCompanion::QuerySeeEntity( CBaseEntity *pEntity, bool bOnlyHateO
 
 	return BaseClass::QuerySeeEntity( pEntity, bOnlyHateOrFearIfNPC );
 }
-
 
 
 //-----------------------------------------------------------------------------
@@ -1007,16 +1014,6 @@ bool CNPC_PlayerCompanion::IgnorePlayerPushing( void )
 int CNPC_PlayerCompanion::SelectCombatSchedule()
 {
 	// -----------
-	// Dead Enemy
-	// -----------
-	if ( HasCondition( COND_ENEMY_DEAD ) )
-	{
-		// call base class, all code to handle dead enemies is centralized there.
-		m_bAnnoyed = false;
-		return SCHED_NONE;
-	}
-
-	// -----------
 	// New Enemy
 	// -----------
 	if ( HasCondition( COND_NEW_ENEMY ) )
@@ -1032,9 +1029,9 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 			else if ( flTimeSinceFirstSeen > 3.0f )
 			{
 				// This is an enemy ive seen before, start being more aggressive!
-				m_bAnnoyed = true;
 				if( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) || Classify()==CLASS_PLAYER_ALLY_VITAL )
 				{
+					m_bAnnoyed = true;
 					return SCHED_ESTABLISH_LINE_OF_FIRE;
 				}
 			}
@@ -1044,11 +1041,11 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 	// ---------------------
 	// No Ammo
 	// ---------------------
-	bool bHighHealth = ((float)GetHealth() / (float)GetMaxHealth() > 0.75f);
-
-	// Only hide and reload if you're injured, Otherwise just reload on the spot.
-	if ( CanReload() && HasCondition( COND_NO_PRIMARY_AMMO ) && !HasCondition( COND_CAN_MELEE_ATTACK1 ) )
+	if ( CanReload() && HasCondition( COND_NO_PRIMARY_AMMO ) )
 	{
+		//TODO; This might be better in translate
+		// Only hide and reload if you're injured, Otherwise just reload on the spot.
+		bool bHighHealth = ((float)GetHealth() / (float)GetMaxHealth() > 0.75f);
 		if( bHighHealth )
 			return SCHED_RELOAD;
 
@@ -1058,40 +1055,25 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 	// ----------------------
 	// Damage
 	// ----------------------
-	int iPercent = random->RandomInt(0,10);
-
 	if ( HasCondition( COND_LIGHT_DAMAGE ) )
 	{
+		int iPercent = random->RandomInt(0,10);
+
 		if ( GetEnemy() != NULL )
 		{
 			// only try to take cover if we actually have an enemy!
 			// 40% chance of run to cover.
 			// 60% chance of crouch OR nothing.
-			if( GetEnemy() && iPercent <= 4 )
+			if( GetEnemy() && iPercent < 5 )
 			{
 				return SCHED_TAKE_COVER_FROM_ENEMY;
 			}
 			else if ( !IsCrouching() )
 			{
 				// If my enemy is shooting at me from a distance, crouch for protection
-				if ( iPercent >= 6 && CouldShootIfCrouching( GetEnemy() ) )
+				if ( iPercent > 6 )
 					DesireCrouch();
-
-#if 0
-				bool bCriticalHealth = ((float)GetHealth() / (float)GetMaxHealth() < 0.25f);
-				if ( !m_bAnnoyed && iPercent >= 7 && bCriticalHealth )
-				{
-					// The guy must be toying with me!
-					m_bAnnoyed = true;
-					return SCHED_CHASE_ENEMY;
-				}
-#endif
 			}
-		}
-		else
-		{
-			// How am I wounded in combat with no enemy?
-			Assert( GetEnemy() != NULL );
 		}
 	}
 
@@ -1120,6 +1102,7 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 		if ( HasCondition( COND_TOO_FAR_TO_ATTACK ) )
 			return SCHED_MOVE_TO_WEAPON_RANGE;
 
+		// Dont wait around if im pissed!
 		if ( m_bAnnoyed )
 			return SCHED_ESTABLISH_LINE_OF_FIRE;
 
@@ -1149,7 +1132,7 @@ int CNPC_PlayerCompanion::SelectNonCombatSchedule()
 	{
 		if ( HasCondition( COND_HEAR_COMBAT ) || HasCondition( COND_HEAR_PLAYER ) )
 		{
-			if ( m_pSquad )
+			if ( m_pSquad && !IsInPlayerSquad() )
 			{
 				// Investigate the disturbance
 				return SCHED_INVESTIGATE_SOUND;
@@ -1164,15 +1147,6 @@ int CNPC_PlayerCompanion::SelectNonCombatSchedule()
 		}
 	}
 
-	//!!! This should be defined in the subclass-Story characters really shouldnt do this
-#if 0
-	// Scan around for new enemies
-	if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
-	{
-		return SCHED_VICTORY_DANCE;
-	}
-#endif
-
 	return SCHED_NONE;
 }
 
@@ -1182,6 +1156,9 @@ int CNPC_PlayerCompanion::SelectNonCombatSchedule()
 bool CNPC_PlayerCompanion::CanReload( void )
 {
 	if ( IsRunningDynamicInteraction() )
+		return false;
+
+	if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
 		return false;
 
 	return true;
@@ -1203,9 +1180,8 @@ bool CNPC_PlayerCompanion::ShouldDeferToFollowBehavior()
 		return false;
 	}
 
-	// Even though assault and act busy are placed ahead of the follow behavior in precedence, the below
-	// code is necessary because we call ShouldDeferToFollowBehavior BEFORE we call the generic
-	// BehaviorSelectSchedule, which tries the behaviors in priority order.
+	// I don't know why I have to write this @#*$&# piece of code, since I've already placed Assault Behavior 
+	// ABOVE the Follow behavior in precedence. (sjb)
 	if ( m_AssaultBehavior.CanSelectSchedule() )
 	{
 		return false;
@@ -1259,7 +1235,6 @@ int CNPC_PlayerCompanion::TranslateSchedule( int scheduleType )
 		{
 			// Everyone with less than half a clip takes turns reloading when not fighting.
 			CBaseCombatWeapon *pWeapon = GetActiveWeapon();
-
 			if( CanReload() && pWeapon->UsesClipsForAmmo1() && pWeapon->Clip1() < ( pWeapon->GetMaxClip1() * .5 ) && OccupyStrategySlot( SQUAD_SLOT_EXCLUSIVE_RELOAD ) )
 			{
 				if ( AI_IsSinglePlayer() )
@@ -2668,6 +2643,7 @@ void CNPC_PlayerCompanion::OnUpdateShotRegulator()
 
 	if( GetEnemy() && HasCondition(COND_CAN_RANGE_ATTACK1) )
 	{
+		//TODO; This needs to take into account firemode - only do this if its a full-auto
 		if( GetAbsOrigin().DistTo( GetEnemy()->GetAbsOrigin() ) <= PC_LARGER_BURST_RANGE )
 		{
 			// Longer burst
@@ -4414,7 +4390,7 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 
 		"	Tasks"
 		"		TASK_STOP_MOVING					0"
-		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
+		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"	// Act finicky
 		"		TASK_WAIT_FACE_ENEMY				0.2"	// give the guy some time to come out on his own
 		"		TASK_WAIT_FACE_ENEMY_RANDOM			4"		// Wait up to 4 seconds
 		"		TASK_SET_SCHEDULE					SCHEDULE:SCHED_ESTABLISH_LINE_OF_FIRE"
@@ -4482,7 +4458,6 @@ AI_BEGIN_CUSTOM_NPC( player_companion_base, CNPC_PlayerCompanion )
 		"		COND_HEAR_DANGER"
 	)
 
-//=============================================================
 //=============================================================
 	DEFINE_SCHEDULE
 	(

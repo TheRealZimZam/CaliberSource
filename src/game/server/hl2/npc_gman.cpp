@@ -1,6 +1,6 @@
 //========= Copyright © 2009, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Garry Newman
+// Purpose: The Garry-Man, misunderstood servant of the people
 //
 // $NoKeywords: $
 //
@@ -20,9 +20,6 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-//-----------------------------------------------------------------------------
-// NPC's Anim Events Go Here
-//-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -35,7 +32,7 @@ public:
 
 	void	Spawn( void );
 	void	Precache( void );
-	Class_T Classify ( void );
+	Class_T Classify( void );
 	void	HandleAnimEvent( animevent_t *pEvent );
 	virtual Disposition_t IRelationType(CBaseEntity *pTarget);
 	int		GetSoundInterests ( void );
@@ -47,6 +44,7 @@ private:
 };
 
 LINK_ENTITY_TO_CLASS( npc_gman, CNPC_GMan );
+LINK_ENTITY_TO_CLASS( npc_stranger, CNPC_GMan );
 
 BEGIN_DATADESC( CNPC_GMan )
 // (auto saved by AI)
@@ -57,12 +55,10 @@ END_DATADESC()
 // Classify - indicates this NPC's place in the 
 // relationship table.
 //-----------------------------------------------------------------------------
-Class_T	CNPC_GMan::Classify ( void )
+Class_T	CNPC_GMan::Classify( void )
 {
-	// Why was this ally_vital??
 	return CLASS_NONE;
 }
-
 
 //-----------------------------------------------------------------------------
 // HandleAnimEvent - catches the NPC-specific messages
@@ -70,13 +66,6 @@ Class_T	CNPC_GMan::Classify ( void )
 //-----------------------------------------------------------------------------
 void CNPC_GMan::HandleAnimEvent( animevent_t *pEvent )
 {
-//	switch( pEvent->event )
-//	{
-//	case 1:
-//	default:
-//		BaseClass::HandleAnimEvent( pEvent );
-//		break;
-//	}
 	switch( pEvent->event )
 	{
 	case NPC_EVENT_LEFTFOOT:
@@ -99,11 +88,10 @@ void CNPC_GMan::HandleAnimEvent( animevent_t *pEvent )
 //-----------------------------------------------------------------------------
 // GetSoundInterests - generic NPC can't hear.
 //-----------------------------------------------------------------------------
-int CNPC_GMan::GetSoundInterests ( void )
+int CNPC_GMan::GetSoundInterests( void )
 {
 	return NULL;
 }
-
 
 //-----------------------------------------------------------------------------
 // Spawn
@@ -122,9 +110,8 @@ void CNPC_GMan::Spawn()
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_STEP );
-//	SetBloodColor( BLOOD_COLOR_RED );
-	SetBloodColor( BLOOD_COLOR_YELLOW );
-	m_iHealth			= 8;
+	SetBloodColor( BLOOD_COLOR_BLUE );
+	m_iHealth			= 9999;	//disgusting hack - FIXME
 	m_flFieldOfView		= 0.5;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
 	SetImpactEnergyScale( 0.0f ); // no physics damage on the gman
@@ -149,7 +136,7 @@ void CNPC_GMan::Precache()
 }	
 
 //-----------------------------------------------------------------------------
-// The G-Man isn't scared of anything but vorts.
+// The G-Man isn't scared of anything (but vorts).
 //-----------------------------------------------------------------------------
 Disposition_t CNPC_GMan::IRelationType(CBaseEntity *pTarget)
 {
@@ -183,9 +170,7 @@ int CNPC_GMan::SelectSchedule( void )
 // AI Schedules Specific to this NPC
 //-----------------------------------------------------------------------------
 
-
 	//=========================================================
 	// > SCHED_GMAN_TELEPORT
 	//=========================================================
-
 

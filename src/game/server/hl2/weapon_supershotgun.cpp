@@ -48,6 +48,11 @@ public:
 		static Vector AllyCone = VECTOR_CONE_4DEGREES;
 		static Vector cone = VECTOR_CONE_SUPERSHOTGUN;
 
+		if ( GetHSpread() != NULL )
+		{
+			// We got a cone, use that instead
+			cone = Vector( GetHSpread(), (GetHSpread() / 2) + (GetVSpread() / 2), GetVSpread() );
+		}
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
 			// Story allies fire shots more akin to slugs. Leave room-clearing for the player.
@@ -268,7 +273,7 @@ float CWeaponSuperShotgun::GetFireRate()
 		return BaseClass::GetCycleTime() * 1.25;
 	}
 
-	return BaseClass::GetFireRate();
+	return BaseClass::GetCycleTime();
 }
 
 

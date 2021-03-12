@@ -36,6 +36,7 @@ public:
 
 	float		GetRange( void )		{	return STAB_RANGE;	}
 	float		GetFireRate( void )		{	return BaseClass::GetCycleTime();	}	//STAB_REFIRE
+	int			GetDamageType( void )	{	return DMG_SLASH;	}
 
 	void		AddViewKick( void );
 	float		GetDamageForActivity( Activity hitActivity );

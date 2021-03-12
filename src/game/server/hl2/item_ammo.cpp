@@ -35,9 +35,46 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 	return pPlayer->GiveAmmo( flCount, iAmmoType, bSuppressSound );
 }
 
+// Already defined in baseclass
+#if 0
+// Ammo counts given by ammo items - Large variations are NEAR full-resupply
+// NOTENOTE: This should (almost) always be a multiplier of the magazine size for the weapon;
+// Also, this is very closely linked to balance. Because of this, it might be prudent to link this to the convars, 
+// but im not sureabout the perf/function impact of that. For now, It'll stay hardcoded, cause'
+// im pretty sure nobody is going to be making mods for a mod anytime soon.
+#define SIZE_AMMO_PISTOL			26	// Default Pistol clips come in a bundle
+#define SIZE_AMMO_PISTOL_SMALL		13	// Here for posterity
+#define SIZE_AMMO_PISTOL_LARGE		104
+#define SIZE_AMMO_SMG1				50
+#define SIZE_AMMO_SMG1_LARGE		200
+#define SIZE_AMMO_SMG2				60
+#define SIZE_AMMO_SMG2_LARGE		180
+#define SIZE_AMMO_AR1				30
+#define SIZE_AMMO_AR1_LARGE			120
+#define SIZE_AMMO_AR2				25
+#define SIZE_AMMO_AR2_LARGE			100
+#define SIZE_AMMO_357				8
+#define SIZE_AMMO_357_LARGE			32
+
+#define SIZE_AMMO_RPG_ROUND			1
+#define	SIZE_AMMO_AR2_ALTFIRE		1	// Direct grenade
+#define SIZE_AMMO_SMG1_GRENADE		1	// Arc grenade
+
+#define SIZE_AMMO_SNIPER			4	// Comes in a strip like a bolt rifle, but is loaded seperately
+// Both shotguns use the same ammo, so average out their magazine size (better solution L8R)
+#define SIZE_AMMO_BUCKSHOT			4
+#define SIZE_AMMO_BUCKSHOT_MAG		7
+#define SIZE_AMMO_BUCKSHOT_LARGE	16	//Bigger box based on smaller box, for sweeper use clips
+#define SIZE_AMMO_SLUG_MAG			7
+#define SIZE_AMMO_CROSSBOW			1
+#define SIZE_AMMO_FLAMER			100	// One tank
+#define SIZE_AMMO_PROJECTOR			200	// A full burst
+#define SIZE_AMMO_REVOLVER			6
+#endif
+
 // Obselete ammo types
-#define SIZE_BOX_SNIPER_ROUNDS 10
 #define SIZE_BOX_FLARE_ROUNDS 5
+#define SIZE_BOX_SNIPER_ROUNDS 8
 
 // ========================================================================
 //	>> BoxSRounds
@@ -167,8 +204,7 @@ public:
 	}
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		//This seems super-hacky, find a better solution not-so-pronto
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "AR2"))
 		{
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
@@ -192,7 +228,7 @@ public:
 	DECLARE_CLASS( CItem_HMGBox, CItem );
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/boxmrounds.mdl");
 		BaseClass::Spawn( );
@@ -679,6 +715,40 @@ LINK_ENTITY_TO_CLASS(item_large_box_buckshot, CItem_LargeBoxBuckshot);
 
 
 // ========================================================================
+//	>> ClipBuckshot
+// ========================================================================
+class CItem_ClipBuckshot : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_ClipBuckshot, CItem );
+
+	void Spawn( void )
+	{ 
+		Precache( );
+		SetModel( "models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
+		BaseClass::Spawn( );
+	}
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
+	}
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_BUCKSHOT_MAG, "Buckshot"))
+		{
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_buckshot, CItem_ClipBuckshot);
+
+
+// ========================================================================
 //	>> CItem_AR2AltFireRound
 // Old AR2 Altfire
 // ========================================================================
@@ -754,6 +824,7 @@ LINK_ENTITY_TO_CLASS(item_ammo_flamer, CItem_FlamerTank);
 
 // ========================================================================
 //	>> CItem_LargeFlamerTank
+// Bundle o' tanks
 // ========================================================================
 #if 0
 class CItem_LargeFlamerTank : public CItem
@@ -763,12 +834,12 @@ public:
 
 	void Precache( void )
 	{
-		PrecacheModel ("models/items/flame_tank_large.mdl");
+		PrecacheModel ("models/items/flametank_large.mdl");
 	}
 	void Spawn( void )
 	{
 		Precache( );
-		SetModel( "models/items/flame_tank_large.mdl");
+		SetModel( "models/items/flametank_large.mdl");
 		BaseClass::Spawn( );
 	}
 

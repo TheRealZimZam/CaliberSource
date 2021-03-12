@@ -61,39 +61,25 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		// Handle NPCs first
-		// Decreased accuracy, npcs with a pistol are usually cannon-fodder anyways -- was 5
-		static Vector NPCcone = VECTOR_CONE_8DEGREES;
 		static Vector cone;
+		cone = VECTOR_CONE_4DEGREES;
 
 		if ( GetOwner() && GetOwner()->IsNPC() )
-			return NPCcone;
-		else
-		{
-			// Old value
-			cone = VECTOR_CONE_4DEGREES;
-		}
+			cone = VECTOR_CONE_7DEGREES;
 
 		return cone;
 	}
-	
-	virtual int		GetMinBurst() { return 1; }
-	virtual int		GetMaxBurst() { return 2; }
 
-	virtual float GetFireRate( void ) 
+	virtual int		GetMinBurst() { return 4; }
+	virtual int		GetMaxBurst() { return 4; }
+
+	virtual float GetFireRate( void )
 	{
 		// This is default fire-rate (primary attack) holding it down
 		if ( GetOwner() && GetOwner()->IsNPC() )
-		{
-			// NPC value
 			return BaseClass::GetFireRate() + 0.25f;	//0.5f
-		}
-		else
-		{
-			// Player(s) value
-			return BaseClass::GetFireRate();	//0.35f
-		}
 
+		return BaseClass::GetFireRate();	//0.35f
 	}
 	
 	DECLARE_ACTTABLE();
@@ -229,7 +215,7 @@ void CWeaponPistol::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 void CWeaponPistol::SecondaryAttack( void )
 {
-	PistolFire( sk_pistol_burst_accuracy.GetFloat(), GetFireRate() * 0.25, true );
+	PistolFire( sk_pistol_burst_accuracy.GetFloat(), 0.06f, true );
 }
 
 //-----------------------------------------------------------------------------
@@ -268,7 +254,7 @@ void CWeaponPistol::PistolFire( float flSpread, float flCycleTime, bool bBurstFi
 		m_flNextPrimaryAttack	= gpGlobals->curtime + (flCycleTime * 4);
 		m_flNextSecondaryAttack = gpGlobals->curtime + flCycleTime;
 		//If four boolets have been shooted, reset
-		if ( m_nNumShotsFired > 3 )
+		if ( m_nNumShotsFired > (GetMinBurst() - 1) )
 		{
 			m_nNumShotsFired = 0;
 			m_flSoonestPrimaryAttack = gpGlobals->curtime;
@@ -426,18 +412,7 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		// Handle NPCs first
-		// Decreased accuracy, npcs with a pistol are usually cannon-fodder anyways -- was 5
-		static Vector NPCcone = VECTOR_CONE_5DEGREES;
-		static Vector cone;
-
-		if ( GetOwner() && GetOwner()->IsNPC() )
-			return NPCcone;
-		else
-		{
-			// Old value
-			cone = VECTOR_CONE_3DEGREES;
-		}
+		static Vector cone = VECTOR_CONE_3DEGREES;
 
 		return cone;
 	}

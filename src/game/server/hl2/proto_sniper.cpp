@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Sniper entity
 //
-// $NoKeywords: $
+// YODO; Sound delay for far shots
 //=============================================================================//
 
 #include "cbase.h"

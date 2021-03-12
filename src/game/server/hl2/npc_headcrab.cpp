@@ -2514,6 +2514,7 @@ void CHeadcrab::BiteSound( void )
 	EmitSound( "NPC_HeadCrab.Bite" );
 }
 
+LINK_ENTITY_TO_CLASS( npc_headcrab, CHeadcrab );
 
 //---------------------------------------------------------
 // Save/Restore
@@ -2862,11 +2863,6 @@ void CFastHeadcrab::StartTask( const Task_t *pTask )
 	}
 }
 
-
-LINK_ENTITY_TO_CLASS( npc_headcrab, CHeadcrab );
-LINK_ENTITY_TO_CLASS( npc_headcrab_fast, CFastHeadcrab );
-
-
 //-----------------------------------------------------------------------------
 // Purpose: Make the sound of this headcrab chomping a target.
 // Input  : 
@@ -2977,7 +2973,7 @@ float CFastHeadcrab::MaxYawSpeed( void )
 
 		default:
 		{
-			return( 120 );
+			return( 90 );
 		}
 	}
 }
@@ -3001,6 +2997,7 @@ bool CFastHeadcrab::QuerySeeEntity(CBaseEntity *pSightEnt, bool bOnlyHateOrFearI
 	return BaseClass::QuerySeeEntity(pSightEnt, bOnlyHateOrFearIfNPC);
 }
 
+LINK_ENTITY_TO_CLASS( npc_headcrab_fast, CFastHeadcrab );
 
 //-----------------------------------------------------------------------------
 // Black headcrab stuff

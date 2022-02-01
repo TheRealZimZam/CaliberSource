@@ -1,6 +1,6 @@
 # CaliberSource
 Caliber Source Sourcecode -- Half-Life 1 but with fancy lightbulbs.
-Latest build 3/12/2021
+Latest build 2/1/2022
 
 Free to use, modify and even outright copy, but credit is always appreciated - 'fanks
 

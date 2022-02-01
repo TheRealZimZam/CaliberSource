@@ -40,4 +40,11 @@ public:
 	DECLARE_CLIENTCLASS();
 };
 
+class C_HLThrowable : public C_BaseHLCombatWeapon
+{
+public:
+	DECLARE_CLASS( C_HLThrowable, C_BaseHLCombatWeapon );
+	DECLARE_CLIENTCLASS();
+};
+
 #endif // C_BASEHLCOMBATWEAPON_H

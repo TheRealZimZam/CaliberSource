@@ -19,6 +19,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#define MIN_ALPHA	100
+
 //-----------------------------------------------------------------------------
 // Purpose: Shows the flashlight icon
 //-----------------------------------------------------------------------------
@@ -35,27 +37,16 @@ protected:
 
 private:
 	void SetFlashlightState( bool flashlightOn );
-	void Reset( void );
 	
 	bool	m_bFlashlightOn;
-	CPanelAnimationVar( vgui::HFont, m_hFont, "Font", "WeaponIconsSmall" );
-	CPanelAnimationVarAliasType( float, m_IconX, "icon_xpos", "4", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_IconY, "icon_ypos", "4", "proportional_float" );
-	
-	CPanelAnimationVarAliasType( float, m_flBarInsetX, "BarInsetX", "2", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flBarInsetY, "BarInsetY", "18", "proportional_float" );
-
-	CPanelAnimationVarAliasType( float, m_flBarWidth, "BarWidth", "28", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flBarHeight, "BarHeight", "2", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkWidth, "BarChunkWidth", "2", "proportional_float" );
-	CPanelAnimationVarAliasType( float, m_flBarChunkGap, "BarChunkGap", "2", "proportional_float" );
+	CHudTexture		*icon_flash_empty;
+	CHudTexture		*icon_flash_full;
+	CHudTexture		*icon_flash_beam;
 };	
 
 using namespace vgui;
 
-#ifdef HL2_EPISODIC
 DECLARE_HUDELEMENT( CHudFlashlight );
-#endif // HL2_EPISODIC
 
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
@@ -75,14 +66,7 @@ CHudFlashlight::CHudFlashlight( const char *pElementName ) : CHudElement( pEleme
 void CHudFlashlight::ApplySchemeSettings( vgui::IScheme *pScheme )
 {
 	BaseClass::ApplySchemeSettings(pScheme);
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Start with our background off
-//-----------------------------------------------------------------------------
-void CHudFlashlight::Reset( void )
-{
-	g_pClientMode->GetViewportAnimationController()->StartAnimationSequence( "SuitFlashlightOn" ); 
+	SetPaintBackgroundEnabled(false);
 }
 
 //-----------------------------------------------------------------------------
@@ -96,67 +80,77 @@ void CHudFlashlight::SetFlashlightState( bool flashlightOn )
 	m_bFlashlightOn = flashlightOn;
 }
 
-#define WCHAR_FLASHLIGHT_ON  (L'©')
-#define WCHAR_FLASHLIGHT_OFF (L'®')
-
 //-----------------------------------------------------------------------------
 // Purpose: draws the flashlight icon
 //-----------------------------------------------------------------------------
 void CHudFlashlight::Paint()
 {
-#ifdef HL2_EPISODIC
+	int		r, g, b, a, nUnused;
+	int		x, y;
+	bool	bIsOn;
+	Color	clrFlash;
+
 	C_BaseHLPlayer *pPlayer = (C_BaseHLPlayer *)C_BasePlayer::GetLocalPlayer();
 	if ( !pPlayer )
 		return;
 
-	// Only paint if we're using the new flashlight code
-	if ( pPlayer->m_HL2Local.m_flFlashBattery < 0.0f )
+	if ( !icon_flash_empty )
 	{
-		SetPaintBackgroundEnabled( false );
+		icon_flash_empty = gHUD.GetIcon( "flash_empty" );
+	}
+
+	if ( !icon_flash_full )
+	{
+		icon_flash_full = gHUD.GetIcon( "flash_full" );
+	}
+
+	if ( !icon_flash_beam )
+	{
+		icon_flash_beam = gHUD.GetIcon( "flash_beam" );
+	}
+
+	if ( !icon_flash_empty || !icon_flash_full || !icon_flash_beam )
+	{
 		return;
 	}
 
-	bool bIsOn = pPlayer->IsEffectActive( EF_DIMLIGHT );
-	SetFlashlightState( bIsOn );
+	bIsOn = pPlayer->IsEffectActive( EF_DIMLIGHT );
 
-	// get bar chunks
-	int chunkCount = m_flBarWidth / (m_flBarChunkWidth + m_flBarChunkGap);
-	int enabledChunks = (int)((float)chunkCount * (pPlayer->m_HL2Local.m_flFlashBattery * 1.0f/100.0f) + 0.5f );
+	if ( bIsOn )
+		a = 225;
+	else
+		a = MIN_ALPHA;
 
-	Color clrFlashlight;
-	clrFlashlight = ( enabledChunks < ( chunkCount / 4 ) ) ? gHUD.m_clrCaution : gHUD.m_clrNormal;
-	clrFlashlight[3] = ( bIsOn ) ? 255: 32;
-
-	// Pick the right character given our current state
-	wchar_t pState = ( bIsOn ) ? WCHAR_FLASHLIGHT_ON : WCHAR_FLASHLIGHT_OFF;
-
-	surface()->DrawSetTextFont( m_hFont );
-	surface()->DrawSetTextColor( clrFlashlight );
-	surface()->DrawSetTextPos( m_IconX, m_IconY );
-	surface()->DrawUnicodeChar( pState );
-
-	// Don't draw the progress bar is we're fully charged
-	if ( bIsOn == false && chunkCount == enabledChunks )
-		return;
-
-	// draw the suit power bar
-	surface()->DrawSetColor( clrFlashlight );
-	int xpos = m_flBarInsetX, ypos = m_flBarInsetY;
-	for (int i = 0; i < enabledChunks; i++)
+	if ( pPlayer->m_HL2Local.m_flFlashBattery < 20 )
 	{
-		surface()->DrawFilledRect( xpos, ypos, xpos + m_flBarChunkWidth, ypos + m_flBarHeight );
-		xpos += (m_flBarChunkWidth + m_flBarChunkGap);
+		(gHUD.m_clrCaution).GetColor( r, g, b, nUnused );
 	}
-	
-	// Be even less transparent than we already are
-	clrFlashlight[3] = clrFlashlight[3] / 8;
-
-	// draw the exhausted portion of the bar.
-	surface()->DrawSetColor( clrFlashlight );
-	for (int i = enabledChunks; i < chunkCount; i++)
+	else
 	{
-		surface()->DrawFilledRect( xpos, ypos, xpos + m_flBarChunkWidth, ypos + m_flBarHeight );
-		xpos += (m_flBarChunkWidth + m_flBarChunkGap);
+		(gHUD.m_clrNormal).GetColor( r, g, b, nUnused );
 	}
-#endif // HL2_EPISODIC
+
+	clrFlash.SetColor( r, g, b, a );
+
+	y = icon_flash_empty->Height() / 2;
+	x = GetWide() - ( icon_flash_empty->Width() * 1.5 );
+
+	// Draw the flashlight casing
+	icon_flash_empty->DrawSelf( x, y, clrFlash );
+
+	if ( bIsOn )
+	{  // draw the flashlight beam
+		x = GetWide() - icon_flash_empty->Width() / 2;
+
+		icon_flash_beam->DrawSelf( x, y, clrFlash );
+	}
+
+	// draw the flashlight energy level
+	x = GetWide() - ( icon_flash_empty->Width() * 1.5 );
+
+	int nOffset = icon_flash_empty->Width() * ( 1.0 - ( (float)pPlayer->m_HL2Local.m_flFlashBattery / 100.0 ) );
+	if ( nOffset < icon_flash_empty->Width() )
+	{
+		icon_flash_full->DrawSelfCropped( x + nOffset, y, nOffset, 0, icon_flash_full->Width() - nOffset, icon_flash_full->Height(), clrFlash );
+	}
 }

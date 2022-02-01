@@ -8,7 +8,7 @@
 #include "hud.h"
 #include "hudelement.h"
 #include "hud_macros.h"
-#include "hud_numericdisplay.h"
+#include "hud_bitmapnumericdisplay.h"
 #include "iclientmode.h"
 #include "iclientvehicle.h"
 #include <vgui_controls/AnimationController.h>
@@ -24,9 +24,9 @@ using namespace vgui;
 //-----------------------------------------------------------------------------
 // Purpose: Displays current ammunition level
 //-----------------------------------------------------------------------------
-class CHudAmmo : public CHudNumericDisplay, public CHudElement
+class CHudAmmo : public CHudBitmapNumericDisplay, public CHudElement
 {
-	DECLARE_CLASS_SIMPLE( CHudAmmo, CHudNumericDisplay );
+	DECLARE_CLASS_SIMPLE( CHudAmmo, CHudBitmapNumericDisplay );
 
 public:
 	CHudAmmo( const char *pElementName );
@@ -78,15 +78,7 @@ void CHudAmmo::Init( void )
 	
 	m_iconPrimaryAmmo = NULL;
 
-	wchar_t *tempString = g_pVGuiLocalize->Find("#Valve_Hud_AMMO");
-	if (tempString)
-	{
-		SetLabelText(tempString);
-	}
-	else
-	{
-		SetLabelText(L"AMMO");
-	}
+	SetLabel(3);
 }
 
 //-----------------------------------------------------------------------------
@@ -134,6 +126,7 @@ void CHudAmmo::UpdatePlayerAmmo( C_BasePlayer *player )
 		return;
 	}
 
+	SetIsAmmo(true);
 	SetPaintEnabled(true);
 	SetPaintBackgroundEnabled(true);
 
@@ -329,7 +322,7 @@ void CHudAmmo::SetAmmo2(int ammo2, bool playAnimation)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: We add an icon into the 
+// Purpose: Ammo type icon
 //-----------------------------------------------------------------------------
 void CHudAmmo::Paint( void )
 {
@@ -338,13 +331,9 @@ void CHudAmmo::Paint( void )
 #ifndef HL2MP
 	if ( m_hCurrentVehicle == NULL && m_iconPrimaryAmmo )
 	{
-		int nLabelHeight;
-		int nLabelWidth;
-		surface()->GetTextSize( m_hTextFont, m_LabelText, nLabelWidth, nLabelHeight );
-
-		// Figure out where we're going to put this
-		int x = text_xpos + ( nLabelWidth - m_iconPrimaryAmmo->Width() ) / 2;
-		int y = text_ypos - ( nLabelHeight + ( m_iconPrimaryAmmo->Height() / 2 ) );
+		// Put above the reserve ammo spot
+		int x = text_xpos + ( digit2_xpos - m_iconPrimaryAmmo->Width() ) / 2;	//TODO; The number after this would be nice to softcode
+		int y = text_ypos - ( digit2_ypos + ( m_iconPrimaryAmmo->Height() / 2 ) - 8 );	//TODO; The number after this would be nice to softcode
 		
 		m_iconPrimaryAmmo->DrawSelf( x, y, GetFgColor() );
 	}
@@ -354,9 +343,9 @@ void CHudAmmo::Paint( void )
 //-----------------------------------------------------------------------------
 // Purpose: Displays the secondary ammunition level
 //-----------------------------------------------------------------------------
-class CHudSecondaryAmmo : public CHudNumericDisplay, public CHudElement
+class CHudSecondaryAmmo : public CHudBitmapNumericDisplay, public CHudElement
 {
-	DECLARE_CLASS_SIMPLE( CHudSecondaryAmmo, CHudNumericDisplay );
+	DECLARE_CLASS_SIMPLE( CHudSecondaryAmmo, CHudBitmapNumericDisplay );
 
 public:
 	CHudSecondaryAmmo( const char *pElementName ) : BaseClass( NULL, "HudAmmoSecondary" ), CHudElement( pElementName )
@@ -368,17 +357,6 @@ public:
 
 	void Init( void )
 	{
-#ifndef HL2MP
-		wchar_t *tempString = g_pVGuiLocalize->Find("#Valve_Hud_AMMO_ALT");
-		if (tempString)
-		{
-			SetLabelText(tempString);
-		}
-		else
-		{
-			SetLabelText(L"ALT");
-		}
-#endif // HL2MP
 	}
 
 	void VidInit( void )
@@ -415,7 +393,7 @@ public:
 		BaseClass::Reset();
 		m_iAmmo = 0;
 		m_hCurrentActiveWeapon = NULL;
-		SetAlpha( 0 );
+	//	SetAlpha( 0 );
 		UpdateAmmoState();
 	}
 
@@ -426,14 +404,10 @@ public:
 #ifndef HL2MP
 		if ( m_iconSecondaryAmmo )
 		{
-			int nLabelHeight;
-			int nLabelWidth;
-			surface()->GetTextSize( m_hTextFont, m_LabelText, nLabelWidth, nLabelHeight );
-
-			// Figure out where we're going to put this
-			int x = text_xpos + ( nLabelWidth - m_iconSecondaryAmmo->Width() ) / 2;
-			int y = text_ypos - ( nLabelHeight + ( m_iconSecondaryAmmo->Height() / 2 ) );
-
+			// Put below the number
+			int x = text_xpos + ( digit_xpos - m_iconSecondaryAmmo->Width() ) / 2;
+			int y = text_ypos - ( digit_ypos + ( m_iconSecondaryAmmo->Height() / 2 ) - 8 );	//TODO; The number after this would be nice to softcode
+			
 			m_iconSecondaryAmmo->DrawSelf( x, y, GetFgColor() );
 		}
 #endif // HL2MP
@@ -470,6 +444,8 @@ protected:
 
 		if (player && wpn && wpn->UsesSecondaryAmmo())
 		{
+		//	SetHalfSize(true);
+			SetNumZeros(2);
 			SetAmmo(player->GetAmmoCount(wpn->GetSecondaryAmmoType()));
 		}
 

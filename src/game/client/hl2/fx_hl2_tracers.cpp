@@ -519,7 +519,7 @@ void MuzzleFlash_Airboat( ClientEntityHandle_t hEntity, int attachmentIndex )
 
 	// Tack on the smoke
 	pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), pSimple->GetPMaterial( "sprites/ar2_muzzle1" ), vec3_origin );
-		
+
 	if ( pParticle == NULL )
 		return;
 

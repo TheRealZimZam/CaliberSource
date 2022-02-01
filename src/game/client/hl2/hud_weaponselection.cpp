@@ -37,7 +37,7 @@ ConVar hud_showemptyweaponslots( "hud_showemptyweaponslots", "0", FCVAR_ARCHIVE,
 #define CAROUSEL_SMALL_DISPLAY_ALPHA	200.0f
 #define FASTSWITCH_SMALL_DISPLAY_ALPHA	160.0f
 
-#define MAX_CAROUSEL_SLOTS				5
+#define HL2_MAX_WEAPON_SLOTS				5
 
 //-----------------------------------------------------------------------------
 // Purpose: hl2 weapon selection hud element
@@ -472,7 +472,7 @@ void CHudWeaponSelection::Paint()
 				// nothing to do
 				return;
 			}
-			else if ( m_WeaponBoxes.Count() < MAX_CAROUSEL_SLOTS )
+			else if ( m_WeaponBoxes.Count() < HL2_MAX_WEAPON_SLOTS )
 			{
 				// draw the selected weapon as a 1 of n style
 				width = (m_WeaponBoxes.Count()-1) * (m_flLargeBoxWide+m_flBoxGap) + m_flLargeBoxWide;
@@ -1005,7 +1005,7 @@ void CHudWeaponSelection::ApplySchemeSettings(vgui::IScheme *pScheme)
 	if ( hud_fastswitch.GetInt() == HUDTYPE_CAROUSEL )
 	{
 		// need bounds to be exact width for proper clipping during scroll 
-		int width = MAX_CAROUSEL_SLOTS*m_flLargeBoxWide + (MAX_CAROUSEL_SLOTS-1)*m_flBoxGap;
+		int width = HL2_MAX_WEAPON_SLOTS*m_flLargeBoxWide + (HL2_MAX_WEAPON_SLOTS-1)*m_flBoxGap;
 		SetBounds( (screenWide-width)/2, y, width, screenTall - y);
 	}
 	else

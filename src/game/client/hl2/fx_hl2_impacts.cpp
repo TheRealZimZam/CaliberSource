@@ -88,20 +88,8 @@ DECLARE_CLIENT_EFFECT( "MeleeImpact", MeleeImpactCallback );
 //-----------------------------------------------------------------------------
 void AR2ImpactCallback( const CEffectData &data )
 {
-#if 0
-	VPROF_BUDGET( "ImpactAR2Callback", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
-
-	trace_t tr;
-	Vector vecOrigin;
-
-	//
-	// Fast Lines
-	//
-	FX_MicroExplosion( vecOrigin, tr.plane.normal );
-#endif
-	//
+#ifdef _XBOX
 	// Impact sprite
-	//
 	FX_AddQuad( data.m_vOrigin, 
 				data.m_vNormal, 
 				random->RandomFloat( 24, 32 ),
@@ -116,8 +104,15 @@ void AR2ImpactCallback( const CEffectData &data )
 				0.25f,
 				"effects/ar2_impact",
 				(FXQUAD_BIAS_SCALE|FXQUAD_BIAS_ALPHA) );
-	// Create an elight
+#else
+	// Fast Lines
+	Vector vecNormal;
+	Vector vecPosition;
+	vecPosition = data.m_vOrigin;
+	vecNormal = data.m_vNormal;
 
+	FX_MicroExplosion( vecPosition, vecNormal );
+#endif
 }
 
 DECLARE_CLIENT_EFFECT( "AR2Impact", AR2ImpactCallback );
@@ -196,11 +191,9 @@ DECLARE_CLIENT_EFFECT( "Impact", ImpactCallback );
 //-----------------------------------------------------------------------------
 void FX_AirboatGunImpact( const Vector &origin, const Vector &normal, float scale )
 {
-#ifdef _XBOX
-
 	Vector offset = origin + ( normal * 1.0f );
 
-	CSmartPtr<CTrailParticles> sparkEmitter = CTrailParticles::Create( "FX_MetalSpark 1" );
+	CSmartPtr<CTrailParticles> sparkEmitter = CTrailParticles::Create( "FX_AirboatGun 1" );
 
 	if ( sparkEmitter == NULL )
 		return;
@@ -248,13 +241,7 @@ void FX_AirboatGunImpact( const Vector &origin, const Vector &normal, float scal
 		Color32Init( pParticle->m_color, 255, 255, 255, 255 );
 	}
 
-#else
-
-	// Normal metal spark
-	FX_MetalSpark( origin, normal, normal, (int) scale );
-
-#endif // _XBOX
-
+#ifdef _XBOX
 	// Add a quad to highlite the hit point
 	FX_AddQuad( origin, 
 				normal, 
@@ -270,6 +257,31 @@ void FX_AirboatGunImpact( const Vector &origin, const Vector &normal, float scal
 				0.05f, 
 				"effects/combinemuzzle2_nocull",
 				(FXQUAD_BIAS_SCALE|FXQUAD_BIAS_ALPHA) );
+#else
+	CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "FX_AirboatGun 2" );
+	pSimple->SetSortOrigin( offset );
+
+	SimpleParticle *sParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), pSimple->GetPMaterial( "effects/combinemuzzle2_nocull" ), offset );
+
+	if ( sParticle )
+	{
+		sParticle->m_flLifetime		= 0.0f;
+		sParticle->m_flDieTime		= 0.05f;
+		
+		sParticle->m_vecVelocity.Init();
+
+		sParticle->m_uchColor[0]	= 255;
+		sParticle->m_uchColor[1]	= 255;
+		sParticle->m_uchColor[2]	= 255;
+		sParticle->m_uchStartAlpha	= random->RandomInt( 224, 255 );
+		sParticle->m_uchEndAlpha	= 0;
+		sParticle->m_uchStartSize	= random->RandomFloat( 16, 32 );
+		sParticle->m_uchEndSize		= random->RandomFloat( 32, 48 );
+		sParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		sParticle->m_flRollDelta	= 0.0f;
+	}
+#endif
+
 }
 
 //-----------------------------------------------------------------------------

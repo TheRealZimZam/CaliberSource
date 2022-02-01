@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: For nearby gibbed enemies
 //
 //=============================================================================//
 
@@ -14,7 +14,6 @@
 
 void BloodSplatCallback( const CEffectData & data )
 {
-
 	Msg("SPLAT!\n");
 
 	int		x,y;

@@ -18,6 +18,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#define	QINFO_FADE_TIME				150
 #define	HEALTH_WARNING_THRESHOLD	25
 
 static ConVar	hud_quickinfo( "hud_quickinfo", "1", FCVAR_ARCHIVE );
@@ -61,6 +62,8 @@ private:
 
 	float	m_ammoFade;
 	float	m_healthFade;
+	float	m_fFade;
+	float	m_fDamageFade;
 
 	bool	m_warnAmmo;
 	bool	m_warnHealth;
@@ -83,6 +86,9 @@ private:
 
 DECLARE_HUDELEMENT( CHUDQuickInfo );
 
+//
+//-----------------------------------------------------
+//
 CHUDQuickInfo::CHUDQuickInfo( const char *pElementName ) :
 	CHudElement( pElementName ), BaseClass( NULL, "HUDQuickInfo" )
 {
@@ -99,11 +105,17 @@ void CHUDQuickInfo::ApplySchemeSettings( IScheme *scheme )
 	SetPaintBackgroundEnabled( false );
 }
 
+/*
+==================================================
+Init
+==================================================
+*/
 
 void CHUDQuickInfo::Init( void )
 {
 	m_ammoFade		= 0.0f;
 	m_healthFade	= 0.0f;
+	m_fFade			= 0.0f;
 
 	m_lastAmmo		= 0;
 	m_lastHealth	= 100;
@@ -116,6 +128,11 @@ void CHUDQuickInfo::Init( void )
 	m_flLastEventTime   = 0.0f;
 }
 
+/*
+==================================================
+VidInit
+==================================================
+*/
 
 void CHUDQuickInfo::VidInit( void )
 {
@@ -130,6 +147,11 @@ void CHUDQuickInfo::VidInit( void )
 	m_icon_lbn = gHUD.GetIcon( "crosshair_left" );
 }
 
+/*
+==================================================
+DrawWarning
+==================================================
+*/
 
 void CHUDQuickInfo::DrawWarning( int x, int y, CHudTexture *icon, float &time )
 {
@@ -175,7 +197,7 @@ bool CHUDQuickInfo::ShouldDraw( void )
 	if ( !crosshair.GetBool() && !IsX360() )
 		return false;
 
-	return ( CHudElement::ShouldDraw() && !engine->IsDrawingLoadingImage() );
+	return ( CHudElement::ShouldDraw() && !engine->IsDrawingLoadingImage() );	//&& hud_quickinfo.GetInt()
 }
 
 //-----------------------------------------------------------------------------
@@ -228,8 +250,27 @@ void CHUDQuickInfo::OnThink()
 	}
 }
 
+/*
+==================================================
+Draw
+==================================================
+*/
+
 void CHUDQuickInfo::Paint()
 {
+	CHudTexture	*icon_c		= gHUD.GetIcon( "crosshair" );
+	CHudTexture	*icon_rb	= gHUD.GetIcon( "crosshair_right" );
+	CHudTexture	*icon_lb	= gHUD.GetIcon( "crosshair_left" );
+
+	if (!icon_c || !icon_rb || !icon_lb)
+		return;
+
+
+	int		xCenter = (ScreenWidth() / 2) - icon_c->Width() / 2;
+	int		yCenter = (ScreenHeight() / 2) - icon_c->Height() / 2;
+//	int		scalar;
+	float	scalar = 1.0f; //138.0f/255.0f
+
 	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
 	if ( player == NULL )
 		return;
@@ -238,16 +279,26 @@ void CHUDQuickInfo::Paint()
 	if ( pWeapon == NULL )
 		return;
 
-	int		xCenter	= ( ScreenWidth() - m_icon_c->Width() ) / 2;
-	int		yCenter = ( ScreenHeight() - m_icon_c->Height() ) / 2;
-	float	scalar  = 138.0f/255.0f;
-	
-	// Check our health for a warning
+	//Get our values
 	int	health	= player->GetHealth();
+	int	ammo	= pWeapon->Clip1();
+
+	if ( m_fDamageFade > 0.0f )
+	{
+		m_fDamageFade -= (gpGlobals->frametime * 200.0f);
+	}
+
+	// Check our health for a warning
 	if ( health != m_lastHealth )
 	{
 		UpdateEventTime();
-		m_lastHealth = health;
+		if (health < m_lastHealth)
+		{
+			m_fDamageFade = QINFO_FADE_TIME;
+		}
+
+		m_fFade			= QINFO_FADE_TIME;
+		m_lastHealth	= health;
 
 		if ( health <= HEALTH_WARNING_THRESHOLD )
 		{
@@ -267,10 +318,10 @@ void CHUDQuickInfo::Paint()
 	}
 
 	// Check our ammo for a warning
-	int	ammo = pWeapon->Clip1();
 	if ( ammo != m_lastAmmo )
 	{
 		UpdateEventTime();
+		m_fFade		= QINFO_FADE_TIME;
 		m_lastAmmo	= ammo;
 
 		// Find how far through the current clip we are

@@ -173,7 +173,7 @@ void CGrenadeHomer::StartRocketTrail(void)
 	if(pRocketTrail)
 	{
 		pRocketTrail->m_SpawnRate = 80;
-		pRocketTrail->m_ParticleLifetime = 2;
+		pRocketTrail->m_ParticleLifetime = HOMER_TRAIL0_LIFE;
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
 		{
 			pRocketTrail->m_StartColor.Init(0.5, 0.0, 0.5);
@@ -194,7 +194,7 @@ void CGrenadeHomer::StartRocketTrail(void)
 
 		m_hRocketTrail[0] = pRocketTrail;
 	}
-	/*
+
 	pRocketTrail = RocketTrail::CreateRocketTrail();
 	if(pRocketTrail)
 	{
@@ -219,6 +219,7 @@ void CGrenadeHomer::StartRocketTrail(void)
 
 		m_hRocketTrail[1] = pRocketTrail;
 	}
+
 	pRocketTrail = RocketTrail::CreateRocketTrail();
 	if(pRocketTrail)
 	{
@@ -243,7 +244,6 @@ void CGrenadeHomer::StartRocketTrail(void)
 
 		m_hRocketTrail[2] = pRocketTrail;
 	}
-	*/
 }
 
 //------------------------------------------------------------------------------

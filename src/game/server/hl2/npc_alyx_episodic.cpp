@@ -807,7 +807,7 @@ void CNPC_Alyx::GatherConditions()
 	{
 		CSound *pSound = GetBestSound(); 
 
-		if ( IsInAVehicle() == false )  // For now, don't do these animations while in the vehicle
+		if ( !IsInAVehicle() )  // For now, don't do these animations while in the vehicle
 		{
 			if( (pSound->SoundTypeNoContext() & SOUND_COMBAT) && (pSound->SoundContext() & SOUND_CONTEXT_EXPLOSION) )
 			{
@@ -817,14 +817,6 @@ void CNPC_Alyx::GatherConditions()
 					{
 						RestartGesture( ACT_GESTURE_FLINCH_BLAST_SHOTGUN );
 						GetShotRegulator()->FireNoEarlierThan( gpGlobals->curtime + SequenceDuration( ACT_GESTURE_FLINCH_BLAST_SHOTGUN ) + 0.5f ); // Allow another second for Alyx to bring her weapon to bear after the flinch.
-					}
-				}
-				else
-				{
-					if ( !IsPlayingGesture(ACT_GESTURE_FLINCH_BLAST) && !IsPlayingGesture(ACT_GESTURE_FLINCH_BLAST_DAMAGED) )
-					{
-						RestartGesture( ACT_GESTURE_FLINCH_BLAST );
-						GetShotRegulator()->FireNoEarlierThan( gpGlobals->curtime + SequenceDuration( ACT_GESTURE_FLINCH_BLAST ) + 0.5f ); // Allow another second for Alyx to bring her weapon to bear after the flinch.
 					}
 				}
 			}

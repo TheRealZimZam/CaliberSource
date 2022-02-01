@@ -276,10 +276,12 @@ void CNPC_BaseScanner::OnScheduleChange( void )
 //-----------------------------------------------------------------------------
 int CNPC_BaseScanner::MeleeAttack1Conditions( float flDot, float flDist )
 {
+#if 0
 	if (GetEnemy() == NULL)
 	{
 		return COND_NONE;
 	}
+#endif
 
 	// Check too far to attack with 2D distance
 	float vEnemyDist2D = (GetEnemy()->GetLocalOrigin() - GetLocalOrigin()).Length2D();

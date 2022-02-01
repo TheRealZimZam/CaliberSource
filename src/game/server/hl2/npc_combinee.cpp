@@ -46,7 +46,8 @@ extern ConVar sk_plr_dmg_ar2;
 extern ConVar npc_combine_drop_health;
 
 LINK_ENTITY_TO_CLASS( npc_combine_e, CNPC_CombineE );
-LINK_ENTITY_TO_CLASS( npc_ancorp_e, CNPC_CombineE );
+LINK_ENTITY_TO_CLASS( npc_atf_e, CNPC_CombineE );
+LINK_ENTITY_TO_CLASS( npc_atf_sniper, CNPC_CombineE );
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -65,11 +66,12 @@ void CNPC_CombineE::Spawn( void )
 	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
 	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 	// Sniper elites dont use grenades
-//	if ( !FClassnameIs( GetActiveWeapon(), "weapon_sniperrifle" ) )
-//	{
+	if ( !FClassnameIs( this, "npc_atf_sniper" ))
+	{
 		CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
-		CapabilitiesAdd( bits_CAP_DOORS_GROUP );
-//	}
+	}
+	CapabilitiesAdd( bits_CAP_DOORS_GROUP );
+
 	if ( sk_combine_e_jump.GetBool() )
 	{
 		CapabilitiesAdd( bits_CAP_MOVE_JUMP );
@@ -125,7 +127,6 @@ void CNPC_CombineE::DeathSound( const CTakeDamageInfo &info )
 	GetSentences()->Speak( pSentenceName, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
 }
 
-#if 0
 void CNPC_CombineE::PainSound( const CTakeDamageInfo &info )
 {
 	if ( gpGlobals->curtime < m_flNextPainSoundTime )
@@ -139,11 +140,10 @@ void CNPC_CombineE::PainSound( const CTakeDamageInfo &info )
 	if ( healthRatio > 0.0f )
 	{
 		// This causes it to speak it no matter what; doesn't bother with setting sounds.
-		m_Sentences.Speak( COMBINE_ELITE_PAIN, SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
+		GetSentences()->Speak( "COMBINE_ELITE_PAIN", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS );
 		m_flNextPainSoundTime = gpGlobals->curtime + 1;
 	}
 }
-#endif
 
 #if 0
 void CNPC_CombineE::IdleSound( void )

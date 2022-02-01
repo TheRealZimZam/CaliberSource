@@ -104,7 +104,7 @@ public:
 	virtual char	*GetScannerSoundPrefix( void ) { return ""; }
 	void			ScannerEmitSound( const char *pszSoundName );
 
-	int				MeleeAttack1Conditions ( float flDot, float flDist );
+	int				MeleeAttack1Conditions( float flDot, float flDist );
 
 	int				SelectSchedule(void);
 	void			StartTask( const Task_t *pTask );

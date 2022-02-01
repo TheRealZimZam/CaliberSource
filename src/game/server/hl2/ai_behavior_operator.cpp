@@ -116,7 +116,7 @@ void CAI_OperatorBehavior::GatherConditions( void )
 			if( IsCurSchedule(SCHED_OPERATOR_OPERATE) )
 			{
 				// Break us out of the operator schedule if the operation completes.
-				SetCondition(COND_PROVOKED);
+				SetCondition(COND_WAY_CLEAR);
 			}
 
 			m_hGoalEntity.Set(NULL);
@@ -460,7 +460,7 @@ DEFINE_SCHEDULE
  "		TASK_WAIT_INDEFINITE		0"
  "	"
  "	Interrupts"
- "		COND_PROVOKED"
+ "		COND_WAY_CLEAR"
  )
 
 //=========================================================

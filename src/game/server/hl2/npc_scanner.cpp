@@ -446,12 +446,29 @@ int CNPC_CScanner::TranslateSchedule( int scheduleType )
 	switch ( scheduleType )
 	{
 		case SCHED_IDLE_STAND:
-		{
 			return SCHED_SCANNER_PATROL;
-		}
 
 		case SCHED_SCANNER_PATROL:
 			return SCHED_CSCANNER_PATROL;
+
+		case SCHED_SCANNER_ATTACK:
+			{
+				//!!TODO; If the player is being swarmed by 2+ scanners, try to dish out each attack
+				// role evenly - assigning by odd/even squad numbers might work
+				// ex;
+				// if ( m_pSquad > 3 )
+				//		{ if me = 1,3,5 do gas, else flash }
+				if ( random->RandomInt(0,1) )
+				{
+					return SCHED_CSCANNER_ATTACK_FLASH;
+				}
+				else
+				{
+					return SCHED_CSCANNER_ATTACK_GAS;
+				}
+			}
+			break;
+
 	}
 	return BaseClass::TranslateSchedule(scheduleType);
 }
@@ -1472,26 +1489,15 @@ int CNPC_CScanner::SelectSchedule(void)
 		// Chase via route if we're directly blocked
 		if ( HasCondition( COND_SCANNER_FLY_BLOCKED ) )
 			return SCHED_SCANNER_CHASE_ENEMY;
-		
-		// Attack if it's time
+
+		// Hover about if its not time to attack
 		if ( gpGlobals->curtime < m_flNextAttack )
 			return SCHED_CSCANNER_SPOTLIGHT_HOVER;
 
 		// Melee attack if possible
 		if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
 		{
-			//TODO; If the player is being swarmed by 2+ scanners, try to dish out each attack
-			// role evenly
-			if ( random->RandomInt(0,1) )
-			{
-				return SCHED_CSCANNER_ATTACK_FLASH;
-			}
-			else
-			{
-				return SCHED_CSCANNER_ATTACK_GAS;
-			}
-			// TODO: a schedule where he makes an alarm sound?
-			return SCHED_SCANNER_CHASE_ENEMY;
+			return SCHED_SCANNER_ATTACK;
 		}
 		else
 		{
@@ -2001,6 +2007,52 @@ void CNPC_CScanner::AttackFlash(void)
 	}
 }
 
+//------------------------------------------------------------------------------
+// Purpose :
+//------------------------------------------------------------------------------
+void CNPC_CScanner::AttackGas(void)
+{
+	if ( GetEnemy() )
+	{
+		ScannerEmitSound( "AttackGas" );
+
+		CSteamJet *pJet= (CSteamJet *)CreateEntityByName("env_steamjet");
+		pJet->Spawn();
+		pJet->SetLocalOrigin( GetLocalOrigin() );
+		pJet->m_bEmit		= true;
+		pJet->m_SpreadSpeed	= 60;
+		pJet->m_Speed		= 500;
+		pJet->m_StartSize	= 5;
+		pJet->m_EndSize		= 100;
+		pJet->m_Rate		= 30;
+		pJet->m_JetLength	= 400;
+		//pJet->m_Color		= Vector(110/255.0,82/255.0,9/255.0); // Mustard gas orange
+		pJet->SetRenderColor( 160, 132, 18, 255 );
+		//NOTENOTE: Set pJet->m_clrRender->a here for translucency
+
+		pJet->SetParent(this);
+		pJet->SetLifetime(1.0);
+
+		Vector	vEnemyPos	= GetEnemy()->EyePosition() + GetEnemy()->GetAbsVelocity();
+		m_vGasDirection		= GetLocalOrigin() - vEnemyPos;
+
+		QAngle angles;
+		VectorAngles(m_vGasDirection, angles );
+		angles.y += 90;
+
+		pJet->SetLocalAngles( angles );
+
+		float fAttackDelay = random->RandomFloat(SCANNER_ATTACK_MIN_DELAY,SCANNER_ATTACK_MAX_DELAY);
+		if( IsStriderScout() )
+		{
+			// Make strider scouts more snappy.
+			fAttackDelay *= 0.75;
+		}
+		m_flNextAttack = gpGlobals->curtime + fAttackDelay;
+		m_fNextSpotlightTime = gpGlobals->curtime + 1.0f;
+	}
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : *pTarget - 
@@ -2077,53 +2129,6 @@ void CNPC_CScanner::AttackFlashBlind(void)
 	}
 	m_flNextAttack	= gpGlobals->curtime + fAttackDelay;
 	m_fNextSpotlightTime = gpGlobals->curtime + 1.0f;
-}
-
-//------------------------------------------------------------------------------
-// Purpose :
-// Input   :
-// Output  :
-//------------------------------------------------------------------------------
-void CNPC_CScanner::AttackGas(void)
-{
-	if ( GetEnemy() )
-	{
-		ScannerEmitSound( "AttackGas" );
-
-		CSteamJet *pJet= (CSteamJet *)CreateEntityByName("env_steamjet");
-		pJet->Spawn();
-		pJet->SetLocalOrigin( GetLocalOrigin() );
-		pJet->m_bEmit		= true;
-		pJet->m_SpreadSpeed	= 30;
-		pJet->m_Speed		= 400;
-		pJet->m_StartSize	= 5;
-		pJet->m_EndSize		= 100;
-		pJet->m_JetLength	= 700;
-		//pJet->m_Color		= Vector(110/255.0,82/255.0,9/255.0); // Mustard gas orange
-		pJet->SetRenderColor( 110, 82, 9, 255 );
-		//NOTENOTE: Set pJet->m_clrRender->a here for translucency
-
-		pJet->SetParent(this);
-		pJet->SetLifetime(1.0);
-
-		Vector	vEnemyPos	= GetEnemy()->EyePosition() + GetEnemy()->GetAbsVelocity();
-		m_vGasDirection		= GetLocalOrigin() - vEnemyPos;
-
-		QAngle angles;
-		VectorAngles(m_vGasDirection, angles );
-		angles.y += 90;
-
-		pJet->SetLocalAngles( angles );
-
-		float fAttackDelay = random->RandomFloat(SCANNER_ATTACK_MIN_DELAY,SCANNER_ATTACK_MAX_DELAY);
-		if( IsStriderScout() )
-		{
-			// Make strider scouts more snappy.
-			fAttackDelay *= 0.5;
-		}
-		m_flNextAttack = gpGlobals->curtime + fAttackDelay;
-		m_fNextSpotlightTime = gpGlobals->curtime + 1.0f;
-	}
 }
 
 //------------------------------------------------------------------------------
@@ -2370,11 +2375,11 @@ void CNPC_CScanner::StartTask( const Task_t *pTask )
 		{
 			AttackPreGas();
 			// Flash red for a while
-			SetWait( 0.5f );
+			SetWait( 0.5f );	//Abit faster than flash, as gas can be dodged after spraying
 		}
 		else
 		{
-			TaskFail("No Flash");
+			TaskFail("No Gaz");
 		}
 		break;
 	}
@@ -2932,7 +2937,9 @@ AI_BEGIN_CUSTOM_NPC( npc_cscanner, CNPC_CScanner )
 	DECLARE_TASK(TASK_CSCANNER_SET_FLY_SPOT)
 	DECLARE_TASK(TASK_CSCANNER_PHOTOGRAPH)
 	DECLARE_TASK(TASK_CSCANNER_ATTACK_PRE_FLASH)
+	DECLARE_TASK(TASK_CSCANNER_ATTACK_PRE_GAS)
 	DECLARE_TASK(TASK_CSCANNER_ATTACK_FLASH)
+	DECLARE_TASK(TASK_CSCANNER_ATTACK_GAS)
 	DECLARE_TASK(TASK_CSCANNER_SPOT_INSPECT_ON)
 	DECLARE_TASK(TASK_CSCANNER_SPOT_INSPECT_WAIT)
 	DECLARE_TASK(TASK_CSCANNER_SPOT_INSPECT_OFF)

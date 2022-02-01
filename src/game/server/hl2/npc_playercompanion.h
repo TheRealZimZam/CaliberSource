@@ -119,6 +119,7 @@ public:
 	//---------------------------------
 	// Behavior
 	//---------------------------------
+	int				MeleeAttack1Conditions( float flDot, float flDist );
 	void 			GatherConditions();
 	virtual void	PredictPlayerPush();
 	void			BuildScheduleTestBits();
@@ -334,6 +335,7 @@ protected:
 		SCHED_PC_COWER = BaseClass::NEXT_SCHEDULE,
 		SCHED_PC_MOVE_TOWARDS_COVER_FROM_BEST_SOUND,
 		SCHED_PC_TAKE_COVER_FROM_BEST_SOUND,
+//!		SCHED_PC_DIVE_TOWARDS_COVER,
 		SCHED_PC_FLEE_FROM_BEST_SOUND,
 		SCHED_PC_TAKE_COVER,
 		SCHED_PC_FAIL_TAKE_COVER_TURRET,
@@ -346,6 +348,7 @@ protected:
 		SCHED_PC_ESTABLISH_LINE_OF_FIRE,
 		SCHED_PC_COMBAT_FACE,
 		SCHED_PC_KNOCKDOWN,
+		SCHED_PC_INVESTIGATE_SOUND,
 		NEXT_SCHEDULE,
 
 		TASK_PC_WAITOUT_MORTAR = BaseClass::NEXT_TASK,

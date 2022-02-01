@@ -494,20 +494,23 @@ void CPropJeep::HandleWater( void )
 			// Create an entry/exit splash!
 			if ( m_WaterData.m_bWheelInWater[iWheel] != m_WaterData.m_bWheelWasInWater[iWheel] )
 			{
+				// Stagger ripple times
+				m_WaterData.m_flNextRippleTime[iWheel] = gpGlobals->curtime + RandomFloat( 0.1, 0.3 );
 				CreateSplash( m_WaterData.m_vecWheelContactPoints[iWheel] );
 				CreateRipple( m_WaterData.m_vecWheelContactPoints[iWheel] );
 			}
-			
+
+// Taken over by vehicle_hl2buggy
+#ifndef HL2_EPISODIC
 			// Create ripples.
 			if ( m_WaterData.m_bWheelInWater[iWheel] && m_WaterData.m_bWheelWasInWater[iWheel] )
 			{
 				if ( m_WaterData.m_flNextRippleTime[iWheel] < gpGlobals->curtime )
 				{
-					// Stagger ripple times
-					m_WaterData.m_flNextRippleTime[iWheel] = gpGlobals->curtime + RandomFloat( 0.1, 0.3 );
 					CreateRipple( m_WaterData.m_vecWheelContactPoints[iWheel] );
 				}
 			}
+#endif
 		}
 	}
 
@@ -644,7 +647,10 @@ void CPropJeep::CreateSplash( const Vector &vecPosition )
 	data.m_vOrigin = vecPosition;
 	data.m_vNormal.Init( 0.0f, 0.0f, 1.0f );
 	VectorAngles( data.m_vNormal, data.m_vAngles );
-	data.m_flScale = 10.0f + random->RandomFloat( 0, 2 );
+
+	float flsplashscale = m_VehiclePhysics.GetSpeed() * random->RandomFloat( 0.15f, 0.25f );
+	flsplashscale = clamp( flsplashscale, 0.0f, 9.0f );
+	data.m_flScale = 5.0f + flsplashscale;
 
 	// Create the splash..
 	DispatchEffect( "watersplash", data );
@@ -1319,7 +1325,7 @@ void CPropJeep::DriveVehicle( float flFrameTime, CUserCmd *ucmd, int iButtonsDow
 	int iButtons = ucmd->buttons;
 
 	//Adrian: No headlights on Superfly.
-#if 1
+#if 0
 	if ( ucmd->impulse == 100 )
 	{
 		if (HeadlightIsOn())
@@ -1468,7 +1474,10 @@ void CPropJeep::EnterVehicle( CBaseCombatCharacter *pPassenger )
 void CPropJeep::ExitVehicle( int nRole )
 {
 	// Cars have batteries and its not 2004, keep it on.
-//!	HeadlightTurnOff();
+//!	if ( HeadlightIsOn() )
+//!	{
+//!		HeadlightTurnOff();
+//!	}
 
 	BaseClass::ExitVehicle( nRole );
 

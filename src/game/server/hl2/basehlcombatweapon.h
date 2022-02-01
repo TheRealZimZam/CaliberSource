@@ -82,10 +82,12 @@ public:
 
 	virtual int		GetBurstSize( void ) { return 3; };
 
+	void			ChangeFireMode( void );
 	void			BurstThink( void );
 
 	virtual void	PrimaryAttack( void );
 	virtual void	SecondaryAttack( void );
+	virtual void	TertiaryAttack( void );
 
 	virtual int		WeaponRangeAttack1Condition( float flDot, float flDist );
 	virtual int		WeaponRangeAttack2Condition( float flDot, float flDist );

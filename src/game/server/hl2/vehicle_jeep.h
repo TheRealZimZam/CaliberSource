@@ -111,8 +111,6 @@ private:
 
 	void		InitWaterData( void );
 	void		CheckWaterLevel( void );
-	void		CreateSplash( const Vector &vecPosition );
-	void		CreateRipple( const Vector &vecPosition );
 
 	void		CreateDangerSounds( void );
 
@@ -132,6 +130,8 @@ protected:
 
 	virtual void HandleWater( void );
 	bool		 CheckWater( void );
+	void		CreateSplash( const Vector &vecPosition );
+	void		CreateRipple( const Vector &vecPosition );
 
 	bool			m_bGunHasBeenCutOff;
 	float			m_flDangerSoundTime;

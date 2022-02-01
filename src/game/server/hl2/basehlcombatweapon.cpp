@@ -162,7 +162,7 @@ int CHLMachineGun::WeaponRangeAttack1Condition( float flDot, float flDist )
 
 //-----------------------------------------------------------------------------
 // Purpose: Add recoil and kick effects
-// TODO; Accuracy should be seperate to the kick angle, and crouching should
+// TODO; Accuracy should be separate to the kick angle, and crouching should
 // reduce the recoil/accuracy hit (sort of like RTCW)
 //-----------------------------------------------------------------------------
 void CHLMachineGun::DoMachineGunKick( CBasePlayer *pPlayer, float dampEasy, float maxVerticleKickAngle, float fireDurationTime, float slideLimitTime )
@@ -378,6 +378,23 @@ void CHLSelectFireMachineGun::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 void CHLSelectFireMachineGun::SecondaryAttack( void )
 {
+	ChangeFireMode();
+	m_flNextSecondaryAttack = gpGlobals->curtime + 0.3;
+}
+
+void CHLSelectFireMachineGun::TertiaryAttack( void )
+{
+	ChangeFireMode();
+	m_flNextTertiaryAttack = gpGlobals->curtime + 0.3;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//
+//
+//-----------------------------------------------------------------------------
+void CHLSelectFireMachineGun::ChangeFireMode( void )
+{
 	// change fire modes
 	switch( m_iFireMode )
 	{
@@ -396,21 +413,13 @@ void CHLSelectFireMachineGun::SecondaryAttack( void )
 	
 	SendWeaponAnim( GetSecondaryAttackActivity() );
 
-	m_flNextSecondaryAttack = gpGlobals->curtime + 0.3;
-
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 	if ( pOwner )
 	{
-		m_iSecondaryAttacks++;
 		gamestats->Event_WeaponFired( pOwner, false, GetClassname() );
 	}
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//
-//
-//-----------------------------------------------------------------------------
 void CHLSelectFireMachineGun::BurstThink( void )
 {
 	CHLMachineGun::PrimaryAttack();

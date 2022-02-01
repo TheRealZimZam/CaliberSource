@@ -2,7 +2,7 @@
 //
 // Purpose: The downtrodden citizens of City 17.
 // Todo's: Fix weapon pickup (currently only goes for rpg???), fix healing/ammo supplying, 
-// Weapon priority/rating script, Optimize
+// Weapon priority/rating script, make player commands non-suicidal, Optimize
 //=============================================================================//
 
 //-----------------------------------------------------------------------------
@@ -335,7 +335,7 @@ BEGIN_DATADESC( CNPC_Citizen )
 	DEFINE_KEYFIELD(	m_iAmmoAmount, 				FIELD_INTEGER,	"ammoamount" ),
 	DEFINE_FIELD( 		m_bRPGAvoidPlayer, 			FIELD_BOOLEAN ),
 	DEFINE_FIELD( 		m_bShouldPatrol, 			FIELD_BOOLEAN ),
-	DEFINE_FIELD( 		m_fIsRebel, 				FIELD_BOOLEAN ),
+	DEFINE_FIELD( 		m_bIsRebel, 				FIELD_BOOLEAN ),
 	DEFINE_FIELD( 		m_iszOriginalSquad, 		FIELD_STRING ),
 	DEFINE_FIELD( 		m_flTimeJoinedPlayerSquad,	FIELD_TIME ),
 	DEFINE_FIELD( 		m_bWasInPlayerSquad, FIELD_BOOLEAN ),
@@ -417,7 +417,7 @@ void CNPC_Citizen::Precache()
 	PrecacheScriptSound( "NPC_Citizen.Die" );
 	PrecacheScriptSound( "NPC_Citizen.DieFall" );
 	PrecacheScriptSound( "NPC_Citizen.Gib" );
-//	PrecacheScriptSound( "NPC_Citizen.OnFire" );
+//	PrecacheScriptSound( "NPC_Citizen.Scream" );
 	PrecacheScriptSound( "NPC_Citizen.DieIWHBYD" );
 
 	PrecacheInstancedScene( "scenes/Expressions/CitizenIdle.vcd" );
@@ -505,7 +505,7 @@ void CNPC_Citizen::Spawn()
 	if( HasSpawnFlags( SF_CITIZEN_LEADER ) || m_Type == CT_REBEL )
 	{
 		// Stronger, tougher.
-		m_fIsRebel = true;
+		m_bIsRebel = true;
 		m_iHealth = sk_citizen_rebel_health.GetFloat();
 		CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 	}
@@ -1206,20 +1206,6 @@ int CNPC_Citizen::SelectSchedule()
 		return SCHED_CITIZEN_SIT_ON_TRAIN;
 	}
 
-	if ( HasCondition( COND_ON_FIRE ) )
-	{
-		//TODO; Speak concept
-//		EmitSound( "NPC_Citizen.OnFire" );
-		if ( random->RandomInt( 0, 1 ) )
-		{
-			return SCHED_BURNING_RUN;
-		}
-		else
-		{
-			return SCHED_BURNING_STAND;
-		}
-	}
-
 	CWeaponRPG *pRPG = dynamic_cast<CWeaponRPG*>(GetActiveWeapon());
 	if ( pRPG && pRPG->IsGuiding() )
 	{
@@ -1233,18 +1219,19 @@ int CNPC_Citizen::SelectSchedule()
 		// If im at critical health, run away!
 		if ( IsInPlayerSquad() )
 		{
-			if ( !m_bAnnoyed && (HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_SEE_NEMESIS )) && IsInjured() )
+			if ( !m_bAnnoyed && HasCondition( COND_LIGHT_DAMAGE ) && IsInjured() )
 			{
 				if ( random->RandomInt( 0, 2 ) != 0 )
 				{
 					m_bAnnoyed = true;
+					TakeHealth( -(GetHealth() * 2), DMG_GENERIC );	//Give a little boost to health
 					return SCHED_CITIZEN_ANNOYED;
 				}
 			}
 		}
 		else
 		{
-			if ( HasCondition( COND_LIGHT_DAMAGE ) && IsInjured() )
+			if ( (HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_SEE_NEMESIS )) && IsInjured() )
 			{
 				//TODO; This needs a counter, stop doing this after 2 or 3 times
 				if ( !(m_Type == CT_REBEL || m_Type == CT_UNIQUE) )	//TODO; instead of checking type every tick, maybe do a spawn value instead?
@@ -1252,10 +1239,11 @@ int CNPC_Citizen::SelectSchedule()
 					FearSound();
 					return SCHED_CITIZEN_FLEE;
 				}
-				else if ( !m_bAnnoyed && random->RandomInt( 0, 2 ) == 1 )
+				else if ( random->RandomInt( 0, 2 ) == 2 )
 				{
 					// The guy must be toying with me - Get mad!
 					m_bAnnoyed = true;
+					TakeHealth( -(GetHealth() * 2), DMG_GENERIC );	//Give a little boost to health
 					return SCHED_CITIZEN_ANNOYED;
 				}
 			}
@@ -1412,7 +1400,7 @@ int CNPC_Citizen::SelectScheduleHeal()
 //-----------------------------------------------------------------------------
 int CNPC_Citizen::SelectScheduleRetrieveItem()
 {
-	if ( HasCondition(COND_BETTER_WEAPON_AVAILABLE) )
+	if ( HasCondition( COND_BETTER_WEAPON_AVAILABLE ) )
 	{
 		CBaseHLCombatWeapon *pWeapon = dynamic_cast<CBaseHLCombatWeapon *>(Weapon_FindUsable( WEAPON_SEARCH_DELTA ));
 		if ( pWeapon )
@@ -1425,23 +1413,15 @@ int CNPC_Citizen::SelectScheduleRetrieveItem()
 		}
 	}
 
-	if( HasCondition(COND_HEALTH_ITEM_AVAILABLE) )
+	if( HasCondition( COND_HEALTH_ITEM_AVAILABLE ) )
 	{
-		if( !IsInPlayerSquad() )
-		{
-			// Been kicked out of the player squad since the time I located the health.
-			ClearCondition( COND_HEALTH_ITEM_AVAILABLE );
-		}
-		else
-		{
-			CBaseEntity *pBase = FindHealthItem(m_FollowBehavior.GetFollowTarget()->GetAbsOrigin(), Vector( 120, 120, 120 ) );
-			CItem *pItem = dynamic_cast<CItem *>(pBase);
+		CBaseEntity *pBase = FindHealthItem(m_FollowBehavior.GetFollowTarget()->GetAbsOrigin(), Vector( 120, 120, 120 ) );
+		CItem *pItem = dynamic_cast<CItem *>(pBase);
 
-			if( pItem )
-			{
-				SetTarget( pItem );
-				return SCHED_GET_HEALTHKIT;
-			}
+		if( pItem )
+		{
+			SetTarget( pItem );
+			return SCHED_GET_HEALTHKIT;
 		}
 	}
 	return SCHED_NONE;
@@ -1917,35 +1897,6 @@ void CNPC_Citizen::TaskFail( AI_TaskFailureCode_t code )
 //-----------------------------------------------------------------------------
 Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 {
-#if 0
-	if ( activity == ACT_MELEE_ATTACK1 )
-	{
-		return ACT_MELEE_ATTACK_SWING;
-	}
-
-	if ( activity == ACT_RUN)
-	{
-		if ( IsOnFire() && HaveSequenceForActivity( ACT_RUN_ON_FIRE ) )
-		{
-			// flail around!
-			return ACT_RUN_ON_FIRE;
-		}
-		else if ( IsInjured() && HaveSequenceForActivity( ACT_RUN_HURT ) )
-		{
-			// limp!
-			return ACT_RUN_HURT;
-		}
-	}
-	else if ( activity == ACT_WALK)
-	{
-		if ( IsInjured() && HaveSequenceForActivity( ACT_WALK_HURT ) )
-		{
-			// limp!
-			return ACT_WALK_HURT;
-		}
-	}
-#endif
-
 	switch ( activity )
 	{
 		case ACT_MELEE_ATTACK1:
@@ -2292,15 +2243,17 @@ bool CNPC_Citizen::ShouldLookForBetterWeapon()
 			return false;
 		}
 
-		if ( GetActiveWeapon() && IsMoving() )
+		if ( GetActiveWeapon() && IsMoving() && GetEnemy() )
 			return false;
 
+#ifndef HL2_EPISODIC
 		if ( GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON )
 		{
 			// This stops the NPC looking altogether.
 			m_flNextWeaponSearchTime = FLT_MAX;
 			return false;
 		}
+#endif
 
 #ifdef DEBUG
 		// Cached off to make sure you change this if you ask the code to defer.
@@ -3252,6 +3205,10 @@ void CNPC_Citizen::FixupPlayerSquad()
 		if ( pAllyNpc->IsCommandable() )
 		{
 			pLeader = pAllyNpc;
+			if ( !IsLeader() )
+			{
+				m_bIsRebel = true;
+			}
 			break;
 		}
 	}
@@ -3315,7 +3272,14 @@ void CNPC_Citizen::UpdateFollowCommandPoint()
 			{
 				pFollowTarget = pCommandPoint;
 				m_FollowBehavior.SetFollowTarget( pFollowTarget );
-				m_FollowBehavior.SetParameters( AIF_COMMANDER );
+				if ( m_NPCState != NPC_STATE_IDLE && HasCondition( COND_SEE_ENEMY ) && !m_bIsRebel )
+				{
+					m_FollowBehavior.SetParameters( AIF_WIDE );
+				}
+				else
+				{
+					m_FollowBehavior.SetParameters( AIF_COMMANDER );
+				}
 			}
 			
 			if ( ( pCommandPoint->GetAbsOrigin() - GetCommandGoal() ).LengthSqr() > 0.01 )
@@ -3893,15 +3857,19 @@ bool CNPC_Citizen::ShouldLookForHealthItem()
 		return false;
 #endif
 
-	// I'm fully healthy.
-	if( GetHealth() >= GetMaxHealth() )
+	if( gpGlobals->curtime < m_flNextHealthSearchTime )
 		return false;
 
-	if( gpGlobals->curtime < m_flNextHealthSearchTime )
+	// I'm healthy, dont need it.
+	if( GetHealth() >= GetMaxHealth() * 0.75 )
 		return false;
 
 	// Player is hurt, don't steal his health.
 	if( AI_IsSinglePlayer() && IsPlayerAlly() && UTIL_GetLocalPlayer()->GetHealth() <= UTIL_GetLocalPlayer()->GetHealth() * 0.75f )
+		return false;
+
+	// Don't search .
+	if( CanReload() )
 		return false;
 
 	// Wait till you're standing still.
@@ -3990,7 +3958,14 @@ void CNPC_Citizen::DeathSound( const CTakeDamageInfo &info )
 	// Sentences don't play on dead NPCs
 	SentenceStop();
 
-	//TODO; Dont make sound on headshot
+	// Dont make sound on headshot
+#if 0
+	if ( LastHitGroup() == HITGROUP_HEAD )
+	{
+		return;
+	}
+#endif
+
 	const char *pDeathsoundName = "NPC_Citizen.Die";
 
 	// If im gibbing, dont make a long, drawn-out, bone-chilling, almost shakespearean death rattle
@@ -4256,7 +4231,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 	)
 
 	//=========================================================
-	// > Fear Schedules
+	// > Temp Fear Schedules, will use behavior tbd
 	//=========================================================
 	DEFINE_SCHEDULE
 	(

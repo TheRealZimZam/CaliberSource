@@ -32,7 +32,7 @@
 #include "ai_tacticalservices.h"
 
 #ifdef HL2_EPISODIC
-#include "grenade_spit.h"
+#include "grenade_ball.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -1118,13 +1118,13 @@ void CNPC_Antlion::HandleAnimEvent( animevent_t *pEvent )
 										
 					if ( i == 0 )
 					{
-						pGrenade->SetSpitSize( SPIT_LARGE );
+						pGrenade->SetSpitType( SPIT, LARGE );
 						pGrenade->SetAbsVelocity( vecToss * flVelocity );
 					}
 					else
 					{
 						pGrenade->SetAbsVelocity( ( vecToss + RandomVector( -0.035f, 0.035f ) ) * flVelocity );
-						pGrenade->SetSpitSize( random->RandomInt( SPIT_SMALL, SPIT_MEDIUM ) );
+						pGrenade->SetSpitType( SPIT, random->RandomInt( SMALL, MEDIUM ) );
 					}
 
 					// Tumble through the air
@@ -3016,6 +3016,7 @@ bool CNPC_Antlion::HandleInteraction( int interactionType, void *data, CBaseComb
 //-----------------------------------------------------------------------------
 bool CNPC_Antlion::Alone( void )
 {
+	//TODO; Also check if there are other ants around me
 	if ( m_pSquad == NULL )
 		return true;
 

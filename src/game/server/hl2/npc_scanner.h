@@ -20,6 +20,7 @@
 
 class CBeam;
 class CSprite;
+class CSteamJet;
 class SmokeTrail;
 class CSpotlightEnd;
 

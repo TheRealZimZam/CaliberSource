@@ -27,8 +27,7 @@
 
 #define	PISTOL_FASTEST_REFIRE_TIME		0.2f
 
-ConVar	sk_pistol_accuracy			( "sk_pistol_accuracy",			"0.01745");	//2 DEGREES
-ConVar	sk_pistol_burst_accuracy	( "sk_pistol_burst_accuracy",	"0.06105");	//7 DEGREES
+ConVar	sk_pistol_burst_accuracy_scale( "sk_pistol_burst_accuracy_scale",	"2.5");	//7 DEGREES
 extern ConVar sv_funmode;
 
 //-----------------------------------------------------------------------------
@@ -67,6 +66,12 @@ public:
 		if ( GetOwner() && GetOwner()->IsNPC() )
 			cone = VECTOR_CONE_7DEGREES;
 
+		if ( GetHSpread() != NULL )
+		{
+			// We got a weaponscript cone, use that instead
+			cone = Vector( GetHSpread(), ((GetHSpread() / 2) + (GetVSpread() / 2)), GetVSpread() );
+		}
+
 		return cone;
 	}
 
@@ -85,7 +90,7 @@ public:
 	DECLARE_ACTTABLE();
 
 private:
-	void	PistolFire( float flSpread, float flCycleTime, bool bBurstFire );
+	void	PistolFire( Vector vSpread, float flCycleTime, bool bBurstFire );
 	float	m_flSoonestPrimaryAttack;
 	int		m_nNumShotsFired;
 };
@@ -207,7 +212,7 @@ void CWeaponPistol::DryFire( void )
 //-----------------------------------------------------------------------------
 void CWeaponPistol::PrimaryAttack( void )
 {
-	PistolFire( sk_pistol_accuracy.GetFloat(), GetFireRate(), false );
+	PistolFire( GetBulletSpread(), GetFireRate(), false );
 }
 
 //-----------------------------------------------------------------------------
@@ -215,13 +220,13 @@ void CWeaponPistol::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 void CWeaponPistol::SecondaryAttack( void )
 {
-	PistolFire( sk_pistol_burst_accuracy.GetFloat(), 0.06f, true );
+	PistolFire( (GetBulletSpread() * sk_pistol_burst_accuracy_scale.GetFloat()), 0.06f, true );
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Shoot de gun, mon!
 //-----------------------------------------------------------------------------
-void CWeaponPistol::PistolFire( float flSpread, float flCycleTime, bool bBurstFire )
+void CWeaponPistol::PistolFire( Vector vSpread, float flCycleTime, bool bBurstFire )
 {
 	// Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
@@ -273,7 +278,8 @@ void CWeaponPistol::PistolFire( float flSpread, float flCycleTime, bool bBurstFi
 	Vector	vecSrc	 = pPlayer->Weapon_ShootPosition( );
 	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
 
-	pPlayer->FireBullets( 1, vecSrc, vecAiming, Vector( flSpread, flSpread, flSpread ), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
+//	pPlayer->FireBullets( 1, vecSrc, vecAiming, Vector( flSpread, flSpread, flSpread ), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
+	pPlayer->FireBullets( 1, vecSrc, vecAiming, vSpread, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
 
 	if( pPlayer )
 	{
@@ -412,7 +418,7 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector cone = VECTOR_CONE_3DEGREES;
+		static Vector cone = VECTOR_CONE_2DEGREES;
 
 		return cone;
 	}

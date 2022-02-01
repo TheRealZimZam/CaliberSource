@@ -1,100 +1,60 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2002, Valve LLC, All rights reserved. ============
 //
-// Purpose:		Projectile shot from the AR2 
-//
-// $Workfile:     $
-// $Date:         $
-//
-//-----------------------------------------------------------------------------
-// $Log: $
+// Purpose: 
 //
 // $NoKeywords: $
-//=============================================================================//
+//=============================================================================
 
-#ifndef	WEAPONAR2_H
-#define	WEAPONAR2_H
+#ifndef WEAPON_FLAMETHROWER_H
+#define WEAPON_FLAMETHROWER_H
+#ifdef _WIN32
+#pragma once
+#endif
 
-#include "basegrenade_shared.h"
 #include "basehlcombatweapon.h"
+#include "basegrenade_shared.h"
+#include "soundenvelope.h"
 
-class CWeaponAR2 : public CHLMachineGun
+#define	FLAMETHROWER_VELOCITY	400.0f
+#define	FLAMETHROWER_FIRERATE	0.1f	// Eject a fire blob entity this often.
+#define	FLAMETHROWER_DRAINRATE	0.05f	// Drain ammo this fast
+#define FLAMETHROWER_SPREAD_ANGLE		15.0	// How far the flame particles will spread from the center.
+
+//=========================================================
+// Medikit Weapon
+//=========================================================
+class CWeaponFlameThrower : public CBaseHLCombatWeapon
 {
 public:
-	DECLARE_CLASS( CWeaponAR2, CHLMachineGun );
+	DECLARE_DATADESC();
+	DECLARE_CLASS( CWeaponFlameThrower, CBaseHLCombatWeapon );
 
-	CWeaponAR2();
-
+	CWeaponFlameThrower();
 	DECLARE_SERVERCLASS();
 
-	void	ItemPostFrame( void );
-	void	Precache( void );
-	virtual void Equip( CBaseCombatCharacter *pOwner );
+	float GetVelocity( void )		{ return FLAMETHROWER_VELOCITY; }
+	float GetFireRate( void )		{ return FLAMETHROWER_FIRERATE; }
 
-	void	SecondaryAttack( void );
-	void	DelayedAttack( void );
+	int CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
-	const char *GetTracerType( void ) { return "AR2Tracer"; }
+	void Precache( void );
+	void PrimaryAttack( void );
 
-	void	AddViewKick( void );
-
-	void	FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
-	void	FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
-	void	Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
-	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-
-	int		GetMinBurst( void ) { return 2; }
-	int		GetMaxBurst( void ) { return 5; }
-	float	GetFireRate( void );
-//	float	GetFireRate( void ) { return 0.125f; }
-
+	void	StartSound();
+	void	StopFlameSound();
+	
 	bool	CanHolster( void );
 	bool	Reload( void );
 
-	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
-
-	Activity	GetPrimaryAttackActivity( void );
-	
-	void	DoImpactEffect( trace_t &tr, int nDamageType );
-
-//	virtual const Vector& GetBulletSpread( void )
-//	{
-//		static Vector cone;
-//		
-//		cone = VECTOR_CONE_3DEGREES;
-//
-//		return cone;
-//	}
-	virtual const Vector& GetBulletSpread( void )
-	{
-		static Vector cone;
-		
-		if( GetOwner() && GetOwner()->IsPlayer() )
-		{
-			cone = ( m_bZoomed ) ? VECTOR_CONE_1DEGREES : VECTOR_CONE_3DEGREES;
-		}
-		else
-		{
-			cone = VECTOR_CONE_4DEGREES;
-		}
-		
-		return cone;
-	}
-
-	const WeaponProficiencyInfo_t *GetProficiencyValues();
-
-protected:
-
-	float					m_flDelayedFire;
-	bool					m_bShotDelayed;
-
-	void			Zoom( void );
-	bool			m_bZoomed;
-
-	int						m_nVentPose;
+	void	ItemPostFrame( void );
 	
 	DECLARE_ACTTABLE();
-	DECLARE_DATADESC();
+
+private:
+	// Start/stop the fire sound.
+	bool					m_bSoundOn;	// Is the sound on?
+	bool					m_bFiring;	// Are we firing?
+	
 };
 
-
-#endif	//WEAPONAR2_H
+#endif // WEAPON_FLAME_THROWER_H

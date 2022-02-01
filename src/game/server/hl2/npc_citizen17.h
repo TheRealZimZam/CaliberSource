@@ -168,8 +168,8 @@ public:
 	//---------------------------------
 	// Commander mode
 	//---------------------------------
-	bool			m_fIsRebel;
-	bool			IsLeader() { return m_fIsRebel; }
+	bool			m_bIsRebel;
+	bool			IsLeader() { return m_bIsRebel; }
 	bool 			IsCommandable();
 	bool			IsPlayerAlly( CBasePlayer *pPlayer = NULL );
 	bool			CanJoinPlayerSquad();

@@ -1583,26 +1583,14 @@ void CGameMovement::Friction( void )
 		friction = sv_friction.GetFloat() * player->m_surfaceFriction;
 
 		// Bleed off some speed, but if we have less than the bleed
-		//  threshold, bleed the threshold amount.
-
-		if ( IsX360() )
+		// threshold, bleed the threshold amount.
+		if( player->m_Local.m_bDucked )
 		{
-			if( player->m_Local.m_bDucked )
-			{
-				control = (speed < sv_stopspeed.GetFloat()) ? sv_stopspeed.GetFloat() : speed;
-			}
-			else
-			{
-#if defined ( TF_DLL ) || defined ( TF_CLIENT_DLL )
-				control = (speed < sv_stopspeed.GetFloat()) ? sv_stopspeed.GetFloat() : speed;
-#else
-				control = (speed < sv_stopspeed.GetFloat()) ? (sv_stopspeed.GetFloat() * 2.0f) : speed;
-#endif
-			}
+			control = (speed < sv_deceleration.GetFloat()) ? sv_deceleration.GetFloat() : speed;
 		}
 		else
 		{
-			control = (speed < sv_stopspeed.GetFloat()) ? sv_stopspeed.GetFloat() : speed;
+			control = (speed < sv_deceleration.GetFloat()) ? (sv_deceleration.GetFloat() * 0.75f) : speed;	//2.0f
 		}
 
 		// Add the amount to the drop amount.
@@ -2781,6 +2769,18 @@ inline bool CGameMovement::OnLadder( trace_t &trace )
 	return false;
 }
 
+//=============================================================================
+// HPE_BEGIN
+// [sbodenbender] make ladders easier to climb in cstrike
+//=============================================================================
+//#if defined (CSTRIKE_DLL)
+ConVar sv_ladder_dampen( "sv_ladder_dampen", "0.2", FCVAR_REPLICATED, "Amount to dampen perpendicular movement on a ladder", true, 0.0f, true, 1.0f );
+ConVar sv_ladder_angle( "sv_ladder_angle", "-0.707", FCVAR_REPLICATED, "Cos of angle of incidence to ladder perpendicular for applying ladder_dampen", true, -1.0f, true, 1.0f );
+//#endif // CSTRIKE_DLL
+//=============================================================================
+// HPE_END
+//=============================================================================
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -2905,6 +2905,30 @@ bool CGameMovement::LadderMove( void )
 			// because the velocity is a sum of the directional velocity and the converted
 			// velocity through the face of the ladder -- by design.
 			CrossProduct( pm.plane.normal, perp, tmp );
+
+			//=============================================================================
+			// HPE_BEGIN
+			// [sbodenbender] make ladders easier to climb in cstrike
+			//=============================================================================
+//#if defined (CSTRIKE_DLL)
+			// break lateral into direction along tmp (up the ladder) and direction along perp (perpendicular to ladder)
+			float tmpDist = DotProduct ( tmp, lateral );
+			float perpDist = DotProduct ( perp, lateral );
+
+			Vector angleVec = perp * perpDist;
+			angleVec += cross;
+			// angleVec is our desired movement in the ladder normal/perpendicular plane
+			VectorNormalize(angleVec);
+			float angleDot = DotProduct(angleVec, pm.plane.normal);
+			// angleDot is our angle of incidence to the laddernormal in the ladder normal/perpendicular plane
+
+			if (angleDot < sv_ladder_angle.GetFloat())
+				lateral = (tmp * tmpDist) + (perp * sv_ladder_dampen.GetFloat() * perpDist);
+//#endif // CSTRIKE_DLL
+			//=============================================================================
+			// HPE_END
+			//=============================================================================
+
 			VectorMA( lateral, -normal, tmp, mv->m_vecVelocity );
 
 			if ( onFloor && normal > 0 )	// On ground moving away from the ladder
@@ -4470,9 +4494,8 @@ void CGameMovement::PlayerMove( void )
 			break;
 
 		case MOVETYPE_ISOMETRIC:
-			//IsometricMove();
+			IsometricMove();
 			// Could also try:  FullTossMove();
-			FullWalkMove();
 			break;
 			
 		case MOVETYPE_OBSERVER:

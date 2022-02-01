@@ -381,6 +381,11 @@ bool CBaseCombatWeapon::UsesClipsForAmmo2( void ) const
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+int CBaseCombatWeapon::GetPriority( void ) const
+{
+	return GetWpnData().iPriority;
+}
+
 int CBaseCombatWeapon::GetWeight( void ) const
 {
 	return GetWpnData().iWeight;
@@ -776,6 +781,10 @@ void CBaseCombatWeapon::MakeTracer( const Vector &vecTracerSrc, const trace_t &t
 		UTIL_Tracer( vNewSrc, tr.endpos, iEntIndex, iAttachment, 0.0f, false, pszTracerName );
 		break;
 
+	case TRACER_RAIL:
+	case TRACER_BEAM:
+		break;
+
 	case TRACER_LINE_AND_WHIZ:
 		UTIL_Tracer( vNewSrc, tr.endpos, iEntIndex, iAttachment, 0.0f, true, pszTracerName );
 		break;
@@ -961,6 +970,7 @@ void CBaseCombatWeapon::Equip( CBaseCombatCharacter *pOwner )
 
 	m_flNextPrimaryAttack		= gpGlobals->curtime;
 	m_flNextSecondaryAttack		= gpGlobals->curtime;
+	m_flNextTertiaryAttack		= gpGlobals->curtime;
 	SetTouch( NULL );
 	SetThink( NULL );
 #if !defined( CLIENT_DLL )
@@ -976,6 +986,7 @@ void CBaseCombatWeapon::Equip( CBaseCombatCharacter *pOwner )
 		// Make the weapon ready as soon as any NPC picks it up.
 		m_flNextPrimaryAttack = gpGlobals->curtime;
 		m_flNextSecondaryAttack = gpGlobals->curtime;
+		m_flNextTertiaryAttack = gpGlobals->curtime;
 		SetModel( GetWorldModel() );
 	}
 }
@@ -1377,6 +1388,7 @@ bool CBaseCombatWeapon::DefaultDeploy( char *szViewModel, char *szWeaponModel, i
 	// Can't shoot again until we've finished deploying
 	m_flNextPrimaryAttack	= gpGlobals->curtime + SequenceDuration();
 	m_flNextSecondaryAttack	= gpGlobals->curtime + SequenceDuration();
+	m_flNextTertiaryAttack	= gpGlobals->curtime + SequenceDuration();
 	m_flHudHintMinDisplayTime = 0;
 
 	m_bAltFireHudHintDisplayed = false;
@@ -1658,6 +1670,16 @@ void CBaseCombatWeapon::ItemPostFrame( void )
 	}
 
 	// -----------------------
+	//  Change Firemode
+	// -----------------------
+	if ( (pOwner->m_nButtons & IN_ATTACK3) && (m_flNextTertiaryAttack <= gpGlobals->curtime))
+	{
+		TertiaryAttack();
+		m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
+		m_flNextSecondaryAttack = gpGlobals->curtime + 0.2;
+	}
+
+	// -----------------------
 	//  No buttons down
 	// -----------------------
 	if (!((pOwner->m_nButtons & IN_ATTACK) || (pOwner->m_nButtons & IN_ATTACK2) || (pOwner->m_nButtons & IN_RELOAD)))
@@ -1750,7 +1772,15 @@ const WeaponProficiencyInfo_t *CBaseCombatWeapon::GetProficiencyValues()
 //-----------------------------------------------------------------------------
 float CBaseCombatWeapon::GetFireRate( void )
 {
-	return GetCycleTime();
+	float cycletime = 1.0f;
+
+	if ( GetCycleTime() != NULL )
+	{
+		// We got a weaponscript rate, use that instead
+		cycletime = GetCycleTime();
+	}
+
+	return cycletime;
 }
 
 //-----------------------------------------------------------------------------
@@ -2285,6 +2315,7 @@ BEGIN_PREDICTION_DATA( CBaseCombatWeapon )
 	DEFINE_PRED_FIELD( m_iWorldModelIndex, FIELD_INTEGER, FTYPEDESC_INSENDTABLE | FTYPEDESC_MODELINDEX ),
 	DEFINE_PRED_FIELD_TOL( m_flNextPrimaryAttack, FIELD_FLOAT, FTYPEDESC_INSENDTABLE, TD_MSECTOLERANCE ),	
 	DEFINE_PRED_FIELD_TOL( m_flNextSecondaryAttack, FIELD_FLOAT, FTYPEDESC_INSENDTABLE, TD_MSECTOLERANCE ),
+	DEFINE_PRED_FIELD_TOL( m_flNextTertiaryAttack, FIELD_FLOAT, FTYPEDESC_INSENDTABLE, TD_MSECTOLERANCE ),
 	DEFINE_PRED_FIELD_TOL( m_flTimeWeaponIdle, FIELD_FLOAT, FTYPEDESC_INSENDTABLE, TD_MSECTOLERANCE ),
 
 	DEFINE_PRED_FIELD( m_iPrimaryAmmoType, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
@@ -2337,6 +2368,7 @@ BEGIN_DATADESC( CBaseCombatWeapon )
 
 	DEFINE_FIELD( m_flNextPrimaryAttack, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextSecondaryAttack, FIELD_TIME ),
+	DEFINE_FIELD( m_flNextTertiaryAttack, FIELD_TIME ),
 	DEFINE_FIELD( m_flTimeWeaponIdle, FIELD_TIME ),
 
 	DEFINE_FIELD( m_bInReload, FIELD_BOOLEAN ),
@@ -2474,6 +2506,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CBaseCombatWeapon, DT_LocalActiveWeaponData )
 #if !defined( CLIENT_DLL )
 	SendPropTime( SENDINFO( m_flNextPrimaryAttack ) ),
 	SendPropTime( SENDINFO( m_flNextSecondaryAttack ) ),
+	SendPropTime( SENDINFO( m_flNextTertiaryAttack ) ),
 	SendPropInt( SENDINFO( m_nNextThinkTick ) ),
 	SendPropTime( SENDINFO( m_flTimeWeaponIdle ) ),
 
@@ -2484,6 +2517,7 @@ BEGIN_NETWORK_TABLE_NOBASE( CBaseCombatWeapon, DT_LocalActiveWeaponData )
 #else
 	RecvPropTime( RECVINFO( m_flNextPrimaryAttack ) ),
 	RecvPropTime( RECVINFO( m_flNextSecondaryAttack ) ),
+	RecvPropTime( RECVINFO( m_flNextTertiaryAttack ) ),
 	RecvPropInt( RECVINFO( m_nNextThinkTick ) ),
 	RecvPropTime( RECVINFO( m_flTimeWeaponIdle ) ),
 #endif

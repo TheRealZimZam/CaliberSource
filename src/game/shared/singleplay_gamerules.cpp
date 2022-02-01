@@ -37,7 +37,7 @@ bool CSingleplayRules::IsMultiplayer( void )
 //-----------------------------------------------------------------------------
 int CSingleplayRules::Damage_GetTimeBased( void )
 {
-	int iDamage = ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN );
+	int iDamage = ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE );
 	return iDamage;
 }
 
@@ -55,7 +55,7 @@ int	CSingleplayRules::Damage_GetShouldGibCorpse( void )
 //-----------------------------------------------------------------------------
 int CSingleplayRules::Damage_GetShowOnHud( void )
 {
-	int iDamage = ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK );
+	int iDamage = ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_SLOWFREEZE | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK );
 	return iDamage;
 }
 
@@ -87,7 +87,7 @@ int	CSingleplayRules::Damage_GetShouldNotBleed( void )
 bool CSingleplayRules::Damage_IsTimeBased( int iDmgType )
 {
 	// Damage types that are time-based.
-	return ( ( iDmgType & ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN ) ) != 0 );
+	return ( ( iDmgType & ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE ) ) != 0 );
 }
 
 //-----------------------------------------------------------------------------
@@ -98,7 +98,7 @@ bool CSingleplayRules::Damage_IsTimeBased( int iDmgType )
 bool CSingleplayRules::Damage_ShouldGibCorpse( int iDmgType )
 {
 	// Damage types that gib the corpse.
-	return ( ( iDmgType & ( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_SONIC | DMG_CLUB ) ) != 0 );
+	return ( ( iDmgType & ( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_SONIC ) ) != 0 );
 }
 
 //-----------------------------------------------------------------------------
@@ -109,7 +109,7 @@ bool CSingleplayRules::Damage_ShouldGibCorpse( int iDmgType )
 bool CSingleplayRules::Damage_ShowOnHUD( int iDmgType )
 {
 	// Damage types that have client HUD art.
-	return ( ( iDmgType & ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK ) ) != 0 );
+	return ( ( iDmgType & ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_SLOWFREEZE | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK ) ) != 0 );
 }
 
 //-----------------------------------------------------------------------------

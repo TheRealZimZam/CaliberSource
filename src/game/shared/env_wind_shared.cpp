@@ -106,6 +106,12 @@ void CEnvWindShared::Init( int nEntIndex, int iRandomSeed, float flTime,
 
 	m_flAveWindSpeed = m_flWindSpeed = m_flInitialWindSpeed = flInitialWindSpeed;
 
+#ifndef CLIENT_DLL
+	// Disgusting hack for legacy fx (might only be rain)
+	ConVarRef winddir( "cl_winddir" );
+	winddir.SetValue( iInitialWindYaw );
+#endif
+
 	/*
 	// Cache in the wind sound...
 	if (!g_pEffects->IsServer())
@@ -209,6 +215,11 @@ float CEnvWindShared::WindThink( float flTime )
 				bReachedSteadyState = false;
 		}
 
+#ifndef CLIENT_DLL
+	// Disgusting hack for legacy fx (might only be rain)
+	ConVarRef windspeed( "cl_windspeed" );
+	windspeed.SetValue( m_flWindSpeed );
+#endif
 		// Update the sim time
 
 		// If we didn't get to a switch point, then we're done simulating for now 

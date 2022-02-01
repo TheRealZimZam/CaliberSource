@@ -1933,7 +1933,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			}
 		}
 
-		//NOTENOTE: We could expand this to a more general solution for various material penetration types (wood, thin metal, etc)
+		//TODO: We could expand this to a more general solution for various material penetration types (wood, thin metal, etc)
 
 		// See if we should pass through glass
 #ifdef GAME_DLL
@@ -2008,7 +2008,7 @@ bool CBaseEntity::HandleShotImpactingWater( const FireBulletsInfo_t &info,
 		{
 			data.m_fFlags |= FX_WATER_IN_SLIME;
 		}
-		DispatchEffect( "gunshotsplash", data );
+		DispatchEffect( "bulletsplash", data );
 	}
 
 #ifdef GAME_DLL
@@ -2031,7 +2031,6 @@ bool CBaseEntity::HandleShotImpactingWater( const FireBulletsInfo_t &info,
 	*pVecTracerDest = waterTrace.endpos;
 	return true;
 }
-
 
 ITraceFilter* CBaseEntity::GetBeamTraceFilter( void )
 {

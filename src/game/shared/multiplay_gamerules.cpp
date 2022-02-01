@@ -117,7 +117,7 @@ bool CMultiplayRules::IsMultiplayer( void )
 //-----------------------------------------------------------------------------
 int CMultiplayRules::Damage_GetTimeBased( void )
 {
-	int iDamage = ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN );
+	int iDamage = ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE );
 	return iDamage;
 }
 
@@ -135,7 +135,7 @@ int	CMultiplayRules::Damage_GetShouldGibCorpse( void )
 //-----------------------------------------------------------------------------
 int CMultiplayRules::Damage_GetShowOnHud( void )
 {
-	int iDamage = ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK );
+	int iDamage = ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_SLOWFREEZE | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK );
 	return iDamage;
 }
 
@@ -189,7 +189,7 @@ bool CMultiplayRules::Damage_ShouldGibCorpse( int iDmgType )
 bool CMultiplayRules::Damage_ShowOnHUD( int iDmgType )
 {
 	// Damage types that have client HUD art.
-	return ( ( iDmgType & ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK ) ) != 0 );
+	return ( ( iDmgType & ( DMG_POISON | DMG_ACID | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_SLOWFREEZE | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK ) ) != 0 );
 }
 
 //-----------------------------------------------------------------------------

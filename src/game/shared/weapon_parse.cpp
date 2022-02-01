@@ -319,6 +319,7 @@ FileWeaponInfo_t::FileWeaponInfo_t()
 	iMaxClip2 = 0;
 	iDefaultClip1 = 0;
 	iDefaultClip2 = 0;
+	iPriority = 2;
 	iWeight = 0;
 	iRumbleEffect = -1;
 	bAutoSwitchTo = false;
@@ -381,6 +382,7 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 	iMaxClip2 = pKeyValuesData->GetInt( "clip2_size", WEAPON_NOCLIP );				// Max secondary clips gun can hold (assume they don't use clips by default)
 	iDefaultClip1 = pKeyValuesData->GetInt( "default_clip", iMaxClip1 );			// amount of primary ammo placed in the primary clip when it's picked up
 	iDefaultClip2 = pKeyValuesData->GetInt( "default_clip2", iMaxClip2 );			// amount of secondary ammo placed in the secondary clip when it's picked up
+	iPriority = pKeyValuesData->GetInt( "priority", 0 );							// Weapon priority for npcs to pickup (0-4)
 	iWeight = pKeyValuesData->GetInt( "weight", 0 );
 
 	iRumbleEffect = pKeyValuesData->GetInt( "rumble", -1 );

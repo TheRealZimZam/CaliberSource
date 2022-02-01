@@ -911,7 +911,9 @@ void PhysForceClearVelocity( IPhysicsObject *pPhys )
 	pPhys->DestroyFrictionSnapshot( pSnapshot );
 }
 
-
+//-----------------------------------------------------------------------------
+// Purpose: Ragdoll/Object scrape dust
+//-----------------------------------------------------------------------------
 void PhysFrictionEffect( Vector &vecPos, Vector vecVel, float energy, int surfaceProps, int surfacePropsHit )
 {
 	Vector invVecVel = -vecVel;
@@ -919,26 +921,41 @@ void PhysFrictionEffect( Vector &vecPos, Vector vecVel, float energy, int surfac
 
 	surfacedata_t *psurf = physprops->GetSurfaceData( surfaceProps );
 	surfacedata_t *phit = physprops->GetSurfaceData( surfacePropsHit );
+	float flisragdoll = 1.0f;
 
+	// A body flying at mach speed just impacted something
+	if ( psurf->game.material == CHAR_TEX_FLESH || psurf->game.material == CHAR_TEX_BLOODYFLESH )
+	{
+		flisragdoll = 0.75f;
+/*
+		if ( energy > MASS10_SPEED2ENERGY(95) )
+		{
+			//TODO; Get the color of the ragdoll! Somehow!
+			UTIL_BloodImpact( vecPos, invVecVel, 1, 1 );
+		}
+*/
+	}
+
+	//TODO; Size of object needs to be accounted for dust
 	switch ( phit->game.material )
 	{
 	case CHAR_TEX_DIRT:
-		
+	case CHAR_TEX_SAND:
 		if ( energy < MASS10_SPEED2ENERGY(15) )
 			break;
-		
-		g_pEffects->Dust( vecPos, invVecVel, 1, 16 );
+
+		g_pEffects->Dust( vecPos, invVecVel, (random->RandomFloat( 0.75f, 3.5f ) * flisragdoll), 16 );
 		break;
 
 	case CHAR_TEX_CONCRETE:
-		
+//	case CHAR_TEX_WOOD:
 		if ( energy < MASS10_SPEED2ENERGY(28) )
 			break;
 		
-		g_pEffects->Dust( vecPos, invVecVel, 1, 16 );
+		g_pEffects->Dust( vecPos, invVecVel, (random->RandomFloat( 0.75f, 3.5f ) * flisragdoll * 0.75f), 16 );
 		break;
 	}
-	
+
 	//Metal sparks
 	if ( energy > MASS10_SPEED2ENERGY(50) )
 	{
@@ -981,7 +998,7 @@ void PhysFrictionSound( CBaseEntity *pEntity, IPhysicsObject *pObject, float ene
 	if ( psurf->sounds.scrapeSmooth && phit->audio.roughnessFactor < psurf->audio.roughThreshold )
 	{
 		soundName = psurf->sounds.scrapeSmooth;
-		soundHandle = &psurf->soundhandles.scrapeRough;
+		soundHandle = &psurf->soundhandles.scrapeSmooth;
 	}
 
 	const char *pSoundName = physprops->GetString( soundName );

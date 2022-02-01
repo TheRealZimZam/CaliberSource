@@ -13,7 +13,7 @@
 #include "convar.h"
 
 extern ConVar sv_gravity;
-extern ConVar sv_stopspeed;
+extern ConVar sv_deceleration;
 extern ConVar sv_noclipaccelerate;
 extern ConVar sv_noclipspeed;
 extern ConVar sv_maxspeed;
@@ -30,6 +30,7 @@ extern ConVar sv_maxvelocity;
 extern ConVar sv_stepsize;
 extern ConVar sv_skyname;
 extern ConVar sv_backspeed;
+extern ConVar sv_strafespeed;
 extern ConVar sv_waterdist;
 extern ConVar sv_specaccelerate;
 extern ConVar sv_specspeed;

@@ -774,7 +774,7 @@ void UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, 
 	if ( g_pGameRules->IsMultiplayer() )
 	{
 		// scale up blood effect in multiplayer for better visibility
-		amount *= 5;
+		amount *= 4;
 	}
 
 	if ( amount > 255 )
@@ -850,6 +850,34 @@ void UTIL_BloodDecalTrace( trace_t *pTrace, int bloodColor )
 {
 	if ( UTIL_ShouldShowBlood( bloodColor ) )
 	{
+		switch( bloodColor )
+		{
+			case BLOOD_COLOR_RED:
+				UTIL_DecalTrace( pTrace, "Blood" );
+				break;
+
+			case BLOOD_COLOR_YELLOW:
+			case BLOOD_COLOR_GREEN:
+#ifdef HL2_EPISODIC
+			case BLOOD_COLOR_ANTLION:
+			case BLOOD_COLOR_ZOMBIE:
+			case BLOOD_COLOR_ANTLION_WORKER:
+#endif
+				UTIL_DecalTrace( pTrace, "YellowBlood" );
+				break;
+
+			case BLOOD_COLOR_BLUE:
+				UTIL_DecalTrace( pTrace, "Blood" );	//TEMP
+				break;
+
+			case BLOOD_COLOR_MECH:
+				UTIL_DecalTrace( pTrace, "SmallScorch" );
+				break;
+
+				default:
+				break;
+		}
+#if 0
 		//TODO; Shouldnt this be a switch with all possibilites??
 		if ( bloodColor == BLOOD_COLOR_RED )
 		{
@@ -859,6 +887,7 @@ void UTIL_BloodDecalTrace( trace_t *pTrace, int bloodColor )
 		{
 			UTIL_DecalTrace( pTrace, "YellowBlood" );
 		}
+#endif
 	}
 }
 

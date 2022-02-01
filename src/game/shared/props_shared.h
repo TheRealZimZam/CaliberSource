@@ -119,9 +119,11 @@ public:
 	virtual void		SetDmgModBullet( float flDmgMod ) = 0;
 	virtual void		SetDmgModClub( float flDmgMod ) = 0;
 	virtual void		SetDmgModExplosive( float flDmgMod ) = 0;
+	virtual void		SetDmgModFire( float flDmgMod ) = 0;
 	virtual float		GetDmgModBullet( void ) = 0;
 	virtual float		GetDmgModClub( void ) = 0;
 	virtual float		GetDmgModExplosive( void ) = 0;
+	virtual float		GetDmgModFire( void ) = 0;
 
 	// Explosive
 	virtual void		SetExplosiveRadius( float flRadius ) = 0;

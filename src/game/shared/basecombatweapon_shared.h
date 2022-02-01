@@ -254,6 +254,7 @@ public:
 	virtual float			GetMinRestTime() { return 0.3; }
 	virtual float			GetMaxRestTime() { return 0.6; }
 	virtual int				GetRandomBurst() { return random->RandomInt( GetMinBurst(), GetMaxBurst() ); }
+//	virtual float			GetRestTime() { return random->RandomFloat( GetMinRestTime(), GetMaxRestTime() ); }
 	virtual void			WeaponSound( WeaponSound_t sound_type, float soundtime = 0.0f );
 	virtual void			StopWeaponSound( WeaponSound_t sound_type );
 	virtual const WeaponProficiencyInfo_t *GetProficiencyValues();
@@ -312,6 +313,7 @@ public:
 	virtual int				GetDefaultClip2( void ) const;
 	virtual bool			UsesClipsForAmmo1( void ) const;
 	virtual bool			UsesClipsForAmmo2( void ) const;
+	virtual int				GetPriority( void ) const;
 	virtual int				GetWeight( void ) const;
 	virtual bool			AllowsAutoSwitchTo( void ) const;
 	virtual bool			AllowsAutoSwitchFrom( void ) const;
@@ -486,6 +488,7 @@ public:
 	// Weapon firing
 	CNetworkVar( float, m_flNextPrimaryAttack );						// soonest time ItemPostFrame will call PrimaryAttack
 	CNetworkVar( float, m_flNextSecondaryAttack );					// soonest time ItemPostFrame will call SecondaryAttack
+	CNetworkVar( float, m_flNextTertiaryAttack );					// soonest time ItemPostFrame will call TertiaryAttack
 	CNetworkVar( float, m_flTimeWeaponIdle );							// soonest time ItemPostFrame will call WeaponIdle
 	// Weapon state
 	bool					m_bInReload;			// Are we in the middle of a reload;

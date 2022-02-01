@@ -234,15 +234,15 @@ public:
 enum
 {
 	MUZZLEFLASH_AR2				= 0,	//Large Rifle/HMG
+	MUZZLEFLASH_COMBINE,				//Caseless Rifle
+	MUZZLEFLASH_COMBINE_TURRET,			//Minigun turret
+	MUZZLEFLASH_FLAREGUN,				//Flaregun
+	MUZZLEFLASH_PISTOL,					//Pistol
+	MUZZLEFLASH_RPG,					//Rawket lawnchair
 	MUZZLEFLASH_SHOTGUN,				//Shotgun
 	MUZZLEFLASH_SMG1,					//Small Rifle/SMG
 	MUZZLEFLASH_SMG2,					//Silenced SMG
-	MUZZLEFLASH_PISTOL,					//Pistol
-	MUZZLEFLASH_COMBINE,				//Caseless Rifle
 	MUZZLEFLASH_357,					//Big Pistol/Revolver
-	MUZZLEFLASH_RPG,					//Rawket lawnchair
-	MUZZLEFLASH_COMBINE_TURRET,			//Minigun turret
-	MUZZLEFLASH_FLAREGUN,				//Flaregun
 
 	MUZZLEFLASH_FIRSTPERSON		= 0x100,
 };
@@ -336,6 +336,7 @@ enum PLAYER_ANIM
 #define DMG_BULLET			(1 << 1)	// shot
 #define DMG_SLASH			(1 << 2)	// cut, clawed, stabbed
 #define DMG_BURN			(1 << 3)	// heat burned
+//#define DMG_FREEZE			(1 << 4)	// frozen
 #define DMG_VEHICLE			(1 << 4)	// hit by a vehicle
 #define DMG_FALL			(1 << 5)	// fell too far
 #define DMG_BLAST			(1 << 6)	// explosive blast damage
@@ -348,7 +349,6 @@ enum PLAYER_ANIM
 #define DMG_ALWAYSGIB		(1 << 13)	// with this bit OR'd in, any damage type can be made to gib victims upon death.
 #define DMG_DROWN			(1 << 14)	// Drowning
 
-
 #define DMG_PARALYZE		(1 << 15)	// slows affected creature down
 #define DMG_NERVEGAS		(1 << 16)	// nerve toxins, very bad
 #define DMG_POISON			(1 << 17)	// blood poisoning - heals over time like drowning damage
@@ -356,9 +356,7 @@ enum PLAYER_ANIM
 #define DMG_DROWNRECOVER	(1 << 19)	// drowning recovery
 #define DMG_ACID			(1 << 20)	// toxic chemicals or acid burns
 #define DMG_SLOWBURN		(1 << 21)	// in an oven
-
-#define DMG_REMOVENORAGDOLL	(1<<22)		// with this bit OR'd in, no ragdoll will be created, and the target will be quietly removed.
-										// use this to kill an entity that you've already got a server-side ragdoll for
+#define DMG_SLOWFREEZE		(1 << 22)	// in a subzero freezer
 
 #define DMG_PHYSGUN			(1<<23)		// Hit by manipulator. Usually doesn't do any damage.
 #define DMG_PLASMA			(1<<24)		// Shot by Cremator
@@ -369,12 +367,27 @@ enum PLAYER_ANIM
 #define DMG_DIRECT			(1<<28)
 #define DMG_BUCKSHOT		(1<<29)		// not quite a bullet. Little, rounder, different.
 
+#define DMG_REMOVENORAGDOLL	(1<<30)		// with this bit OR'd in, no ragdoll will be created, and the target will be quietly removed.
+										// use this to kill an entity that you've already got a server-side ragdoll for
+
 // NOTE: DO NOT ADD ANY MORE CUSTOM DMG_ TYPES. MODS USE THE DMG_LASTGENERICFLAG BELOW, AND
 //		 IF YOU ADD NEW DMG_ TYPES, THEIR TYPES WILL BE HOSED. WE NEED A BETTER SOLUTION.
 
 // TODO: keep this up to date so all the mod-specific flags don't overlap anything.
-#define DMG_LASTGENERICFLAG	DMG_BUCKSHOT
+#define DMG_LASTGENERICFLAG	DMG_REMOVENORAGDOLL
 
+
+// time-based damage
+#define DMG_TIMEBASED		(DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE)	// mask for time-based damage
+
+// these are the damage types that are allowed to gib corpses
+#define DMG_GIB_CORPSE		( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_SONIC | DMG_CLUB )
+
+// these are the damage types that have client hud art
+#define DMG_SHOWNHUD		(DMG_POISON | DMG_ACID | DMG_SLOWFREEZE | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK)
+
+// these are the damage types that don't have to supply a physics force & position
+#define DMG_NO_PHYSICS_FORCE	(DMG_FALL | DMG_BURN | DMG_PLASMA | DMG_DROWN | DMG_TIMEBASED | DMG_CRUSH | DMG_PHYSGUN)
 
 
 // settings for m_takedamage

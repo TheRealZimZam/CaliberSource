@@ -25,13 +25,13 @@
 CLIENTEFFECT_REGISTER_BEGIN( SmokeStackMaterials )
 	CLIENTEFFECT_MATERIAL( "particle/SmokeStack" )
 	CLIENTEFFECT_MATERIAL( "particle/fire" )
-	CLIENTEFFECT_MATERIAL( "sprites/flamefromabove" )
 	CLIENTEFFECT_MATERIAL( "sprites/flamelet1" )
 	CLIENTEFFECT_MATERIAL( "sprites/flamelet2" )
 	CLIENTEFFECT_MATERIAL( "sprites/flamelet3" )
 	CLIENTEFFECT_MATERIAL( "sprites/flamelet4" )
 	CLIENTEFFECT_MATERIAL( "sprites/flamelet5" )
 	CLIENTEFFECT_MATERIAL( "sprites/fire1" )
+	CLIENTEFFECT_MATERIAL( "sprites/fire_floor" )
 CLIENTEFFECT_REGISTER_END()
 
 
@@ -409,6 +409,7 @@ void C_FireSmoke::Start( void )
 		{
 			//Keep a scale offset
 			m_entFlameScales[i] = random->RandomFloat( 0.5f, 1.0f );
+		//!	m_entFlameScales[i] = 1.0f - ( ( (float) i / (float) NUM_CHILD_FLAMES ) );
 		}
 	}
 
@@ -1191,7 +1192,7 @@ void C_EntityFlame::AttachToHitBoxes( void )
 #endif
 
 		m_pFireSmoke[i]->m_nFlameModelIndex	= modelinfo->GetModelIndex("sprites/fire1.vmt");
-		m_pFireSmoke[i]->m_nFlameFromAboveModelIndex = modelinfo->GetModelIndex("sprites/flamefromabove.vmt");
+		m_pFireSmoke[i]->m_nFlameFromAboveModelIndex = modelinfo->GetModelIndex("sprites/fire_floor.vmt");
 		m_pFireSmoke[i]->m_flScale = 0;
 		m_pFireSmoke[i]->m_flStartScale = 0;
 		m_pFireSmoke[i]->m_flScaleTime = 1.5;

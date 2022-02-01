@@ -146,15 +146,13 @@ void FX_WaterRipple( const Vector &origin, float scale, Vector *pColor, float fl
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-// Input  : &origin - 
-//			&normal - 
 //-----------------------------------------------------------------------------
-void FX_GunshotSplash( const Vector &origin, const Vector &normal, float scale )
+void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale )
 {
-	VPROF_BUDGET( "FX_GunshotSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
-	
 	if ( cl_show_splashes.GetBool() == false )
 		return;
+
+	VPROF_BUDGET( "FX_WaterSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 
 	Vector	color;
 	float	luminosity;
@@ -182,6 +180,7 @@ void FX_GunshotSplash( const Vector &origin, const Vector &normal, float scale )
 	sparkEmitter->GetBinding().SetBBox( origin - Vector( 32, 32, 32 ), origin + Vector( 32, 32, 32 ) );
 
 	PMaterialHandle	hMaterial = ParticleMgr()->GetPMaterial( "effects/splash2" );
+	PMaterialHandle	hMaterial2 = ParticleMgr()->GetPMaterial( "effects/splash1" );
 
 	TrailParticle	*tParticle;
 
@@ -232,7 +231,7 @@ void FX_GunshotSplash( const Vector &origin, const Vector &normal, float scale )
 	//Main gout
 	for ( int i = 0; i < 8; i++ )
 	{
-		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial, origin );
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial2, origin );
 
 		if ( pParticle == NULL )
 			break;
@@ -271,7 +270,7 @@ void FX_GunshotSplash( const Vector &origin, const Vector &normal, float scale )
 
 	EmitSound_t ep;
 	ep.m_nChannel = CHAN_VOICE;
-	ep.m_pSoundName =  "Physics.WaterSplash";
+	ep.m_pSoundName =  "Water.WaterSplash";
 	ep.m_flVolume = 1.0f;
 	ep.m_SoundLevel = SNDLVL_NORM;
 	ep.m_pOrigin = &origin;
@@ -282,19 +281,13 @@ void FX_GunshotSplash( const Vector &origin, const Vector &normal, float scale )
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-// Input  : &origin - 
-//			&normal - 
-//			scale - 
-//			*pColor - 
 //-----------------------------------------------------------------------------
-void FX_GunshotSlimeSplash( const Vector &origin, const Vector &normal, float scale )
+void FX_SlimeSplash( const Vector &origin, const Vector &normal, float scale )
 {
 	if ( cl_show_splashes.GetBool() == false )
 		return;
 
-	VPROF_BUDGET( "FX_GunshotSlimeSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
-	
-#if 0
+	VPROF_BUDGET( "FX_SlimeSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 
 	float	colorRamp;
 	float	flScale = min( 1.0f, scale / 8.0f );
@@ -408,9 +401,122 @@ void FX_GunshotSlimeSplash( const Vector &origin, const Vector &normal, float sc
 		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
 		pParticle->m_flRollDelta	= random->RandomFloat( -4.0f, 4.0f );
 	}
+
+	//Play a sound
+	CLocalPlayerFilter filter;
+
+	EmitSound_t ep;
+	ep.m_nChannel = CHAN_VOICE;
+	ep.m_pSoundName =  "Water.WaterSplash";
+	ep.m_flVolume = 1.0f;
+	ep.m_SoundLevel = SNDLVL_NORM;
+	ep.m_pOrigin = &origin;
+
+	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale )
+{
+	VPROF_BUDGET( "FX_BulletSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	
-#else
+	if ( cl_show_splashes.GetBool() == false )
+		return;
+
+	Vector	color;
+	float	luminosity;
 	
+	// Get our lighting information
+	FX_GetSplashLighting( origin + ( normal * scale ), &color, &luminosity );
+
+	float	colorRamp;
+	float flScale = scale / 8.0f;
+
+	if ( flScale > 4.0f )
+	{
+		flScale = 4.0f;
+	}
+
+	PMaterialHandle	hMaterial = ParticleMgr()->GetPMaterial( "effects/splash2" );
+
+	// Setup the particle emitter
+	CSmartPtr<CSplashParticle> pSimple = CSplashParticle::Create( "splish" );
+	pSimple->SetSortOrigin( origin );
+	pSimple->SetClipHeight( origin.z );
+	pSimple->SetParticleCullRadius( scale * 2.0f );
+	pSimple->GetBinding().SetBBox( origin - Vector( 32, 32, 32 ), origin + Vector( 32, 32, 32 ) );
+
+	SimpleParticle	*pParticle;
+
+	//Main gout
+	for ( int i = 0; i < 8; i++ )
+	{
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial, origin );
+
+		if ( pParticle == NULL )
+			break;
+
+		pParticle->m_flLifetime = 0.0f;
+		pParticle->m_flDieTime	= 2.0f;	//NOTENOTE: We use a clip plane to realistically control our lifespan
+
+		pParticle->m_vecVelocity.Random( -0.2f, 0.2f );
+		pParticle->m_vecVelocity += ( normal * random->RandomFloat( 4.0f, 6.0f ) );
+		
+		VectorNormalize( pParticle->m_vecVelocity );
+
+		pParticle->m_vecVelocity *= 50 * flScale * (8-i);
+		
+		colorRamp = random->RandomFloat( 0.75f, 1.25f );
+
+		pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
+		pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
+		pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
+		
+		pParticle->m_uchStartSize	= 24 * flScale * RemapValClamped( i, 7, 0, 1, 0.5f );
+		pParticle->m_uchEndSize		= min( 255, pParticle->m_uchStartSize * 2 );
+		
+		pParticle->m_uchStartAlpha	= RemapValClamped( i, 7, 0, 255, 32 ) * luminosity;
+		pParticle->m_uchEndAlpha	= 0;
+		
+		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		pParticle->m_flRollDelta	= random->RandomFloat( -4.0f, 4.0f );
+	}
+
+	// Do a ripple
+	FX_WaterRipple( origin, flScale, &color, 1.5f, luminosity );
+
+	//Play a sound
+	CLocalPlayerFilter filter;
+
+	EmitSound_t ep;
+	ep.m_nChannel = CHAN_VOICE;
+	ep.m_pSoundName =  "Water.BulletImpact";
+	ep.m_flVolume = 1.0f;
+	ep.m_SoundLevel = SNDLVL_NORM;
+	ep.m_pOrigin = &origin;
+
+
+	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : &origin - 
+//			&normal - 
+//			scale - 
+//			*pColor - 
+//-----------------------------------------------------------------------------
+void FX_BulletSlimeSplash( const Vector &origin, const Vector &normal, float scale )
+{
+	if ( cl_show_splashes.GetBool() == false )
+		return;
+
+	VPROF_BUDGET( "FX_BulletSlimeSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+	
+#if 0
+
 	QAngle vecAngles;
 	VectorAngles( normal, vecAngles );
 	if ( scale < 2.0f )
@@ -426,6 +532,70 @@ void FX_GunshotSlimeSplash( const Vector &origin, const Vector &normal, float sc
 		DispatchParticleEffect( "slime_splash_03", origin, vecAngles );
 	}
 
+#else
+
+	float	colorRamp;
+	float	flScale = min( 1.0f, scale / 8.0f );
+
+	PMaterialHandle	hMaterial = ParticleMgr()->GetPMaterial( "effects/slime1" );
+
+	Vector	color;
+	float	luminosity;
+	
+	// Get our lighting information
+	FX_GetSplashLighting( origin + ( normal * scale ), &color, &luminosity );
+
+	// Setup splash emitter
+	CSmartPtr<CSplashParticle> pSimple = CSplashParticle::Create( "splish" );
+	pSimple->SetSortOrigin( origin );
+	pSimple->SetClipHeight( origin.z );
+	pSimple->SetParticleCullRadius( scale * 2.0f );
+
+	if ( IsXbox() )
+	{
+		pSimple->GetBinding().SetBBox( origin - Vector( 32, 32, 64 ), origin + Vector( 32, 32, 64 ) );
+	}
+
+	SimpleParticle	*pParticle;
+
+	// Tint
+	colorRamp = random->RandomFloat( 0.75f, 1.0f );
+	color = Vector( 1.0f, 0.8f, 0.0f ) * color * colorRamp;
+
+	//Main gout
+	for ( int i = 0; i < 8; i++ )
+	{
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial, origin );
+
+		if ( pParticle == NULL )
+			break;
+
+		pParticle->m_flLifetime = 0.0f;
+		pParticle->m_flDieTime	= 2.0f;	//NOTENOTE: We use a clip plane to realistically control our lifespan
+
+		pParticle->m_vecVelocity.Random( -0.2f, 0.2f );
+		pParticle->m_vecVelocity += ( normal * random->RandomFloat( 4.0f, 6.0f ) );
+		
+		VectorNormalize( pParticle->m_vecVelocity );
+
+		pParticle->m_vecVelocity *= 50 * flScale * (8-i);
+		
+		colorRamp = random->RandomFloat( 0.75f, 1.25f );
+
+		pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
+		pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
+		pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
+		
+		pParticle->m_uchStartSize	= 24 * flScale * RemapValClamped( i, 7, 0, 1, 0.5f );
+		pParticle->m_uchEndSize		= min( 255, pParticle->m_uchStartSize * 2 );
+		
+		pParticle->m_uchStartAlpha	= RemapValClamped( i, 7, 0, 255, 32 ) * luminosity;
+		pParticle->m_uchEndAlpha	= 0;
+		
+		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		pParticle->m_flRollDelta	= random->RandomFloat( -4.0f, 4.0f );
+	}
+
 #endif
 
 	//Play a sound
@@ -433,7 +603,7 @@ void FX_GunshotSlimeSplash( const Vector &origin, const Vector &normal, float sc
 
 	EmitSound_t ep;
 	ep.m_nChannel = CHAN_VOICE;
-	ep.m_pSoundName =  "Physics.WaterSplash";
+	ep.m_pSoundName =  "Water.BulletImpact";
 	ep.m_flVolume = 1.0f;
 	ep.m_SoundLevel = SNDLVL_NORM;
 	ep.m_pOrigin = &origin;
@@ -452,11 +622,11 @@ void SplashCallback( const CEffectData &data )
 
 	if ( data.m_fFlags & FX_WATER_IN_SLIME )
 	{
-		FX_GunshotSlimeSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
+		FX_SlimeSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
 	}
 	else
 	{
-		FX_GunshotSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
+		FX_WaterSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
 	}
 }
 
@@ -467,19 +637,19 @@ DECLARE_CLIENT_EFFECT( "watersplash", SplashCallback );
 // Purpose: 
 // Input  : &data - 
 //-----------------------------------------------------------------------------
-void GunshotSplashCallback( const CEffectData &data )
+void BulletSplashCallback( const CEffectData &data )
 {
 	if ( data.m_fFlags & FX_WATER_IN_SLIME )
 	{
-		FX_GunshotSlimeSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
+		FX_BulletSlimeSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
 	}
 	else
 	{
-		FX_GunshotSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
+		FX_BulletSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
 	}
 }
 
-DECLARE_CLIENT_EFFECT( "gunshotsplash", GunshotSplashCallback );
+DECLARE_CLIENT_EFFECT( "bulletsplash", BulletSplashCallback );
 
 //-----------------------------------------------------------------------------
 // Purpose: 

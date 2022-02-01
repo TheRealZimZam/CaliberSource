@@ -337,6 +337,7 @@ void C_PhysPropClientside::Spawn()
 	m_flDmgModBullet = 1.0;
 	m_flDmgModClub = 1.0;
 	m_flDmgModExplosive = 1.0;
+	m_flDmgModFire = 1.0;
 
 	BaseClass::Spawn();
 

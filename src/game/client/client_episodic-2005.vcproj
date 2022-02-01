@@ -1033,6 +1033,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\fx_filmgrain.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\fx_fleck.cpp"
 				>
 			</File>
@@ -2704,6 +2708,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\fx_neardeath.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\hl2_clientmode.cpp"
 					>
 				</File>
@@ -2757,6 +2765,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\hud_damageindicator.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\hud_dev.cpp"
 					>
 				</File>
 				<File

@@ -43,7 +43,7 @@ static ConVar r_flashlightnear( "r_flashlightnear", "4.0", FCVAR_CHEAT );
 static ConVar r_flashlightfar( "r_flashlightfar", "750.0", FCVAR_CHEAT );
 static ConVar r_flashlightconstant( "r_flashlightconstant", "0.0", FCVAR_CHEAT );
 static ConVar r_flashlightlinear( "r_flashlightlinear", "100.0", FCVAR_CHEAT );
-static ConVar r_flashlightquadratic( "r_flashlightquadratic", "0.0", FCVAR_CHEAT );
+static ConVar r_flashlightquadratic( "r_flashlightquadratic", "50.0", FCVAR_CHEAT );
 static ConVar r_flashlightvisualizetrace( "r_flashlightvisualizetrace", "0", FCVAR_CHEAT );
 static ConVar r_flashlightambient( "r_flashlightambient", "0.0", FCVAR_CHEAT );
 static ConVar r_flashlightshadowatten( "r_flashlightshadowatten", "0.35", FCVAR_CHEAT );
@@ -511,8 +511,8 @@ void CHeadlightEffect::UpdateLight( const Vector &vecPos, const Vector &vecDir, 
 		
 	state.m_vecLightOrigin = vecPos;
 
-	state.m_fHorizontalFOVDegrees = 45.0f;
-	state.m_fVerticalFOVDegrees = 30.0f;
+	state.m_fHorizontalFOVDegrees = 60.0f;
+	state.m_fVerticalFOVDegrees = 40.0f;
 	state.m_fQuadraticAtten = r_flashlightquadratic.GetFloat();
 	state.m_fLinearAtten = r_flashlightlinear.GetFloat();
 	state.m_fConstantAtten = r_flashlightconstant.GetFloat();
@@ -521,7 +521,7 @@ void CHeadlightEffect::UpdateLight( const Vector &vecPos, const Vector &vecDir, 
 	state.m_Color[2] = 1.0f;
 	state.m_Color[3] = r_flashlightambient.GetFloat();
 	state.m_NearZ = r_flashlightnear.GetFloat();
-	state.m_FarZ = r_flashlightfar.GetFloat();
+	state.m_FarZ = r_flashlightfar.GetFloat() * 2;
 	state.m_bEnableShadows = true;
 	state.m_pSpotlightTexture = m_FlashlightTexture;
 	state.m_nSpotlightTextureFrame = 0;

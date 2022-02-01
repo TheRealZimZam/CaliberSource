@@ -27,14 +27,15 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar	cl_winddir			( "cl_winddir", "0", FCVAR_CHEAT, "Weather effects wind direction angle" );
-ConVar	cl_windspeed		( "cl_windspeed", "0", FCVAR_CHEAT, "Weather effects wind speed scalar" );
+// TODO; This should be taken from env_wind
+ConVar	cl_winddir			( "cl_winddir", "0", FCVAR_CHEAT, "Set by env_wind - wind direction angle" );
+ConVar	cl_windspeed		( "cl_windspeed", "0", FCVAR_CHEAT, "Set by env_wind - base wind speed" );
 
 Vector g_vSplashColor( 0.5, 0.5, 0.5 );
 float g_flSplashScale = 0.15;
 float g_flSplashLifetime = 0.5f;
 float g_flSplashAlpha = 0.3f;
-ConVar r_RainSplashPercentage( "r_RainSplashPercentage", "50", FCVAR_CHEAT ); // N% chance of a rain particle making a splash.
+ConVar r_RainSplashPercentage( "r_RainSplashPercentage", "50", FCVAR_NONE ); // N% chance of a rain particle making a splash.
 ConVar r_RainParticleDensity( "r_RainParticleDensity", "1", FCVAR_NONE, "Density of Particle Rain 0-1" );
 
 float GUST_INTERVAL_MIN = 1;
@@ -47,12 +48,17 @@ float MIN_SCREENSPACE_RAIN_WIDTH = 1;
 
 #ifndef _XBOX
 ConVar r_RainHack( "r_RainHack", "0", FCVAR_CHEAT );
-ConVar r_RainRadius( "r_RainRadius", "1500", FCVAR_CHEAT );
-ConVar r_RainSideVel( "r_RainSideVel", "130", FCVAR_CHEAT, "How much sideways velocity rain gets." );
+ConVar r_RainRadius( "r_RainRadius", "1800", FCVAR_CHEAT );
+#else
+ConVar r_RainHack( "r_RainHack", "1", FCVAR_CHEAT );
+ConVar r_RainRadius( "r_RainRadius", "1200", FCVAR_CHEAT );
+#endif
+ConVar r_RainSideVel( "r_RainSideVel", "90", FCVAR_CHEAT, "How much sideways velocity rain gets without any wind." );
+ConVar r_RainWindScale( "r_RainWindScale", "1.0", FCVAR_CHEAT, "Scale of wind to apply to rain." );
 
 // Performance optimization by Certain Affinity
 // calling IsInAir() for 800 particles was taking 4 ms
-ConVar r_RainCheck( "r_RainCheck", "0", FCVAR_CHEAT, "Enable/disable IsInAir() check for rain drops?" );
+ConVar r_RainCheck( "r_RainCheck", "0", FCVAR_NONE, "Enable/disable IsInAir() check for rain drops?" );
 
 ConVar r_RainSimulate( "r_RainSimulate", "1", FCVAR_CHEAT, "Enable/disable rain simulation." );
 ConVar r_DrawRain( "r_DrawRain", "1", FCVAR_CHEAT, "Enable/disable rain rendering." );
@@ -61,6 +67,12 @@ ConVar r_RainDebugDuration( "r_RainDebugDuration", "0", FCVAR_CHEAT, "Shows rain
 
 //Precahce the effects
 CLIENTEFFECT_REGISTER_BEGIN( PrecachePrecipitation )
+#ifdef HL2_EPISODIC
+CLIENTEFFECT_MATERIAL( "effects/fleck_ash1" )
+CLIENTEFFECT_MATERIAL( "effects/fleck_ash2" )
+CLIENTEFFECT_MATERIAL( "effects/fleck_ash3" )
+CLIENTEFFECT_MATERIAL( "effects/ember_swirling001" )
+#endif
 CLIENTEFFECT_MATERIAL( "particle/rain" )
 CLIENTEFFECT_MATERIAL( "particle/snow" )
 CLIENTEFFECT_REGISTER_END()
@@ -152,10 +164,10 @@ static bool IsInAir( const Vector& position )
 //-----------------------------------------------------------------------------
 
 ConVar CClient_Precipitation::s_raindensity( "r_raindensity","0.001", FCVAR_CHEAT);
-ConVar CClient_Precipitation::s_rainwidth( "r_rainwidth", "0.5", FCVAR_CHEAT );
-ConVar CClient_Precipitation::s_rainlength( "r_rainlength", "0.1f", FCVAR_CHEAT );
+ConVar CClient_Precipitation::s_rainwidth( "r_rainwidth", "1.0", FCVAR_CHEAT );
+ConVar CClient_Precipitation::s_rainlength( "r_rainlength", "0.05f", FCVAR_CHEAT );
 ConVar CClient_Precipitation::s_rainspeed( "r_rainspeed", "600.0f", FCVAR_CHEAT );
-ConVar r_rainalpha( "r_rainalpha", "0.4", FCVAR_CHEAT );
+ConVar r_rainalpha( "r_rainalpha", "0.2", FCVAR_CHEAT );
 ConVar r_rainalphapow( "r_rainalphapow", "0.8", FCVAR_CHEAT );
 
 
@@ -205,7 +217,7 @@ inline bool CClient_Precipitation::SimulateRain( CPrecipitationParticle* pPartic
 	// wind blows rain around
 	if (cl_windspeed.GetFloat() > 0) // determines if s_WindVector is zeroes
 	{
-		for ( int i = 0 ; i < 2 ; i++ ) // X and Y components
+		for ( int i = 0 ; i < 2 ; i++ )
 		{
 			if ( pParticle->m_Velocity[i] < s_WindVector[i] )
 			{
@@ -226,48 +238,6 @@ inline bool CClient_Precipitation::SimulateRain( CPrecipitationParticle* pPartic
 		}
 	}
 
-#if 0
-	// No longer in the air? punt.
-	if ( !IsInAir( pParticle->m_Pos ) )
-	{
-		// Possibly make a splash if we hit a water surface and it's in front of the view.
-		if ( m_Splashes.Count() < 32 )
-		{
-			if ( RandomInt( 0, 100 ) < r_RainSplashPercentage.GetInt() )
-			{
-				trace_t trace;
-				// Ideally, this would trace both brush and water
-				UTIL_TraceLine(vOldPos, pParticle->m_Pos, MASK_WATER, NULL, COLLISION_GROUP_NONE, &trace);
-				if( trace.fraction < 1 || trace.DidHit() )
-				{
-					m_Splashes.AddToTail( trace.endpos );
-				}
-			}
-		}
-		// Tell the framework it's time to remove the particle from the list
-		return false;
-	}
-
-	//
-	if ( m_Splashes.Count() < 32 )	//!!!FIXME; This should be a callback to perf, not a hard-set number (24,48,96)
-	{
-		trace_t trace;
-		// Ideally, this would trace both brush and water
-		UTIL_TraceLine(vOldPos, pParticle->m_Pos, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &trace);
-		if( trace.fraction < 1 || trace.DidHit() )
-		{
-			if ( RandomInt( 0, 100 ) <= r_RainSplashPercentage.GetInt() )
-			{
-				//TODO; This one only works on water, need a splash particle aswell
-				m_Splashes.AddToTail( trace.endpos );
-			}
-
-			// Tell the framework it's time to remove the particle from the list
-			return false;
-		}
-	}
-#endif
-
 	// Left4Dead does not use rain splashes on water surfaces
 	// This change could allow rain into some solids, but the code
 	// already performed a ray-test to calculate the particle lifetime,
@@ -283,6 +253,7 @@ inline bool CClient_Precipitation::SimulateRain( CPrecipitationParticle* pPartic
 				if ( RandomInt( 0, 100 ) < r_RainSplashPercentage.GetInt() )
 				{
 					trace_t trace;
+					// Ideally, this would trace both brush and water
 					UTIL_TraceLine(vOldPos, pParticle->m_Pos, MASK_WATER, NULL, COLLISION_GROUP_NONE, &trace);
 					if( trace.fraction < 1 )
 					{
@@ -1384,7 +1355,6 @@ void CClient_Precipitation::CreateRainOrSnowParticle( const Vector &vSpawnPositi
 //-----------------------------------------------------------------------------
 // emit the precipitation particles
 //-----------------------------------------------------------------------------
-
 void CClient_Precipitation::EmitParticles( float fTimeDelta )
 {
 	Vector2D size;
@@ -1422,7 +1392,7 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 #if 0
 	// Emit all the particles
 	for ( int i = 0 ; i < cParticles ; i++ )
-	{									 
+	{
 		Vector vParticlePos = org;
 		vParticlePos[ 0 ] += size[ 0 ] * random->RandomFloat(0, 1);
 		vParticlePos[ 1 ] += size[ 1 ] * random->RandomFloat(0, 1);
@@ -1449,6 +1419,8 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 		CreateRainOrSnowParticle( vParticlePos, vel );
 	}
 #endif
+
+#if 0
 	// Emit all the particles
 	for ( int i = 0 ; i < cParticles ; i++ )
 	{
@@ -1517,13 +1489,69 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 
 		CreateRainOrSnowParticle( vParticlePos, vParticleEndPos, vParticleVel );
 	}
+#endif
+
+	// Emit all the particles
+	for ( int i = 0 ; i < cParticles ; i++ )
+	{
+		// TERROR: moving random velocity out so it can be included in endpos calcs
+		Vector vParticleVel = vel;
+		vParticleVel[ 0 ] += random->RandomFloat(-r_RainSideVel.GetInt(), r_RainSideVel.GetInt());
+		vParticleVel[ 1 ] += random->RandomFloat(-r_RainSideVel.GetInt(), r_RainSideVel.GetInt());
+
+		Vector vParticlePos = org;
+		vParticlePos[ 0 ] += size[ 0 ] * random->RandomFloat(0, 1);
+		vParticlePos[ 1 ] += size[ 1 ] * random->RandomFloat(0, 1);
+
+		// Figure out where the particle should lie in Z by tracing a line from the player's height up to the 
+		// desired height and making sure it doesn't hit a wall.
+		Vector vPlayerHeight = vParticlePos;
+		vPlayerHeight.z = vPlayerCenter.z;
+
+		if ( ParticleIsBlocked( vPlayerHeight, vParticlePos ) )
+		{
+			if ( r_RainDebugDuration.GetBool() )
+			{
+				debugoverlay->AddLineOverlay( vPlayerHeight, vParticlePos, 255, 0, 0, false, r_RainDebugDuration.GetFloat() );
+			}
+			continue;
+		}
+
+		trace_t trace;
+		UTIL_TraceLine( vPlayerHeight, vParticlePos, MASK_SOLID_BRUSHONLY, NULL, COLLISION_GROUP_NONE, &trace );
+		if ( trace.fraction < 1 )
+		{
+			// If we hit a brush, then don't spawn the particle.
+			if ( trace.surface.flags & SURF_SKY )
+			{
+				vParticlePos = trace.endpos;
+			}
+			else
+			{
+				continue;
+			}
+		}
+
+		// TERROR: Find an endpos
+		//!!!TODO; This is bad! a hardcoded endpoint doesnt work for ledges, or when the player is viewing from a high indoor position!
+		//!!! possible solution - determine if the player is viewing the particles from indoors (ie not in the trigger box),
+		//!!! if so, use the old logic that just falls through the floor until the lifetime ends - W.M
+		float endposCompatibility = 96.0f; 
+		if ( r_RainCheck.GetInt() != 0 )
+		{
+			endposCompatibility = 256.0f;
+		}
+		Vector vParticleEndPos( (vPlayerHeight - endposCompatibility) );
+
+		CreateRainOrSnowParticle( vParticlePos, vParticleEndPos, vParticleVel );
+	}
+
 }
 
 
 //-----------------------------------------------------------------------------
 // Computes the wind vector
 //-----------------------------------------------------------------------------
-
 void CClient_Precipitation::ComputeWindVector( )
 {
 	// Compute the wind direction
@@ -1531,7 +1559,7 @@ void CClient_Precipitation::ComputeWindVector( )
 
 	// Randomize the wind angle and speed slightly to get us a little variation
 	windangle[1] = windangle[1] + random->RandomFloat( -10, 10 );
-	float windspeed = cl_windspeed.GetFloat() * (1.0 + random->RandomFloat( -0.2, 0.2 ));
+	float windspeed = cl_windspeed.GetFloat() * (r_RainWindScale.GetFloat() + random->RandomFloat( -0.2, 0.2 ));
 
 	AngleVectors( windangle, &s_WindVector );
 	VectorScale( s_WindVector, windspeed, s_WindVector );
@@ -1583,14 +1611,6 @@ public:
 	bool m_bLevelInitted;
 };
 CPrecipHack g_PrecipHack( "CPrecipHack" );
-
-#else
-
-void DrawPrecipitation()
-{
-}
-
-#endif	// _XBOX
 
 //-----------------------------------------------------------------------------
 // EnvWind - global wind info

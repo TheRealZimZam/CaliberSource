@@ -33,7 +33,7 @@ CLIENTEFFECT_MATERIAL( "effects/fire_embers1" )
 CLIENTEFFECT_MATERIAL( "effects/fire_embers2" )
 CLIENTEFFECT_MATERIAL( "effects/fire_embers3" )
 CLIENTEFFECT_MATERIAL( "particle/particle_smokegrenade" )
-CLIENTEFFECT_MATERIAL( "sprites/heatwave" )
+//CLIENTEFFECT_MATERIAL( "sprites/shockwave" )
 CLIENTEFFECT_MATERIAL( "effects/splash3" )
 CLIENTEFFECT_MATERIAL( "effects/splashwake1" )
 CLIENTEFFECT_REGISTER_END()
@@ -696,9 +696,9 @@ void C_BaseExplosionEffect::CreateMisc( void )
 	//
 
 #ifndef _XBOX
-	int HeatwaveQuality = 6;
+	int HeatwaveQuality = 8;
 #else
-	int HeatwaveQuality = 4;
+	int HeatwaveQuality = 6;
 #endif
 
 	for ( i = 0; i < HeatwaveQuality; i++ )
@@ -711,7 +711,7 @@ void C_BaseExplosionEffect::CreateMisc( void )
 		if ( pParticle != NULL )
 		{
 			pParticle->m_flLifetime = 0.0f;
-			pParticle->m_flDieTime	= random->RandomFloat( 0.25f, 0.5f );
+			pParticle->m_flDieTime	= (HeatwaveQuality / 10) * random->RandomFloat( 0.5f, 1.25f );
 
 			pParticle->m_vecVelocity.Init();
 
@@ -1335,7 +1335,7 @@ void C_WaterExplosionEffect::PlaySound( void )
 		return;
 
 	CLocalPlayerFilter filter;
-	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "Physics.WaterSplash", &m_vecWaterSurface );
+	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "Water.WaterSplash", &m_vecWaterSurface );
 
 	if ( m_flDepth > 128 )
 	{

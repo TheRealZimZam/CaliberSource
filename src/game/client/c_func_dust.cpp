@@ -283,7 +283,7 @@ void FX_Dust( const Vector &vecOrigin, const Vector &vecDirection, float flSize,
 
 		particle.m_Pos = offset;
 		particle.m_flLifetime = 0.0f;
-		particle.m_flDieTime  = random->RandomFloat( 0.4f, 1.0f );
+		particle.m_flDieTime  = random->RandomFloat( 0.4f, 1.2f );
 		
 		particle.m_vecVelocity = vecDirection * random->RandomFloat( speed*0.5f, speed ) * i;
 		particle.m_vecVelocity[2] = 0.0f;
@@ -296,8 +296,8 @@ void FX_Dust( const Vector &vecOrigin, const Vector &vecDirection, float flSize,
 
 		particle.m_uchStartAlpha= random->RandomInt( 64, 128 );
 		particle.m_uchEndAlpha	= 0;
-		particle.m_uchStartSize = random->RandomInt( 2, 8 );
-		particle.m_uchEndSize	= random->RandomInt( 24, 48 );
+		particle.m_uchStartSize = random->RandomInt( 2, 8 ) * flSize;
+		particle.m_uchEndSize	= random->RandomInt( 16, 48 ) * flSize;
 		particle.m_flRoll		= random->RandomInt( 0, 360 );
 		particle.m_flRollDelta	= random->RandomFloat( -0.5f, 0.5f );
 

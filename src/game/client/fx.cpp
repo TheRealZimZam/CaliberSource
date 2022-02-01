@@ -34,6 +34,7 @@
 //Precahce the effects
 #ifndef TF_CLIENT_DLL
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheMuzzleFlash )
+CLIENTEFFECT_MATERIAL( "effects/base" )
 CLIENTEFFECT_MATERIAL( "effects/muzzleflash1" )
 CLIENTEFFECT_MATERIAL( "effects/muzzleflash2" )
 CLIENTEFFECT_MATERIAL( "effects/muzzleflash3" )
@@ -44,6 +45,7 @@ CLIENTEFFECT_MATERIAL( "effects/gunshipmuzzle" )
 CLIENTEFFECT_MATERIAL( "effects/gunshiptracer" )
 CLIENTEFFECT_MATERIAL( "effects/huntertracer" )
 CLIENTEFFECT_MATERIAL( "sprites/physcannon_bluelight2" )
+CLIENTEFFECT_MATERIAL( "sprites/heatwave" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle2" )
 CLIENTEFFECT_MATERIAL( "effects/combinemuzzle2_nocull" )
@@ -352,7 +354,7 @@ void FX_MuzzleEffectAttached(
 			return;
 
 		pParticle->m_flLifetime		= 0.0f;
-		pParticle->m_flDieTime		= bOneFrame ? 0.01f : random->RandomFloat( 0.05f, 0.1f );
+		pParticle->m_flDieTime		= bOneFrame ? 0.01f : 0.1f;
 
 		pParticle->m_vecVelocity.Init();
 

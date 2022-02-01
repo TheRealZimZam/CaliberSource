@@ -669,7 +669,7 @@ void CCollisionEvent::Friction( IPhysicsObject *pObject, float energy, int surfa
 
 	CBaseEntity *pEntity = reinterpret_cast<CBaseEntity *>(pObject->GetGameData());
 		
-	if ( pEntity  )
+	if ( pEntity )
 	{
 		friction_t *pFriction = g_Collisions.FindFriction( pEntity );
 
@@ -771,7 +771,7 @@ void PhysicsSplash( IPhysicsFluidController *pFluid, IPhysicsObject *pObject, CB
 	
 	float impactSpeed = velocity.Length();
 
-	if ( impactSpeed < 25.0f )
+	if ( impactSpeed < 20.0f )
 		return;
 
 	Vector normal;
@@ -852,15 +852,15 @@ void PhysicsSplash( IPhysicsFluidController *pFluid, IPhysicsObject *pObject, CB
 		FX_GetSplashLighting( centerPoint + ( normal * 8.0f ), &color, &luminosity );
 	}
 
-	if ( impactSpeed > 150 )
+	if ( impactSpeed > 120 )
 	{
 		if ( bInSlime )
 		{
-			FX_GunshotSlimeSplash( centerPoint, normal, random->RandomFloat( 8, 10 ) );
+			FX_SlimeSplash( centerPoint, normal, random->RandomFloat( 8, 10 ) );
 		}
 		else
 		{
-			FX_GunshotSplash( centerPoint, normal, random->RandomFloat( 8, 10 ) );
+			FX_WaterSplash( centerPoint, normal, random->RandomFloat( 8, 10 ) );
 		}
 	}
 	else if ( !bInSlime )
@@ -878,15 +878,15 @@ void PhysicsSplash( IPhysicsFluidController *pFluid, IPhysicsObject *pObject, CB
 
 		point += corner[i];
 
-		if ( impactSpeed > 150 )
+		if ( impactSpeed > 160 )
 		{
 			if ( bInSlime )
 			{
-				FX_GunshotSlimeSplash( centerPoint, normal, random->RandomFloat( 4, 6 ) );
+				FX_BulletSlimeSplash( centerPoint, normal, random->RandomFloat( 4, 6 ) );
 			}
 			else
 			{
-				FX_GunshotSplash( centerPoint, normal, random->RandomFloat( 4, 6 ) );
+				FX_BulletSplash( centerPoint, normal, random->RandomFloat( 4, 6 ) );
 			}
 		}
 		else if ( !bInSlime )

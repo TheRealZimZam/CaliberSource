@@ -71,7 +71,7 @@ IterationRetval_t CRagdollEnumerator::EnumElement( IHandleEntity *pHandleEntity 
 bool FX_AffectRagdolls( Vector vecOrigin, Vector vecStart, int iDamageType )
 {
 	// don't do this when lots of ragdolls are simulating
-	if ( s_RagdollLRU.CountRagdolls(true) > 1 )
+	if ( s_RagdollLRU.CountRagdolls(true) > 2 )
 		return false;
 	Ray_t shotRay;
 	shotRay.Init( vecStart, vecOrigin );
@@ -426,9 +426,13 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 	{
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
 	}
-	else if ( ( iMaterial == CHAR_TEX_DIRT ) || ( iMaterial == CHAR_TEX_SAND ) || ( iMaterial == CHAR_TEX_SNOW ) )
+	else if ( ( iMaterial == CHAR_TEX_DIRT ) || ( iMaterial == CHAR_TEX_SNOW ) )
 	{
 		FX_DustImpact( vecOrigin, &tr, iScale );
+	}
+	else if ( ( iMaterial == CHAR_TEX_SAND ) )
+	{
+		FX_DustImpact( vecOrigin, &tr, iScale, true );
 	}
 	else if ( ( iMaterial == CHAR_TEX_METAL ) || ( iMaterial == CHAR_TEX_VENT ) )
 	{

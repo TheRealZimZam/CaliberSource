@@ -959,7 +959,7 @@ void FX_Blood( Vector &pos, Vector &dir, float r, float g, float b, float a )
 // Input  : &origin - position
 //			&tr - trace information
 //-----------------------------------------------------------------------------
-void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale )
+void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale, bool Sand )
 {
 	if ( !fx_drawimpactdust.GetBool() )
 		return;
@@ -1070,11 +1070,11 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale )
 	}
 
 #else
-	FX_DustImpact( origin, tr, (float)iScale );
+	FX_DustImpact( origin, tr, (float)iScale, Sand );
 #endif // _XBOX
 }
 
-void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale )
+void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool Sand )
 {
 	//
 	// PC version
@@ -1095,9 +1095,10 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale )
 	GetColorForSurface( tr, &color );
 
 	int i;
+	// Dust puffs
 	for ( i = 0; i < 4; i++ )
 	{
-		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[0], origin );
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[random->RandomInt(0,2)], origin );
 
 		if ( pParticle != NULL )
 		{
@@ -1134,8 +1135,9 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale )
 		}
 	}			
 
-	//Dust specs
-	for ( i = 0; i < 4; i++ )
+	// Dust specs
+	int IDustSpecs = random->RandomInt( 4, 6 );
+	for ( i = 0; i < IDustSpecs; i++ )
 	{
 		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_BloodPuff[0], origin );
 
@@ -1171,7 +1173,7 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale )
 	}
 
 	//Impact hit
-	for ( i = 0; i < 4; i++ )
+	for ( i = 0; i < 3; i++ )
 	{
 		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[0], origin );
 
@@ -1210,7 +1212,90 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale )
 			pParticle->m_flRoll			= random->RandomInt( 0, 360 );
 			pParticle->m_flRollDelta	= random->RandomFloat( -16.0f, 16.0f );
 		}
-	}			
+	}
+
+	// Loose dust
+	int ILooseDust = random->RandomInt( 2, 4 );
+	for ( i = 0; i < ILooseDust; i++ )
+	{
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[0], origin );
+
+		if ( pParticle != NULL )
+		{
+			offset = origin;
+			offset[0] += random->RandomFloat( 0.0f, 16.0f );
+			offset[1] += random->RandomFloat( 0.0f, 16.0f );
+
+			pParticle->m_flLifetime = 0.0f;
+			pParticle->m_flDieTime	= random->RandomFloat( 1.5f, 2.75f );
+
+			spread = 1.0f;
+
+			pParticle->m_vecVelocity.Random( -spread, spread );
+			pParticle->m_vecVelocity += tr->plane.normal;
+				
+			VectorNormalize( pParticle->m_vecVelocity );
+
+			float	fForce = random->RandomFloat( 0, 20 );
+
+			pParticle->m_vecVelocity *= fForce;
+				
+			colorRamp = random->RandomFloat( 0.75f, 1.25f );
+
+			pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
+			pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
+			pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
+				
+			pParticle->m_uchStartSize	= random->RandomInt( 8, 16 );
+			pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 2;
+				
+			pParticle->m_uchStartAlpha	= random->RandomInt( 32, 64 );
+			pParticle->m_uchEndAlpha	= 0;
+				
+			pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+			pParticle->m_flRollDelta	= random->RandomFloat( -16.0f, 16.0f );
+		}
+	}
+
+	// Extra particles for sand/very dry dirt
+	if ( Sand )
+	{
+		int IHangingDust = random->RandomInt( 1, 2 );
+		for ( i = 0; i < IHangingDust; i++ )
+		{
+			pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[0], origin );
+
+			if ( pParticle != NULL )
+			{
+				pParticle->m_flLifetime = 0.0f;
+				pParticle->m_flDieTime	= random->RandomFloat( 2.5f, 4.0f );
+
+				pParticle->m_vecVelocity.Random( -spread, spread );
+				pParticle->m_vecVelocity += ( tr->plane.normal * random->RandomFloat( 1.0f, 6.0f ) );
+				
+				VectorNormalize( pParticle->m_vecVelocity );
+
+				float	fForce = random->RandomFloat( 15, 40 );
+
+				pParticle->m_vecVelocity *= fForce;
+				
+				colorRamp = random->RandomFloat( 0.75f, 1.25f );
+
+				pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
+				pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
+				pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
+				
+				pParticle->m_uchStartSize	= random->RandomInt( 24, 32 );
+				pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 2;
+				
+				pParticle->m_uchStartAlpha	= random->RandomInt( 8, 32 );
+				pParticle->m_uchEndAlpha	= 0;
+				
+				pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+				pParticle->m_flRollDelta	= random->RandomFloat( -8.0f, 8.0f );
+			}
+		}
+	}
 }
 
 #ifdef _XBOX

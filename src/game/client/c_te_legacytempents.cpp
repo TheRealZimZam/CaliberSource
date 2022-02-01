@@ -46,25 +46,33 @@ extern ConVar muzzleflash_light;
 #ifndef TF_CLIENT_DLL
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectMuzzleFlash )
 	CLIENTEFFECT_MATERIAL( "effects/ar2_muzzle1" )
-	CLIENTEFFECT_MATERIAL( "effects/ar2_muzzle2" )
 	CLIENTEFFECT_MATERIAL( "effects/ar2_muzzle1_noz" )
+	CLIENTEFFECT_MATERIAL( "effects/ar2_muzzle2" )
 	CLIENTEFFECT_MATERIAL( "effects/ar2_muzzle2_noz" )
+	CLIENTEFFECT_MATERIAL( "effects/ar2_muzzle3" )
+	CLIENTEFFECT_MATERIAL( "effects/ar2_muzzle3_noz" )
 
 	CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1" )
 	CLIENTEFFECT_MATERIAL( "effects/combinemuzzle2" )
 	CLIENTEFFECT_MATERIAL( "effects/combinemuzzle1_noz" )
 	CLIENTEFFECT_MATERIAL( "effects/combinemuzzle2_noz" )
 
-	CLIENTEFFECT_MATERIAL( "effects/muzzleflash_blowout" )
-	CLIENTEFFECT_MATERIAL( "effects/muzzleflash_ring" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash1" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash2" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash3" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash4" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash5" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash6" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash7" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash8" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash1_noz" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash2_noz" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash3_noz" )
 	CLIENTEFFECT_MATERIAL( "effects/muzzleflash4_noz" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash5_noz" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash6_noz" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash7_noz" )
+	CLIENTEFFECT_MATERIAL( "effects/muzzleflash8_noz" )
 
 	CLIENTEFFECT_MATERIAL( "effects/strider_muzzle" )
 CLIENTEFFECT_REGISTER_END()
@@ -1761,6 +1769,15 @@ void CTempEnts::MuzzleFlash( int type, ClientEntityHandle_t hEntity, int attachm
 		}
 		break;
 	case MUZZLEFLASH_SMG2:
+		if ( firstPerson )
+		{
+			MuzzleFlash_SMG2_Player( hEntity, attachmentIndex );
+		}
+		else
+		{
+			MuzzleFlash_SMG2_NPC( hEntity, attachmentIndex );
+		}
+		break;
 	case MUZZLEFLASH_PISTOL:
 		if ( firstPerson )
 		{
@@ -1876,6 +1893,16 @@ void CTempEnts::MuzzleFlash( const Vector& pos1, const QAngle& angles, int type,
 		break;
 
 	case MUZZLEFLASH_SMG2:
+		if ( firstPerson )
+		{
+			MuzzleFlash_SMG2_Player( hEntity, 1 );
+		}
+		else
+		{
+			MuzzleFlash_SMG2_NPC( hEntity, 1 );
+		}
+		break;
+
 	case MUZZLEFLASH_PISTOL:
 		if ( firstPerson )
 		{
@@ -2647,7 +2674,7 @@ void CTempEnts::MuzzleFlash_Combine_Player( ClientEntityHandle_t hEntity, int at
 			flags = 0;
 		}
 
-		const char *text = ( random->RandomInt( 0, 1 ) ) ? "effects/ar2_muzzle1" : "effects/ar2_muzzle2";
+		const char *text = ( random->RandomInt( 0, 1 ) ) ? "effects/ar2_muzzle2" : "effects/ar2_muzzle3";
 
 		//!!!FIXME; start, end is borked - fx shows up at world origin - the provided data might not be compatible
 		FX_AddStaticLine( start, end, random->RandomFloat( 8.0f, 12.0f ), 0.02f, text, flags );
@@ -2950,10 +2977,17 @@ void CTempEnts::MuzzleFlash_Combine_NPC( ClientEntityHandle_t hEntity, int attac
 void CTempEnts::MuzzleFlash_AR2_Player( ClientEntityHandle_t hEntity, int attachmentIndex )
 {
 	VPROF_BUDGET( "MuzzleFlash_AR2_Player", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
-	CSmartPtr<CLocalSpaceEmitter> pSimple = CLocalSpaceEmitter::Create( "MuzzleFlash_AR2_Player", hEntity, attachmentIndex, FLE_VIEWMODEL );
+	CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "MuzzleFlash_AR2_Player" );
 	pSimple->SetDrawBeforeViewModel( true );
 
 	CacheMuzzleFlashes();
+
+	SimpleParticle *pParticle;
+	Vector offset;
+
+	float flScale = random->RandomFloat( 1.0f, 1.5f );
+
+	pSimple->SetDrawBeforeViewModel( true );
 
 	Vector origin;
 	QAngle angles;
@@ -2966,15 +3000,10 @@ void CTempEnts::MuzzleFlash_AR2_Player( ClientEntityHandle_t hEntity, int attach
 	Vector forward;
 	AngleVectors( angles, &forward, NULL, NULL );
 
-	SimpleParticle *pParticle;
-	Vector			offset;
+	// Fire
+	offset = origin + (forward * (10.0f*flScale));
 
-	float flScale = random->RandomFloat( 1.25f, 1.5f );
-
-	// Muzzlebrake fire
-	offset = origin + forward * 4.0f;
-
-	pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), ParticleMgr()->GetPMaterial( "effects/muzzleflash_blowout" ), offset );
+	pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), ParticleMgr()->GetPMaterial( "effects/ar2_muzzle1_noz" ), offset );
 		
 	if ( pParticle == NULL )
 		return;
@@ -2984,23 +3013,21 @@ void CTempEnts::MuzzleFlash_AR2_Player( ClientEntityHandle_t hEntity, int attach
 
 	pParticle->m_vecVelocity.Init();
 
-	int color = random->RandomInt( 200, 255 );
 	pParticle->m_uchColor[0]	= 255;
-	pParticle->m_uchColor[1]	= color;
-	pParticle->m_uchColor[2]	= color;
+	pParticle->m_uchColor[1]	= 255;
+	pParticle->m_uchColor[2]	= 255;
 
 	pParticle->m_uchStartAlpha	= 255;
-	pParticle->m_uchEndAlpha	= 64;
+	pParticle->m_uchEndAlpha	= 128;
 
-	pParticle->m_uchStartSize	= (random->RandomFloat( 6.0f, 8.0f ) * flScale );
+	pParticle->m_uchStartSize	= (random->RandomInt( 8, 12 ) * flScale );
 	pParticle->m_uchEndSize		= pParticle->m_uchStartSize;
 	pParticle->m_flRoll			= random->RandomInt( 0, 360 );
-	pParticle->m_flRollDelta	= random->RandomFloat( -0.5f, 0.5f );
+	pParticle->m_flRollDelta	= 0.0f;
 
 	// Flash
-	for ( int i = 1; i < 6; i++ )
+	for ( int i = 1; i < 4; i++ )
 	{
-		offset = (forward * (i*8.0f*flScale));
 		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), m_Material_MuzzleFlash_Player[random->RandomInt(0,3)], offset );
 			
 		if ( pParticle == NULL )
@@ -3036,7 +3063,7 @@ void CTempEnts::MuzzleFlash_AR2_Player( ClientEntityHandle_t hEntity, int attach
 		pParticle->m_flDieTime		= random->RandomFloat( 0.25f, 0.5f );
 
 		pParticle->m_vecVelocity.Init();
-		pParticle->m_vecVelocity = forward * random->RandomFloat( 48.0f, 64.0f );
+		pParticle->m_vecVelocity = forward * random->RandomFloat( 32.0f, 64.0f );
 		pParticle->m_vecVelocity[2] += random->RandomFloat( 4.0f, 16.0f );
 
 		int color = random->RandomInt( 200, 255 );
@@ -3153,12 +3180,166 @@ void CTempEnts::MuzzleFlash_SMG1_Player( ClientEntityHandle_t hEntity, int attac
 		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
 		pParticle->m_flRollDelta	= 0.0f;
 	}
+	
+	// Overheating/whispy smoke
+	for ( int i = 1; i < 2; i++ )
+	{
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[random->RandomInt(0,1)], (offset * 0.5f) );	//g_Mat_DustPuff[random->RandomInt(0,2)]
+
+		if ( pParticle == NULL )
+			return;
+
+		pParticle->m_flLifetime		= 0.0f;
+		pParticle->m_flDieTime		= random->RandomFloat( 0.25f, 0.75f );
+
+		pParticle->m_vecVelocity.Init();
+		pParticle->m_vecVelocity = forward * random->RandomFloat( 8.0f, 24.0f );
+		pParticle->m_vecVelocity[2] += random->RandomFloat( 4.0f, 12.0f );
+
+		int color = random->RandomInt( 200, 255 );
+		pParticle->m_uchColor[0]	= color;
+		pParticle->m_uchColor[1]	= color;
+		pParticle->m_uchColor[2]	= color;
+
+		pParticle->m_uchStartAlpha	= random->RandomInt( 32, 64 );
+		pParticle->m_uchEndAlpha	= 0;
+
+		pParticle->m_uchStartSize	= random->RandomInt( 1, 2 );
+		pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 2.0f;
+		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		pParticle->m_flRollDelta	= random->RandomFloat( -0.1f, 0.1f );
+	}
 }
 
 void CTempEnts::MuzzleFlash_SMG1_NPC( ClientEntityHandle_t hEntity, int attachmentIndex )
 {
 	//Draw the cloud of fire
 	FX_MuzzleEffectAttached( 0.75f, hEntity, attachmentIndex, NULL, true );
+}
+
+//==================================================
+// Purpose: SMG2 flash
+// Input: 
+//==================================================
+void CTempEnts::MuzzleFlash_SMG2_Player( ClientEntityHandle_t hEntity, int attachmentIndex )
+{
+	VPROF_BUDGET( "MuzzleFlash_SMG2_Player", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+	CSmartPtr<CLocalSpaceEmitter> pSimple = CLocalSpaceEmitter::Create( "MuzzleFlash_SMG2_Player", hEntity, attachmentIndex, FLE_VIEWMODEL );
+	
+	CacheMuzzleFlashes();
+
+	SimpleParticle *pParticle;
+	Vector			forward(1,0,0), offset; //NOTENOTE: All coords are in local space
+
+	pSimple->SetDrawBeforeViewModel( true );
+
+	float flScale = random->RandomFloat( 1.25f, 1.5f );
+
+	// Flash
+	for ( int i = 0; i < 4; i++ )
+	{
+		offset = (forward * (16.0f*flScale));
+
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), m_Material_MuzzleFlash_Player[random->RandomInt(0,3)], offset );
+			
+		if ( pParticle == NULL )
+			return;
+
+		pParticle->m_flLifetime		= 0.0f;
+		pParticle->m_flDieTime		= 0.01f;
+
+		pParticle->m_vecVelocity.Init();
+
+		pParticle->m_uchColor[0]	= 255;
+		pParticle->m_uchColor[1]	= 255;
+		pParticle->m_uchColor[2]	= 200+random->RandomInt(0,55);
+
+		pParticle->m_uchStartAlpha	= 255;
+		pParticle->m_uchEndAlpha	= 255;
+
+		pParticle->m_uchStartSize	= ( random->RandomFloat( 2.0f, 8.0f ) * flScale );
+		pParticle->m_uchEndSize		= pParticle->m_uchStartSize;
+		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		pParticle->m_flRollDelta	= 0.0f;
+	}
+
+	// Silencer smoke
+	for ( int i = 1; i < 3; i++ )
+	{
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[random->RandomInt(0,1)], (offset * 0.75f) );	//g_Mat_DustPuff[random->RandomInt(0,2)]
+
+		if ( pParticle == NULL )
+			return;
+
+		pParticle->m_flLifetime		= 0.0f;
+		pParticle->m_flDieTime		= random->RandomFloat( 0.25f, 0.75f );
+
+		pParticle->m_vecVelocity.Init();
+		pParticle->m_vecVelocity = forward * random->RandomFloat( 16.0f, 48.0f );
+		pParticle->m_vecVelocity[2] += random->RandomFloat( 4.0f, 16.0f );
+
+		int color = random->RandomInt( 200, 255 );
+		pParticle->m_uchColor[0]	= color;
+		pParticle->m_uchColor[1]	= color;
+		pParticle->m_uchColor[2]	= color;
+
+		pParticle->m_uchStartAlpha	= random->RandomInt( 32, 64 );
+		pParticle->m_uchEndAlpha	= 0;
+
+		pParticle->m_uchStartSize	= ( (random->RandomInt( 1, 3 ) * (8-(i))/6) * flScale );
+		pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 2.0f;
+		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		pParticle->m_flRollDelta	= random->RandomFloat( -0.1f, 0.1f );
+	}
+}
+
+void CTempEnts::MuzzleFlash_SMG2_NPC( ClientEntityHandle_t hEntity, int attachmentIndex )
+{
+	//Draw the cloud of fire
+	FX_MuzzleEffectAttached( 0.5f, hEntity, attachmentIndex, NULL, true );
+
+	QAngle	angles;
+	Vector	forward;
+
+	// Setup the origin.
+	Vector	origin;
+	IClientRenderable *pRenderable = ClientEntityList().GetClientRenderableFromHandle( hEntity );
+	if ( !pRenderable )
+		return;
+
+	pRenderable->GetAttachment( attachmentIndex, origin, angles );
+	AngleVectors( angles, &forward );
+
+	// Smoke
+	CSmartPtr<CFireSmokeEffect> pSmoke = CFireSmokeEffect::Create( "MuzzleFlash_SMG2_NPC" );
+	pSmoke->SetSortOrigin( origin );
+
+	SimpleParticle *pParticle;
+
+	pParticle = (SimpleParticle *) pSmoke->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[0], origin );
+				
+	if ( pParticle == NULL )
+		return;
+
+	pParticle->m_flLifetime		= 0.0f;
+	pParticle->m_flDieTime		= random->RandomFloat( 0.15f, 0.3f );
+
+	pParticle->m_vecVelocity.Init();
+	pParticle->m_vecVelocity = forward * random->RandomFloat( 32.0f, 48.0f );
+	pParticle->m_vecVelocity[2] += random->RandomFloat( 4.0f, 12.0f );
+
+	pParticle->m_uchColor[0]	= 255;
+	pParticle->m_uchColor[1]	= 255;
+	pParticle->m_uchColor[2]	= 200+random->RandomInt(0,55);
+
+	pParticle->m_uchStartAlpha	= random->RandomInt( 16, 48 );
+	pParticle->m_uchEndAlpha	= 0;
+
+	pParticle->m_uchStartSize	= random->RandomInt( 1, 2 );
+	pParticle->m_uchEndSize		= pParticle->m_uchStartSize * random->RandomFloat( 2.0f, 4.0f );
+
+	pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+	pParticle->m_flRollDelta	= random->RandomFloat( -0.1f, 0.1f );
 }
 
 //==================================================
@@ -3425,7 +3606,7 @@ void CTempEnts::MuzzleFlash_357_Player( ClientEntityHandle_t hEntity, int attach
 	SimpleParticle *pParticle;
 	Vector			offset;
 
-	// Smoke/Heat
+	// Smoke
 	offset = origin + forward * 8.0f;
 
 	pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[1], offset );
@@ -3484,12 +3665,12 @@ void CTempEnts::MuzzleFlash_357_Player( ClientEntityHandle_t hEntity, int attach
 	}
 
 	// Fire ring
-	int	numRings = random->RandomInt( 1, 2 );
+	int	numRings = random->RandomInt( 2, 3 );
 	for ( int i = 0; i < numRings; i++ )
 	{
 		offset = origin + (forward * (i*8.0f*flScale));
 
-		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), ParticleMgr()->GetPMaterial( "effects/muzzleflash_ring" ), offset );
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), ParticleMgr()->GetPMaterial( "effects/muzzleflash7" ), offset );
 			
 		if ( pParticle == NULL )
 			return;
@@ -3506,9 +3687,39 @@ void CTempEnts::MuzzleFlash_357_Player( ClientEntityHandle_t hEntity, int attach
 		pParticle->m_uchColor[2]	= 200+random->RandomInt(0,55);
 
 		pParticle->m_uchStartAlpha	= 255;
-		pParticle->m_uchEndAlpha	= 64;
+		pParticle->m_uchEndAlpha	= 32;
 
 		pParticle->m_uchStartSize	= 4;
+		pParticle->m_uchEndSize		= pParticle->m_uchStartSize * random->RandomFloat( 2.0f, 3.0f );
+		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		pParticle->m_flRollDelta	= 0.0f;
+	}
+
+	// Fire ring distortion
+	for ( int i = 0; i < numRings; i++ )
+	{
+		offset = origin + (forward * (i*8.0f*flScale));
+
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), ParticleMgr()->GetPMaterial( "sprites/heatwave" ), offset );
+			
+		if ( pParticle == NULL )
+			return;
+
+		pParticle->m_flLifetime		= 0.0f;
+		pParticle->m_flDieTime		= 0.25f;
+
+		pParticle->m_vecVelocity.Init();
+		pParticle->m_vecVelocity = forward * 32;
+		pParticle->m_vecVelocity[2] += random->RandomFloat( 8.0f, 12.0f );
+
+		pParticle->m_uchColor[0]	= 255;
+		pParticle->m_uchColor[1]	= 255;
+		pParticle->m_uchColor[2]	= 200+random->RandomInt(0,55);
+
+		pParticle->m_uchStartAlpha	= 255;
+		pParticle->m_uchEndAlpha	= 0;
+
+		pParticle->m_uchStartSize	= 4 + numRings;
 		pParticle->m_uchEndSize		= pParticle->m_uchStartSize * random->RandomFloat( 2.0f, 3.0f );
 		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
 		pParticle->m_flRollDelta	= 0.0f;
@@ -3553,7 +3764,7 @@ void CTempEnts::MuzzleFlash_Pistol_Player( ClientEntityHandle_t hEntity, int att
 	if ( random->RandomInt( 0, 3 ) != 0 )
 	{
 		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[0], offset );	//g_Mat_DustPuff[random->RandomInt(0,2)]
-			
+
 		if ( pParticle == NULL )
 			return;
 

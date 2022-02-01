@@ -1301,6 +1301,11 @@ void UTIL_ParticleEffect( const Vector &vecOrigin, const Vector &vecDirection, U
 	Msg( "UTIL_ParticleEffect:  Disabled\n" );
 }
 
+void UTIL_Dust( const Vector &origin, const Vector &dir, const float scale, const float speed )
+{
+	g_pEffects->Dust( origin, dir, scale, speed );
+}
+
 void UTIL_Smoke( const Vector &origin, const float scale, const float framerate )
 {
 	g_pEffects->Smoke( origin, g_sModelIndexSmoke, scale, framerate );

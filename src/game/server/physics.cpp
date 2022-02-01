@@ -1924,7 +1924,7 @@ void CCollisionEvent::Friction( IPhysicsObject *pObject, float energy, int surfa
 
 	CBaseEntity *pEntity = reinterpret_cast<CBaseEntity *>(pObject->GetGameData());
 		
-	if ( pEntity  )
+	if ( pEntity )
 	{
 		friction_t *pFriction = g_Collisions.FindFriction( pEntity );
 
@@ -2622,22 +2622,57 @@ void PhysCollisionWarpEffect( gamevcollisionevent_t *pEvent, surfacedata_t *phit
 
 void PhysCollisionDust( gamevcollisionevent_t *pEvent, surfacedata_t *phit )
 {
+	//Kick up dust
+	Vector	vecPos, vecVel;
+
+	pEvent->pInternalData->GetContactPoint( vecPos );
+
+	vecVel.Random( -1.0f, 1.0f );
+	vecVel.z = random->RandomFloat( 0.3f, 1.0f );
+	VectorNormalize( vecVel );
 
 	switch ( phit->game.material )
 	{
-	case CHAR_TEX_SAND:
 	case CHAR_TEX_DIRT:
-
 		if ( pEvent->collisionSpeed < 200.0f )
 			return;
-		
+
+		// Throw some dust and mud
+		g_pEffects->Dust( vecPos, vecVel, random->RandomFloat( 4.0f, 8.0f ), pEvent->collisionSpeed );
+		//TODO; Some mud particles would be nice aswell
+		break;
+
+	case CHAR_TEX_SAND:
+		if ( pEvent->collisionSpeed < 160.0f )
+			return;
+
+		// Throw some dust and sand
+		g_pEffects->Dust( vecPos, vecVel, random->RandomFloat( 4.0f, 8.0f ), pEvent->collisionSpeed );
 		break;
 
 	case CHAR_TEX_CONCRETE:
-
 		if ( pEvent->collisionSpeed < 340.0f )
 			return;
 
+		// Throw some dust
+		g_pEffects->Dust( vecPos, vecVel, random->RandomFloat( 2.5f, 6.0f ), pEvent->collisionSpeed );
+		break;
+
+	case CHAR_TEX_FOLIAGE:
+		if ( pEvent->collisionSpeed < 260.0f )
+			return;
+
+		// Throw some leaves
+		g_pEffects->Dust( vecPos, vecVel, random->RandomFloat( 4.0f, 8.0f ), pEvent->collisionSpeed );
+		break;
+
+	case CHAR_TEX_TILE:
+	case CHAR_TEX_PLASTIC:
+		if ( pEvent->collisionSpeed < 400.0f )
+			return;
+
+		// Throw some shards
+		g_pEffects->Dust( vecPos, vecVel, random->RandomFloat( 1.0f, 4.0f ), pEvent->collisionSpeed );
 		break;
 
 #if HL2_EPISODIC 
@@ -2652,16 +2687,6 @@ void PhysCollisionDust( gamevcollisionevent_t *pEvent, surfacedata_t *phit )
 	default:
 		return;
 	}
-
-	//Kick up dust
-	Vector	vecPos, vecVel;
-
-	pEvent->pInternalData->GetContactPoint( vecPos );
-
-	vecVel.Random( -1.0f, 1.0f );
-	vecVel.z = random->RandomFloat( 0.3f, 1.0f );
-	VectorNormalize( vecVel );
-	g_pEffects->Dust( vecPos, vecVel, 8.0f, pEvent->collisionSpeed );
 }
 
 void PhysFrictionSound( CBaseEntity *pEntity, IPhysicsObject *pObject, const char *pSoundName, HSOUNDSCRIPTHANDLE& handle, float flVolume )

@@ -140,7 +140,7 @@ void CSun::Activate()
 	// Cache off our image indices
 	if ( m_strMaterial == NULL_STRING )
 	{
-		m_strMaterial = AllocPooledString( "sprites/light_glow02_add_noz.vmt" );
+		m_strMaterial = AllocPooledString( "sun/sun.vmt" );
 	}
 	else 
 	{
@@ -156,7 +156,7 @@ void CSun::Activate()
 
 	if ( m_strOverlayMaterial == NULL_STRING )
 	{
-		m_strOverlayMaterial = AllocPooledString( "sprites/light_glow02_add_noz.vmt" );
+		m_strOverlayMaterial = AllocPooledString( "sun/sun.vmt" );
 	}
 	else 
 	{

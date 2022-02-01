@@ -2202,6 +2202,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_COMBAT_PATROL,
 
 	"	Tasks"
+//	"		TASK_SET_TOLERANCE_DISTANCE		48"
 	"		TASK_SET_ROUTE_SEARCH_TIME		5"	// Spend 5 seconds trying to build a path if stuck
 	"		TASK_GET_PATH_TO_RANDOM_NODE	200"
 	"		TASK_WALK_PATH					0"
@@ -2228,6 +2229,7 @@ AI_DEFINE_SCHEDULE
 //	"		TASK_SET_TOLERANCE_DISTANCE		48"
 	"		TASK_SET_ROUTE_SEARCH_TIME		1"	// Spend 1 seconds trying to build a path if stuck
 	"		TASK_GET_PATH_TO_RANDOM_NODE	500"
+	"		TASK_FACE_PATH					0"
 	"		TASK_RUN_PATH					0"
 	"		TASK_WAIT_FOR_MOVEMENT			0"
 	""

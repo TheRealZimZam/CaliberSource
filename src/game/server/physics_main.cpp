@@ -1888,7 +1888,7 @@ void CBaseEntity::PhysicsStepRunTimestep( float timestep )
 			{
 				friction = sv_friction.GetFloat() * GetFriction();
 
-				control = speed < sv_stopspeed.GetFloat() ? sv_stopspeed.GetFloat() : speed;
+				control = speed < sv_deceleration.GetFloat() ? sv_deceleration.GetFloat() : speed;
 				newspeed = speed - timestep*control*friction;
 
 				if (newspeed < 0)

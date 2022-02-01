@@ -51,7 +51,6 @@ bool CAI_BaseHumanoid::HandleInteraction(int interactionType, void *data, CBaseC
 	return BaseClass::HandleInteraction( interactionType, data, sourceEnt);
 }
 
-
 //-----------------------------------------------------------------------------
 // Purpose: check ammo
 //-----------------------------------------------------------------------------
@@ -75,7 +74,6 @@ void CAI_BaseHumanoid::CheckAmmo( void )
 		}
 		else if (GetActiveWeapon()->UsesClipsForAmmo1() && GetActiveWeapon()->Clip1() < (GetActiveWeapon()->GetMaxClip1() / 4 + 1))
 		{
-			// don't check for low ammo if you're near the max range of the weapon
 			SetCondition(COND_LOW_PRIMARY_AMMO);
 		}
 	}
@@ -173,6 +171,26 @@ bool CAI_BaseHumanoid::OnMoveBlocked( AIMoveResult_t *pResult )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
+bool CAI_BaseHumanoid::ShouldPickADeathPose( void ) 
+{
+	if ( IsCrouching() )
+		return false;
+
+//	if ( IsMoving() )
+//		return false;
+
+#ifdef HL2_DLL
+	// Allow unique death animations - deathposes are meant to overwrite the generic ones
+	if ( GetDeathActivity() != ACT_DIESIMPLE )
+		return false;
+#endif
+
+#ifdef HL1_DLL
+	return false;
+#endif
+	return true;
+}
+
 bool CAI_BaseHumanoid::ShouldGib( const CTakeDamageInfo &info )
 {
 	if ( info.GetDamageType() & DMG_NEVERGIB )
@@ -184,7 +202,7 @@ bool CAI_BaseHumanoid::ShouldGib( const CTakeDamageInfo &info )
 	return false;
 }
 
-#define SNEAK_ATTACK_DIST	144.0f // 16 feet -- orig; 360.0f
+ConVar	sk_backstab_distance( "sk_backstab_distance", "144.0" );	// 16 feet -- orig; 360.0f
 ConVar	sk_backstab_multiplier( "sk_backstab_multiplier", "5.0" );
 void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
@@ -212,7 +230,7 @@ void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 			float flDist;
 			flDist = (info.GetAttacker()->GetAbsOrigin() - GetAbsOrigin()).Length();
 
-			if( flDist > SNEAK_ATTACK_DIST )
+			if( flDist > sk_backstab_distance.GetFloat() )
 			{
 				bSneakAttacked = false;
 			}
@@ -235,7 +253,7 @@ int CAI_BaseHumanoid::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
 	// If I just got blasted and I should be knocked down, get KO'd!
 	// NOTE; Whether or not a npc can get knocked down depends on that npcs selectsched,
-	// If a bit of logic isnt in there, that npc wont get absolutelyBLOODYDES-TROY-EDED
+	// If a bit of logic isnt in there, that npc wont get gonk'd
 	if ( m_NPCState != NPC_STATE_SCRIPT && m_NPCState != NPC_STATE_PRONE && !m_bKnockedDown )
 	{
 		bool bKnockdownDamage = (info.GetDamage() >= (GetMaxHealth() / 2));

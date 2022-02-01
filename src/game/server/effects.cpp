@@ -1280,7 +1280,7 @@ END_DATADESC()
 
 void CEnvFunnel::Precache ( void )
 {
-	m_iSprite = PrecacheModel ( "sprites/flare6.vmt" );
+	m_iSprite = PrecacheModel ( "sprites/flare1.vmt" );
 }
 
 void CEnvFunnel::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
@@ -2390,9 +2390,10 @@ void EffectsPrecache( void *pUser )
 	CBaseEntity::PrecacheScriptSound( "FX_RicochetSound.Ricochet" );
 	CBaseEntity::PrecacheScriptSound( "FX_RicochetSound.HMGRicochet" );
 
-	CBaseEntity::PrecacheScriptSound( "Physics.WaterSplash" );
+	CBaseEntity::PrecacheScriptSound( "Water.WaterSplash" );
+	CBaseEntity::PrecacheScriptSound( "Water.BulletImpact" );
 	CBaseEntity::PrecacheScriptSound( "BaseExplosionEffect.Sound" );
-	CBaseEntity::PrecacheScriptSound( "Splash.SplashSound" );
+	CBaseEntity::PrecacheScriptSound( "MicroExplosionEffect.Sound" );
 
 	if ( gpGlobals->maxClients > 1 )
 	{

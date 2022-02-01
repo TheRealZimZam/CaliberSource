@@ -341,6 +341,7 @@ void		UTIL_GibSpray( const Vector &pos, const Vector &dir, int color, int amount
 Vector		UTIL_RandomBloodVector( void );
 void		UTIL_ImpactTrace( trace_t *pTrace, int iDamageType, char *pCustomImpactName = NULL );
 void		UTIL_PlayerDecalTrace( trace_t *pTrace, int playernum );
+void		UTIL_Dust( const Vector &origin, const Vector &dir, const float scale, const float speed );
 void		UTIL_Smoke( const Vector &origin, const float scale, const float framerate );
 void		UTIL_AxisStringToPointDir( Vector &start, Vector &dir, const char *pString );
 void		UTIL_AxisStringToPointPoint( Vector &start, Vector &end, const char *pString );

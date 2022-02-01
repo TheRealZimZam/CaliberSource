@@ -76,6 +76,7 @@ ConVar prop_active_gib_max_fade_time( "prop_active_gib_max_fade_time", "999999" 
 ConVar func_breakdmg_bullet( "func_breakdmg_bullet", "0.5" );
 ConVar func_breakdmg_club( "func_breakdmg_club", "1.5" );
 ConVar func_breakdmg_explosive( "func_breakdmg_explosive", "1.25" );
+ConVar func_breakdmg_fire( "func_breakdmg_fire", "0.5" );
 
 ConVar sv_turbophysics( "sv_turbophysics", "0", FCVAR_REPLICATED, "Turns on turbo physics" );
 
@@ -99,6 +100,7 @@ float GetBreakableDamage( const CTakeDamageInfo &inputInfo, IBreakableWithPropDa
 	// Bullet damage?
 	if ( iDmgType & DMG_BULLET )
 	{
+#if 0
 		// Buckshot does double damage to breakables
 		if ( iDmgType & DMG_BUCKSHOT )
 		{
@@ -112,17 +114,15 @@ float GetBreakableDamage( const CTakeDamageInfo &inputInfo, IBreakableWithPropDa
 				flDamage *= (func_breakdmg_bullet.GetFloat() * 2);
 			}
 		}
+#endif
+		if ( pProp )
+		{
+			flDamage *= pProp->GetDmgModBullet();
+		}
 		else
 		{
-			if ( pProp )
-			{
-				flDamage *= pProp->GetDmgModBullet();
-			}
-			else
-			{
-				// Bullets do little damage to breakables
-				flDamage *= func_breakdmg_bullet.GetFloat();
-			}
+			// Bullets do little damage to breakables
+			flDamage *= func_breakdmg_bullet.GetFloat();
 		}
 	}
 
@@ -151,6 +151,20 @@ float GetBreakableDamage( const CTakeDamageInfo &inputInfo, IBreakableWithPropDa
 		{
 			// Explosions do extra damage
 			flDamage *= func_breakdmg_explosive.GetFloat();
+		}
+	}
+
+	// Fire damage?
+	if ( iDmgType & (DMG_BURN|DMG_SLOWBURN) )
+	{
+		if ( pProp )
+		{
+			flDamage *= pProp->GetDmgModFire();
+		}
+		else
+		{
+			// Fires do extra damage
+			flDamage *= func_breakdmg_fire.GetFloat();
 		}
 	}
 

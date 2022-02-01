@@ -1495,7 +1495,6 @@ void CAI_BlendedMotor::BuildVelocityScript( const AILocalMoveGoal_t &move )
 }
 
 
-
 void CAI_BlendedMotor::InsertSlowdown( float distToObstruction, float idealAccel, bool bAlwaysSlowdown )
 {
 	int i;
@@ -1545,8 +1544,6 @@ void CAI_BlendedMotor::InsertSlowdown( float distToObstruction, float idealAccel
 //-----------------------------------------------------------------------------
 // Purpose: issues turn gestures when it detects that the body has turned but the feet haven't compensated
 //-----------------------------------------------------------------------------
-
-
 void CAI_BlendedMotor::MaintainTurnActivity( void )
 {
 	AI_PROFILE_SCOPE(CAI_BlendedMotor_MaintainTurnActivity);
@@ -1683,7 +1680,7 @@ bool CAI_BlendedMotor::AddTurnGesture( float flYD )
 
 		int seq = SelectWeightedSequence( activity );
 
-		if (scene_flatturn.GetBool() && GetOuter()->IsCurSchedule( SCHED_SCENE_GENERIC ))
+		if ( scene_flatturn.GetBool() )	//&& GetOuter()->IsCurSchedule( SCHED_SCENE_GENERIC )
 		{
 			Activity flatactivity = activity;
 

@@ -885,21 +885,19 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 	trace_t		tr;
 	Vector		vecSrc;
 
+#ifdef HL2MP
 	if (IsPlayer())
 	{
 		// die in an interesting way
-		switch( random->RandomInt(0,7) )
+		switch( random->RandomInt(0,3) )
 		{
-		case 0:	return ACT_DIESIMPLE;
-		case 1: return ACT_DIEBACKWARD;
-		case 2: return ACT_DIEFORWARD;
-		case 3: return ACT_DIEVIOLENT;
-		case 4: return ACT_DIE_HEADSHOT;
-		case 5: return ACT_DIE_CHESTSHOT;
-		case 6: return ACT_DIE_GUTSHOT;
-		case 7: return ACT_DIE_BACKSHOT;
+			case 0:	return ACT_DIESIMPLE;
+			case 1: return ACT_DIEBACKWARD;
+			case 2: return ACT_DIEFORWARD;
+			case 3: return ACT_DIEVIOLENT;
 		}
 	}
+#endif
 
 	vecSrc = WorldSpaceCenter();
 
@@ -925,21 +923,12 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 		deathActivity = ACT_DIE_GUTSHOT;
 		break;
 
-	case HITGROUP_GENERIC:
-		// try to pick a death based on attack direction
-		fTriedDirection = true;
-
-		if ( flDot > 0.3 )
-		{
-			deathActivity = ACT_DIEFORWARD;
-		}
-		else if ( flDot <= -0.3 )
-		{
-			deathActivity = ACT_DIEBACKWARD;
-		}
-		break;
-
 	default:
+		if (IsPlayer() && random->RandomInt(0,3) == 3)
+		{
+			deathActivity = ACT_DIEVIOLENT;
+		}
+
 		// try to pick a death based on attack direction
 		fTriedDirection = true;
 
@@ -983,10 +972,7 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 		// if we're still invalid, simple is our only option.
 		deathActivity = ACT_DIESIMPLE;
 
-		if ( SelectWeightedSequence ( deathActivity ) == ACTIVITY_NOT_AVAILABLE )
-		{
-			Msg( "ERROR! %s missing ACT_DIESIMPLE\n", STRING(GetModelName()) );
-		}
+	//	DevMsg( "ERROR! %s missing ACT_DIESIMPLE\n", STRING(GetModelName()) );
 	}
 
 	if ( deathActivity == ACT_DIEFORWARD )
@@ -2755,9 +2741,9 @@ bool CBaseCombatCharacter::Weapon_IsOnGround( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 {
-#if 0
 	bool bConservative = false;
 
+#if 0
 	if( hl2_episodic.GetBool() && !GetActiveWeapon() )
 	{
 		// Unarmed citizens are conservative in their weapon finding
@@ -2803,13 +2789,30 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 				// No, I'm already using this type of weapon.
 				continue;
 			}
+			if( pWeapon->GetPriority() < 2 )
+			{
+				// No, this weapon sux.
+				continue;
+			}
+/*
 #ifdef HL2_DLL
 			if( FClassnameIs( pWeapon, "weapon_pistol" ) )
 			{
 				// No, it's a pistol.
 				continue;
 			}
+			if( FClassnameIs( pWeapon, "weapon_flaregun" ) )
+			{
+				// No, it's a flaregun.
+				continue;
+			}
+			if( FClassnameIs( pWeapon, "weapon_brickbat" ) )
+			{
+				// No, it's a rock.
+				continue;
+			}
 #endif
+*/
 		}
 
 		float fCurDist = (pWeapon->GetLocalOrigin() - GetLocalOrigin()).Length();
@@ -2817,7 +2820,7 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 		// Give any reserved weapon a bonus
 		if( pWeapon->HasSpawnFlags( SF_WEAPON_NO_PLAYER_PICKUP ) )
 		{
-			fCurDist *= 0.5f;
+			fCurDist *= 0.75f;
 		}
 
 		if ( pBestWeapon )
@@ -2825,13 +2828,75 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			// UNDONE: Better heuristic needed here
 			//			Need to pick by power of weapons
 			//			Don't want to pick a weapon right next to a NPC!
+			// Give these weapons a bonus be selected by making it seem closer.
+			switch( pWeapon->GetPriority() )
+			{
+				case 0:
+					// Lowest Priority
+					fCurDist *= 1.5f;
+				break;
+
+				case 1:
+					// Low Priority
+					fCurDist *= 1.25f;
+				break;
+
+				case 2:
+					// Normal Priority
+					fCurDist *= 1.0f;
+				break;
+
+				case 3:
+					// High Priority
+					fCurDist *= 0.75f;
+				break;
+
+				case 4:
+					// Highest Priority
+					fCurDist *= 0.5f;
+				break;
+			}
+
+/*
 #ifdef HL2_DLL
-			// Give the AR2 a bonus to be selected by making it seem closer.
 			if( FClassnameIs( pWeapon, "weapon_ar2" ) )
 			{
 				fCurDist *= 0.5f;
 			}
+			if( FClassnameIs( pWeapon, "weapon_brickbat" ) )
+			{
+				fCurDist *= 1.5f;
+			}
+			if( FClassnameIs( pWeapon, "weapon_crossbow" ) )
+			{
+				fCurDist *= 0.75f;
+			}
+			if( FClassnameIs( pWeapon, "weapon_hmg1" ) )
+			{
+				fCurDist *= 0.75f;
+			}
+			if( FClassnameIs( pWeapon, "weapon_shotgun" ) )
+			{
+				fCurDist *= 0.75f;
+			}
+			if( FClassnameIs( pWeapon, "weapon_smg2" ) )
+			{
+				fCurDist *= 0.75f;
+			}
+			if( FClassnameIs( pWeapon, "weapon_stab" ) )
+			{
+				fCurDist *= 1.25f;
+			}
+			if( FClassnameIs( pWeapon, "weapon_supershotgun" ) )
+			{
+				fCurDist *= 0.5f;
+			}
+			if( FClassnameIs( pWeapon, "weapon_swing" ) )
+			{
+				fCurDist *= 1.25f;
+			}
 #endif
+*/
 
 			// choose the last range attack weapon you find or the first available other weapon
 			if ( ! (pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
@@ -2856,13 +2921,11 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			if ( tr.startsolid || (tr.fraction < 1.0) )
 				continue;
 		}
-#if 0
 		else if( bConservative )
 		{
 			// Skip it.
 			continue;
 		}
-#endif
 
 		if( FVisible(pWeapon) )
 		{

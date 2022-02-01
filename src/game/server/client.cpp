@@ -40,9 +40,11 @@
 #include "tf_player.h"
 #endif
 
+/*
 #ifdef HL2_DLL
 #include "weapon_physcannon.h"
 #endif
+*/
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -933,34 +935,25 @@ void CC_Player_PhysSwap( void )
 	{
 		CBaseCombatWeapon *pWeapon = pPlayer->GetActiveWeapon();
 
+		//TODO; Need a fix here
 		if ( pWeapon )
 		{
 			// Tell the client to stop selecting weapons
 			engine->ClientCommand( UTIL_GetCommandClient()->edict(), "cancelselect" );
 
-			const char *strWeaponName = pWeapon->GetName();
-
-			// If current weapon is a grenade, change it back
-			//TODO; This needs to grab the bucket value to make sure its any grenade
-			if ( !Q_stricmp( strWeaponName, "weapon_frag" ) )
+			// If current weapon is a throwable, change it back
+			if ( pWeapon->GetSlot() == 5 )
 			{
 			//	PhysCannonForceDrop( pWeapon, NULL );
 				pPlayer->SelectLastItem();
 				DevMsg( "Switching to previous weapon.\n");
 			}
-			// If it isnt, change to grenade (frag has priority)
+			// If it isnt, change to slot 5
 			else
 			{
-				//TODO; This needs to grab the bucket value, rather than be a hardcoded priority!
 				DevMsg( "Attempting to switch to highest-priority consumable.\n");
-				//FRAG (Default grenade)
-				pPlayer->SelectItem( "weapon_frag" );
-				//MOLOTOV (Starting grenade)
-
-				//STUN (Police grenade)
-
-				//SMOKE (Smoke grenade)
-
+			//	CBaseCombatWeapon *pSwitch = Weapon_GetSlot( 5 );
+				pPlayer->SelectItem( "weapon_frag" );	//TEMP
 			}
 		}
 	}

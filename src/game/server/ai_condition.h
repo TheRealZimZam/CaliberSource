@@ -43,6 +43,7 @@ enum SCOND_t
 	COND_PHYSICS_DAMAGE,	// Physics based damage
 	COND_REPEATED_DAMAGE,	// Damaged several times in a row
 	COND_ON_FIRE,			// Is currently on-fire
+	COND_STUNNED,			// Stunned by a attack
 	COND_KNOCKED_DOWN,		// Knocked down by a massive attack
 
 	COND_CAN_RANGE_ATTACK1,

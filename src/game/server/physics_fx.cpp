@@ -102,14 +102,14 @@ void PhysicsSplash( IPhysicsFluidController *pFluid, IPhysicsObject *pObject, CB
 
 	if ( pObject->GetGameFlags() & FVPHYSICS_PART_OF_RAGDOLL )
 	{
-		/*
+#if 0
 		data.m_vOrigin = centerPoint;
 		data.m_vNormal = normal;
 		VectorAngles( normal, data.m_vAngles );
 		data.m_flScale = random->RandomFloat( 8, 10 );
 
 		DispatchEffect( "watersplash", data );
-		
+
 		int		splashes = 4;
 		Vector	point;
 
@@ -127,7 +127,7 @@ void PhysicsSplash( IPhysicsFluidController *pFluid, IPhysicsObject *pObject, CB
 
 			DispatchEffect( "watersplash", data );
 		}
-		*/
+#endif
 
 		//FIXME: This code will not work correctly given how the ragdoll/fluid collision is acting currently
 		return;

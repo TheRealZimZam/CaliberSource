@@ -1462,7 +1462,7 @@ void CAI_BaseNPC::FireBullets( const FireBulletsInfo_t &info )
 	BaseClass::FireBullets( info );
 }
 
-
+// TODO; Why TF is this in here???
 //-----------------------------------------------------------------------------
 // Shot statistics
 //-----------------------------------------------------------------------------
@@ -5241,7 +5241,7 @@ bool CAI_BaseNPC::Weapon_IsBetterAvailable()
 	{
 		if( GetActiveWeapon() )
 		{
-			m_flNextWeaponSearchTime = gpGlobals->curtime + 2;
+			m_flNextWeaponSearchTime = gpGlobals->curtime + 3;
 		}
 		else
 		{

@@ -419,6 +419,7 @@ void CPhysBox::Spawn( void )
 	m_flDmgModBullet = func_breakdmg_bullet.GetFloat();
 	m_flDmgModClub = func_breakdmg_club.GetFloat();
 	m_flDmgModExplosive = func_breakdmg_explosive.GetFloat();
+	m_flDmgModFire = func_breakdmg_fire.GetFloat();
 
 	ParsePropData();
 

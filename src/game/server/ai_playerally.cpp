@@ -99,6 +99,7 @@ ConceptInfo_t g_ConceptInfos[] =
 	{ 	TLK_SPOTTED_HEADCRAB_LEAVING_ZOMBIE,SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_DANGER_ZOMBINE_GRENADE,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_BALLSOCKETED,					SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_INVESTIGATE,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		5,		7,		AICF_DEFAULT,	},
 		
 	// Darkness mode
 	{ 	TLK_DARKNESS_LOSTPLAYER, SPEECH_IMPORTANT,-1,	-1,		-1,		-1,		 -1,	-1,		AICF_DEFAULT,	},

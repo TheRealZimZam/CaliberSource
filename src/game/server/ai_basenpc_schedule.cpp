@@ -3,6 +3,7 @@
 // Purpose: Functions and data pertaining to the NPCs' AI scheduling system.
 //			Implements default NPC tasks and schedules.
 //
+// TODO; TASK_FIND_DODGE_POSITION, TASK_DODGE
 //=============================================================================//
 
 
@@ -386,6 +387,7 @@ bool CAI_BaseNPC::IsScheduleValid()
 
 		return false;
 	}
+
 
 	if ( HasCondition(COND_SCHEDULE_DONE) || 
 		 HasCondition(COND_TASK_FAILED)   )
@@ -2717,6 +2719,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 			}
 			break;
 		}
+
 	case TASK_SMALL_FLINCH:
 		{
 			Remember(bits_MEMORY_FLINCHED);
@@ -2731,6 +2734,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 			m_flNextFlinchTime = gpGlobals->curtime; //+ random->RandomFloat( 1.0, 2.0 );
 			break;
 		}
+
 	case TASK_DIE:
 		{
 			GetNavigator()->StopMoving();	
@@ -2739,6 +2743,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 
 			break;
 		}
+
 	case TASK_SOUND_WAKE:
 		{
 			AlertSound();
@@ -2768,7 +2773,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 	case TASK_SOUND_ANGRY:
 		{
 			// sounds are complete as soon as we get here, cause we've already played them.
-			DevMsg( 2, "SOUND\n" );		
+		//	DevMsg( 2, "SOUND\n" );		
 			AngrySound();			
 			TaskComplete();
 			break;
@@ -2807,6 +2812,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 			}
 			break;
 		}
+
 	case TASK_WAIT_FOR_SCRIPT:
 		{
 			if ( !m_hCine )
@@ -4727,7 +4733,7 @@ int CAI_BaseNPC::SelectScriptSchedule()
 	return SCHED_IDLE_STAND;
 }
 
-ConVar scene_full_gesture_flinch( "scene_full_gesture_flinch", "0" );
+ConVar scene_full_gesture_flinch( "scene_full_gesture_flinch", "1" );
 //-----------------------------------------------------------------------------
 // Purpose: Select a gesture to play in response to damage we've taken
 // Output : int

@@ -140,10 +140,7 @@ void CFireSmoke::Precache()
 {
 	BaseClass::Precache();
 	m_nFlameModelIndex	= PrecacheModel( "sprites/fire1.vmt" );
-
-	// This asset doesn't appear to exist anymore. What's going on? 
-	// Commenting this out so that level designers don't get a red error about missing material. (sjb)
-	//m_nFlameFromAboveModelIndex	= PrecacheModel( "sprites/flamefromabove.vmt" );
+	m_nFlameFromAboveModelIndex	= PrecacheModel( "sprites/fire_floor.vmt" );
 }
 
 void CFireSmoke::Spawn()

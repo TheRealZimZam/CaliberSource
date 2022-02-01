@@ -50,36 +50,44 @@ extern Vector		g_vecAttackDir;
 		NULL,						// 0
 		"item_battery",				// 1
 		"item_healthkit",			// 2
-		"item_ammo_pistol",			// 3
-		"item_ammo_pistol_large",	// 4
-		"item_ammo_smg1",			// 5
-		"item_ammo_smg1_large",		// 6
-		"item_ammo_ar2",			// 7
-		"item_ammo_ar2_large",		// 8
-		"item_box_buckshot",		// 9
-		"item_flare_round",			// 10
-		"item_box_flare_rounds",	// 11
-		"item_rpg_round",			// 12
-		"item_smg1_grenade",		// 13
-		"item_box_sniper_rounds",	// 14
-		"weapon_iceaxe",			// 15
-		"weapon_stunstick",			// 16
-		"weapon_ar1",				// 17
-		"weapon_ar2",				// 18
-		"weapon_hmg1",				// 19
-		"weapon_rpg",				// 20
-		"weapon_smg1",				// 21
-		"weapon_smg2",				// 22
-		"weapon_slam",				// 23
-		"weapon_shotgun",			// 24
-		"weapon_molotov",			// 25
-		"item_dynamic_resupply",	// 26
-		"weapon_supershotgun",		// 27
-		"weapon_flamethrower",		// 28
-		"weapon_mitcl",				// 29
-		"weapon_lightrpg",			// 30
-		"weapon_flaregun",			// 31
-		"item_ammo_flamethrower",	// 32
+		"item_healthvial",			// 3
+		"item_ammo_pistol",			// 4
+		"item_large_box_srounds",	// 5
+		"item_ammo_smg1",			// 6
+		"item_large_box_mrounds",	// 7
+		"item_ammo_hmg",			// 8
+		"item_ammo_ar2",			// 9
+		"item_large_box_lrounds",	// 10
+		"item_ammo_357",			// 11
+		"item_ammo_crossbow",		// 12
+		"item_flare_round",			// 13
+		"item_box_flare_rounds",	// 14
+		"item_ar2_grenade",			// 15
+		"item_ml_grenade",			// 16
+		"item_box_sniper_rounds",	// 17
+		"item_ammo_buckshot",		// 18
+		"item_box_buckshot",		// 19
+		"item_large_box_buckshot",	// 20
+		"item_ammo_flamer",			// 21
+		"weapon_iceaxe",			// 22
+		"weapon_stunstick",			// 23
+		"weapon_pistol",			// 24
+		"weapon_357",				// 25
+		"weapon_smg1",				// 26
+		"weapon_smg2",				// 27
+		"weapon_ar1",				// 28
+		"weapon_ar2",				// 29
+		"weapon_hmg1",				// 30
+		"weapon_rpg",				// 31
+		"weapon_flamethrower",		// 32
+		"weapon_shotgun",			// 33
+		"weapon_supershotgun",		// 34
+		"weapon_flaregun",			// 35
+		"weapon_slam",				// 36
+		"weapon_molotov",			// 37
+		"weapon_stun",				// 38
+		"weapon_frag",				// 39
+		"item_dynamic_resupply",	// 40
 	};
 #else
 	// Half-Life 1 spawn objects!
@@ -296,6 +304,7 @@ void CBreakable::Spawn( void )
 	m_flDmgModBullet = func_breakdmg_bullet.GetFloat();
 	m_flDmgModClub = func_breakdmg_club.GetFloat();
 	m_flDmgModExplosive = func_breakdmg_explosive.GetFloat();
+	m_flDmgModFire = func_breakdmg_fire.GetFloat();
 
 	ParsePropData();
 
@@ -465,9 +474,6 @@ void CBreakable::Precache( void )
 		pGibName = "CinderBlocks";
 		break;
 
-	case matWeb:
-		pGibName = "WebGibs";
-		break;
 #else
 
 	case matComputer:
@@ -486,6 +492,10 @@ void CBreakable::Precache( void )
 		pGibName = "FleshGibs";
 		break;
 #endif
+
+	case matWeb:
+		pGibName = "WebGibs";
+		break;
 
 	case matNone:
 		pGibName = "";
@@ -545,9 +555,9 @@ void CBreakable::Precache( void )
 	PrecacheScriptSound( "Breakable.Ceiling" );
 }
 
+
 // play shard sound when func_breakable takes damage.
 // the more damage, the louder the shard sound.
-
 
 void CBreakable::DamageSound( void )
 {
@@ -661,7 +671,6 @@ void CBreakable::BreakTouch( CBaseEntity *pOther )
 		
 		// Add optional delay 
 		SetNextThink( gpGlobals->curtime + m_flPressureDelay );
-
 	}
 }
 
@@ -807,6 +816,13 @@ void CBreakable::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir,
 					g_pEffects->Ricochet( ptr->endpos, (vecDir*-1.0f) );
 				}
 			break;
+
+			case matFlesh:
+			{
+				//!!TODO; its not always red - figure something out here
+				UTIL_BloodImpact( ptr->endpos, vecDir, BLOOD_COLOR_RED, 1 );
+			}
+			break;
 		}
 	}
 
@@ -910,7 +926,7 @@ int CBreakable::OnTakeDamage( const CTakeDamageInfo &info )
 	{
 		// Don't play shard noise if being burned.
 		// Don't play shard noise if cbreakable actually died.
-		if ( ( subInfo.GetDamageType() & DMG_BURN ) == false )
+		if ( subInfo.GetDamageType() & (DMG_SLASH|DMG_CLUB|DMG_VEHICLE) )
 		{
 			DamageSound();
 		}

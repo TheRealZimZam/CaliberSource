@@ -63,9 +63,9 @@ void W_Precache(void)
 
 
 #ifdef HL1_DLL
-	g_sModelIndexWExplosion = CBaseEntity::PrecacheModel ("sprites/WXplo1.vmt");// underwater fireball
-	g_sModelIndexBloodSpray = CBaseEntity::PrecacheModel ("sprites/bloodspray.vmt"); // initial blood
-	g_sModelIndexBloodDrop = CBaseEntity::PrecacheModel ("sprites/blood.vmt"); // splattered blood 
+	g_sModelIndexWExplosion = CBaseEntity::PrecacheModel("sprites/WXplo1.vmt");	// underwater fireball
+	g_sModelIndexBloodSpray = CBaseEntity::PrecacheModel("sprites/bloodspray.vmt");	// initial blood
+	g_sModelIndexBloodDrop = CBaseEntity::PrecacheModel("sprites/blood.vmt");	// splattered blood 
 	g_sModelIndexLaserDot = CBaseEntity::PrecacheModel("sprites/laserdot.vmt");
 #endif // HL1_DLL
 
@@ -80,7 +80,7 @@ void W_Precache(void)
 	PrecacheParticleSystem( "blood_impact_green_01" );
 	PrecacheParticleSystem( "blood_impact_yellow_01" );
 
-	CBaseEntity::PrecacheModel ("effects/bubble.vmt");//bubble trails
+	CBaseEntity::PrecacheModel("effects/bubble.vmt");	//bubble trails
 
 	CBaseEntity::PrecacheModel("models/weapons/w_bullet.mdl");
 #endif

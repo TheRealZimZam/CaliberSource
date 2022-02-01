@@ -104,7 +104,6 @@ bool CAI_SentenceBase::MatchesCriteria( SentenceCriteria_t nCriteria )
 	case SENTENCE_CRITERIA_ALWAYS:
 		return true;
 
-	// Remove combat requirement, if that is one V
 	case SENTENCE_CRITERIA_NORMAL:
 		return (GetOuter()->GetState() == NPC_STATE_COMBAT) || (GetOuter()->HasSpawnFlags( SF_NPC_GAG ) == 0);
 

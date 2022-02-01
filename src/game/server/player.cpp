@@ -2,7 +2,7 @@
 //
 // Purpose: Functions dealing with the player.
 //
-// Todo; Kick/dropkick attack
+// Todo; Critical damage state, Kick/Desperate melee attack
 //===========================================================================//
 
 #include "cbase.h"
@@ -98,6 +98,16 @@ extern ConVar sv_turbophysics;
 extern ConVar *sv_maxreplay;
 
 extern CServerGameDLL g_ServerGameDLL;
+
+/*
+#define DMG_FREEZE		DMG_VEHICLE
+#define DMG_SLOWFREEZE	DMG_DISSOLVE
+
+// HL1_DMG_SHOWNHUD: Add DMG_VEHICLE because HL2 hijacked those bits from DMG_FREEZE, which is what they are in HL1
+// HL1_DMG_SHOWNHUD: Add DMG_DISSOLVE because HL2 hijacked those bits from DMG_SLOWFREEZE, which is what they are in HL1
+// See Halflife1 GameRules - Damage_GetShowOnHud()
+//#define HL1_DMG_SHOWNHUD	(DMG_POISON | DMG_ACID | DMG_FREEZE | DMG_SLOWFREEZE | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK)
+*/
 
 // TIME BASED DAMAGE AMOUNT
 // tweak these values based on gameplay feedback:
@@ -409,6 +419,7 @@ BEGIN_DATADESC( CBasePlayer )
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetHealth", InputSetHealth ),
 	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "SetHUDVisibility", InputSetHUDVisibility ),
+	DEFINE_INPUTFUNC( FIELD_INTEGER, "Cough", InputCough ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetFogController", InputSetFogController ),
 
 	DEFINE_FIELD( m_nNumCrouches, FIELD_INTEGER ),
@@ -778,8 +789,6 @@ int TrainSpeed(int iSpeed, int iMax)
 
 void CBasePlayer::DeathSound( const CTakeDamageInfo &info )
 {
-	// temporarily using pain sounds for death sounds
-
 	// Did we die from falling?
 	if ( m_bitsDamageType & DMG_FALL )
 	{
@@ -899,6 +908,15 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 		case HITGROUP_LEFTLEG:
 		case HITGROUP_RIGHTLEG:
 			info.ScaleDamage( sk_player_leg.GetFloat() );
+#if 0
+			//Slow down a bit if hit in the knee
+			if( m_takedamage )
+			{
+				//m_bSlowedByHit = true;
+				//m_flUnslowTime = gpGlobals->curtime + 1;
+				m_Shared.SetSlowedTime( 0.5f );
+			}
+#endif
 			break;
 		default:
 			break;
@@ -925,16 +943,21 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 //------------------------------------------------------------------------------
 void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 {
-	if (fDamageType & DMG_CRUSH)
+	// TODO; Maybe a switch??
+	if ( fDamageType & DMG_BULLET )
+	{
+		EmitSound( "Player.BulletImpact" );
+	}
+	else if (fDamageType & DMG_CRUSH)
 	{
 		//Red damage indicator
-		color32 red = {128,0,0,128};
+		color32 red = {128,0,0,100};
 		UTIL_ScreenFade( this, red, 1.0f, 0.1f, FFADE_IN );
 	}
 	else if (fDamageType & DMG_DROWN)
 	{
-		//Red damage indicator
-		color32 blue = {0,0,128,128};
+		//Blue damage indicator
+		color32 blue = {0,0,128,100};
 		UTIL_ScreenFade( this, blue, 1.0f, 0.1f, FFADE_IN );
 	}
 	else if (fDamageType & DMG_SLASH)
@@ -949,19 +972,63 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 		UTIL_ScreenFade( this, blue, 0.2, 0.4, FFADE_MODULATE );
 
 		// Very small screen shake
-		ViewPunch(QAngle(random->RandomInt(-0.1,0.1), random->RandomInt(-0.1,0.1), random->RandomInt(-0.1,0.1)));
+		UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 0.5, 1000, SHAKE_START, false );
 
 		// Burn sound 
 		EmitSound( "Player.PlasmaDamage" );
 	}
+	else if (fDamageType & DMG_SHOCK)
+	{
+		// Blue screen fade
+		color32 blue = {0,0,128,50};
+		UTIL_ScreenFade( this, blue, 0.2, 0.2, FFADE_MODULATE );
+
+		// Very small screen shake
+		UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 1.0, 1000, SHAKE_START, false );
+	}
+	else if (fDamageType & DMG_POISON)
+	{
+		// Greenish screen fade
+		color32 green = {0,128,0,50};
+		UTIL_ScreenFade( this, green, 0.2, 0.4, FFADE_MODULATE );
+
+		Cough( 2 );
+	}
+	else if (fDamageType & DMG_ACID)
+	{
+		// Blur screen abit
+		
+	}
 	else if (fDamageType & DMG_SONIC)
 	{
-		// Sonic damage sound 
+		// Blur screen abit
+
+		// Sonic damage sound
 		EmitSound( "Player.SonicDamage" );
 	}
-	else if ( fDamageType & DMG_BULLET )
+}
+
+void CBasePlayer::Cough( int CoughType )
+{
+	switch ( CoughType )
 	{
-		EmitSound( "Flesh.BulletImpact" );
+	case 1:
+		// Normal cough (mustiness, dust, etc.), just a little shake
+		ViewPunch(QAngle(random->RandomInt(-0.2,0.2), random->RandomInt(-0.2,0.2), random->RandomInt(-0.2,0.2)));
+		EmitSound( "Player.Cough" );
+		break;
+	case 2:
+		// Poison cough (World hazards, minor poisons, etc.)
+		ViewPunch(QAngle(random->RandomInt(-0.75,0.75), random->RandomInt(-0.75,0.75), random->RandomInt(-0.75,0.75)));
+		EmitSound( "Player.Cough" );
+		break;
+	case 3:
+		// Huge whooping cough (Huge poison attacks, stunned, etc.)
+		ViewPunch(QAngle(random->RandomInt(-1.0,1.0), random->RandomInt(-1.0,1.0), random->RandomInt(-1.0,1.0)));
+		EmitSound( "Player.BigCough" );
+		break;
+	default:
+		break;
 	}
 }
 
@@ -978,7 +1045,7 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 
 // New values
 #define ARMOR_RATIO	0.2
-#define ARMOR_BONUS	1.0
+#define ARMOR_BONUS	0.8
 
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -1065,8 +1132,7 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 		flRatio = ARMOR_RATIO;
 	}
 
-//	if ( ( info.GetDamageType() & DMG_BLAST ) && g_pGameRules->IsMultiplayer() )
-	if ( ( info.GetDamageType() & DMG_BLAST ) )
+	if ( ( info.GetDamageType() & DMG_BLAST ) )	//&& g_pGameRules->IsMultiplayer()
 	{
 		// blasts damage armor more.
 		flBonus *= 2;
@@ -1202,32 +1268,34 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	m_bitsDamageType |= bitsDamage; // Save this so we can report it to the client
 	m_bitsHUDDamage = -1;  // make sure the damage bits get resent
 
+#ifdef HL2_DLL
 	while (fTookDamage && (!ftrivial || g_pGameRules->Damage_IsTimeBased( bitsDamage ) ) && ffound && bitsDamage)
 	{
 		ffound = false;
 
+		//TODO; This is gross, would a switch be possible here?
 		if (bitsDamage & DMG_CLUB)
 		{
 			if (fmajor)
-				SetSuitUpdate("!HEV_DMG4", false, SUIT_NEXT_IN_30SEC);	// minor fracture
+				SetSuitUpdate("HEV_FRACTURE", true, SUIT_NEXT_IN_30SEC);	// major fracture
 			bitsDamage &= ~DMG_CLUB;
 			ffound = true;
 		}
 		if (bitsDamage & (DMG_FALL | DMG_CRUSH))
 		{
 			if (fmajor)
-				SetSuitUpdate("!HEV_DMG5", false, SUIT_NEXT_IN_30SEC);	// major fracture
+				SetSuitUpdate("!HEV_FRACTURE0", false, SUIT_NEXT_IN_30SEC);	// major fracture
 			else
-				SetSuitUpdate("!HEV_DMG4", false, SUIT_NEXT_IN_30SEC);	// minor fracture
+				SetSuitUpdate("!HEV_FRACTURE1", false, SUIT_NEXT_IN_30SEC);	// minor fracture
 	
 			bitsDamage &= ~(DMG_FALL | DMG_CRUSH);
 			ffound = true;
 		}
-		
+
 		if (bitsDamage & DMG_BULLET)
 		{
 			if (m_lastDamageAmount > 5)
-				SetSuitUpdate("!HEV_DMG6", false, SUIT_NEXT_IN_30SEC);	// blood loss detected
+				SetSuitUpdate("HEV_DMG", true, SUIT_NEXT_IN_30SEC);	// blood loss detected
 			//else
 			//	SetSuitUpdate("!HEV_DMG0", false, SUIT_NEXT_IN_30SEC);	// minor laceration
 			
@@ -1238,19 +1306,27 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 		if (bitsDamage & DMG_SLASH)
 		{
 			if (fmajor)
-				SetSuitUpdate("!HEV_DMG1", false, SUIT_NEXT_IN_30SEC);	// major laceration
+				SetSuitUpdate("!HEV_CUTS0", false, SUIT_NEXT_IN_30SEC);	// major laceration
 			else
-				SetSuitUpdate("!HEV_DMG0", false, SUIT_NEXT_IN_30SEC);	// minor laceration
+				SetSuitUpdate("!HEV_CUTS1", false, SUIT_NEXT_IN_30SEC);	// minor laceration
 
 			bitsDamage &= ~DMG_SLASH;
 			ffound = true;
 		}
-		
+
 		if (bitsDamage & DMG_SONIC)
 		{
 			if (fmajor)
-				SetSuitUpdate("!HEV_DMG2", false, SUIT_NEXT_IN_1MIN);	// internal bleeding
+				SetSuitUpdate("HEV_SONIC", true, SUIT_NEXT_IN_1MIN);	// internal bleeding
 			bitsDamage &= ~DMG_SONIC;
+			ffound = true;
+		}
+
+		if (bitsDamage & DMG_BURN)
+		{
+			if (fmajor)
+				SetSuitUpdate("HEV_FIRE", true, SUIT_NEXT_IN_1MIN);		// heat damage
+			bitsDamage &= ~DMG_BURN;
 			ffound = true;
 		}
 
@@ -1263,7 +1339,7 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 				m_rgbTimeBasedDamage[itbd_PoisonRecover] = 0;
 			}
 
-			SetSuitUpdate("!HEV_DMG3", false, SUIT_NEXT_IN_1MIN);	// blood toxins detected
+			SetSuitUpdate("HEV_POISON", true, SUIT_NEXT_IN_1MIN);	// blood toxins detected
 			bitsDamage &= ~( DMG_POISON | DMG_PARALYZE );
 			ffound = true;
 		}
@@ -1290,23 +1366,30 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 		}
 		if (bitsDamage & DMG_SHOCK)
 		{
+			if (fmajor)
+				SetSuitUpdate("HEV_SHOCK", true, SUIT_NEXT_IN_1MIN);	// 
 			bitsDamage &= ~DMG_SHOCK;
 			ffound = true;
 		}
 	}
+#endif
 
-	float flPunch = -2;
+	float flPunch = RandomFloat( -3, -4 );
+
+	if( info.GetDamage() > 15.0f )
+		flPunch = -6;
 
 	if( hl2_episodic.GetBool() && info.GetAttacker() && !FInViewCone( info.GetAttacker() ) )
 	{
 		if( info.GetDamage() > 10.0f )
-			flPunch = -10;
+			flPunch = -12;
 		else
-			flPunch = RandomFloat( -5, -7 );
+			flPunch = RandomFloat( -7, -10 );
 	}
 
 	m_Local.m_vecPunchAngle.SetX( flPunch );
 
+#ifdef HL2_DLL
 	if (fTookDamage && !ftrivial && fmajor && flHealthPrev >= 75) 
 	{
 		// first time we take major damage...
@@ -1319,7 +1402,6 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	
 	if (fTookDamage && !ftrivial && fcritical && flHealthPrev < 75)
 	{
-
 		// already took major damage, now it's critical...
 		if (m_iHealth < 6)
 			SetSuitUpdate("!HEV_HLTH3", false, SUIT_NEXT_IN_10MIN);	// near death
@@ -1342,6 +1424,7 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 			else
 				SetSuitUpdate("!HEV_HLTH1", false, SUIT_NEXT_IN_10MIN);	// health dropping
 		}
+#endif
 
 	// Do special explosion damage effect
 	if ( bitsDamage & DMG_BLAST )
@@ -1355,15 +1438,10 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : &info - 
-//			damageAmount - 
 //-----------------------------------------------------------------------------
 #define MIN_SHOCK_AND_CONFUSION_DAMAGE	30.0f
 #define MIN_EAR_RINGING_DISTANCE		240.0f  // 20 feet
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : &info - 
-//-----------------------------------------------------------------------------
 void CBasePlayer::OnDamagedByExplosion( const CTakeDamageInfo &info )
 {
 	float lastDamage = info.GetDamage();
@@ -1380,6 +1458,8 @@ void CBasePlayer::OnDamagedByExplosion( const CTakeDamageInfo &info )
 	bool ear_ringing = distanceFromPlayer < MIN_EAR_RINGING_DISTANCE ? true : false;
 	bool shock = lastDamage >= MIN_SHOCK_AND_CONFUSION_DAMAGE;
 
+//	Msg( "expl dist %f damage %f\n", distanceFromPlayer, lastDamage );
+
 	if ( !shock && !ear_ringing )
 		return;
 
@@ -1389,6 +1469,8 @@ void CBasePlayer::OnDamagedByExplosion( const CTakeDamageInfo &info )
 
 	CSingleUserRecipientFilter user( this );
 	enginesound->SetPlayerDSP( user, effect, false );
+	// Add a bit of trembling after the explosion, ontop of the big punchback of critical damage effects
+	UTIL_ScreenShake( info.GetInflictor()->GetAbsOrigin(), 2.0, 0.5, 3.0, 1000, SHAKE_START, true );
 }
 
 //=========================================================
@@ -1859,8 +1941,8 @@ WaterMove
 #ifdef HL2_DLL
 
 // test for HL2 drowning damage increase (aux power used instead)
-#define AIRTIME						7		// lung full of air lasts this many seconds
-#define DROWNING_DAMAGE_INITIAL		10
+#define AIRTIME						9		// lung full of air lasts this many seconds
+#define DROWNING_DAMAGE_INITIAL		5
 #define DROWNING_DAMAGE_MAX			10
 
 #else
@@ -4971,10 +5053,15 @@ void CBasePlayer::Precache( void )
 
 	PrecacheScriptSound( "Player.FallGib" );
 	PrecacheScriptSound( "Player.Death" );
+	PrecacheScriptSound( "Player.Pain" );
+	PrecacheScriptSound( "Player.BulletImpact" );
 	PrecacheScriptSound( "Player.PlasmaDamage" );
 	PrecacheScriptSound( "Player.SonicDamage" );
+	PrecacheScriptSound( "Player.Heartbeat" );
 	PrecacheScriptSound( "Player.DrownStart" );
 	PrecacheScriptSound( "Player.DrownContinue" );
+	PrecacheScriptSound( "Player.Cough" );
+	PrecacheScriptSound( "Player.BigCough" );
 	PrecacheScriptSound( "Player.Wade" );
 	PrecacheScriptSound( "Player.AmbientUnderWater" );
 	enginesound->PrecacheSentenceGroup( "HEV" );
@@ -5907,7 +5994,7 @@ static void CreateJeep( CBasePlayer *pPlayer )
 	Vector vecForward;
 	AngleVectors( pPlayer->EyeAngles(), &vecForward );
 //Tony; in sp sdk, we have prop_vehicle_hl2buggy; because episode 2 modified the jeep code to turn it into the jalopy instead of the regular buggy
-#if defined ( SP_SDK )
+#ifdef HL2_EPISODIC
 	CBaseEntity *pJeep = (CBaseEntity *)CreateEntityByName( "prop_vehicle_hl2buggy" );
 #else
 	CBaseEntity *pJeep = (CBaseEntity *)CreateEntityByName( "prop_vehicle_jeep" );
@@ -6044,6 +6131,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveAmmo( 24,	"SniperRound");
 		GiveAmmo( 16,	"XBowBolt" );
 		GiveAmmo( 10,	"FlareRound" );
+		GiveAmmo( 255,	"Flamethrower");
 		GiveAmmo( 5,	"Grenade");
 		GiveAmmo( 5,	"StunGrenade");
 		GiveAmmo( 5,	"Slam");
@@ -8498,6 +8586,23 @@ void CBasePlayer::InputSetHUDVisibility( inputdata_t &inputdata )
 	else
 	{
 		m_Local.m_iHideHUD |= HIDEHUD_ALL;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Do a cough
+//-----------------------------------------------------------------------------
+void CBasePlayer::InputCough( inputdata_t &inputdata )
+{
+	int iCoughType = inputdata.value.Int();
+
+	if ( iCoughType > 1 )
+	{
+		Cough( iCoughType );
+	}
+	else
+	{
+		Cough( 1 );
 	}
 }
 

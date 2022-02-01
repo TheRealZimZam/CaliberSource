@@ -616,7 +616,7 @@ void CFire::Precache( void )
 	{
 		UTIL_PrecacheOther("_firesmoke");
 
-#ifdef HL2_EPISODIC
+#if 0
 		if ( m_spawnflags & SF_FIRE_SMOKELESS )
 		{
 			PrecacheParticleSystem( "env_fire_tiny" );
@@ -631,7 +631,7 @@ void CFire::Precache( void )
 			PrecacheParticleSystem( "env_fire_medium_smoke" );
 			PrecacheParticleSystem( "env_fire_large_smoke" );
 		}
-#endif
+#endif	//HL2_EPISODIC
 	}
 
 	if ( m_nFireType == FIRE_PLASMA )
@@ -813,7 +813,8 @@ void CFire::SpawnEffect( fireType_e type, float scale )
 	UTIL_SetOrigin( pEffect, GetAbsOrigin() );
 	pEffect->Spawn();
 	pEffect->SetParent( this );
-	pEffect->Scale( m_flFireSize, m_flFireSize, 0 );
+//!	pEffect->Scale( m_flFireSize, m_flFireSize, 0 );
+
 	//Start it going
 	pEffect->Enable( ( m_spawnflags & SF_FIRE_START_ON ) );
 	m_hEffect = pEffect;

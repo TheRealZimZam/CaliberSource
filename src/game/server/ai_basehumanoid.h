@@ -35,6 +35,7 @@ public:
 	bool OnMoveBlocked( AIMoveResult_t *pResult );
 
 	// Damage
+	virtual bool ShouldPickADeathPose( void );
 	virtual bool ShouldGib( const CTakeDamageInfo &info );
 	void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );

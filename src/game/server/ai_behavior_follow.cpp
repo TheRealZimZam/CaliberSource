@@ -2227,22 +2227,22 @@ struct AI_FollowFormation_t
 
 static AI_FollowSlot_t g_SimpleFollowFormationSlots[] = 
 {
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
 };
 
 static AI_FollowFormation_t g_SimpleFollowFormation = 
@@ -2262,15 +2262,16 @@ static AI_FollowFormation_t g_SimpleFollowFormation =
 
 
 //-------------------------------------
+// Loose circle
 
 static AI_FollowSlot_t g_WideFollowFormationSlots[] = 
 {
-	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 96, 180, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 180, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 200, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 200, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 220, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 96, 220, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 240, -1, 128 },
@@ -2289,7 +2290,7 @@ static AI_FollowFormation_t g_WideFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_WideFollowFormationSlots),
 	168,						// followPointTolerance
-	72,							// targetMoveTolerance
+	42,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	190,						// walkTolerance
 	600,						// coverTolerance
@@ -2298,11 +2299,45 @@ static AI_FollowFormation_t g_WideFollowFormation =
 	g_WideFollowFormationSlots,
 };
 
+//-------------------------------------
+// Tight wedge
+#define COMMANDER_TOLERANCE (13.0 * 1.415)
+
+static AI_FollowSlot_t g_CommanderFollowFormationSlots[] = 
+{
+	{ 2, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
+	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
+	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
+	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
+	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
+};
+
+static AI_FollowFormation_t g_CommanderFollowFormation = 
+{
+	"Commander",
+	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
+	ARRAYSIZE(g_CommanderFollowFormationSlots),
+	168,						// followPointTolerance
+	8,							// targetMoveTolerance
+	60,							// repathOnRouteTolerance
+	16,							// walkTolerance
+	300,						// coverTolerance
+	300,						// enemyLOSTolerance
+	300,						// chaseEnemyTolerance
+	g_CommanderFollowFormationSlots,
+};
+
 //---------------------------------------------
 // Antlion use very loose following criteria
 
 static AI_FollowSlot_t g_AntlionFollowFormationSlots[] = 
 {
+	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
+	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
@@ -2331,36 +2366,11 @@ static AI_FollowFormation_t g_AntlionFollowFormation =
 };
 
 //-------------------------------------
-
-#define COMMANDER_TOLERANCE (13.0 * 1.415)
-
-static AI_FollowSlot_t g_CommanderFollowFormationSlots[] = 
-{
-	{ 2, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-};
-
-static AI_FollowFormation_t g_CommanderFollowFormation = 
-{
-	"Commander",
-	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
-	ARRAYSIZE(g_CommanderFollowFormationSlots),
-	168,						// followPointTolerance
-	6,							// targetMoveTolerance
-	60,							// repathOnRouteTolerance
-	12,							// walkTolerance
-	300,						// coverTolerance
-	300,						// enemyLOSTolerance
-	300,						// chaseEnemyTolerance
-	g_CommanderFollowFormationSlots,
-};
-
-//-------------------------------------
+// Very tight circle
 
 static AI_FollowSlot_t g_TightFollowFormationSlots[] = 
 {
+	{ 1, { 0, 0, 0 }, 0, 0,  0, -1, 48 },
 	{ 1, { 0, 0, 0 }, 0, 0,  0, -1, 48 },
 	{ 1, { 0, 0, 0 }, 0, 0,  0, -1, 48 },
 	{ 1, { 0, 0, 0 }, 0, 0,  0, -1, 48 },
@@ -2420,23 +2430,12 @@ static AI_FollowFormation_t g_MediumFollowFormation =
 };
 
 //-------------------------------------
+// Sidekick/Sidehanger
 
 static AI_FollowSlot_t g_SidekickFollowFormationSlots[] = 
 {
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
-	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
+	{ 2, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
+	{ 2, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
 };
@@ -2459,7 +2458,7 @@ static AI_FollowFormation_t g_SidekickFollowFormation =
 
 //-------------------------------------
 // Used for hunters following striders
-//-------------------------------------
+
 static AI_FollowSlot_t g_HunterFollowFormationSlots[] = 
 {
 	{ 3, { 480, -240, -400 }, 0, 48, 64, 1000, 60 },

@@ -1,7 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
-//
+// Purpose: Laser enemy for industrial areas
+// TODO; Current way of playing sounds is a bit messy, it'd be better to consolidate
+// it by moving it all to schedule tasks or something similar
 //=============================================================================//
 
 #include "cbase.h"
@@ -44,12 +45,12 @@
 
 //#define		STALKER_DEBUG
 #define	MIN_STALKER_FIRE_RANGE		64
-#define	MAX_STALKER_FIRE_RANGE		3600 // 3600 feet.
+#define	MAX_STALKER_FIRE_RANGE		3072 // 2048
 #define	STALKER_LASER_ATTACHMENT	1
 #define	STALKER_TRIGGER_DIST		200	// Enemy dist. that wakes up the stalker
 #define	STALKER_SENTENCE_VOLUME		(float)0.35
-#define STALKER_LASER_DURATION		99999
-#define STALKER_LASER_RECHARGE		1
+#define STALKER_LASER_DURATION		6.0
+#define STALKER_LASER_RECHARGE		2.0
 #define STALKER_PLAYER_AGGRESSION	1
 
 enum StalkerBeamPower_e
@@ -63,6 +64,9 @@ enum StalkerBeamPower_e
 #define STALKER_AE_MELEE_HIT			1
 
 ConVar	sk_stalker_health( "sk_stalker_health","0");
+ConVar	sk_stalker_lbeam_dmg( "sk_stalker_lbeam_dmg","0");
+ConVar	sk_stalker_mbeam_dmg( "sk_stalker_mbeam_dmg","0");
+ConVar	sk_stalker_hbeam_dmg( "sk_stalker_hbeam_dmg","0");
 ConVar	sk_stalker_melee_dmg( "sk_stalker_melee_dmg","0");
 
 extern void		SpawnBlood(Vector vecSpot, const Vector &vAttackDir, int bloodColor, float flDamage);
@@ -110,24 +114,24 @@ enum SquadSlot_T
 
 BEGIN_DATADESC( CNPC_Stalker )
 
-	DEFINE_KEYFIELD( m_eBeamPower,		FIELD_INTEGER,	"BeamPower" ),
-	DEFINE_FIELD( m_vLaserDir,			FIELD_VECTOR),
+	DEFINE_KEYFIELD( m_eBeamPower,			FIELD_INTEGER,	"BeamPower" ),
+	DEFINE_FIELD( m_vLaserDir,				FIELD_VECTOR),
 	DEFINE_FIELD( m_vLaserTargetPos,		FIELD_POSITION_VECTOR),
 	DEFINE_FIELD( m_fBeamEndTime,			FIELD_FLOAT),
-	DEFINE_FIELD( m_fBeamRechargeTime,	FIELD_FLOAT),
+	DEFINE_FIELD( m_fBeamRechargeTime,		FIELD_TIME),
 	DEFINE_FIELD( m_fNextDamageTime,		FIELD_FLOAT),
 	DEFINE_FIELD( m_bPlayingHitWall,		FIELD_FLOAT),
 	DEFINE_FIELD( m_bPlayingHitFlesh,		FIELD_FLOAT),
-	DEFINE_FIELD( m_pBeam,				FIELD_CLASSPTR),
-	DEFINE_FIELD( m_pLightGlow,			FIELD_CLASSPTR),
-	DEFINE_FIELD( m_flNextNPCThink,		FIELD_FLOAT),
+	DEFINE_FIELD( m_pBeam,					FIELD_CLASSPTR),
+	DEFINE_FIELD( m_pLightGlow,				FIELD_CLASSPTR),
+	DEFINE_FIELD( m_flNextNPCThink,			FIELD_FLOAT),
 	DEFINE_FIELD( m_vLaserCurPos,			FIELD_POSITION_VECTOR),
-	DEFINE_FIELD( m_flNextAttackSoundTime, FIELD_TIME ),
-	DEFINE_FIELD( m_flNextBreatheSoundTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flNextAttackSoundTime,	FIELD_TIME ),
+	DEFINE_FIELD( m_flNextBreatheSoundTime,	FIELD_TIME ),
 	DEFINE_FIELD( m_flNextScrambleSoundTime, FIELD_TIME ),
-	DEFINE_FIELD( m_nextSmokeTime, FIELD_TIME ),
-	DEFINE_FIELD( m_iPlayerAggression, FIELD_INTEGER ),
-	DEFINE_FIELD( m_flNextScreamTime, FIELD_TIME ),
+	DEFINE_FIELD( m_nextSmokeTime,			FIELD_TIME ),
+	DEFINE_FIELD( m_iPlayerAggression,		FIELD_INTEGER ),
+	DEFINE_FIELD( m_flNextScreamTime,		FIELD_TIME ),
 
 	// Function Pointers
 	DEFINE_THINKFUNC( StalkerThink ),
@@ -143,6 +147,12 @@ int	CNPC_Stalker::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 {
 	CTakeDamageInfo info = inputInfo;
 
+	if( info.GetDamageType() & DMG_BURN )
+	{
+		Scorch( 8, 50 );
+	}
+
+#ifdef HL2_EPISODIC
 	// --------------------------------------------
 	//	Don't take a lot of damage from Vortigaunt
 	// --------------------------------------------
@@ -150,16 +160,15 @@ int	CNPC_Stalker::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	{
 		info.ScaleDamage( 0.25 );
 	}
-
-
-	int ret = BaseClass::OnTakeDamage_Alive( info );
+#endif
 
 	// If player shot me make sure I'm mad at him even if I wasn't earlier
 	if ( (info.GetAttacker()->GetFlags() & FL_CLIENT) )
 	{
 		AddClassRelationship( CLASS_PLAYER, D_HT, 0 );
 	}
-	return ret;
+
+	return BaseClass::OnTakeDamage_Alive( info );
 }
 
 //-----------------------------------------------------------------------------
@@ -167,24 +176,26 @@ int	CNPC_Stalker::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 //-----------------------------------------------------------------------------
 float CNPC_Stalker::MaxYawSpeed( void )
 {
-#ifdef HL2_EPISODIC
-	return 10.0f;
-#else
 	switch( GetActivity() )
 	{
-	case ACT_TURN_LEFT:
-	case ACT_TURN_RIGHT:
-		return 160;
+	case ACT_IDLE:		
+		return 45;
 		break;
+	case ACT_WALK:
+	case ACT_WALK_HURT:
 	case ACT_RUN:
 	case ACT_RUN_HURT:
-		return 280;
+		return 30;
 		break;
+	case ACT_TURN_LEFT:
+	case ACT_TURN_RIGHT:
+	case ACT_RANGE_ATTACK1:
+	case ACT_RANGE_ATTACK2:
+		return 90;
 	default:
-		return 160;
+		return 60;
 		break;
 	}
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -202,10 +213,11 @@ Class_T CNPC_Stalker::Classify( void )
 //-----------------------------------------------------------------------------
 void CNPC_Stalker::PrescheduleThink()
 {
-	if (gpGlobals->curtime > m_flNextBreatheSoundTime)
+	BaseClass::PrescheduleThink();
+
+	if ( m_NPCState == NPC_STATE_COMBAT && gpGlobals->curtime > m_flNextBreatheSoundTime )
 	{
-		EmitSound( "NPC_Stalker.Ambient01" );
-		m_flNextBreatheSoundTime = gpGlobals->curtime + 3.0 + random->RandomFloat( 0.0, 5.0 );
+		IdleSound();
 	}
 }
 
@@ -218,7 +230,7 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 	if( enemyClass == CLASS_PLAYER || enemyClass == CLASS_PLAYER_ALLY || enemyClass == CLASS_PLAYER_ALLY_VITAL )
 	{
 		// Don't get angry at these folks unless provoked.
-		if( m_iPlayerAggression < STALKER_PLAYER_AGGRESSION )
+		if( IsInSquad() && m_iPlayerAggression < STALKER_PLAYER_AGGRESSION )
 		{
 			return false;
 		}
@@ -245,6 +257,7 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 		}
 	}
 
+#if 0
 	if( IsStrategySlotRangeOccupied( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) && !HasStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 	{
 		return false;
@@ -258,6 +271,7 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 		// slowly to their last known position. So don't take enemies you can't see.
 		return false;
 	}
+#endif
 
 	return BaseClass::IsValidEnemy(pEnemy);
 }
@@ -278,17 +292,20 @@ void CNPC_Stalker::Spawn( void )
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_STEP );
-	m_bloodColor		= DONT_BLEED;
+//	m_bloodColor		= DONT_BLEED;
+	SetBloodColor( BLOOD_COLOR_BLUE );	//DONT_BLEED - Temp until decent flinch anims are added
 	m_iHealth			= sk_stalker_health.GetFloat();
-	m_flFieldOfView		= 0.1;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
+	m_flFieldOfView		= 0.3;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
 	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_MOVE_GROUND );
+	CapabilitiesAdd( bits_CAP_INNATE_MELEE_ATTACK1);
 	CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK1);
 
-	m_flNextAttackSoundTime		= 0;
+	m_flNextAttackSoundTime		= gpGlobals->curtime;
 	m_flNextBreatheSoundTime	= gpGlobals->curtime + random->RandomFloat( 0.0, 10.0 );
-	m_flNextScrambleSoundTime	= 0;
-	m_nextSmokeTime = 0;
+	m_flNextScrambleSoundTime	= gpGlobals->curtime;
+	m_flNextScreamTime			= gpGlobals->curtime;
+	m_nextSmokeTime 			= 0;
 	m_bPlayingHitWall			= false;
 	m_bPlayingHitFlesh			= false;
 
@@ -319,15 +336,20 @@ void CNPC_Stalker::Precache( void )
 	PrecacheModel("sprites/orangeglow1.vmt");
 	PrecacheModel("sprites/yellowglow1.vmt");
 
+	PrecacheScriptSound( "NPC_Stalker.Alert" );
+	PrecacheScriptSound( "NPC_Stalker.Attack" );
+	PrecacheScriptSound( "NPC_Stalker.AmbientLaserStart" );
 	PrecacheScriptSound( "NPC_Stalker.BurnFlesh" );
 	PrecacheScriptSound( "NPC_Stalker.BurnWall" );
+	PrecacheScriptSound( "NPC_Stalker.Die" );
 	PrecacheScriptSound( "NPC_Stalker.FootstepLeft" );
 	PrecacheScriptSound( "NPC_Stalker.FootstepRight" );
 	PrecacheScriptSound( "NPC_Stalker.Hit" );
-	PrecacheScriptSound( "NPC_Stalker.Ambient01" );
+	PrecacheScriptSound( "NPC_Stalker.Idle" );
+	PrecacheScriptSound( "NPC_Stalker.IdleCombat" );
+	PrecacheScriptSound( "NPC_Stalker.Scramble" );
 	PrecacheScriptSound( "NPC_Stalker.Scream" );
 	PrecacheScriptSound( "NPC_Stalker.Pain" );
-	PrecacheScriptSound( "NPC_Stalker.Die" );
 
 	BaseClass::Precache();
 }
@@ -349,8 +371,22 @@ bool CNPC_Stalker::CreateBehaviors()
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-void CNPC_Stalker::IdleSound ( void )
+void CNPC_Stalker::IdleSound( void )
 {
+	if (gpGlobals->curtime > m_flNextBreatheSoundTime)
+	{
+		// breathe faster and more ragged if I have an enemy
+		if ( GetEnemy() )
+		{
+			EmitSound( "NPC_Stalker.IdleCombat" );
+			m_flNextBreatheSoundTime = gpGlobals->curtime + 2.0 + random->RandomFloat( 0.0, 5.0 );
+		}
+		else
+		{
+			EmitSound( "NPC_Stalker.Idle" );
+			m_flNextBreatheSoundTime = gpGlobals->curtime + 2.0 + random->RandomFloat( 0.0, 10.0 );
+		}
+	}
 }
 
 void CNPC_Stalker::OnScheduleChange()
@@ -406,6 +442,10 @@ void CNPC_Stalker::DeathSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CNPC_Stalker::PainSound( const CTakeDamageInfo &info )
 { 
+//	if ( IsOnFire() )
+//		return;
+// This actually works decently (with the current soundset)
+
 	EmitSound( "NPC_Stalker.Pain" );
 	m_flNextScrambleSoundTime	= gpGlobals->curtime + 1.5;
 	m_flNextBreatheSoundTime	= gpGlobals->curtime + 1.5;
@@ -481,6 +521,27 @@ void CNPC_Stalker::UpdateAttackBeam( void )
 			CSoundEnt::InsertSound(SOUND_DANGER, tr.endpos, 60, 0.025, this);
 		}
 	}
+#if 0
+	else if (m_pScriptedTarget)
+	{
+		GetMotor()->SetIdealYawToTargetAndUpdate( m_pScriptedTarget->GetAbsOrigin() );
+		// ---------------------------------------------
+		//  If can't see burn target, stop attacking
+		// ---------------------------------------------
+		trace_t tr;
+		AI_TraceLine( LaserStartPosition(GetAbsOrigin()), m_vLaserCurPos, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
+		CBaseEntity *pEntity = tr.m_pEnt;
+		if (tr.fraction != 1.0 && pEntity!=m_pScriptedTarget)		
+		{	
+			SetDefaultFailSchedule( SCHED_ESTABLISH_LINE_OF_FIRE ); 
+			TaskFail("No LOS");
+		}
+		else
+		{
+			CSoundEnt::InsertSound(SOUND_DANGER, tr.endpos, 60, 0.025, this);
+		}
+	}
+#endif
 	else
 	{
 		TaskFail(FAIL_NO_ENEMY);
@@ -501,6 +562,10 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 			EmitSound( "NPC_Stalker.Scream" );
 			m_flNextScreamTime = gpGlobals->curtime + random->RandomFloat( 10.0, 15.0 );
 		}
+		else
+		{
+			EmitSound( "NPC_Stalker.Alert" );
+		}
 
 		TaskComplete();
 	}
@@ -520,15 +585,25 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 				EmitSound( "NPC_Stalker.Scream" );
 				m_flNextScrambleSoundTime = gpGlobals->curtime + 2;
 				m_flNextBreatheSoundTime = gpGlobals->curtime + 2;
+				m_flNextScreamTime = gpGlobals->curtime + 2;
 
 				// Wait two seconds
-				SetWait( 2.0 );
+				SetWait( 1.5 );
 				SetActivity(ACT_IDLE);
 		}
 		break;
 	}
+
 	case TASK_STALKER_ZIGZAG:
+			if (gpGlobals->curtime > m_flNextScrambleSoundTime)
+			{
+				EmitSound( "NPC_Stalker.Scramble" );
+				m_flNextScrambleSoundTime	= gpGlobals->curtime + 0.5;
+				m_flNextBreatheSoundTime	= gpGlobals->curtime + 0.5;
+				m_flNextAttackSoundTime		= gpGlobals->curtime + 0.5;	
+			}
 			break;
+
 	case TASK_RANGE_ATTACK1:
 		{
 			CBaseEntity *pEnemy = GetEnemy();
@@ -576,6 +651,22 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 				m_vLaserDir = missPos - LaserStartPosition(GetAbsOrigin());
 				VectorNormalize(m_vLaserDir);	
 			}
+#if 0
+			else if (m_pScriptedTarget)
+			{
+				trace_t tr;
+				AI_TraceLine(LaserStartPosition(GetAbsOrigin()), m_vLaserCurPos, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr);	
+				CBaseEntity *pEntity = tr.m_pEnt;
+				if (tr.fraction != 1.0 && pEntity != m_pScriptedTarget)
+				{	
+					SetDefaultFailSchedule( SCHED_ESTABLISH_LINE_OF_FIRE ); 
+					TaskFail("No LOS");
+					return;
+				}
+				m_vLaserDir	= m_vLaserCurPos - LaserStartPosition(GetAbsOrigin());
+				VectorNormalize(m_vLaserDir);	
+			}
+#endif
 			else
 			{
 				TaskFail(FAIL_NO_ENEMY);
@@ -586,6 +677,7 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 			SetActivity(ACT_RANGE_ATTACK1);
 			break;
 		}
+
 	case TASK_GET_PATH_TO_ENEMY_LOS:
 		{
 			if ( GetEnemy() != NULL )
@@ -607,6 +699,7 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 			}
 			break;
 		}
+
 	case TASK_FACE_ENEMY:
 		{
 			if ( GetEnemy() != NULL )
@@ -617,6 +710,7 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 			GetMotor()->SetIdealYawToTarget( m_vLaserCurPos );
 			break;
 		}
+
 	default: 
 		BaseClass:: StartTask( pTask );
 		break;
@@ -646,9 +740,8 @@ void CNPC_Stalker::RunTask( const Task_t *pTask )
 		break;
 	}
 
-	case TASK_STALKER_ZIGZAG :
+	case TASK_STALKER_ZIGZAG:
 		{
-
 			if (GetNavigator()->GetGoalType() == GOALTYPE_NONE)
 			{
 				TaskComplete();
@@ -665,6 +758,7 @@ void CNPC_Stalker::RunTask( const Task_t *pTask )
 			}
 			break;
 		}
+
 	case TASK_RANGE_ATTACK1:
 		UpdateAttackBeam();
 		if ( !TaskIsRunning() || HasCondition( COND_TASK_FAILED ))
@@ -688,6 +782,7 @@ void CNPC_Stalker::RunTask( const Task_t *pTask )
 			}
 			break;
 		}
+
 	default:
 		{
 			BaseClass::RunTask( pTask );
@@ -713,8 +808,20 @@ int CNPC_Stalker::SelectSchedule( void )
 		case NPC_STATE_IDLE:
 		case NPC_STATE_ALERT:
 		{
-			if( HasCondition(COND_IN_PVS) )
+			if ( HasCondition(COND_IN_PVS) )
 			{
+				if ( HasCondition ( COND_HEAR_DANGER ) ||
+					 HasCondition ( COND_HEAR_COMBAT ) ||
+					 HasCondition ( COND_HEAR_WORLD  ) ||
+					 HasCondition ( COND_HEAR_PLAYER ) )
+				{
+					return SCHED_ALERT_FACE;
+				}
+				if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
+				{
+					// Scan around for new enemies
+					return SCHED_ALERT_SCAN;
+				}
 				return SCHED_STALKER_PATROL;
 			}
 
@@ -728,7 +835,7 @@ int CNPC_Stalker::SelectSchedule( void )
 			// -----------
 			// new enemy
 			// -----------
-			if( HasCondition( COND_NEW_ENEMY ) )
+			if ( HasCondition( COND_NEW_ENEMY ) )
 			{
 				if( GetEnemy()->IsPlayer() )
 				{
@@ -736,25 +843,86 @@ int CNPC_Stalker::SelectSchedule( void )
 				}
 			}
 
-			if( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+			if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
 			{
-				if( OccupyStrategySlotRange(SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2) )
+				if (gpGlobals->curtime > m_flNextAttackSoundTime)
 				{
-					return SCHED_RANGE_ATTACK1;
+					EmitSound( "NPC_Stalker.Attack" );
+					m_flNextScrambleSoundTime	= gpGlobals->curtime + 0.5;
+					m_flNextBreatheSoundTime	= gpGlobals->curtime + 0.5;
+					m_flNextAttackSoundTime		= gpGlobals->curtime + 0.5;	
 				}
-				else
-				{
-					return SCHED_STALKER_PATROL;
-				}
+				return SCHED_MELEE_ATTACK1;
 			}
 
-			if( !HasCondition(COND_SEE_ENEMY) )
+			// ----------------------
+			// GIVE WAY
+			// ----------------------
+#if 0
+			if ( HasCondition ( COND_GIVE_WAY ) )
+			{
+				return SCHED_GIVE_WAY;
+			}
+#endif
+
+			// -------------------------------------------
+			// If I can't range attack and not ready to beam
+			// -------------------------------------------
+			if ( !HasCondition( COND_CAN_RANGE_ATTACK1 ) && gpGlobals->curtime < m_fBeamRechargeTime )
+			{
+				if (gpGlobals->curtime > m_flNextScrambleSoundTime)
+				{
+					EmitSound( "NPC_Stalker.Scramble" );
+					m_flNextScrambleSoundTime	= gpGlobals->curtime + 0.5;
+					m_flNextBreatheSoundTime	= gpGlobals->curtime + 0.5;
+					m_flNextAttackSoundTime		= gpGlobals->curtime + 0.5;	
+				}
+				return SCHED_TAKE_COVER_FROM_ENEMY;
+			}
+
+			if ( HasCondition( COND_ENEMY_TOO_FAR )				||
+				 HasCondition( COND_TOO_FAR_TO_ATTACK )			||	 
+				 HasCondition( COND_TOO_CLOSE_TO_ATTACK )		||
+				 HasCondition( COND_ENEMY_OCCLUDED )			|| 
+				 HasCondition( COND_WEAPON_SIGHT_OCCLUDED )		|| 
+				 HasCondition( COND_WEAPON_BLOCKED_BY_FRIEND )	)
+			{
+				return SCHED_ESTABLISH_LINE_OF_FIRE;
+			}
+
+			// --------------------------------------------------------------
+			// If there aren't any attack slots, go to work go dormant unless
+			// my enemy just hurt
+			// --------------------------------------------------------------
+			if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) && !HasCondition( COND_LOST_ENEMY ) )
+			{
+				if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+				{
+					if (gpGlobals->curtime > m_flNextAttackSoundTime)
+					{
+//						EmitSound( "NPC_Stalker.Attack" );
+						m_flNextScrambleSoundTime	= gpGlobals->curtime + 0.5;
+						m_flNextBreatheSoundTime	= gpGlobals->curtime + 0.5;
+						m_flNextAttackSoundTime		= gpGlobals->curtime + 0.5;	
+					}
+					if ( gpGlobals->curtime > m_fBeamRechargeTime )
+					{
+						return SCHED_RANGE_ATTACK1;
+					}
+					return SCHED_COMBAT_FACE;
+				}
+				return SCHED_CHASE_ENEMY;
+			}
+
+			if ( !HasCondition( COND_SEE_ENEMY ) )
 			{
 				return SCHED_STALKER_PATROL;
 			}
 
-			return SCHED_COMBAT_FACE;
-
+			// --------------------------------------
+			// Otherwise go for cover
+			// --------------------------------------
+			return SCHED_COMBAT_FACE;	//SCHED_TAKE_COVER_FROM_ENEMY
 			break;
 		}
 	}
@@ -774,19 +942,21 @@ int CNPC_Stalker::TranslateSchedule( int scheduleType )
 	switch( scheduleType )
 	{
 	case SCHED_RANGE_ATTACK1:
-		{
-			return SCHED_STALKER_RANGE_ATTACK;
-		}
+		return SCHED_STALKER_RANGE_ATTACK;
+		break;
+
+	case SCHED_CHASE_ENEMY:
+		return SCHED_STALKER_CHASE_ENEMY;
+		break;
+
 	case SCHED_FAIL_ESTABLISH_LINE_OF_FIRE:
-		{	
-			return SCHED_COMBAT_STAND;
-			break;
-		}
+		return SCHED_COMBAT_STAND;
+		break;
+
 	case SCHED_FAIL_TAKE_COVER:
-		{
-			return SCHED_RUN_RANDOM;
-			break;
-		}
+		return SCHED_RUN_RANDOM;
+		break;
+
 	}
 
 	return BaseClass::TranslateSchedule( scheduleType );
@@ -858,11 +1028,6 @@ void CNPC_Stalker::CalcBeamPosition(void)
 
 void CNPC_Stalker::StartAttackBeam( void )
 {
-	if ( m_fBeamEndTime > gpGlobals->curtime || m_fBeamRechargeTime > gpGlobals->curtime )
-	{
-		// UNDONE: Debug this and fix!?!?!
-		m_fBeamRechargeTime = gpGlobals->curtime;
-	}
 	// ---------------------------------------------
 	//  If I don't have a beam yet, create one
 	// ---------------------------------------------
@@ -923,6 +1088,7 @@ void CNPC_Stalker::StartAttackBeam( void )
 			EmitAmbientSound( 0, GetAbsOrigin(), "NPC_Stalker.AmbientLaserStart" );
 		}
 #endif
+		EmitAmbientSound( 0, GetAbsOrigin(), "NPC_Stalker.AmbientLaserStart" );
 	}
 
 	SetThink( &CNPC_Stalker::StalkerThink );
@@ -1029,13 +1195,13 @@ void CNPC_Stalker::DrawAttackBeam(void)
 			switch (m_eBeamPower)
 			{
 				case STALKER_BEAM_LOW:
-					damage = 1;
+					damage = sk_stalker_lbeam_dmg.GetFloat();
 					break;
 				case STALKER_BEAM_MED:
-					damage = 3;
+					damage = sk_stalker_mbeam_dmg.GetFloat();
 					break;
 				case STALKER_BEAM_HIGH:
-					damage = 10;
+					damage = sk_stalker_hbeam_dmg.GetFloat();
 					break;
 			}
 
@@ -1126,16 +1292,15 @@ void CNPC_Stalker::KillAttackBeam(void)
 	m_bPlayingHitWall = false;
 	m_bPlayingHitFlesh = false;
 
+	// Beam has to recharge
+	m_fBeamRechargeTime = gpGlobals->curtime + STALKER_LASER_RECHARGE;
+	ClearCondition( COND_CAN_RANGE_ATTACK1 );
+
 	SetThink(&CNPC_Stalker::CallNPCThink);
 	if ( m_flNextNPCThink > gpGlobals->curtime )
 	{
 		SetNextThink( m_flNextNPCThink );
 	}
-
-	// Beam has to recharge
-	m_fBeamRechargeTime = gpGlobals->curtime + STALKER_LASER_RECHARGE;
-
-	ClearCondition( COND_CAN_RANGE_ATTACK1 );
 
 	RelaxAim();
 }
@@ -1191,7 +1356,7 @@ bool CNPC_Stalker::InnateWeaponLOSCondition( const Vector &ownerPos, const Vecto
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-int CNPC_Stalker::MeleeAttack1Conditions ( float flDot, float flDist )
+int CNPC_Stalker::MeleeAttack1Conditions( float flDot, float flDist )
 {
 	if (flDist > MIN_STALKER_FIRE_RANGE)
 	{
@@ -1201,6 +1366,11 @@ int CNPC_Stalker::MeleeAttack1Conditions ( float flDot, float flDist )
 	{
 		return COND_NOT_FACING_ATTACK;
 	}
+
+	// Check Z
+	if ( GetEnemy() && fabs(GetEnemy()->GetAbsOrigin().z - GetAbsOrigin().z) > 64 )
+		return COND_NONE;
+
 	return COND_CAN_MELEE_ATTACK1;
 }
 
@@ -1211,16 +1381,8 @@ int CNPC_Stalker::MeleeAttack1Conditions ( float flDot, float flDist )
 //-----------------------------------------------------------------------------
 int CNPC_Stalker::RangeAttack1Conditions( float flDot, float flDist )
 {
-	if (gpGlobals->curtime < m_fBeamRechargeTime )
-	{
+	if ( gpGlobals->curtime < m_fBeamRechargeTime )
 		return COND_NONE;
-	}
-
-	if( IsStrategySlotRangeOccupied( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
-	{
-		// Couldn't attack if I wanted to.
-		return COND_NONE;
-	}
 
 	if (flDist <= MIN_STALKER_FIRE_RANGE)
 	{
@@ -1431,16 +1593,16 @@ AI_BEGIN_CUSTOM_NPC( npc_stalker, CNPC_Stalker )
 		"	Tasks"
 		"		TASK_STOP_MOVING				0"
 		"		TASK_FACE_ENEMY					0"
+		"		TASK_ANNOUNCE_ATTACK			1"
 		"		TASK_RANGE_ATTACK1				0"
 		""
 		"	Interrupts"
+		"		COND_NEW_ENEMY"
 		"		COND_CAN_MELEE_ATTACK1"
 		"		COND_HEAVY_DAMAGE"
 		"		COND_REPEATED_DAMAGE"
 		"		COND_HEAR_DANGER"
-		"		COND_NEW_ENEMY"
-		"		COND_ENEMY_DEAD"
-		"		COND_ENEMY_OCCLUDED"	// Don't break on this.  Keep shooting at last location
+		//"		COND_ENEMY_OCCLUDED"	// Don't break on this.  Keep shooting at last location
 	)
 
 	//=========================================================
@@ -1491,7 +1653,7 @@ AI_BEGIN_CUSTOM_NPC( npc_stalker, CNPC_Stalker )
 	"	Tasks"
 	"		TASK_STOP_MOVING				0"
 	"		TASK_WAIT						0.5"// This makes them look a bit more vigilant, instead of INSTANTLY patrolling after some other action.
-	"		TASK_WAIT_RANDOM				0.5"
+	"		TASK_WAIT_RANDOM				1.0"
 	"		TASK_WANDER						18000600" 
 	"		TASK_FACE_PATH					0"
 	"		TASK_WALK_PATH					0"
@@ -1502,8 +1664,9 @@ AI_BEGIN_CUSTOM_NPC( npc_stalker, CNPC_Stalker )
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
-	"		COND_CAN_RANGE_ATTACK1"
 	"		COND_SEE_ENEMY"
+	"		COND_CAN_RANGE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK1"
 	)
 
 AI_END_CUSTOM_NPC()

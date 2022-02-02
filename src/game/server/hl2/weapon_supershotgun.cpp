@@ -24,6 +24,7 @@
 #include "tier0/memdbgon.h"
 
 #define VECTOR_CONE_SUPERSHOTGUN		Vector( 0.12206, 0.12206, 0.11334 )
+#define SUPERSHOTGUN_KICKBACK			2	// Range for punchangle when firing.
 ConVar sk_weapon_supershotgun_lerp( "sk_weapon_supershotgun_lerp", "5.0" );
 
 extern ConVar sk_auto_reload_time;
@@ -70,7 +71,8 @@ public:
 
 	virtual float			GetFireRate( void );
 
-	bool	Reload( void );
+	Activity	GetPrimaryAttackActivity( void );
+
 //	void	WeaponIdle( void );
 	void	ItemHolsterFrame( void );
 	void	PrimaryAttack( void );
@@ -85,6 +87,10 @@ public:
 	DECLARE_ACTTABLE();
 
 	CWeaponSuperShotgun( void );
+
+private:
+	float	m_flLastAttackTime;
+	int		m_nNumShotsFired;
 };
 
 IMPLEMENT_SERVERCLASS_ST( CWeaponSuperShotgun, DT_WeaponSuperShotgun )
@@ -94,6 +100,9 @@ LINK_ENTITY_TO_CLASS( weapon_supershotgun, CWeaponSuperShotgun );
 PRECACHE_WEAPON_REGISTER( weapon_supershotgun );
 
 BEGIN_DATADESC( CWeaponSuperShotgun )
+
+	DEFINE_FIELD( m_flLastAttackTime, FIELD_TIME ),
+	DEFINE_FIELD( m_nNumShotsFired, FIELD_INTEGER ),
 
 END_DATADESC()
 
@@ -151,6 +160,8 @@ IMPLEMENT_ACTTABLE(CWeaponSuperShotgun);
 void CWeaponSuperShotgun::Precache( void )
 {
 	CBaseCombatWeapon::Precache();
+
+	PrecacheScriptSound( "Weapon_SuperShotgun.Lastfire" );
 }
 
 //-----------------------------------------------------------------------------
@@ -166,8 +177,9 @@ CWeaponSuperShotgun::CWeaponSuperShotgun( void )
 
 	m_fMinRange1		= 0.0;
 	m_fMaxRange1		= 768;
-	m_fMinRange2		= 0.0;
-	m_fMaxRange2		= 256;
+	
+	m_nNumShotsFired = 0;
+	m_flLastAttackTime = gpGlobals->curtime;
 }
 
 //-----------------------------------------------------------------------------
@@ -215,7 +227,6 @@ void CWeaponSuperShotgun::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator
 //-----------------------------------------------------------------------------
 void CWeaponSuperShotgun::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
-//	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 	switch( pEvent->event )
 	{
 		case EVENT_WEAPON_SHOTGUN_FIRE:
@@ -292,17 +303,19 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 
 	if ( m_iClip1 <= 0 )
 	{
-		if ( !m_bFireOnEmpty )
-		{
-			Reload();
-		}
-		else
-		{
-			DryFire();
-		}
+		DryFire();
+		Reload();
 		return;
 	}
 
+	if ( ( gpGlobals->curtime - m_flLastAttackTime ) > 0.5f )
+	{
+		m_nNumShotsFired = 0;
+	}
+	else
+	{
+		m_nNumShotsFired++;
+	}
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 
@@ -310,11 +323,12 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 	pPlayer->DoMuzzleFlash();
 
 	// player """shoot""" animation
-	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
+	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 
 	// Don't fire again until fire animation has completed
 	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+	m_flLastAttackTime = gpGlobals->curtime + SequenceDuration();
 	m_iClip1--;
 
 	Vector	vecSrc		= pPlayer->Weapon_ShootPosition( );
@@ -325,7 +339,10 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 
 	//Disorient the player
-	pPlayer->ViewPunch( QAngle( random->RandomFloat( -2, -1 ), random->RandomFloat( -2, 2 ), 0 ) );
+	pPlayer->ViewPunch( QAngle( random->RandomFloat( -SUPERSHOTGUN_KICKBACK, -1 ), random->RandomFloat( -SUPERSHOTGUN_KICKBACK, SUPERSHOTGUN_KICKBACK ), 0 ) );
+	Vector	recoilForce = pPlayer->BodyDirection2D() * -( SUPERSHOTGUN_KICKBACK + (sk_plr_num_shotgun_pellets.GetInt() * m_nNumShotsFired) );
+	recoilForce[2] += 96.0f;
+	pPlayer->ApplyAbsVelocityImpulse( recoilForce );
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
 
@@ -338,16 +355,22 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Override if we're waiting to release a shot
+// Purpose:
 //-----------------------------------------------------------------------------
-bool CWeaponSuperShotgun::Reload( void )
+Activity CWeaponSuperShotgun::GetPrimaryAttackActivity( void )
 {
-	bool fRet = DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
-	if ( fRet )
-	{
-		WeaponSound( RELOAD );
-	}
-	return fRet;
+	if ( m_nNumShotsFired < 1 )
+		return ACT_VM_PRIMARYATTACK;
+
+	//TEMP; Shotgun doesnt have recoil anims yet
+/*
+	if ( m_nNumShotsFired < 3 )
+		return ACT_VM_RECOIL1;
+
+	if ( m_nNumShotsFired < 5 )
+		return ACT_VM_RECOIL2;
+*/
+	return ACT_VM_PRIMARYATTACK;	//ACT_VM_RECOIL3
 }
 
 //-----------------------------------------------------------------------------
@@ -399,6 +422,8 @@ void CWeaponSuperShotgun::WeaponIdle( void )
 	{
 		SendWeaponAnim( ACT_VM_IDLE_ACTIVE );
 	}
+	
+	m_nNumShotsFired = 0;
 	
 	BaseClass::WeaponIdle();
 }

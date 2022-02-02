@@ -23,7 +23,7 @@
 #include "soundent.h"
 #include "gib.h"
 #include "ndebugoverlay.h"
-#include "smoke_trail.h"
+//#include "smoke_trail.h"
 #include "weapon_rpg.h"
 #include "player.h"
 #include "mathlib/mathlib.h"
@@ -31,7 +31,7 @@
 #include "engine/IEngineSound.h"
 #include "IEffects.h"
 #include "effect_color_tables.h"
-#include "npc_rollermine.h"
+//#include "npc_rollermine.h"
 #include "eventqueue.h"
 
 #include "effect_dispatch_data.h"
@@ -44,7 +44,8 @@
 
 extern Vector PointOnLineNearestPoint(const Vector& vStartPos, const Vector& vEndPos, const Vector& vPoint);
 
-ConVar bulletSpeed( "bulletspeed", "6000" );	//This might be better to offload
+ConVar sniperbulletspeed( "sniperbulletspeed", "6000" );	//This might be better to offload
+ConVar snipersoundmultiplier( "snipersoundmultiplier", "3", FCVAR_CHEAT, "Speed of sound multiplier - 1 is normal, higher is more delayed" );
 ConVar sniperLines( "showsniperlines", "0" );
 ConVar sniperviewdist("sniperviewdist", "35" );	//Achtually the viewCONE
 ConVar showsniperdist("showsniperdist", "0" );
@@ -62,6 +63,7 @@ extern ConVar sk_dmg_sniper_penetrate_npc;
 #define SF_SNIPER_STARTDISABLED	(1 << 19)
 #define SF_SNIPER_FAST			(1 << 20) ///< This is faster-shooting sniper. Paint time is decreased 25%. Bullet speed increases 150%.
 #define SF_SNIPER_NOSWEEP		(1 << 21) ///< This sniper doesn't sweep to the target or use decoys.
+#define SF_SNIPER_TAKEALLDMG	(1 << 22) ///< This sniper can be counter-sniped.
 
 // If the last time I fired at someone was between 0 and this many seconds, draw
 // a bead on them much faster. (use subsequent paint time)
@@ -70,7 +72,7 @@ extern ConVar sk_dmg_sniper_penetrate_npc;
 // These numbers determine the interval between shots. They used to be constants,
 // but are now keyfields. HL2 backwards compatibility was maintained by supplying 
 // default values in the constructor.
-#if 0
+#ifndef HL2_EPISODIC
 // How long to aim at someone before shooting them.
 #define SNIPER_PAINT_ENEMY_TIME			1.0f
 // ...plus this
@@ -82,7 +84,7 @@ extern ConVar sk_dmg_sniper_penetrate_npc;
 #define	SNIPER_DEFAULT_PAINT_NPC_TIME_NOISE		0.75f
 #endif
 
-#define SNIPER_SUBSEQUENT_PAINT_TIME	( ( IsXbox() ) ? 1.0f : 0.4f )
+#define SNIPER_SUBSEQUENT_PAINT_TIME	( ( IsXbox() ) ? 1.0f : 0.6f )
 
 #define SNIPER_FOG_PAINT_ENEMY_TIME	    0.25f
 #define SNIPER_PAINT_DECOY_TIME			2.0f
@@ -122,6 +124,10 @@ extern ConVar sk_dmg_sniper_penetrate_npc;
 
 #define SNIPER_MAX_GROUP_TARGETS	16
 
+//-----------------------------------------------------------------------------
+// Think contexts
+//-----------------------------------------------------------------------------
+static const char *s_pSniperSoundThinkContext = "SniperSoundThinkContext";
 
 //=========================================================
 //=========================================================
@@ -210,9 +216,13 @@ public:
 
 	bool IsLaserOn( void ) { return m_pBeam != NULL; }
 
+	void SniperSoundThink();
 	void Event_Killed( const CTakeDamageInfo &info );
 	void Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo &info );
 	void UpdateOnRemove( void );
+	void IdleSound( void );
+	void AlertSound( void )	{ EmitSound( "NPC_Sniper.Alert" ); };
+
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	bool WeaponLOSCondition(const Vector &ownerPos, const Vector &targetPos, bool bSetConditions) {return true;}
 	int IRelationPriority( CBaseEntity *pTarget );
@@ -322,7 +332,9 @@ private:
 	bool						m_fWeaponLoaded;
 	bool						m_fEnabled;
 	bool						m_fIsPatient;
+	bool						m_fFired;
 	float						m_flPatience;
+	float						m_flSoundDelay;
 	int							m_iMisses;
 	EHANDLE						m_hDecoyObject;
 	EHANDLE						m_hSweepTarget;
@@ -406,6 +418,7 @@ BEGIN_DATADESC( CProtoSniper )
 	DEFINE_FIELD( m_fEnabled, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIsPatient, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flPatience, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flSoundDelay, FIELD_TIME ),
 	DEFINE_FIELD( m_iMisses, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hDecoyObject, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hSweepTarget, FIELD_EHANDLE ),
@@ -439,6 +452,8 @@ BEGIN_DATADESC( CProtoSniper )
 
 	DEFINE_FIELD( m_bWarnedTargetEntity, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeLastShotMissed, FIELD_TIME ),
+
+	DEFINE_THINKFUNC( SniperSoundThink ),
 
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableSniper", InputEnableSniper ),
@@ -547,7 +562,8 @@ CProtoSniper::CProtoSniper( void ) : m_flKeyfieldPaintTime(SNIPER_DEFAULT_PAINT_
 #endif
 
 	m_iMisses = 0; 
-	m_flDecoyRadius = SNIPER_DECOY_RADIUS; 
+	m_flDecoyRadius = SNIPER_DECOY_RADIUS;
+	m_flSoundDelay = 1e9;
 	m_fSnapShot = false; 
 	m_iBeamBrightness = 100;
 }
@@ -643,7 +659,7 @@ void CProtoSniper::LaserOn( const Vector &vecTarget, const Vector &vecDeviance )
 {
 	if (!m_pBeam)
 	{
-		m_pBeam = CBeam::BeamCreate( "effects/bluelaser1.vmt", 1.0f );
+		m_pBeam = CBeam::BeamCreate( "sprites/purplelaser1.vmt", 1.0f );
 		m_pBeam->SetColor( 255, 50, 0 );	//0, 100, 255 -- Isnt this important enough to be exported?
 	}
 	else
@@ -859,7 +875,6 @@ void CProtoSniper::OnScheduleChange( void )
 	BaseClass::OnScheduleChange();
 }
 
-
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 bool CProtoSniper::KeyValue( const char *szKeyName, const char *szValue )
@@ -907,17 +922,19 @@ void CProtoSniper::Precache( void )
 	PrecacheModel("models/combine_soldier.mdl");
 	sHaloSprite = PrecacheModel("sprites/light_glow03.vmt");
 	sFlashSprite = PrecacheModel( "sprites/muzzleflash1.vmt" );
-	PrecacheModel("effects/bluelaser1.vmt");	
+	PrecacheModel("sprites/purplelaser1.vmt");	
 
 	UTIL_PrecacheOther( "sniperbullet" );
 
 	PrecacheScriptSound( "NPC_Sniper.Die" );
-//	PrecacheScriptSound( "NPC_Sniper.CoverDestroyed" );
+	PrecacheScriptSound( "NPC_Sniper.Idle" );
+	PrecacheScriptSound( "NPC_Sniper.Alert" );
+	PrecacheScriptSound( "NPC_Sniper.CoverDestroyed" );
 	PrecacheScriptSound( "NPC_Sniper.TargetDestroyed" );
+	PrecacheScriptSound( "NPC_Sniper.TargetHidden" );
 	PrecacheScriptSound( "NPC_Sniper.HearDanger");
 	PrecacheScriptSound( "NPC_Sniper.FireBullet" );
 	PrecacheScriptSound( "NPC_Sniper.Reload" );
-	PrecacheScriptSound( "NPC_Sniper.SonicBoom" );
 
 	BaseClass::Precache();
 }
@@ -948,7 +965,7 @@ void CProtoSniper::Spawn( void )
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_FLY );
 	m_bloodColor		= DONT_BLEED;
-	m_iHealth			= 10;
+	m_iHealth			= 15;
 	m_flFieldOfView		= 0.2;
 	m_NPCState			= NPC_STATE_NONE;
 
@@ -999,6 +1016,10 @@ void CProtoSniper::Spawn( void )
 	m_flTimeLastAttackedPlayer = 0.0f;
 	m_bWarnedTargetEntity = false;
 	m_bKilledPlayer = false;
+	m_fFired = false;
+
+	SetContextThink( &CProtoSniper::SniperSoundThink, gpGlobals->curtime, s_pSniperSoundThinkContext );
+	SetNextThink( gpGlobals->curtime );
 }
 
 //-----------------------------------------------------------------------------
@@ -1173,9 +1194,6 @@ int CProtoSniper::IRelationPriority( CBaseEntity *pTarget )
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-//
-//
-// Output : 
 //-----------------------------------------------------------------------------
 Class_T	CProtoSniper::Classify( void )
 {
@@ -1189,6 +1207,16 @@ Class_T	CProtoSniper::Classify( void )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CProtoSniper::IdleSound( void )
+{
+	if( sniperspeak.GetBool() )
+	{
+		EmitSound( "NPC_Sniper.Idle" );
+	}
+}
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -1262,6 +1290,35 @@ void CProtoSniper::AddOldDecoy( CBaseEntity *pDecoy )
 #endif
 }
 
+void CProtoSniper::SniperSoundThink()
+{
+	// Just fired, do the logic
+	if ( m_fFired )
+	{
+		// Some maths here to get the distance
+		// Get bullet time to player
+		CBasePlayer *pPlayer = AI_GetSinglePlayer();
+		if ( pPlayer )
+		{
+			float SpeedofSound = 18000.0f;	// in hmmr units
+			float Dist = (pPlayer->GetAbsOrigin() - GetBulletOrigin() ).Length();
+			float Time = Dist / (SpeedofSound / snipersoundmultiplier.GetInt());	// Slow it down a bit so its more noticeable
+			m_flSoundDelay = Time;
+			m_fFired = false;
+			SetContextThink( &CProtoSniper::SniperSoundThink, gpGlobals->curtime + m_flSoundDelay, s_pSniperSoundThinkContext );
+			return;
+		}
+	}
+
+	if( gpGlobals->curtime > m_flSoundDelay )
+	{
+		CPASAttenuationFilter filter( this );
+		EmitSound( filter, entindex(), "NPC_Sniper.FireBullet" );
+		m_flSoundDelay = 1e9;
+	}
+	
+	SetContextThink( &CProtoSniper::SniperSoundThink, gpGlobals->curtime + 0.1f, s_pSniperSoundThinkContext );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Only blast damage can hurt a sniper.
@@ -1287,10 +1344,13 @@ int CProtoSniper::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	if ( info.GetDamageType() == DMG_GENERIC && info.GetInflictor() == this )
 		return CAI_BaseNPC::OnTakeDamage_Alive( newInfo );
 
-	if( !(info.GetDamageType() & (DMG_BLAST|DMG_BURN) ) )
+	if( !(info.GetDamageType() & (DMG_BLAST|DMG_BURN|DMG_NERVEGAS) ) )
 	{
-		// Only blasts and burning hurt
-		return 0;
+		// Only blasts, burning and gassing hurt (by default)
+		if ( !(m_spawnflags & SF_SNIPER_TAKEALLDMG) )
+		{
+			return 0;
+		}
 	}
 
 	if( (info.GetDamageType() & DMG_BLAST) && info.GetDamage() < m_iHealth )
@@ -1344,7 +1404,6 @@ void CProtoSniper::Event_Killed( const CTakeDamageInfo &info )
 		CBaseEntity *pGib;
 		bool bShouldIgnite = IsOnFire();	//|| hl2_episodic.GetBool()
 		pGib = CreateRagGib( "models/combine_soldier.mdl", GetLocalOrigin(), GetLocalAngles(), (vecForward * flForce) + Vector(0, 0, 600), flFadeTime, bShouldIgnite );
-
 	}
 
 	m_OnDeath.FireOutput( info.GetAttacker(), this );
@@ -1383,13 +1442,8 @@ void CProtoSniper::UpdateOnRemove( void )
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-int CProtoSniper::SelectSchedule ( void )
+int CProtoSniper::SelectSchedule( void )
 {
-	if( HasCondition(COND_ENEMY_DEAD) && sniperspeak.GetBool() )
-	{
-		EmitSound( "NPC_Sniper.TargetDestroyed" );
-	}
-
 	if( !m_fWeaponLoaded )
 	{
 		// Reload is absolute priority.
@@ -1421,7 +1475,7 @@ int CProtoSniper::SelectSchedule ( void )
 			// probably won't harm him.
 
 			// Also, don't play the sound effect if we're an ally.
-			if ( IsPlayerAllySniper() == false )
+			if ( IsPlayerAllySniper() == false && sniperspeak.GetBool() )
 			{
 				EmitSound( "NPC_Sniper.HearDanger" );
 			}
@@ -1453,6 +1507,10 @@ int CProtoSniper::SelectSchedule ( void )
 	if( GetEnemy() == NULL || HasCondition( COND_ENEMY_DEAD ) )
 	{
 		// Look for an enemy.
+		if ( HasCondition( COND_ENEMY_DEAD ) && sniperspeak.GetBool() )
+		{
+			EmitSound( "NPC_Sniper.TargetDestroyed" );
+		}
 		SetEnemy( NULL );
 		return SCHED_PSNIPER_SCAN;
 	}
@@ -1469,6 +1527,10 @@ int CProtoSniper::SelectSchedule ( void )
 
 	if( HasCondition( COND_SNIPER_NO_SHOT ) )
 	{
+		if ( sniperspeak.GetBool() )
+		{
+			EmitSound( "NPC_Sniper.TargetHidden" );
+		}
 		return SCHED_PSNIPER_NO_CLEAR_SHOT;
 	}
 
@@ -1823,7 +1885,6 @@ int CProtoSniper::RangeAttack1Conditions ( float flDot, float flDist )
 			// If I don't have a decoy, try to find one and shoot it.
 			return COND_SNIPER_CANATTACKDECOY;
 		}
-		
 
 		if( fFrustration >= 2.5 )
 		{
@@ -1905,13 +1966,16 @@ bool CProtoSniper::FireBullet( const Vector &vecTarget, bool bDirectShot )
 	}
 
 	pBullet->SetOwnerEntity( this );
+	m_fFired = true;
 
-	CPASAttenuationFilter filternoatten( this, ATTN_NONE );
-	EmitSound( filternoatten, entindex(), "NPC_Sniper.FireBullet" );
+//	CPASAttenuationFilter filternoatten( this, ATTN_NONE );
+//	EmitSound( filternoatten, entindex(), "NPC_Sniper.FireBullet" );
 
 	CPVSFilter filter( vecBulletOrigin );
-	te->Sprite( filter, 0.0, &vecBulletOrigin, sFlashSprite, 0.3, 255 );
-	
+	te->Sprite( filter, 0.1, &vecBulletOrigin, sFlashSprite, 0.4, 255 );
+//	BaseClass::DoMuzzleFlash();
+	//TODO; Need a dlight here
+
 	// force a reload when we're done
 	 m_fWeaponLoaded = false;
 
@@ -1943,11 +2007,11 @@ bool CProtoSniper::FireBullet( const Vector &vecTarget, bool bDirectShot )
 //---------------------------------------------------------
 float CProtoSniper::GetBulletSpeed()
 {
-	float speed = bulletSpeed.GetFloat();
+	float speed = sniperbulletspeed.GetFloat();
 
 	if( IsFastSniper() )
 	{
-		speed *= 2.5f;
+		speed *= 1.5f;
 	}
 
 	return speed;
@@ -3165,6 +3229,7 @@ AI_END_CUSTOM_NPC()
 //---------------------------------------------------------
 void CSniperBullet::Precache()
 {
+	PrecacheScriptSound( "NPC_Sniper.SonicBoom" );
 }
 
 
@@ -3185,8 +3250,8 @@ void CSniperBullet::BulletThink( void )
 	if( gpGlobals->curtime >= m_SoundTime )
 	{
 		// See if it's time to make the sonic boom.
-		CPASAttenuationFilter filter( this, ATTN_NONE );
-		EmitSound( filter, entindex(), "NPC_Sniper.SonicBoom" );
+		CPASAttenuationFilter filternoatten( this );	//, ATTN_NONE
+		EmitSound( filternoatten, entindex(), "NPC_Sniper.SonicBoom" );
 
 		if( GetOwnerEntity() )
 		{
@@ -3231,11 +3296,7 @@ void CSniperBullet::BulletThink( void )
 		GetOwnerEntity()->FireBullets( 1, vecStart, m_vecDir, vec3_origin, flDist, m_AmmoType, 0 );
 		m_iImpacts++;
 
-#ifdef HL2_EPISODIC
-		if( tr.m_pEnt->IsNPC() || m_iImpacts == NUM_PENETRATIONS )
-#else	 
 		if( tr.m_pEnt->m_takedamage == DAMAGE_YES || m_iImpacts == NUM_PENETRATIONS )
-#endif//HL2_EPISODIC
 		{
 			// Bullet stops when it hits an NPC, or when it has penetrated enough times.
 			
@@ -3269,7 +3330,7 @@ void CSniperBullet::BulletThink( void )
 
 					// Fire another tracer.
 					AI_TraceLine( vecCursor, vecCursor + m_vecDir * 8192, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
-					UTIL_Tracer( vecCursor, tr.endpos, 0, TRACER_DONT_USE_ATTACHMENT, m_Speed, true, "StriderTracer" );
+					UTIL_Tracer( vecCursor, tr.endpos, 0, TRACER_DONT_USE_ATTACHMENT, m_Speed, true, "AR2Tracer" );
 					return;
 				}
 			}
@@ -3335,7 +3396,7 @@ bool CSniperBullet::Start( const Vector &vecOrigin, const Vector &vecTarget, CBa
 	}
 	else
 	{
-		m_Speed = bulletSpeed.GetFloat();
+		m_Speed = sniperbulletspeed.GetFloat();
 	}
 
 	// Start the tracer here, and tell it to end at the end of the last trace
@@ -3345,7 +3406,7 @@ bool CSniperBullet::Start( const Vector &vecOrigin, const Vector &vecTarget, CBa
 	UTIL_Tracer( vecOrigin, tr.endpos, 0, TRACER_DONT_USE_ATTACHMENT, m_Speed, true, "AR2Tracer" );	//StriderTracer
 
 	float flElapsedTime = ( (tr.startpos - tr.endpos).Length() / m_Speed );
-	m_SoundTime = gpGlobals->curtime + flElapsedTime * 0.5;
+	m_SoundTime = gpGlobals->curtime + flElapsedTime * 0.8;
 	
 	SetThink( &CSniperBullet::BulletThink );
 	SetNextThink( gpGlobals->curtime );
@@ -3483,6 +3544,7 @@ bool CSniperTarget::KeyValue( const char *szKeyName, const char *szValue )
 {
 	if (FStrEq(szKeyName, "groupname"))
 	{
+//		Msg( "Got my group name!\n" );
 		m_iszGroupName = AllocPooledString( szValue );
 		return true;
 	}
@@ -3493,5 +3555,4 @@ bool CSniperTarget::KeyValue( const char *szKeyName, const char *szValue )
 }
 
 LINK_ENTITY_TO_CLASS( info_snipertarget, CSniperTarget );
-
 

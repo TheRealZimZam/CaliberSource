@@ -4,7 +4,7 @@
 //
 //			Primary attack: single barrel shot.
 //			Secondary attack: double barrel shot.
-// TODO's: New impact effects (normal holes are too big)
+// TODO's: New impact effects (normal holes are too big), push player back for secondary attack
 //
 //=============================================================================//
 
@@ -24,6 +24,8 @@
 #include "tier0/memdbgon.h"
 
 #define VECTOR_CONE_SHOTGUN		Vector( 0.10461, 0.10461, 0.09589 )
+#define SHOTGUN_KICKBACK		3	// Range for punchangle when firing.
+
 //ConVar sk_weapon_shotgun_lerp( "sk_weapon_shotgun_lerp", "3.0" );	//NOT USED
 
 extern ConVar sk_auto_reload_time;
@@ -499,7 +501,7 @@ void CWeaponShotgun::PrimaryAttack( void )
 	// Fire the bullets, and force the first shot to be perfectly accuracy
 	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, true, true );
 
-	pPlayer->ViewPunch( QAngle( random->RandomFloat( -3, -1 ), random->RandomFloat( -2, 2 ), 0 ) );
+	pPlayer->ViewPunch( QAngle( -SHOTGUN_KICKBACK, random->RandomFloat( -SHOTGUN_KICKBACK, SHOTGUN_KICKBACK ), 0 ) );
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
 
@@ -559,7 +561,16 @@ void CWeaponShotgun::SecondaryAttack( void )
 	int NumPellets = sk_plr_num_shotgun_pellets.GetInt() * 2;
 	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, VECTOR_CONE_SHOTGUN * 1.25, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, false, false );
 
-	pPlayer->ViewPunch( QAngle( -8, random->RandomFloat( -4, 4 ), 0 ) );
+	pPlayer->ViewPunch( QAngle( -(NumPellets/2), random->RandomFloat( -(SHOTGUN_KICKBACK + 1), (SHOTGUN_KICKBACK + 1) ), 0 ) );
+
+	Vector	recoilForce = pPlayer->BodyDirection3D() * -( NumPellets * 5.0f );
+	recoilForce[2] += 128.0f;
+
+	pPlayer->ApplyAbsVelocityImpulse( recoilForce );
+	if ( pPlayer->GetHealth() > 2 )
+	{
+		pPlayer->TakeDamage( CTakeDamageInfo( this, this, 1, DMG_CLUB ) );
+	}
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );
 

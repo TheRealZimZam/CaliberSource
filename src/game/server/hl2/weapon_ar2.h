@@ -35,7 +35,6 @@ public:
 	void	DelayedAttack( void );
 
 	const char *GetTracerType( void ) { return "AR2Tracer"; }
-//	void	DoMuzzleFlash( int vAttachment );
 
 	void	AddViewKick( void );
 

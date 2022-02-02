@@ -79,6 +79,7 @@ public:
 	virtual int		SelectSchedule ( void );
 	virtual int		TranslateSchedule( int scheduleType );
 	int				OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	virtual	bool	AllowedToIgnite( void ) { return true; }
 	void			OnScheduleChange();
 
 	void			StalkerThink(void);

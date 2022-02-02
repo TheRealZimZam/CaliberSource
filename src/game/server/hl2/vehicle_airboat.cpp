@@ -65,7 +65,7 @@ extern ConVar sv_vehicle_autoaim_scale;
 
 static ConVar sk_airboat_max_ammo("sk_airboat_max_ammo", "100" );
 static ConVar sk_airboat_recharge_rate("sk_airboat_recharge_rate", "15" );
-static ConVar sk_airboat_drain_rate("sk_airboat_drain_rate", "10" );
+static ConVar sk_airboat_drain_rate("sk_airboat_drain_rate", "0.4" );
 static ConVar hud_airboathint_numentries( "hud_airboathint_numentries", "10", FCVAR_NONE );
 static ConVar airboat_fatal_stress( "airboat_fatal_stress", "5000", FCVAR_NONE, "Amount of stress in kg that would kill the airboat driver." );
 
@@ -342,23 +342,23 @@ void CPropAirboat::Precache( void )
 {
 	BaseClass::Precache();
 
-	PrecacheScriptSound( "Airboat_engine_stop" );
-	PrecacheScriptSound( "Airboat_engine_start" );
+	PrecacheScriptSound( "Airboat.engine_stop" );
+	PrecacheScriptSound( "Airboat.engine_start" );
 
 	PrecacheScriptSound( "Airboat.FireGunHeavy" );
 	PrecacheScriptSound( "Airboat.FireGunRevDown");
 
-	PrecacheScriptSound( "Airboat_engine_idle" );
-	PrecacheScriptSound( "Airboat_engine_fullthrottle" );
-	PrecacheScriptSound( "Airboat_fan_idle" );
-	PrecacheScriptSound( "Airboat_fan_fullthrottle" );
-	PrecacheScriptSound( "Airboat_water_stopped" );
-	PrecacheScriptSound( "Airboat_water_fast" );
-	PrecacheScriptSound( "Airboat_impact_splash" );
-	PrecacheScriptSound( "Airboat_impact_hard" );
+	PrecacheScriptSound( "Airboat.engine_idle" );
+	PrecacheScriptSound( "Airboat.engine_fullthrottle" );
+	PrecacheScriptSound( "Airboat.fan_idle" );
+	PrecacheScriptSound( "Airboat.fan_fullthrottle" );
+	PrecacheScriptSound( "Airboat.water_stopped" );
+	PrecacheScriptSound( "Airboat.water_fast" );
+	PrecacheScriptSound( "Airboat.impact_splash" );
+	PrecacheScriptSound( "Airboat.impact_hard" );
 
-	PrecacheScriptSound( "Airboat_headlight_on" );
-	PrecacheScriptSound( "Airboat_headlight_off" );
+	PrecacheScriptSound( "Airboat.headlight_on" );
+	PrecacheScriptSound( "Airboat.headlight_off" );
 
 	PrecacheScriptSound( "Airboat.FireGunLoop" );
 
@@ -663,7 +663,7 @@ void CPropAirboat::EnterVehicle( CBaseCombatCharacter *pPlayer )
 
 	// Play the engine start sound.
 	float flDuration;
-	EmitSound( "Airboat_engine_start", 0.0, &flDuration );
+	EmitSound( "Airboat.engine_start", 0.0, &flDuration );
 	m_VehiclePhysics.TurnOn();
 
 	// Start playing the engine's idle sound as the startup sound finishes.
@@ -730,7 +730,7 @@ void CPropAirboat::ExitVehicle( int nRole )
 
 	EmitSound_t ep;
 	ep.m_nChannel = CHAN_BODY;
-	ep.m_pSoundName = "Airboat_engine_stop";
+	ep.m_pSoundName = "Airboat.engine_stop";
 	ep.m_flVolume = controller.SoundGetVolume( m_pEngineSound );
 	ep.m_SoundLevel = SNDLVL_NORM;
 	ep.m_nPitch = controller.SoundGetPitch( m_pEngineSound );
@@ -753,7 +753,7 @@ void CPropAirboat::ExitVehicle( int nRole )
 //-----------------------------------------------------------------------------
 void CPropAirboat::HeadlightTurnOn( void )
 {
-	EmitSound( "Airboat_headlight_on" );
+	EmitSound( "Airboat.headlight_on" );
 	m_bHeadlightIsOn = true;
 }
 
@@ -763,7 +763,7 @@ void CPropAirboat::HeadlightTurnOn( void )
 //-----------------------------------------------------------------------------
 void CPropAirboat::HeadlightTurnOff( void )
 {
-	EmitSound( "Airboat_headlight_off" );
+	EmitSound( "Airboat.headlight_off" );
 	m_bHeadlightIsOn = false;
 }
 
@@ -863,8 +863,8 @@ void CPropAirboat::DoImpactEffect( trace_t &tr, int nDamageType )
 		return;
 
 	// Randomly drop out
-	if ( random->RandomInt( 0, 5 ) )
-		return;
+//	if ( random->RandomInt( 0, 5 ) )
+//		return;
 
 	m_flLastImpactEffectTime = gpGlobals->curtime;
 	UTIL_ImpactTrace( &tr, nDamageType, "AirboatGunImpact" );
@@ -1290,31 +1290,31 @@ void CPropAirboat::CreateSounds()
 
 	if (!m_pEngineSound)
 	{
-		m_pEngineSound = controller.SoundCreate( filter, entindex(), "Airboat_engine_idle" );
+		m_pEngineSound = controller.SoundCreate( filter, entindex(), "Airboat.engine_idle" );
 		controller.Play( m_pEngineSound, 0, 100 );
 	}
 
 	if (!m_pFanSound)
 	{
-		m_pFanSound = controller.SoundCreate( filter, entindex(), "Airboat_fan_idle" );
+		m_pFanSound = controller.SoundCreate( filter, entindex(), "Airboat.fan_idle" );
 		controller.Play( m_pFanSound, 0, 100 );
 	}
 
 	if (!m_pFanMaxSpeedSound)
 	{
-		m_pFanMaxSpeedSound = controller.SoundCreate( filter, entindex(), "Airboat_fan_fullthrottle" );
+		m_pFanMaxSpeedSound = controller.SoundCreate( filter, entindex(), "Airboat.fan_fullthrottle" );
 		controller.Play( m_pFanMaxSpeedSound, 0, 100 );
 	}
 
 	if (!m_pWaterStoppedSound)
 	{
-		m_pWaterStoppedSound = controller.SoundCreate( filter, entindex(), "Airboat_water_stopped" );
+		m_pWaterStoppedSound = controller.SoundCreate( filter, entindex(), "Airboat.water_stopped" );
 		controller.Play( m_pWaterStoppedSound, 0, 100 );
 	}
 
 	if (!m_pWaterFastSound)
 	{
-		m_pWaterFastSound = controller.SoundCreate( filter, entindex(), "Airboat_water_fast" );
+		m_pWaterFastSound = controller.SoundCreate( filter, entindex(), "Airboat.water_fast" );
 		controller.Play( m_pWaterFastSound, 0, 100 );
 	}
 
@@ -1446,12 +1446,12 @@ void CPropAirboat::UpdateWaterSound( CSoundEnvelopeController &controller, float
 			if ( ( fabs( vecVelocityWorld.x ) > 400 ) || ( fabs( vecVelocityWorld.y ) > 400 ) || ( fabs( vecVelocityWorld.z ) > 400 ) )
 			{
 				// Landed in the water. Play a splash sound.
-				EmitSound( "Airboat_impact_splash" );
+				EmitSound( "Airboat.impact_splash" );
 
 				if ( fabs( vecVelocityWorld.z ) > 200 )
 				{
 					// Landed hard in the water. Play a smack sound.
-					EmitSound( "Airboat_impact_hard" );
+					EmitSound( "Airboat.impact_hard" );
 				}
 			}
 		}
@@ -1527,7 +1527,7 @@ void CPropAirboat::UpdateSplashEffects( void )
 {
 	// Splash effects.
 	CreateSplash( AIRBOAT_SPLASH_RIPPLE );
-//	CreateSplash( AIRBOAT_SPLASH_SPRAY );
+	CreateSplash( AIRBOAT_SPLASH_SPRAY );
 }
 
 
@@ -1601,17 +1601,17 @@ void CPropAirboat::FireGun( )
 	info.m_vecDirShooting = vecRay;
 	info.m_flDistance = 4096;
 	info.m_iAmmoType = ammoType;
+	info.m_iShots = 1;
 	info.m_nFlags = FIRE_BULLETS_TEMPORARY_DANGER_SOUND;
 
 	if ( gpGlobals->curtime >= m_flNextHeavyShotTime )
 	{
-		info.m_iShots = 1;
 		info.m_vecSpread = VECTOR_CONE_PRECALCULATED;
-		info.m_flDamageForceScale = 1000.0f;
+		info.m_flDamageForceScale = 800.0f;
 	}
 	else
 	{
-		info.m_iShots = 2;
+//		info.m_iShots = 2;
 		info.m_vecSpread = VECTOR_CONE_5DEGREES;
 	}
 
@@ -1701,7 +1701,8 @@ void CPropAirboat::FireGun( )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-#define FIRING_DISCHARGE_RATE (1.0f / 3.0f)
+//#define FIRING_DISCHARGE_RATE (1.0f / 3.0f)
+#define FIRING_DISCHARGE_RATE sk_airboat_drain_rate.GetFloat()
 
 void CPropAirboat::UpdateGunState( CUserCmd *ucmd )
 {
@@ -2011,18 +2012,17 @@ void CPropAirboat::CreateSplash( int nSplashType )
 			VectorNormalize( vecSplashDir );
 			data.m_vNormal = vecSplashDir;
 			data.m_flScale = 10.0f + random->RandomFloat( 0, 10.0f * 0.25 );
-			//DispatchEffect( "waterripple", data );
 			DispatchEffect( "watersplash", data );
 		}
 		case AIRBOAT_SPLASH_RIPPLE:
 		{
-			/*
+		
 			Vector vecSplashDir;
 			vecSplashDir = vecUp;
 			data.m_vNormal = vecSplashDir;
 			data.m_flScale = AIRBOAT_SPLASH_RIPPLE_SIZE + random->RandomFloat( 0, AIRBOAT_SPLASH_RIPPLE_SIZE * 0.25 );
 			DispatchEffect( "waterripple", data );
-			*/
+		
 		}
 		default:
 		{

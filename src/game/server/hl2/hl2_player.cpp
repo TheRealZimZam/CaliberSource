@@ -1,7 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		Player for HL2.
-// TODO's: Sprinting reduces received accuracy, 1-weapon limit for each bucket category (except grenades)
+// Purpose:	Player for HL2.
+// TODO's: Sprinting reduces received accuracy, critical damage state
 //
 //=============================================================================//
 
@@ -70,7 +70,7 @@ extern ConVar autoaim_max_dist;
 // This switches between the single primary weapon, and multiple weapons with buckets approach (jdw)
 //#define	HL2_SINGLE_PRIMARY_WEAPON_MODE	0
 ConVar hl2_single_primary_weapon_mode( "hl2_single_primary_weapon_mode", "0" );
-// 1-weapon limit for each slot -- FIXME; Grenades/anything in bucket 6 shouldnt count
+// 1-weapon limit for each slot -- FIXME; Grenades/anything in bucket 5 shouldnt count
 ConVar hl2_single_weapon_slot( "hl2_single_weapon_slot", "0" );
 
 #define TIME_IGNORE_FALL_DAMAGE 10.0
@@ -79,20 +79,27 @@ extern int gEvilImpulse101;
 
 ConVar sv_autojump( "sv_autojump", "0" );
 
-ConVar hl2_walkspeed( "hl2_walkspeed", "150" );
+ConVar hl2_slowspeed( "hl2_slowspeed", "120" );
+ConVar hl2_walkspeed( "hl2_walkspeed", "170" );
 ConVar hl2_normspeed( "hl2_normspeed", "240" );
 ConVar hl2_sprintspeed( "hl2_sprintspeed", "300" );
 
 ConVar hl2_darkness_flashlight_factor ( "hl2_darkness_flashlight_factor", "1" );
 
 #ifdef HL2MP
+	#define	HL2_SLOW_SPEED 100
 	#define	HL2_WALK_SPEED 140
 	#define	HL2_NORM_SPEED 200
 	#define	HL2_SPRINT_SPEED 320
+	#define	HL2_ACCELERATION 1
+	#define	HL2_DECELERATION 1
 #else
+	#define	HL2_SLOW_SPEED hl2_slowspeed.GetFloat()
 	#define	HL2_WALK_SPEED hl2_walkspeed.GetFloat()
 	#define	HL2_NORM_SPEED hl2_normspeed.GetFloat()
 	#define	HL2_SPRINT_SPEED hl2_sprintspeed.GetFloat()
+	#define	HL2_ACCELERATION 1
+	#define	HL2_DECELERATION 1
 #endif
 
 ConVar player_showpredictedposition( "player_showpredictedposition", "0" );
@@ -433,8 +440,9 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.UseDeny" );
 	PrecacheScriptSound( "HL2Player.FlashLightOn" );
 	PrecacheScriptSound( "HL2Player.FlashLightOff" );
-//	PrecacheScriptSound( "HL2Player.PickupAmmo" );
+	PrecacheScriptSound( "HL2Player.PickupAmmo" );
 	PrecacheScriptSound( "HL2Player.PickupWeapon" );
+//	PrecacheScriptSound( "HL2Player.DropWeapon" );
 	PrecacheScriptSound( "HL2Player.TrainUse" );
 	PrecacheScriptSound( "HL2Player.Use" );
 	PrecacheScriptSound( "HL2Player.BurnPain" );
@@ -470,7 +478,8 @@ void CHL2_Player::EquipSuit( bool bPlayEffects )
 
 	if ( bPlayEffects == true )
 	{
-		StartAdmireGlovesAnimation();
+		StartAdmireGlovesAnimation();	//Gloves animation
+	//	StartSuitEffects();	//Voice/ui fadein
 	}
 }
 
@@ -828,6 +837,21 @@ void CHL2_Player::PreThink(void)
 		m_iTrain = TRAIN_NEW; // turn off train
 	}
 
+	// THIS CODE DOESN'T SEEM TO DO ANYTHING!!!
+	// WHY IS IT STILL HERE? (sjb)
+/*
+	if (m_nButtons & IN_JUMP)
+	{
+		// If on a ladder, jump off the ladder
+		// else Jump
+		if( IsPullingObject() )
+		{
+			StopPullingObject();
+		}
+
+		Jump();
+	}
+*/
 
 	//
 	// If we're not on the ground, we're falling. Update our falling velocity.
@@ -960,7 +984,7 @@ void CHL2_Player::Activate( void )
 
 #ifdef HL2_EPISODIC
 
-	// Delay attacks by 1 second after loading a game.
+	// Delay attacks by a second after loading a game.
 	if ( GetActiveWeapon() )
 	{
 		float flRemaining = GetActiveWeapon()->m_flNextPrimaryAttack - gpGlobals->curtime;
@@ -1990,8 +2014,8 @@ bool CHL2_Player::ApplyBattery( float powerMultiplier )
 
 		IncrementArmorValue( sk_battery.GetFloat() * powerMultiplier, MAX_NORMAL_BATTERY );
 
-		CPASAttenuationFilter filter( this, "ItemBattery.Touch" );
-		EmitSound( filter, entindex(), "ItemBattery.Touch" );
+		CPASAttenuationFilter filter( this, "Battery.Touch" );
+		EmitSound( filter, entindex(), "Battery.Touch" );
 
 		CSingleUserRecipientFilter user( this );
 		user.MakeReliable();
@@ -2382,6 +2406,13 @@ int CHL2_Player::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		EmitSound( "HL2Player.BurnPain" );
 	}
 
+	// Anything that would make a sound
+#if 0
+	if ( GetLastDamageTime() > 0 && info.GetDamageType() & (DMG_BULLET|DMG_CLUB|DMG_SLASH) )
+	{
+		EmitSound( "Player.Pain" );
+	}
+#endif
 
 	if( (info.GetDamageType() & DMG_SLASH) && hl2_episodic.GetBool() )
 	{
@@ -2392,7 +2423,6 @@ int CHL2_Player::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 			SuspendUse( 0.5f );
 		}
 	}
-
 
 	// Call the base class implementation
 	return BaseClass::OnTakeDamage_Alive( info );
@@ -2761,7 +2791,7 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 				// Fix it??? Pls.
 				if( Weapon_EquipAmmoOnly( pWeapon ) )
 				{
-//					EmitSound( "HL2Player.PickupAmmo" );
+					EmitSound( "HL2Player.PickupAmmo" );
 
 					if ( pWeapon->UsesClipsForAmmo1() && pWeapon->HasPrimaryAmmo() )
 						return false;
@@ -2976,6 +3006,19 @@ ConVar	sv_show_crosshair_target( "sv_show_crosshair_target", "0" );
 //-----------------------------------------------------------------------------
 void CHL2_Player::UpdateWeaponPosture( void )
 {
+#if 0
+	//Setup our viewmodel's movement speed
+	CBaseViewModel *pVM = GetViewModel();
+
+	//Send the poseparameter to the viewmodel
+	if ( ( pVM != NULL ) && ( pVM->GetModelPtr() != NULL ) )
+	{
+		//Player's velocity ramped from slowest to fastest
+		float moveBlend = RemapVal( GetAbsVelocity().Length(), 0.0f, MaxSpeed(), 0.0f, 1.0f );
+		pVM->SetPoseParameter( "movement", moveBlend );
+	}
+#endif
+
 	CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>(GetActiveWeapon());
 
 	if ( pWeapon && m_LowerWeaponTimer.Expired() && pWeapon->CanLower() )
@@ -2991,7 +3034,7 @@ void CHL2_Player::UpdateWeaponPosture( void )
 		CBaseEntity *aimTarget = tr.m_pEnt;
 
 		//If we're over something
-		if (  aimTarget && !tr.DidHitWorld() )
+		if ( aimTarget && !tr.DidHitWorld() )
 		{
 			if ( !aimTarget->IsNPC() || aimTarget->MyNPCPointer()->GetState() != NPC_STATE_COMBAT )
 			{
@@ -3033,7 +3076,7 @@ void CHL2_Player::UpdateWeaponPosture( void )
 				}
 
 				//See if we hates it
-				if ( dis == D_LI  )
+				if ( dis == D_LI )
 				{
 					//We're over a friendly, drop our weapon
 					if ( Weapon_Lower() == false )
@@ -3043,6 +3086,13 @@ void CHL2_Player::UpdateWeaponPosture( void )
 
 					return;
 				}
+//				else if ( dis == D_HT )
+//				{
+//					if ( Weapon_Ready() == false )
+//					{
+//						//FIXME: We couldn't raise our weapon!
+//					}
+//				}
 			}
 		}
 

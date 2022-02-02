@@ -40,7 +40,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	RPG_SPEED	1500
+#define	RPG_SPEED	sk_rpg_speed.GetInt()
+ConVar sk_rpg_speed( "sk_rpg_speed","1500");
+#define	RPG_HOMING_SPEED	sk_rpg_homing_speed.GetFloat()
+ConVar sk_rpg_homing_speed( "sk_rpg_homing_speed","0.05");	//0.125
 
 static ConVar sk_apc_missile_damage("sk_apc_missile_damage", "15");
 ConVar rpg_missle_use_custom_detonators( "rpg_missle_use_custom_detonators", "1" );
@@ -241,7 +244,7 @@ void CMissile::DumbFire( void )
 	// Smoketrail.
 	CreateSmokeTrail();
 	// Flare
-//	CreateFlare();
+	CreateFlare();
 }
 
 //-----------------------------------------------------------------------------
@@ -402,6 +405,7 @@ void CMissile::MissileTouch( CBaseEntity *pOther )
 			return;
 	}
 
+	//TODO; Check the angle - only explode if 75* or less
 	Explode();
 }
 
@@ -432,6 +436,11 @@ void CMissile::CreateSmokeTrail( void )
 	}
 }
 
+void CMissile::CreateFlare( void )
+{
+
+
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -443,8 +452,6 @@ void CMissile::IgniteThink( void )
 	UTIL_SetSize( this, vec3_origin, vec3_origin );
  	RemoveSolidFlags( FSOLID_NOT_SOLID );
 
-	//TODO: Play opening sound
-
 	Vector vecForward;
 
 	EmitSound( "Missile.Ignite" );
@@ -455,6 +462,7 @@ void CMissile::IgniteThink( void )
 	SetThink( &CMissile::SeekThink );
 	SetNextThink( gpGlobals->curtime );
 
+	//TODO; Only behind the missle
 	if ( m_hOwner && m_hOwner->GetOwner() )
 	{
 		CBasePlayer *pPlayer = ToBasePlayer( m_hOwner->GetOwner() );
@@ -471,7 +479,7 @@ void CMissile::IgniteThink( void )
 	// Smoketrail.
 	CreateSmokeTrail();
 	// Flare
-//	CreateFlare();
+	CreateFlare();
 }
 
 
@@ -495,8 +503,6 @@ void CMissile::GetShootPosition( CLaserDot *pLaserDot, Vector *pShootPosition )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-#define	RPG_HOMING_SPEED	0.125f
-
 void CMissile::ComputeActualDotPosition( CLaserDot *pLaserDot, Vector *pActualDotPosition, float *pHomingSpeed )
 {
 	*pHomingSpeed = RPG_HOMING_SPEED;
@@ -652,7 +658,7 @@ void CMissile::SeekThink( void )
 		// feet of a Strider, tighten up the turn speed of the missile so it can break the halo and strike. (sjb 4/27/2006)
 		if( pLaserDot->GetTargetEntity()->ClassMatches( "npc_strider" ) )
 		{
-			flHomingSpeed *= 1.75f;
+			flHomingSpeed *= 1.5f;
 		}
 	}
 
@@ -996,7 +1002,7 @@ void CAPCMissile::Init()
 	SetModel("models/weapons/w_missile.mdl");
 	UTIL_SetSize( this, vec3_origin, vec3_origin );
 	CreateSmokeTrail();
-//	CreateFlare();
+	CreateFlare();
 	SetTouch( &CAPCMissile::APCMissileTouch );
 	m_flLastHomingSpeed = APC_HOMING_SPEED;
 	CreateDangerSounds( true );
@@ -1839,7 +1845,6 @@ bool CWeaponRPG::IsGuiding( void )
 bool CWeaponRPG::Deploy( void )
 {
 	m_bInitialStateUpdate = true;
-
 	return BaseClass::Deploy();
 }
 

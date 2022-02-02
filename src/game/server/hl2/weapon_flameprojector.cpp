@@ -10,10 +10,12 @@
 #include "NPCEvent.h"
 #include "basehlcombatweapon.h"
 #include "basecombatcharacter.h"
+#include "decals.h"
 #include "AI_BaseNPC.h"
 #include "player.h"
 #include "soundent.h"
 #include "te_particlesystem.h"
+#include "IEffects.h"
 #include "ndebugoverlay.h"
 #include "in_buttons.h"
 #include "ai_memory.h"
@@ -21,8 +23,11 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define MAX_BURN_RADIUS		256
-#define RADIUS_GROW_RATE	50.0	// units/sec 
+ConVar sk_flameprojector_radius( "sk_flameprojector_radius", "224.0" );
+#define MAX_BURN_RADIUS		sk_flameprojector_radius.GetFloat()
+
+ConVar sk_flameprojector_rate( "sk_flameprojector_rate", "56.0" );
+#define RADIUS_GROW_RATE	sk_flameprojector_rate.GetFloat()	// units/sec 
 
 #define IMMOLATOR_TARGET_INVALID Vector( FLT_MAX, FLT_MAX, FLT_MAX )
 
@@ -44,6 +49,7 @@ public:
 	void ImmolationDamage( const CTakeDamageInfo &info, const Vector &vecSrcIn, float flRadius, int iClassIgnore );
 	virtual bool WeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions );	
 	virtual int	WeaponRangeAttack1Condition( float flDot, float flDist );
+	void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
 	void Update();
 	void UpdateThink();
@@ -111,15 +117,12 @@ CWeaponFlameprojector::CWeaponFlameprojector( void )
 
 void CWeaponFlameprojector::StartImmolating()
 {
-	// Start flamesound
-//!	WeaponSound( SINGLE );
-
 	// Start the radius really tiny because we use radius == 0.0 to 
 	// determine whether the immolator is operating or not.
 	m_flBurnRadius = 0.1;
 	m_flTimeLastUpdatedRadius = gpGlobals->curtime;
 	SetThink( &CWeaponFlameprojector::UpdateThink );
-	SetNextThink( gpGlobals->curtime );
+	SetNextThink( gpGlobals->curtime + 0.25 );	//Needs some time to ignite
 
 	CSoundEnt::InsertSound( SOUND_DANGER, m_vecFlameprojectorTarget, 256, 5.0, GetOwner() );
 }
@@ -127,12 +130,12 @@ void CWeaponFlameprojector::StartImmolating()
 void CWeaponFlameprojector::StopImmolating()
 {
 	// Stop flamesound
-//!	WeaponSound( EMPTY );
+	WeaponSound( EMPTY );
 
 	m_flBurnRadius = 0.0;
 	SetThink( NULL );
-	m_vecFlameprojectorTarget= IMMOLATOR_TARGET_INVALID;
-	m_flNextPrimaryAttack = gpGlobals->curtime + 5.0;
+	m_vecFlameprojectorTarget = IMMOLATOR_TARGET_INVALID;
+	m_flNextPrimaryAttack = gpGlobals->curtime + 4.0;
 }
 
 //-----------------------------------------------------------------------------
@@ -150,13 +153,54 @@ void CWeaponFlameprojector::Precache( void )
 //-----------------------------------------------------------------------------
 void CWeaponFlameprojector::PrimaryAttack( void )
 {
+	// Only the player fires this way so we can cast
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+	if (!pPlayer)
+		return;
+
+	pPlayer->DoMuzzleFlash();
+
 	// Ignite sound
 	WeaponSound( SPECIAL1 );
 
 	if( !IsImmolating() )
 	{
 		StartImmolating();
-	} 
+	}
+
+	m_flNextPrimaryAttack = gpGlobals->curtime + 4.0;
+	SendWeaponAnim( GetPrimaryAttackActivity() );
+	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+
+	// Register a muzzleflash for the AI
+	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CWeaponFlameprojector::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+{
+	switch( pEvent->event )
+	{
+	case EVENT_WEAPON_SMG1:
+		{
+			WeaponSound( SPECIAL1 );
+
+			pOperator->DoMuzzleFlash();
+			m_flNextPrimaryAttack = gpGlobals->curtime + 4.0;
+
+			if( !IsImmolating() )
+			{
+				StartImmolating();
+			}
+		}
+		break;
+
+	default:
+		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
+		break;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -187,7 +231,39 @@ bool CWeaponFlameprojector::WeaponLOSCondition( const Vector &ownerPos, const Ve
 		return false;
 	}
 
-	return true;
+	// Find a nearby immolator target that CAN see targetPOS
+	float flNearest = FLT_MAX;
+	CBaseEntity *pNearest = NULL;
+
+	CBaseEntity *pEnt = gEntList.FindEntityByClassname( NULL, "info_target_immolator" );
+
+	while( pEnt )
+	{
+		float flDist = ( pEnt->GetAbsOrigin() - targetPos ).Length();
+
+		if( flDist < flNearest )
+		{
+			trace_t tr;
+
+			UTIL_TraceLine( targetPos, pEnt->GetAbsOrigin(), MASK_SOLID_BRUSHONLY, NULL, COLLISION_GROUP_NONE, &tr );
+
+			if( tr.fraction == 1.0 )
+			{
+				pNearest = pEnt;
+				flNearest = flDist;
+			}
+		}
+
+		pEnt = gEntList.FindEntityByClassname( pEnt, "info_target_immolator" );
+	}
+
+	if( pNearest )
+	{
+		m_vecFlameprojectorTarget = pNearest->GetAbsOrigin();
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -196,12 +272,6 @@ bool CWeaponFlameprojector::WeaponLOSCondition( const Vector &ownerPos, const Ve
 //-----------------------------------------------------------------------------
 int CWeaponFlameprojector::WeaponRangeAttack1Condition( float flDot, float flDist )
 {
-	if( m_flNextPrimaryAttack > gpGlobals->curtime )
-	{
-		// Too soon to attack!
-		return COND_NONE;
-	}
-
 	if( IsImmolating() )
 	{
 		// Once is enough!
@@ -251,6 +321,8 @@ void CWeaponFlameprojector::Update()
 	if( flDuration != 0.0 )
 	{
 		m_flBurnRadius += RADIUS_GROW_RATE * flDuration;
+		// Play flamesound
+		WeaponSound( SINGLE );
 	}
 
 	// Clamp
@@ -276,7 +348,7 @@ void CWeaponFlameprojector::Update()
 	}
 
 	trace_t	tr;
-	UTIL_TraceLine( vecSrc, vecSrc + vecAiming * MAX_TRACE_LENGTH, MASK_SHOT, pOwner, COLLISION_GROUP_NONE, &tr );
+	UTIL_TraceLine( vecSrc, vecSrc + vecAiming * m_fMaxRange1, MASK_SHOT, pOwner, COLLISION_GROUP_NONE, &tr );	//MAX_TRACE_LENGTH
 
 	int brightness;
 	brightness = 255 * (m_flBurnRadius/MAX_BURN_RADIUS);
@@ -338,21 +410,23 @@ void CWeaponFlameprojector::Update()
 						);
 		}
 
+		UTIL_Smoke( tr.endpos, random->RandomInt( 10, 15 ), 10 );
+
 		// Immolator starts to hurt a few seconds after the effect is seen
 		if( m_flBurnRadius > 64.0 )
 		{
+			UTIL_DecalTrace( &tr, "RedGlowFade" );
 			ImmolationDamage( CTakeDamageInfo( this, this, 1, DMG_BURN ), tr.endpos, m_flBurnRadius, CLASS_NONE );
 		}
 	}
 	else
 	{
 		// The attack beam struck some kind of entity directly, the radius doesnt have to be as big to do damage.
-		/*
-		if( m_flBurnRadius > 32.0 )
+		if( m_flBurnRadius > 8.0 )
 		{
-			ImmolationDamage( CTakeDamageInfo( this, this, 1, DMG_BURN ), tr.endpos, m_flBurnRadius, CLASS_NONE );
+			g_pEffects->Sparks( tr.endpos );
+			ImmolationDamage( CTakeDamageInfo( this, this, 1, DMG_BURN ), tr.endpos, 8.0, CLASS_NONE );
 		}
-		*/
 	}
 
 	m_flTimeLastUpdatedRadius = gpGlobals->curtime;
@@ -412,7 +486,7 @@ void CWeaponFlameprojector::ImmolationDamage( const CTakeDamageInfo &info, const
 				continue;
 			}
 
-			pBCC->Ignite( random->RandomFloat( 10, 15 ) );
+			pBCC->Ignite( random->RandomFloat( 5, 10 ) );
 		}
 	}
 }

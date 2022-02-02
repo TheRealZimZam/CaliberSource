@@ -341,6 +341,7 @@ void CFlare::FlareThink( void )
 	//Act differently underwater
 	if ( GetWaterLevel() > 1 )
 	{
+		//Fizz and bubble
 		UTIL_Bubbles( GetAbsOrigin() + Vector( -2, -2, -2 ), GetAbsOrigin() + Vector( 2, 2, 2 ), 1 );
 		m_bSmoke = false;
 	}
@@ -380,10 +381,20 @@ void CFlare::FlareTouch( CBaseEntity *pOther )
 	if ( !pOther->IsSolid() )
 		return;
 
-	if ( ( m_nBounces < 10 ) && ( GetWaterLevel() < 1 ) )
+	if ( GetWaterLevel() < 1 )
 	{
-		// Throw some real chunks here
-		g_pEffects->Sparks( GetAbsOrigin() );
+		// Small puff of smoke
+		UTIL_Smoke( GetAbsOrigin(), random->RandomInt( 5, 10 ), 10 );
+		if ( m_nBounces < 10 )
+		{
+			// Throw some real chunks here
+			g_pEffects->Sparks( GetAbsOrigin() );
+		}
+	}
+	else
+	{
+		// Big puff of Smoke
+		UTIL_Smoke( GetAbsOrigin(), random->RandomInt( 10, 15 ), 10 );
 	}
 
 	//If the flare hit a person or NPC, do damage here.
@@ -391,7 +402,7 @@ void CFlare::FlareTouch( CBaseEntity *pOther )
 	{
 #ifdef HL2_EPISODIC
 		//Damage is a function of how fast the flare is flying.
-		int iDamage = GetAbsVelocity().Length() / 50.0f * sk_dmg_flaregun_scale.GetFloat();	//TODO; Factor skill into this
+		int iDamage = GetAbsVelocity().Length() / 50.0f * sk_dmg_flaregun_scale.GetFloat();
 
 		if ( iDamage < 5 )
 		{
@@ -401,6 +412,10 @@ void CFlare::FlareTouch( CBaseEntity *pOther )
 
 		//Use m_pOwner, not GetOwnerEntity()
 		pOther->TakeDamage( CTakeDamageInfo( this, m_pOwner, iDamage, (DMG_BULLET|DMG_BURN) ) );	//Should this have bullet???
+		m_flNextDamage = gpGlobals->curtime + 1.0f;
+#else
+		//Use m_pOwner, not GetOwnerEntity()
+		pOther->TakeDamage( CTakeDamageInfo( this, m_pOwner, sk_dmg_flaregun_scale.GetFloat(), (DMG_BULLET|DMG_BURN) ) );	//Should this have bullet???
 		m_flNextDamage = gpGlobals->curtime + 1.0f;
 #endif
 

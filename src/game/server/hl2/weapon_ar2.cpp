@@ -35,6 +35,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+//###########################################################################
+//	>> CWeaponAR2
+//###########################################################################
+
 ConVar sk_weapon_ar2_lerp( "sk_weapon_ar2_lerp", "5.0" );
 
 ConVar sk_weapon_ar2_alt_fire_radius( "sk_weapon_ar2_alt_fire_radius", "10" );
@@ -251,23 +255,6 @@ void CWeaponAR2::DoImpactEffect( trace_t &tr, int nDamageType )
 	BaseClass::DoImpactEffect( tr, nDamageType );
 }
 
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-#if 0
-void CWeaponAR2::DoMuzzleFlash( int nAttachment )
-{
-	BaseClass::DoMuzzleFlash();
-
-	// Dispatch the elight
-	CEffectData data;
-
-	data.m_nAttachmentIndex = LookupAttachment( "muzzle" );
-	data.m_nEntIndex = entindex();
-	DispatchEffect( "AR2MuzzleFlash", data );
-}
-#endif
-
 //-----------------------------------------------------------------------------
 // Purpose: Tracer frequency
 //-----------------------------------------------------------------------------
@@ -458,8 +445,7 @@ void CWeaponAR2::Zoom( void )
 		pPlayer->SetFOV( this, 0, 0.1f );
 		m_bZoomed = false;
 		
-		// Change this to an overlay (cus its fugly)
-		// sprites/reticle1
+		// Darken corners of the screen
 		UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_IN|FFADE_PURGE) );
 	}
 	else
@@ -493,16 +479,6 @@ void CWeaponAR2::Zoom( void )
 float CWeaponAR2::GetMinRestTime()
 {
 	//Default is 0.3
-#if 0
-	Class_T OwnerClass = GetOwner()->Classify();
-
-	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
-		 OwnerClass == CLASS_CITIZEN_REBEL	||
-		 OwnerClass == CLASS_PLAYER_ALLY	||
-		 OwnerClass == CLASS_METROPOLICE	)
-		 return 0.5f;
-#endif
-
 	return 0.5f;
 }
 
@@ -536,7 +512,7 @@ float CWeaponAR2::GetFireRate( void )
 float CWeaponAR2::GetDefaultAnimSpeed( void )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	if ( GetOwner() && GetOwner()->IsPlayer() )
+	if ( GetOwner() && GetOwner()->IsPlayer() && m_bInReload )
 	{
 		if ( pPlayer->GetAbsVelocity().Length2D() > 120 )
 			return 1.0 - 0.25;
@@ -579,7 +555,13 @@ bool CWeaponAR2::Reload( void )
 		Zoom();
 	}
 
-	return BaseClass::Reload();
+	int iActivity = ACT_VM_RELOAD;
+	if ( m_iClip1 > 1 )
+	{
+		iActivity = ACT_VM_RELOAD2;
+	}
+
+	return DefaultReload( GetMaxClip1(), GetMaxClip2(), iActivity );
 }
 
 //-----------------------------------------------------------------------------

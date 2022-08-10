@@ -39,11 +39,7 @@ public:
 	void StartTask( const Task_t *pTask );
 	void RunTask( const Task_t *pTask );
 
-	//void BuildScheduleTestBits();
-	//int TranslateSchedule( int scheduleType );
 	//void OnStartSchedule( int scheduleType );
-
-	//void InitializeBehavior();
 
 	bool EnemyDislikesMe();
 	
@@ -55,8 +51,8 @@ public:
 	CAI_Hint *FindFearWithdrawalDest();
 	void BuildScheduleTestBits();
 	int TranslateSchedule( int scheduleType );
+	virtual Activity	NPC_TranslateActivity( Activity activity );
 
-	
 	enum
 	{
 		SCHED_FEAR_MOVE_TO_SAFE_PLACE = BaseClass::NEXT_SCHEDULE,		
@@ -81,6 +77,8 @@ public:
 
 private:
 	virtual int		SelectSchedule();
+
+	bool			m_bPlayerIsAlly;
 
 	float			m_flTimeToSafety;
 	float			m_flTimePlayerLastVisible;

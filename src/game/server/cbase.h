@@ -107,6 +107,7 @@ enum
 {
 	itbd_Paralyze = 0,
 	itbd_NerveGas,
+	itbd_Poison,
 	itbd_PoisonRecover,
 	itbd_Radiation,
 	itbd_DrownRecover,

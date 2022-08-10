@@ -4,7 +4,7 @@
 // needs to be defined in the subclass - this is for utility functions and very basic
 // states applicable to ALL human npcs like falling/jumping, heavydamage, sneakattacks, etc.
 //
-// $NoKeywords: $
+// TODO; Limb gibbing
 //=============================================================================//
 
 #ifndef AI_BASEHUMANOID_H
@@ -33,11 +33,14 @@ public:
 
 	// Navigation
 	bool OnMoveBlocked( AIMoveResult_t *pResult );
+	virtual bool ShouldMoveAndShoot( void );
 
 	// Damage
 	virtual bool ShouldPickADeathPose( void );
 	virtual bool ShouldGib( const CTakeDamageInfo &info );
+	virtual void Ignite( float flFlameLifetime, bool bNPCOnly = true, float flSize = 0.0f, bool bCalledByLevelDesigner = false );
 	void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
+	void Event_Killed( const CTakeDamageInfo &info );
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	bool IsKnockedDown() { return m_bKnockedDown; }
 

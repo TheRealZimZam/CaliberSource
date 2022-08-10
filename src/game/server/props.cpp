@@ -75,7 +75,7 @@ ConVar prop_active_gib_max_fade_time( "prop_active_gib_max_fade_time", "999999" 
 // Damage type modifiers for breakable objects.
 ConVar func_breakdmg_bullet( "func_breakdmg_bullet", "0.5" );
 ConVar func_breakdmg_club( "func_breakdmg_club", "1.5" );
-ConVar func_breakdmg_explosive( "func_breakdmg_explosive", "1.25" );
+ConVar func_breakdmg_explosive( "func_breakdmg_explosive", "1.0" );
 ConVar func_breakdmg_fire( "func_breakdmg_fire", "0.5" );
 
 ConVar sv_turbophysics( "sv_turbophysics", "0", FCVAR_REPLICATED, "Turns on turbo physics" );
@@ -758,6 +758,7 @@ BEGIN_DATADESC( CBreakableProp )
 	DEFINE_FIELD( m_flDmgModBullet, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flDmgModClub, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flDmgModExplosive, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flDmgModFire, FIELD_FLOAT ),
 	DEFINE_FIELD( m_iszPhysicsDamageTableName, FIELD_STRING ),
 	DEFINE_FIELD( m_iszBreakableModel, FIELD_STRING ),
 	DEFINE_FIELD( m_iBreakableSkin, FIELD_INTEGER ),
@@ -844,6 +845,7 @@ void CBreakableProp::Spawn()
 	m_flDmgModBullet = 1.0;
 	m_flDmgModClub = 1.0;
 	m_flDmgModExplosive = 1.0;
+	m_flDmgModFire = 1.0;
 	
 	//jmd: I am guessing that the call to Spawn will set any flags that should be set anyway; this
 	//clears flags we don't want (specifically the FL_ONFIRE for explosive barrels in HL2MP)]

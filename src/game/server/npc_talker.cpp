@@ -139,6 +139,8 @@ int CNPCSimpleTalker::SelectSchedule( void )
 			{
 				return SCHED_TALKER_IDLE_HELLO;
 			}
+
+			TrySmellTalk();
 		}
 	}
 

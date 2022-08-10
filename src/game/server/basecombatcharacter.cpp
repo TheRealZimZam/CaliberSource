@@ -861,14 +861,17 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 		CGib::SpawnRandomGibs( this, 4, GIB_ALIEN );	// Throw alien gibs
 		gibbed = true;
 	}
-#ifdef HL2_DLL
 	else if ( HasMechGibs() )
 	{
 		CGib::SpawnRandomGibs( this, 4, GIB_MECH );		// Throw general machine gibs
-		gibbed = true;
+		return true;
 	}
-#endif
 
+	if (gibbed)
+	{
+		EmitSound( "BaseCombatCharacter.CorpseGib" );
+		CSoundEnt::InsertSound( SOUND_MEAT, GetAbsOrigin(), 256, 20, this );
+	}
 	return gibbed;
 }
 
@@ -880,7 +883,6 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 Activity CBaseCombatCharacter::GetDeathActivity ( void )
 {
 	Activity	deathActivity;
-	bool		fTriedDirection;
 	float		flDot;
 	trace_t		tr;
 	Vector		vecSrc;
@@ -901,7 +903,6 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 
 	vecSrc = WorldSpaceCenter();
 
-	fTriedDirection = false;
 	deathActivity = ACT_DIESIMPLE;// in case we can't find any special deaths to do.
 
 	Vector forward;
@@ -924,14 +925,7 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 		break;
 
 	default:
-		if (IsPlayer() && random->RandomInt(0,3) == 3)
-		{
-			deathActivity = ACT_DIEVIOLENT;
-		}
-
 		// try to pick a death based on attack direction
-		fTriedDirection = true;
-
 		if ( flDot > 0.3 )
 		{
 			deathActivity = ACT_DIEFORWARD;
@@ -940,33 +934,19 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 		{
 			deathActivity = ACT_DIEBACKWARD;
 		}
+
+		if ( m_iHealth < GIB_HEALTH_VALUE )
+		{
+			if ( IsPlayer() || random->RandomInt(0,3) == 3 )
+			{
+				deathActivity = ACT_DIEVIOLENT;
+			}
+		}
 		break;
 	}
 
 
 	// can we perform the prescribed death?
-	if ( SelectWeightedSequence ( deathActivity ) == ACTIVITY_NOT_AVAILABLE )
-	{
-		// no! did we fail to perform a directional death? 
-		if ( fTriedDirection )
-		{
-			// if yes, we're out of options. Go simple.
-			deathActivity = ACT_DIESIMPLE;
-		}
-		else
-		{
-			// cannot perform the ideal region-specific death, so try a direction.
-			if ( flDot > 0.3 )
-			{
-				deathActivity = ACT_DIEFORWARD;
-			}
-			else if ( flDot <= -0.3 )
-			{
-				deathActivity = ACT_DIEBACKWARD;
-			}
-		}
-	}
-
 	if ( SelectWeightedSequence ( deathActivity ) == ACTIVITY_NOT_AVAILABLE )
 	{
 		// if we're still invalid, simple is our only option.
@@ -2355,13 +2335,7 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 	
 	default:
 	case LIFE_DEAD:
-		retVal = OnTakeDamage_Dead( info );
-		if ( m_iHealth <= 0 && g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) && ShouldGib( info ) )
-		{
-			Event_Gibbed( info );
-			retVal = 0;
-		}
-		return retVal;
+		return OnTakeDamage_Dead( info );
 	}
 }
 
@@ -2417,6 +2391,17 @@ int CBaseCombatCharacter::OnTakeDamage_Dead( const CTakeDamageInfo &info )
 	if ( m_takedamage != DAMAGE_EVENTS_ONLY )
 	{
 		m_iHealth -= info.GetDamage();
+	}
+
+	// kill the corpse if enough damage was done to destroy the corpse and the damage is of a type that is allowed to destroy the corpse.
+	if ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) && ShouldGib( info ) )
+	{
+		if ( m_iHealth <= info.GetDamage() )
+		{
+			m_iHealth = -50;
+			Event_Gibbed( info );
+			return 1;
+		}
 	}
 
 	return 1;
@@ -2720,16 +2705,12 @@ CBaseEntity *CBaseCombatCharacter::FindHealthItem( const Vector &vecPosition, co
 //-----------------------------------------------------------------------------
 bool CBaseCombatCharacter::Weapon_IsOnGround( CBaseCombatWeapon *pWeapon )
 {
+	// Constrained to a rack.
 	if( pWeapon->IsConstrained() )
-	{
-		// Constrained to a rack.
 		return false;
-	}
 
 	if( fabs(pWeapon->WorldSpaceCenter().z - GetAbsOrigin().z) >= 12.0f )
-	{
 		return false;
-	}
 
 	return true;
 }
@@ -2741,19 +2722,6 @@ bool CBaseCombatCharacter::Weapon_IsOnGround( CBaseCombatWeapon *pWeapon )
 //-----------------------------------------------------------------------------
 CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 {
-	bool bConservative = false;
-
-#if 0
-	if( hl2_episodic.GetBool() && !GetActiveWeapon() )
-	{
-		// Unarmed citizens are conservative in their weapon finding
-		if ( Classify() != CLASS_PLAYER_ALLY_VITAL )
-		{
-			bConservative = true;
-		}
-	}
-#endif
-
 	CBaseCombatWeapon *weaponList[64];
 	CBaseCombatWeapon *pBestWeapon = NULL;
 
@@ -2823,92 +2791,6 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			fCurDist *= 0.75f;
 		}
 
-		if ( pBestWeapon )
-		{
-			// UNDONE: Better heuristic needed here
-			//			Need to pick by power of weapons
-			//			Don't want to pick a weapon right next to a NPC!
-			// Give these weapons a bonus be selected by making it seem closer.
-			switch( pWeapon->GetPriority() )
-			{
-				case 0:
-					// Lowest Priority
-					fCurDist *= 1.5f;
-				break;
-
-				case 1:
-					// Low Priority
-					fCurDist *= 1.25f;
-				break;
-
-				case 2:
-					// Normal Priority
-					fCurDist *= 1.0f;
-				break;
-
-				case 3:
-					// High Priority
-					fCurDist *= 0.75f;
-				break;
-
-				case 4:
-					// Highest Priority
-					fCurDist *= 0.5f;
-				break;
-			}
-
-/*
-#ifdef HL2_DLL
-			if( FClassnameIs( pWeapon, "weapon_ar2" ) )
-			{
-				fCurDist *= 0.5f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_brickbat" ) )
-			{
-				fCurDist *= 1.5f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_crossbow" ) )
-			{
-				fCurDist *= 0.75f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_hmg1" ) )
-			{
-				fCurDist *= 0.75f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_shotgun" ) )
-			{
-				fCurDist *= 0.75f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_smg2" ) )
-			{
-				fCurDist *= 0.75f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_stab" ) )
-			{
-				fCurDist *= 1.25f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_supershotgun" ) )
-			{
-				fCurDist *= 0.5f;
-			}
-			if( FClassnameIs( pWeapon, "weapon_swing" ) )
-			{
-				fCurDist *= 1.25f;
-			}
-#endif
-*/
-
-			// choose the last range attack weapon you find or the first available other weapon
-			if ( ! (pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
-			{
-				continue;
-			}
-			else if (fCurDist > fBestDist ) 
-			{
-				continue;
-			}
-		}
-
 		if( Weapon_IsOnGround(pWeapon) )
 		{
 			// Weapon appears to be lying on the ground. Make sure this weapon is reachable
@@ -2921,10 +2803,47 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			if ( tr.startsolid || (tr.fraction < 1.0) )
 				continue;
 		}
-		else if( bConservative )
+
+		if ( pBestWeapon )
 		{
-			// Skip it.
-			continue;
+			// Give these weapons a bonus be selected by making it seem closer.
+			switch( pWeapon->GetPriority() )
+			{
+				case 0:
+					// Lowest Priority
+					fCurDist *= 1.75f;
+				break;
+
+				case 1:
+					// Low Priority
+					fCurDist *= 1.35f;
+				break;
+
+				case 2:
+					// Normal Priority
+					fCurDist *= 1.0f;
+				break;
+
+				case 3:
+					// High Priority
+					fCurDist *= 0.65f;
+				break;
+
+				case 4:
+					// Highest Priority
+					fCurDist *= 0.25f;
+				break;
+			}
+
+			// choose the last range attack weapon you find or the first available other weapon
+			if ( ! (pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
+			{
+				continue;
+			}
+			else if (fCurDist > fBestDist ) 
+			{
+				continue;
+			}
 		}
 
 		if( FVisible(pWeapon) )

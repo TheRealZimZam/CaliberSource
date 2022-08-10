@@ -1326,9 +1326,9 @@ bool CAI_BaseActor::PickRandomLookTarget( AILookTargetArgs_t *pArgs )
 		VectorNormalize( delta );
 
 		int iImportance;
-#if 0
+#if 1
 		// consider things in front to be more important than things to the sides
-		iImportance = (DotProduct( delta, HeadDirection3D() );
+		iImportance = (DotProduct(delta, HeadDirection3D()));
 #else
 		// No, for now, give all targets random priority (as long as they're in front)
 		iImportance = random->RandomInt( 1, 100 );

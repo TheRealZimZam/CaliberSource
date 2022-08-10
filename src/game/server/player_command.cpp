@@ -214,17 +214,22 @@ void CPlayerMove::FinishMove( CBasePlayer *player, CUserCmd *ucmd, CMoveData *mo
 
 	player->m_Local.m_nOldButtons			= move->m_nButtons;
 
-	// Convert final pitch to body pitch
-	float pitch = move->m_vecAngles[ PITCH ];
+	// Convert final pitch and yaw
+#if 0
+	float pitch = move->m_vecAngles[PITCH];
 	if ( pitch > 180.0f )
 	{
 		pitch -= 360.0f;
 	}
 	pitch = clamp( pitch, -90, 90 );
+	player->SetAimPitch( pitch );
+//	player->SetBodyPitch( pitch );
 
-	move->m_vecAngles[ PITCH ] = pitch;
-
-	player->SetBodyPitch( pitch );
+	float yaw = EyePosition()[YAW];
+	yaw = clamp( yaw, -90, 90 );
+	player->SetAimYaw( yaw );
+//	player->SetBodyYaw( yaw );
+#endif
 
 	player->SetLocalAngles( move->m_vecAngles );
 

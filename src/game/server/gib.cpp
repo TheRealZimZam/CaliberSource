@@ -290,6 +290,10 @@ void CGib::SpawnSpecificGibs(	CBaseEntity*	pVictim,
 		if ( pVictim != NULL )
 		{
 			pGib->SetOwnerEntity( pVictim );
+			if ( pVictim->GetFlags() & FL_ONFIRE )
+			{
+				pGib->Ignite( (flLifetime * 0.5), false );
+			}
 		}
 	}
 }

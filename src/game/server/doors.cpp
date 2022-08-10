@@ -32,8 +32,8 @@ BEGIN_DATADESC( CBaseDoor )
 
 	DEFINE_FIELD( m_bLockedSentence, FIELD_CHARACTER ),
 	DEFINE_FIELD( m_bUnlockedSentence, FIELD_CHARACTER ),	
-	DEFINE_KEYFIELD( m_NoiseMoving, FIELD_SOUNDNAME, "noise1" ),
-	DEFINE_KEYFIELD( m_NoiseArrived, FIELD_SOUNDNAME, "noise2" ),
+	DEFINE_KEYFIELD( m_NoiseMoving, FIELD_SOUNDNAME, "movesnd" ),
+	DEFINE_KEYFIELD( m_NoiseArrived, FIELD_SOUNDNAME, "stopsnd" ),
 	DEFINE_KEYFIELD( m_NoiseMovingClosed, FIELD_SOUNDNAME, "startclosesound" ),
 	DEFINE_KEYFIELD( m_NoiseArrivedClosed, FIELD_SOUNDNAME, "closesound" ),
 	DEFINE_KEYFIELD( m_ChainTarget, FIELD_STRING, "chainstodoor" ),

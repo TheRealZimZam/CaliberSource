@@ -226,7 +226,7 @@ void CAI_AssaultBehavior::ReceiveAssaultCue( AssaultCue_t cue )
 
 	m_ReceivedAssaultCue = cue;
 
-	SetCondition( COND_PROVOKED );
+	SetCondition( COND_WAY_CLEAR );
 }
 
 //-----------------------------------------------------------------------------
@@ -1174,7 +1174,7 @@ bool CAI_AssaultBehavior::CanSelectSchedule()
 	else if ( m_bDiverting )
 	{
 		// If we were diverting, provoke us to make a new schedule selection
-		SetCondition( COND_PROVOKED );
+		SetCondition( COND_WAY_CLEAR );
 
 		m_bDiverting = false;
 	}
@@ -1645,6 +1645,7 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER(CAI_AssaultBehavior)
 		"	Interrupts"
 		"		COND_HEAR_DANGER"
 		"		COND_PROVOKED"
+		"		COND_WAY_CLEAR"
 		"		COND_NO_PRIMARY_AMMO"
 		"		COND_PLAYER_PUSHING"
 	)
@@ -1690,7 +1691,6 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER(CAI_AssaultBehavior)
 		"		TASK_WAIT_ASSAULT_DELAY					0"
 		"	"
 		"	Interrupts"
-		//"		COND_NEW_ENEMY"
 		"		COND_CAN_RANGE_ATTACK1"
 		"		COND_CAN_MELEE_ATTACK1"
 		"		COND_LIGHT_DAMAGE"

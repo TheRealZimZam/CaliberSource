@@ -28,7 +28,7 @@ string_t MakeButtonSound( int sound );				// get string of button sound number
 #define SF_BUTTON_DAMAGE_ACTIVATES		512		// Button fires when damaged.
 #define SF_BUTTON_USE_ACTIVATES			1024	// Button fires when used.
 #define SF_BUTTON_LOCKED				2048	// Whether the button is initially locked.
-#define	SF_BUTTON_SPARK_IF_OFF			4096	// button sparks in OFF state
+#define	SF_BUTTON_SPARK					4096	// button sparks when pressed, and continues sparking after use
 #define	SF_BUTTON_JIGGLE_ON_USE_LOCKED	8192	// whether to jiggle if someone uses us when we're locked
 
 BEGIN_DATADESC( CBaseButton )
@@ -95,7 +95,7 @@ void CBaseButton::Precache( void )
 		PrecacheScriptSound(m_ls.sUnlockedSound.ToCStr());
 	}
 
-	if (HasSpawnFlags( SF_BUTTON_SPARK_IF_OFF ))
+	if (HasSpawnFlags( SF_BUTTON_SPARK ))
 	{
 		PrecacheScriptSound( "DoSpark" );
 	}
@@ -379,12 +379,6 @@ void CBaseButton::Spawn( )
 
 	Precache();
 
-	if ( HasSpawnFlags( SF_BUTTON_SPARK_IF_OFF ) )// this button should spark in OFF state
-	{
-		SetThink ( &CBaseButton::ButtonSpark );
-		SetNextThink( gpGlobals->curtime + 0.5f );// no hurry, make sure everything else spawns
-	}
-
 	// Convert movedir from angles to a vector
 	QAngle angMoveDir = QAngle( m_vecMoveDir.x, m_vecMoveDir.y, m_vecMoveDir.z );
 	AngleVectors( angMoveDir, &m_vecMoveDir );
@@ -485,12 +479,10 @@ string_t MakeButtonSound( int sound )
 //-----------------------------------------------------------------------------
 // Purpose: Think function that emits sparks at random intervals.
 //-----------------------------------------------------------------------------
-void CBaseButton::ButtonSpark ( void )
+void CBaseButton::ButtonSpark( void )
 {
-	SetThink ( &CBaseButton::ButtonSpark );
-	SetNextThink( gpGlobals->curtime + 0.1 + random->RandomFloat ( 0, 1.5 ) );// spark again at random interval
-
-	DoSpark( this, WorldSpaceCenter(), 1, 1, true, vec3_origin );
+	int Spark = random->RandomInt( 1, 2 );
+	DoSpark( this, WorldSpaceCenter(), Spark, Spark, true, vec3_origin );
 }
 
 
@@ -530,6 +522,11 @@ void CBaseButton::ButtonUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 	{
 		OnUseLocked( pActivator );
 		return;
+	}
+
+	if ( HasSpawnFlags( SF_BUTTON_SPARK ) )// this button should spark in OFF state
+	{
+		ButtonSpark();
 	}
 
 	m_hActivator = pActivator;
@@ -668,7 +665,13 @@ void CBaseButton::ButtonActivate( void )
 
 		EmitSound( filter, entindex(), ep );
 	}
-	
+
+	// reset think for a sparking button
+	if (HasSpawnFlags( SF_BUTTON_SPARK ) )
+	{
+		ButtonSpark();
+	}
+
 	if (!UTIL_IsMasterTriggered(m_sMaster, m_hActivator) || m_bLocked)
 	{
 		// button is locked, play locked sound
@@ -788,13 +791,6 @@ void CBaseButton::ButtonBackHome( void )
 	{
 		// BUGBUG: ALL buttons no longer respond to touch
 		SetTouch ( NULL );
-	}
-
-	// reset think for a sparking button
-	if (HasSpawnFlags( SF_BUTTON_SPARK_IF_OFF ) )
-	{
-		SetThink ( &CBaseButton::ButtonSpark );
-		SetNextThink( gpGlobals->curtime + 0.5f );// no hurry
 	}
 }
 

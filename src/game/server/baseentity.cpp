@@ -2478,7 +2478,6 @@ void CBaseEntity::VPhysicsShadowCollision( int index, gamevcollisionevent_t *pEv
 }
 
 
-
 void CBaseEntity::VPhysicsCollision( int index, gamevcollisionevent_t *pEvent )
 {
 	// filter out ragdoll props hitting other parts of itself too often
@@ -6060,15 +6059,13 @@ void CBaseEntity::RemoveAllDecals( void )
 //-----------------------------------------------------------------------------
 void CBaseEntity::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 {
-	// TODO
-	// Append chapter/day?
-
 	set.AppendCriteria( "randomnum", UTIL_VarArgs("%d", RandomInt(0,100)) );
 	// Append map name
 	set.AppendCriteria( "map", gpGlobals->mapname.ToCStr() );
 	// Append our classname and game name
 	set.AppendCriteria( "classname", GetClassname() );
 	set.AppendCriteria( "name", GetEntityName().ToCStr() );
+	set.AppendCriteria( "water_level", UTIL_VarArgs( "%d", GetWaterLevel() ) );
 
 	// Append our health
 	set.AppendCriteria( "health", UTIL_VarArgs( "%i", GetHealth() ) );
@@ -6078,11 +6075,14 @@ void CBaseEntity::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 	{
 		healthfrac = (float)GetHealth() / (float)GetMaxHealth();
 	}
-
 	set.AppendCriteria( "healthfrac", UTIL_VarArgs( "%.3f", healthfrac ) );
 
-	// Go through all the global states and append them
+#if defined(HL2_DLL)
+	if( hl2_episodic.GetBool() )
+		set.AppendCriteria( "episodic", "1" );
+#endif
 
+	// Go through all the global states and append them
 	for ( int i = 0; i < GlobalEntity_GetNumGlobals(); i++ ) 
 	{
 		const char *szGlobalName = GlobalEntity_GetName(i);
@@ -6092,11 +6092,6 @@ void CBaseEntity::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 
 	// Append anything from I/O or keyvalues pairs
 	AppendContextToCriteria( set );
-
-	if( hl2_episodic.GetBool() )
-	{
-		set.AppendCriteria( "episodic", "1" );
-	}
 
 	// Append anything from world I/O/keyvalues with "world" as prefix
 	CWorld *world = dynamic_cast< CWorld * >( CBaseEntity::Instance( engine->PEntityOfEntIndex( 0 ) ) );

@@ -1542,9 +1542,9 @@ void CPrecipitation::Spawn( void )
 	{
 		SetSolid( SOLID_NONE );							// Remove model & collisions
 	}
-#endif
+#else
 	SetSolid( SOLID_NONE );							// Remove model & collisions
-
+#endif
 	// Default to rain.
 	if ( m_nPrecipType < 0 || m_nPrecipType > NUM_PRECIPITATION_TYPES )
 		m_nPrecipType = PRECIPITATION_TYPE_RAIN;

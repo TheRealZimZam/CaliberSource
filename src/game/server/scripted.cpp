@@ -119,6 +119,9 @@ END_DATADESC()
 
 
 LINK_ENTITY_TO_CLASS( scripted_sequence, CAI_ScriptedSequence );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( aiscripted_sequence, CAI_ScriptedSequence );
+#endif
 #define CLASSNAME "scripted_sequence"
 
 //-----------------------------------------------------------------------------

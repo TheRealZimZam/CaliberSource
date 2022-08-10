@@ -2771,9 +2771,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 			break;
 		}
 	case TASK_SOUND_ANGRY:
-		{
-			// sounds are complete as soon as we get here, cause we've already played them.
-		//	DevMsg( 2, "SOUND\n" );		
+		{	
 			AngrySound();			
 			TaskComplete();
 			break;
@@ -3102,6 +3100,7 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 	
 	case TASK_FALL_TO_GROUND:
 		// Set a wait time to try to force a ground ent.
+		// TODO; This time should be based on distance to ground
 		SetWait(4);
 		break;
 		
@@ -3210,6 +3209,17 @@ void CAI_BaseNPC::RunDieTask()
 		}
 		else // !!!HACKHACK - put NPC in a thin, wide bounding box until we fix the solid type/bounding volume problem
 			UTIL_SetSize ( this, WorldAlignMins(), Vector ( WorldAlignMaxs().x, WorldAlignMaxs().y, WorldAlignMins().z + 1 ) );
+
+		if ( ShouldFadeOnDeath() )
+		{
+			// this monster was created by a monstermaker... fade the corpse out.
+			SUB_StartFadeOut();
+		}
+		else
+		{
+			// body is gonna be around for a while... brutal
+			CSoundEnt::InsertSound(SOUND_CARCASS, GetAbsOrigin(), 384, 30 );
+		}
 	}
 }
 
@@ -4159,6 +4169,10 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 	case TASK_FALL_TO_GROUND:
 		if ( GetFlags() & FL_ONGROUND )
 		{
+			if ( SelectWeightedSequence( ACT_LAND ) != ACTIVITY_NOT_AVAILABLE )
+			{
+				SetActivity( ACT_LAND );
+			}
 			TaskComplete();
 		}
 		else if( GetFlags() & FL_FLY )
@@ -4185,14 +4199,16 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 				{
 					// Found something!
 					SetGroundEntity( trace.m_pEnt );
+					SetIdealActivity( ACT_LAND );
 					TaskComplete();
 				}
 				else
 				{
 					// Try again in a few seconds.
-					SetWait(4);
+					SetWait(1);
 				}
 			}
+			SetIdealActivity( ACT_FALL );
 		}
 		break;
 
@@ -4507,14 +4523,6 @@ int CAI_BaseNPC::SelectAlertSchedule()
 //!		return SCHED_ALERT_SCAN;
 	}
 
-#if 0
-	if ( IsPlayerAlly() )
-	{
-		if ( HasCondition( COND_HEAR_COMBAT ) )	//|| HasCondition ( COND_HEAR_BULLET_IMPACT )
-			return SCHED_ALERT_REACT_TO_COMBAT_SOUND;	//Currently (8/9/2020) a clone of ALERT_FACE_BESTSOUND
-	}
-#endif
-
 	if ( HasCondition(COND_LIGHT_DAMAGE) ||
 		 HasCondition(COND_HEAVY_DAMAGE) )
 	{
@@ -4654,15 +4662,7 @@ int CAI_BaseNPC::SelectCombatSchedule()
 
 	// I can see the enemy
 	if ( HasCondition(COND_CAN_RANGE_ATTACK1) )
-	{
-#if 0
-		if ( !UseAttackSquadSlots() || OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
-			return SCHED_RANGE_ATTACK1;
-		return SCHED_COMBAT_FACE;
-#endif
-		//^^ This shouldnt be present in basenpc, leave this for the childclasses to decide
 		return SCHED_RANGE_ATTACK1;
-	}
 
 	if ( HasCondition(COND_CAN_RANGE_ATTACK2) )
 		return SCHED_RANGE_ATTACK2;
@@ -4694,7 +4694,7 @@ int CAI_BaseNPC::SelectCombatSchedule()
 	}
 
 	DevWarning( 2, "No suitable combat schedule!\n" );
-	return SCHED_FAIL;
+	return SCHED_FAIL;	//SCHED_COMBAT_STAND
 }
 
 

@@ -27,23 +27,25 @@ enum
 enum
 {
 	SOUND_NONE				= 0,
-	SOUND_COMBAT			= 0x00000001,
-	SOUND_WORLD				= 0x00000002,
-	SOUND_PLAYER			= 0x00000004,
-	SOUND_DANGER			= 0x00000008,
-	SOUND_BULLET_IMPACT		= 0x00000010,
-	SOUND_CARCASS			= 0x00000020,
+
+	SOUND_COMBAT			= 0x00000001, // Combat sounds (gunfire, explosions, etc.)
+	SOUND_WORLD				= 0x00000002, // World objects
+	SOUND_PLAYER			= 0x00000004, // Player footsteps
+	SOUND_DANGER			= 0x00000008, // Something dangerous (grenades, explosive wobjects, etc.)
+	SOUND_BULLET_IMPACT		= 0x00000010, // Bullet/weapon impact
+	SOUND_CARCASS			= 0x00000020, // Corpse
 	SOUND_MEAT				= 0x00000040,
 	SOUND_GARBAGE			= 0x00000080,
 	SOUND_THUMPER			= 0x00000100, // keeps certain creatures at bay
 	SOUND_BUGBAIT			= 0x00000200, // gets the antlion's attention
-	SOUND_PHYSICS_DANGER	= 0x00000400,
+	SOUND_PHYSICS_DANGER	= 0x00000400, // Dangerous prop
 	SOUND_DANGER_SNIPERONLY	= 0x00000800, // only scares the sniper NPC.
-	SOUND_MOVE_AWAY			= 0x00001000,
-	SOUND_PLAYER_VEHICLE	= 0x00002000,
+	SOUND_MOVE_AWAY			= 0x00001000, // World Danger (fires, traps, etc.)
+	SOUND_VEHICLE			= 0x00002000, // Vehicle Danger
 	SOUND_READINESS_LOW		= 0x00004000, // Changes listener's readiness (Player Companion only)
 	SOUND_READINESS_MEDIUM	= 0x00008000,
 	SOUND_READINESS_HIGH	= 0x00010000,
+	SOUND_WEAPON			= 0x00020000, // Weapon sounds (reloading, bulletcasings, etc.)
 
 	// Contexts begin here.
 	SOUND_CONTEXT_FROM_SNIPER		= 0x00100000, // additional context for SOUND_DANGER

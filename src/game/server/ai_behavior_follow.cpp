@@ -1105,7 +1105,7 @@ int CAI_FollowBehavior::SelectSchedule()
 			if ( result != SCHED_NONE )
 				return result;
 				
-			if ( HasCondition ( COND_NO_PRIMARY_AMMO ) && HaveSequenceForActivity( GetOuter()->TranslateActivity( ACT_RUN_AIM ) ) )
+			if ( HasCondition( COND_NO_PRIMARY_AMMO ) && HaveSequenceForActivity( GetOuter()->TranslateActivity( ACT_RUN_AIM ) ) )
 				return SCHED_HIDE_AND_RELOAD;
 		}
 
@@ -2229,20 +2229,20 @@ static AI_FollowSlot_t g_SimpleFollowFormationSlots[] =
 {
 	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
 	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 112, 152, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 112, 152, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 112, 152, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 112, 152, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 180, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 180, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 180, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 180, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 200, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 200, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 200, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 200, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 200, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 128, 200, -1, 112 },
 };
 
 static AI_FollowFormation_t g_SimpleFollowFormation = 
@@ -2301,15 +2301,15 @@ static AI_FollowFormation_t g_WideFollowFormation =
 
 //-------------------------------------
 // Tight wedge
-#define COMMANDER_TOLERANCE (13.0 * 1.415)
+#define COMMANDER_TOLERANCE 16	//13.0 * 1.415
 
 static AI_FollowSlot_t g_CommanderFollowFormationSlots[] = 
 {
 	{ 2, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
-	{ 1, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
+	{ 1, { 0, -COMMANDER_TOLERANCE, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
+	{ 1, { 0, COMMANDER_TOLERANCE, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
+	{ 1, { -COMMANDER_TOLERANCE, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
+	{ 1, { COMMANDER_TOLERANCE, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
 };
 
 static AI_FollowFormation_t g_CommanderFollowFormation = 
@@ -2317,11 +2317,11 @@ static AI_FollowFormation_t g_CommanderFollowFormation =
 	"Commander",
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_CommanderFollowFormationSlots),
-	168,						// followPointTolerance
+	144,						// followPointTolerance
 	8,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	16,							// walkTolerance
-	300,						// coverTolerance
+	400,						// coverTolerance
 	300,						// enemyLOSTolerance
 	300,						// chaseEnemyTolerance
 	g_CommanderFollowFormationSlots,

@@ -365,6 +365,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\ai_behavior_actbusy.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ai_behavior_actbusy.h"
+				>
+			</File>
+			<File
 				RelativePath=".\ai_behavior_assault.cpp"
 				>
 			</File>
@@ -1605,6 +1613,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\func_pendulum.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\func_reflective_glass.cpp"
 				>
 			</File>
@@ -1826,6 +1838,10 @@
 			</File>
 			<File
 				RelativePath="..\shared\hintsystem.h"
+				>
+			</File>
+			<File
+				RelativePath=".\hl1_ents.cpp"
 				>
 			</File>
 			<File
@@ -2154,6 +2170,10 @@
 			</File>
 			<File
 				RelativePath="..\shared\multiplay_gamerules.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\multiplayer_animstate.cpp"
 				>
 			</File>
 			<File
@@ -3520,14 +3540,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\ai_behavior_actbusy.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\ai_behavior_actbusy.h"
-					>
-				</File>
-				<File
 					RelativePath=".\hl2\ai_behavior_functank.cpp"
 					>
 				</File>
@@ -3633,6 +3645,14 @@
 				</File>
 				<File
 					RelativePath=".\hl2\ar2_explosion.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\assassin_smoke.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\assassin_smoke.h"
 					>
 				</File>
 				<File
@@ -3857,6 +3877,14 @@
 				</File>
 				<File
 					RelativePath=".\hl2\grenade_satchel.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\grenade_shrapnel.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\grenade_shrapnel.h"
 					>
 				</File>
 				<File
@@ -4160,10 +4188,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\npc_franz.cpp"
-					>
-				</File>
-				<File
 					RelativePath=".\hl2\npc_gman.cpp"
 					>
 				</File>
@@ -4257,10 +4281,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\npc_scanner.h"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\npc_south.cpp"
 					>
 				</File>
 				<File
@@ -4405,6 +4425,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\weapon_357.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_45.cpp"
 					>
 				</File>
 				<File
@@ -4579,6 +4603,14 @@
 						>
 					</File>
 					<File
+						RelativePath=".\episodic\grenade_hopwire.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\episodic\grenade_hopwire.h"
+						>
+					</File>
+					<File
 						RelativePath=".\hl2\grenade_pathfollower.cpp"
 						>
 					</File>
@@ -4623,10 +4655,22 @@
 						>
 					</File>
 					<File
+						RelativePath=".\episodic\weapon_hopwire.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\episodic\weapon_proto1.cpp"
+						>
+					</File>
+					<File
 						RelativePath=".\hl2\weapon_sniperrifle.cpp"
 						>
 					</File>
 				</Filter>
+			</Filter>
+			<Filter
+				Name="Multiplayer"
+				>
 			</Filter>
 		</Filter>
 		<Filter
@@ -5158,6 +5202,10 @@
 			</File>
 			<File
 				RelativePath="..\shared\mp_shareddefs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\multiplayer_animstate.h"
 				>
 			</File>
 			<File

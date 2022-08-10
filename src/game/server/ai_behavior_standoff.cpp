@@ -2,8 +2,7 @@
 //
 // Purpose: Combat behaviors for AIs in a relatively self-preservationist mode.
 //			Lots of cover taking and attempted shots out of cover.
-// TODO's: Add compatibility with HINT_TACTICAL_COVER_MED (currently only supports LOW)
-// Possibily also incorporate HINT_TACTICAL_ENEMY_DISADVANTAGED, say, encourage more shooting
+// TODO's: Possibily incorporate HINT_TACTICAL_ENEMY_DISADVANTAGED, say, encourage more shooting
 // when the player is near such a hint (use a modifer on the base values, like x2, etc.)
 //
 //=============================================================================//
@@ -524,7 +523,6 @@ int CAI_StandoffBehavior::SelectScheduleCheckCover( void )
 			SetPosture( AIP_CROUCHING );
 		else
 			SetPosture( AIP_STANDING );
-		// Add another IF for cover_med once other fixing has been done
 
 		if ( random->RandomInt(0,99) < 80 )
 			SetReuseCurrentCover();
@@ -1074,7 +1072,7 @@ void CAI_StandoffBehavior::UnlockHintNode()
 Activity CAI_StandoffBehavior::GetCoverActivity()
 {
 	CAI_Hint *pHintNode = GetHintNode();
-	if ( pHintNode && pHintNode->HintType() == HINT_TACTICAL_COVER_LOW )
+	if ( pHintNode && pHintNode->HintType() == (HINT_TACTICAL_COVER_LOW|HINT_TACTICAL_COVER_MED) )
 		return GetOuter()->GetCoverActivity( pHintNode );
 	return ACT_INVALID;
 }
@@ -1095,6 +1093,7 @@ void CAI_MappedActivityBehavior_Temporary::UpdateTranslateActivityMap()
 {
 	AI_ActivityMapping_t mappings[] =		// This array cannot be static, as some activity values are set on a per-map-load basis
 	{
+		{	AIP_STANDING,	ACT_RELOAD,				NULL, 				ACT_RELOAD_LOW, 			},
 		{	AIP_CROUCHING, 	ACT_IDLE, 				NULL, 				ACT_COVER_LOW, 				},
 		{	AIP_CROUCHING, 	ACT_IDLE_ANGRY,			NULL, 				ACT_COVER_LOW, 				},
 		{	AIP_CROUCHING, 	ACT_WALK, 				NULL, 				ACT_WALK_CROUCH, 			},
@@ -1102,9 +1101,7 @@ void CAI_MappedActivityBehavior_Temporary::UpdateTranslateActivityMap()
 		{	AIP_CROUCHING, 	ACT_WALK_AIM, 			NULL, 				ACT_WALK_CROUCH_AIM, 		},
 		{	AIP_CROUCHING, 	ACT_RUN_AIM, 			NULL, 				ACT_RUN_CROUCH_AIM, 		},
 		{	AIP_CROUCHING,	ACT_RELOAD,				NULL, 				ACT_RELOAD_LOW,				},
-		{	AIP_CROUCHING,	ACT_RANGE_ATTACK_SMG1,	NULL,				ACT_RANGE_ATTACK_SMG1_LOW,	},
-		{	AIP_CROUCHING,	ACT_RANGE_ATTACK_AR2,	NULL,				ACT_RANGE_ATTACK_AR2_LOW,	},
-		//----
+		{	AIP_CROUCHING,	ACT_RANGE_ATTACK1,		NULL, 				ACT_RANGE_ATTACK1_LOW,		},
 		{	AIP_PEEKING, 	ACT_IDLE,				NULL,				ACT_RANGE_AIM_LOW,			},
 		{	AIP_PEEKING, 	ACT_IDLE_ANGRY,			NULL,				ACT_RANGE_AIM_LOW,			},
 		{	AIP_PEEKING, 	ACT_COVER_LOW,			NULL,				ACT_RANGE_AIM_LOW,			},
@@ -1208,11 +1205,11 @@ AI_StandoffParams_t g_StandoffParamsByAgression[] =
 	{ 	AIHCR_MOVE_ON_COVER,	true,			true, 			4.0, 			8.0, 			2, 			4, 			75,			false,	30 		},	// AGGR_VERY_LOW
 	{ 	AIHCR_MOVE_ON_COVER,	true,			true, 			2.0, 			5.0, 			2, 			5, 			50,			false, 	20		},	// AGGR_LOW
 	{ 	AIHCR_MOVE_ON_COVER,	true,			true, 			0.6, 			2.5, 			3, 			6, 			25,			false, 	10		},	// AGGR_MEDIUM
-	{ 	AIHCR_MOVE_ON_COVER,	true,			true, 			0.2, 			1.5, 			5, 			8, 			10,			false, 	10		},	// AGGR_HIGH
-	{ 	AIHCR_MOVE_IMMEDIATE,	false,			true, 			0, 				0, 				100,		100, 		0,			false, 	5		},	// AGGR_VERY_HIGH
+	{ 	AIHCR_MOVE_IMMEDIATE,	true,			true, 			0.2, 			1.5, 			5, 			8, 			10,			false, 	10		},	// AGGR_HIGH
+	{ 	AIHCR_MOVE_IMMEDIATE,	false,			true, 			0, 				0.6, 			100,		100, 		0,			false, 	5		},	// AGGR_VERY_HIGH
 };
 
-// AI_DEFAULT_STANDOFF_PARAMS = { AIHCR_MOVE_ON_COVER, true, 1.5, 2.5, 1, 3, 25, 0 };
+// default params = { AIHCR_MOVE_ON_COVER, true, 1.5, 2.5, 1, 3, 25, 0 };
 //-------------------------------------
 
 class CAI_StandoffGoal : public CAI_GoalEntity

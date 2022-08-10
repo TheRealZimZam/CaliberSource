@@ -687,7 +687,7 @@ void CRagdollProp::InitRagdoll( const Vector &forceVector, int forceBone, const 
 	SetMoveType( MOVETYPE_VPHYSICS );
 	SetSolid( SOLID_VPHYSICS );
 	AddSolidFlags( FSOLID_CUSTOMRAYTEST | FSOLID_CUSTOMBOXTEST );
-	m_takedamage = DAMAGE_EVENTS_ONLY;
+	m_takedamage = DAMAGE_EVENTS_ONLY;	//DAMAGE_EVENTS_ONLY
 
 	ragdollparams_t params;
 	params.pGameData = static_cast<void *>( static_cast<CBaseEntity *>(this) );
@@ -787,12 +787,13 @@ void CRagdollProp::SetDamageEntity( CBaseEntity *pEntity )
 //-----------------------------------------------------------------------------
 int	CRagdollProp::OnTakeDamage( const CTakeDamageInfo &info )
 {
+	CTakeDamageInfo subInfo = info;
+
 	// If we have a damage entity, we want to pass damage to it. Add the
 	// Never Ragdoll flag, on the assumption that if the entity dies, we'll
 	// actually be taking the role of its ragdoll.
 	if ( m_hDamageEntity.Get() )
 	{
-		CTakeDamageInfo subInfo = info;
 		subInfo.AddDamageType( DMG_REMOVENORAGDOLL );
 		return m_hDamageEntity->OnTakeDamage( subInfo );
 	}

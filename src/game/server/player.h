@@ -14,6 +14,7 @@
 #include "usercmd.h"
 #include "playerlocaldata.h"
 #include "PlayerState.h"
+#include "base_playeranimstate.h"
 #include "game/server/iplayerinfo.h"
 #include "hintsystem.h"
 #include "SoundEmitterSystem/isoundemittersystembase.h"
@@ -244,7 +245,13 @@ public:
 	IBotController *GetBotController() { return &m_PlayerInfo; }
 
 	virtual void			SetModel( const char *szModelName );
+	void					SetAimYaw( float flYaw );
+	void					SetAimPitch( float flPitch );
+	void					SetBodyYaw( float flYaw );
 	void					SetBodyPitch( float flPitch );
+
+	void					SetAimTime( float Time )	{ m_flAimTime = gpGlobals->curtime + Time; }
+	bool					IsAiming()	{ if (m_flAimTime > gpGlobals->curtime) {return true;} return false; }
 
 	virtual void			UpdateOnRemove( void );
 
@@ -315,6 +322,7 @@ public:
 	virtual int				OnTakeDamage( const CTakeDamageInfo &info );
 	virtual void			DamageEffect(float flDamage, int fDamageType);
 	virtual void			Cough( int CoughType );
+	void					ToggleHeartbeat( void );
 
 	virtual void			OnDamagedByExplosion( const CTakeDamageInfo &info );
 
@@ -822,6 +830,8 @@ public:
 private:
 
 	Activity				m_Activity;
+	
+	CBasePlayerAnimState	*m_PlayerAnimState;
 
 protected:
 
@@ -1002,7 +1012,7 @@ private:
 	int						m_nDrownDmgRate;		// Drowning damage in points per second without air.
 
 	int						m_nNumCrouches;			// Number of times we've crouched (for hinting)
-	bool					m_bDuckToggled;		// If true, the player is crouching via a toggle
+	bool					m_bDuckToggled;			// If true, the player is crouching via a toggle
 
 public:
 	bool					GetToggledDuckState( void ) { return m_bDuckToggled; }
@@ -1035,6 +1045,7 @@ private:
 	float					m_flOldPlayerViewOffsetZ;
 
 	bool					m_bPlayerUnderwater;
+	bool					m_bPlayerHeartbeat;			// Heartbeat sound
 
 	EHANDLE					m_hViewEntity;
 
@@ -1082,7 +1093,11 @@ protected:
 	int		m_nVehicleViewSavedFrame;	// Used to mark which frame was the last one the view was calculated for
 
 	Vector m_vecPreviouslyPredictedOrigin; // Used to determine if non-gamemovement game code has teleported, or tweaked the player's origin
+	int		m_nAimYawPoseParam;
+	int		m_nAimPitchPoseParam;
+	int		m_nBodyYawPoseParam;
 	int		m_nBodyPitchPoseParam;
+	float	m_flAimTime;				// Time to stay aimed after shooting
 
 	// last known navigation area of player - NULL if unknown
 	CNavArea *m_lastNavArea;

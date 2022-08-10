@@ -170,6 +170,8 @@ ConVar	sk_player_stomach( "sk_player_stomach","1" );
 ConVar	sk_player_arm( "sk_player_arm","1" );
 ConVar	sk_player_leg( "sk_player_leg","1" );
 
+ConVar	sk_player_critical_health( "sk_player_critical_health","25", FCVAR_CHEAT);
+
 ConVar  player_debug_print_damage( "player_debug_print_damage", "0", FCVAR_CHEAT, "When true, print amount and type of all damage received by player to console." );
 
 
@@ -294,6 +296,7 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_flSwimTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flDuckTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flDuckJumpTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flAimTime,	FIELD_TIME ),
 
 	DEFINE_FIELD( m_flSuitUpdate, FIELD_TIME ),
 	DEFINE_AUTO_ARRAY( m_rgSuitPlayList, FIELD_INTEGER ),
@@ -394,6 +397,7 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_flOldPlayerZ, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flOldPlayerViewOffsetZ, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bPlayerUnderwater, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bPlayerHeartbeat, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_hViewEntity, FIELD_EHANDLE ),
 
 	DEFINE_FIELD( m_hConstraintEntity, FIELD_EHANDLE ),
@@ -599,7 +603,11 @@ CBasePlayer::CBasePlayer( )
 	m_afButtonDisabled = 0;
 	m_afButtonForced = 0;
 
+	m_nAimYawPoseParam = -1;
+	m_nAimPitchPoseParam = -1;
+	m_nBodyYawPoseParam = -1;
 	m_nBodyPitchPoseParam = -1;
+	m_flAimTime	= 0;
 	m_flForwardMove = 0;
 	m_flSideMove = 0;
 }
@@ -943,68 +951,71 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 //------------------------------------------------------------------------------
 void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 {
-	// TODO; Maybe a switch??
-	if ( fDamageType & DMG_BULLET )
+	color32 red = {128,0,0,100};
+	color32 blue = {0,0,128,50};
+	color32 green = {0,128,0,50};
+	color32 white = {255,225,205,100};
+	switch ( fDamageType )
 	{
+	case DMG_BULLET:
 		EmitSound( "Player.BulletImpact" );
-	}
-	else if (fDamageType & DMG_CRUSH)
-	{
+		break;
+	case DMG_CRUSH:
+	case DMG_BURN:
 		//Red damage indicator
-		color32 red = {128,0,0,100};
-		UTIL_ScreenFade( this, red, 1.0f, 0.1f, FFADE_IN );
-	}
-	else if (fDamageType & DMG_DROWN)
-	{
+		UTIL_ScreenFade( this, red, 0.2f, 0.4f, FFADE_IN );
+		break;
+	case DMG_DROWN:
 		//Blue damage indicator
-		color32 blue = {0,0,128,100};
 		UTIL_ScreenFade( this, blue, 1.0f, 0.1f, FFADE_IN );
-	}
-	else if (fDamageType & DMG_SLASH)
-	{
-		// If slash damage shoot some blood
+		break;
+	case DMG_SLASH:
+		// If slash damage shoot some extra blood
 		SpawnBlood(EyePosition(), g_vecAttackDir, BloodColor(), flDamage);
-	}
-	else if (fDamageType & DMG_PLASMA)
-	{
+		break;
+	case DMG_PLASMA:
 		// Blue screen fade
-		color32 blue = {0,0,255,100};
-		UTIL_ScreenFade( this, blue, 0.2, 0.4, FFADE_MODULATE );
-
+		UTIL_ScreenFade( this, blue, 0.2f, 0.4f, FFADE_MODULATE );
 		// Very small screen shake
 		UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 0.5, 1000, SHAKE_START, false );
-
 		// Burn sound 
 		EmitSound( "Player.PlasmaDamage" );
-	}
-	else if (fDamageType & DMG_SHOCK)
-	{
-		// Blue screen fade
-		color32 blue = {0,0,128,50};
-		UTIL_ScreenFade( this, blue, 0.2, 0.2, FFADE_MODULATE );
-
+		break;
+	case DMG_SHOCK:
+		// Blue indicator
+		UTIL_ScreenFade( this, blue, 0.2f, 0.2f, FFADE_IN );
 		// Very small screen shake
 		UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 1.0, 1000, SHAKE_START, false );
-	}
-	else if (fDamageType & DMG_POISON)
-	{
-		// Greenish screen fade
-		color32 green = {0,128,0,50};
-		UTIL_ScreenFade( this, green, 0.2, 0.4, FFADE_MODULATE );
-
+		break;
+	case DMG_POISON:
+		// Greenish indicator
+		UTIL_ScreenFade( this, green, 0.2f, 0.4f, FFADE_MODULATE );
 		Cough( 2 );
-	}
-	else if (fDamageType & DMG_ACID)
-	{
+		break;
+	case DMG_ACID:
 		// Blur screen abit
-		
+		UTIL_ScreenFade( this, green, 0.2f, 0.4f, FFADE_MODULATE );
+		break;
+	case DMG_SONIC:
+		// Blinded
+		if ( flDamage > 1 )
+		{
+			UTIL_ScreenFade( this, white, 0.2f, 1.0f, FFADE_IN );
+			// Sonic damage sound
+			EmitSound( "Player.SonicDamage" );
+			if ( flDamage > 2 )
+			{
+				UTIL_ScreenFade( this, white, 0.2f, 5.0f, FFADE_IN );
+			}
+		}
+		break;
+	default:
+		break;
 	}
-	else if (fDamageType & DMG_SONIC)
+	if (flDamage > 20 || m_iHealth < sk_player_critical_health.GetInt())
 	{
-		// Blur screen abit
-
-		// Sonic damage sound
-		EmitSound( "Player.SonicDamage" );
+		//Red damage indicator
+		UTIL_ScreenFade( this, red, 1.0f, 0.1f, FFADE_IN );
 	}
 }
 
@@ -1029,6 +1040,24 @@ void CBasePlayer::Cough( int CoughType )
 		break;
 	default:
 		break;
+	}
+}
+
+//------------------------------------------------------------------------------
+// Purpose : Toggle heartbeat sound for low health
+//------------------------------------------------------------------------------
+void CBasePlayer::ToggleHeartbeat( void )
+{
+	if ( !m_bPlayerHeartbeat )
+	{
+		CPASAttenuationFilter filter( this );
+		EmitSound( filter, this->entindex(), "Player.Heartbeat" ); 
+		m_bPlayerHeartbeat = true;
+	}
+	else if ( m_bPlayerHeartbeat )
+	{
+		StopSound( entindex(), "Player.Heartbeat" );
+		m_bPlayerHeartbeat = false;
 	}
 }
 
@@ -1248,8 +1277,9 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	// Display any effect associate with this damage type
 	DamageEffect(info.GetDamage(),bitsDamage);
 
+#ifdef HL2_DLL
 	// how bad is it, doc?
-	ftrivial = (m_iHealth > 75 || m_lastDamageAmount < 5);
+	ftrivial = (m_iHealth > 90 || m_lastDamageAmount < 5);
 	fmajor = (m_lastDamageAmount > 25);
 	fcritical = (m_iHealth < 30);
 
@@ -1268,7 +1298,6 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	m_bitsDamageType |= bitsDamage; // Save this so we can report it to the client
 	m_bitsHUDDamage = -1;  // make sure the damage bits get resent
 
-#ifdef HL2_DLL
 	while (fTookDamage && (!ftrivial || g_pGameRules->Damage_IsTimeBased( bitsDamage ) ) && ffound && bitsDamage)
 	{
 		ffound = false;
@@ -1377,7 +1406,11 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	float flPunch = RandomFloat( -3, -4 );
 
 	if( info.GetDamage() > 15.0f )
+	{
+		RestartGesture( ACT_GESTURE_BIG_FLINCH );
+//!		DoAnimationEvent( PLAYERANIMEVENT_FLINCH_CHEST );
 		flPunch = -6;
+	}
 
 	if( hl2_episodic.GetBool() && info.GetAttacker() && !FInViewCone( info.GetAttacker() ) )
 	{
@@ -1385,9 +1418,18 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 			flPunch = -12;
 		else
 			flPunch = RandomFloat( -7, -10 );
+
+		RestartGesture( ACT_GESTURE_SMALL_FLINCH );
+//!		DoAnimationEvent( PLAYERANIMEVENT_FLINCH_CHEST );
 	}
 
 	m_Local.m_vecPunchAngle.SetX( flPunch );
+
+	// Do special explosion damage effect
+	if ( bitsDamage & DMG_BLAST )
+	{
+		OnDamagedByExplosion( info );
+	}
 
 #ifdef HL2_DLL
 	if (fTookDamage && !ftrivial && fmajor && flHealthPrev >= 75) 
@@ -1425,12 +1467,6 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 				SetSuitUpdate("!HEV_HLTH1", false, SUIT_NEXT_IN_10MIN);	// health dropping
 		}
 #endif
-
-	// Do special explosion damage effect
-	if ( bitsDamage & DMG_BLAST )
-	{
-		OnDamagedByExplosion( info );
-	}
 
 	return fTookDamage;
 }
@@ -1670,9 +1706,17 @@ int CBasePlayer::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	}
 	
 	// Insert a combat sound so that nearby NPCs hear battle
+#if 0
 	if ( attacker->IsNPC() )
 	{
 		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 512, 0.5, this );//<<TODO>>//magic number
+	}
+#endif
+
+	if ( m_iHealth <= (sk_player_critical_health.GetInt() - 5) )
+	{
+		if ( !m_bPlayerHeartbeat )
+			ToggleHeartbeat();
 	}
 
 	return 1;
@@ -1691,8 +1735,6 @@ void CBasePlayer::Event_Killed( const CTakeDamageInfo &info )
 	g_pGameRules->PlayerKilled( this, info );
 
 	gamestats->Event_PlayerKilled( this, info );
-
-	RumbleEffect( RUMBLE_STOP_ALL, 0, RUMBLE_FLAGS_NONE );
 
 	ClearUseEntity();
 	
@@ -1716,6 +1758,11 @@ void CBasePlayer::Event_Killed( const CTakeDamageInfo &info )
 	{
 		GetActiveWeapon()->Holster();
 	}
+
+	RumbleEffect( RUMBLE_STOP_ALL, 0, RUMBLE_FLAGS_NONE );
+	color32 red = {150,0,0,128};
+	UTIL_ScreenFade( this, red, 4.0, 0.4f, FFADE_IN );
+	UTIL_ScreenFade( this, red, 2.0f, 0.2f, FFADE_IN );
 
 	SetAnimation( PLAYER_DIE );
 
@@ -1745,6 +1792,9 @@ void CBasePlayer::Event_Killed( const CTakeDamageInfo &info )
 	{
 		 FlashlightTurnOff();
 	}
+
+	if ( m_bPlayerHeartbeat )
+		ToggleHeartbeat();
 
 	m_flDeathTime = gpGlobals->curtime;
 
@@ -1788,11 +1838,16 @@ void CBasePlayer::Event_Dying()
 void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 {
 	int animDesired;
-	char szAnim[64];
+
+//	char szAnim[64];
 
 	float speed;
-
 	speed = GetAbsVelocity().Length2D();
+#if 0
+	bool bAiming = false;
+	if ( m_flAimTime > gpGlobals->curtime )
+		bAiming = true;
+#endif
 
 	if (GetFlags() & (FL_FROZEN|FL_ATCONTROLS))
 	{
@@ -1800,12 +1855,12 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 		playerAnim = PLAYER_IDLE;
 	}
 
-	Activity idealActivity = ACT_WALK;// TEMP!!!!!
+	Activity idealActivity = ACT_IDLE;
 
 	// This could stand to be redone. Why is playerAnim abstracted from activity? (sjb)
 	if (playerAnim == PLAYER_JUMP)
 	{
-		idealActivity = ACT_HOP;
+		idealActivity = ACT_JUMP;	//ACT_HOP
 	}
 	else if (playerAnim == PLAYER_SUPERJUMP)
 	{
@@ -1818,110 +1873,90 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 			idealActivity = GetDeathActivity();
 		}
 	}
+	else if (playerAnim == PLAYER_IDLE || playerAnim == PLAYER_WALK)
+	{
+		idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_WALK_AIM ) : Weapon_TranslateActivity( ACT_WALK );
+
+		if ( !( GetFlags() & FL_ONGROUND ) && (m_Activity == ACT_JUMP || m_Activity == ACT_LEAP) )	// Still jumping
+		{
+			idealActivity = m_Activity;
+		}
+		else if ( speed < 1 )	//Very slow move/being slightly pushed while idle
+		{
+			idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_IDLE_ANGRY ) : Weapon_TranslateActivity( ACT_IDLE );
+			if ( GetWaterLevel() > 1 || GetFlags() & FL_FLY )
+			{
+				idealActivity = ACT_HOVER;
+			}
+		}
+		else if ( GetFlags() & FL_DUCKING )	// crouching
+		{
+			idealActivity = Weapon_TranslateActivity( ACT_CROUCHIDLE );
+			if ( speed > 1 )
+			{
+				idealActivity = Weapon_TranslateActivity( ACT_WALK_CROUCH );
+			}
+		}
+		else
+		{
+			if ( GetWaterLevel() > 1 )
+			{
+				idealActivity = ACT_SWIM;
+			}
+			if ( m_iHealth < sk_player_critical_health.GetInt() )
+			{
+				idealActivity = ACT_WALK_HURT;
+			}
+			if ( speed > 160.0 )
+			{
+				// Jogging
+				idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_RUN_AIM ) : Weapon_TranslateActivity( ACT_RUN );
+				if ( speed > 240.0 )
+				{
+					// Full sprint
+					idealActivity = Weapon_TranslateActivity( ACT_SPRINT );
+				}
+			}
+		}
+	}
 	else if (playerAnim == PLAYER_ATTACK1)
 	{
 		if ( m_Activity == ACT_HOVER	|| 
 			 m_Activity == ACT_SWIM		||
-			 m_Activity == ACT_HOP		||
+			 m_Activity == ACT_JUMP		||
 			 m_Activity == ACT_LEAP		||
 			 m_Activity == ACT_DIESIMPLE )
 		{
 			idealActivity = m_Activity;
 		}
-		else
+		else if ( speed < 1 )
 		{
-			idealActivity = ACT_RANGE_ATTACK1;
+			idealActivity = Weapon_TranslateActivity( ACT_RANGE_ATTACK1 );
+			if ( IsDucked() )
+				idealActivity = Weapon_TranslateActivity( ACT_RANGE_ATTACK1_LOW );
 		}
+
+		if ( gpGlobals->curtime + m_flAimTime < 1 )
+			SetAimTime( 1.0f );
 	}
-	else if (playerAnim == PLAYER_IDLE || playerAnim == PLAYER_WALK)
+	else if (playerAnim == PLAYER_RELOAD)
 	{
-		if ( !( GetFlags() & FL_ONGROUND ) && (m_Activity == ACT_HOP || m_Activity == ACT_LEAP) )	// Still jumping
-		{
-			idealActivity = m_Activity;
-		}
-		else if ( GetWaterLevel() > 1 )
-		{
-			if ( speed == 0 )
-				idealActivity = ACT_HOVER;
-			else
-				idealActivity = ACT_SWIM;
-		}
-		else
-		{
-			idealActivity = ACT_WALK;
-		}
-	}
+		idealActivity = Weapon_TranslateActivity( ACT_RELOAD );
+		if ( IsDucked() )
+			idealActivity = Weapon_TranslateActivity( ACT_RELOAD_LOW );
 
-	
-	if (idealActivity == ACT_RANGE_ATTACK1)
+	}
+	else if (playerAnim == PLAYER_IN_VEHICLE)
 	{
-		if ( GetFlags() & FL_DUCKING )	// crouching
-		{
-			Q_strncpy( szAnim, "crouch_shoot_" ,sizeof(szAnim));
-		}
-		else
-		{
-			Q_strncpy( szAnim, "ref_shoot_" ,sizeof(szAnim));
-		}
-		Q_strncat( szAnim, m_szAnimExtension ,sizeof(szAnim), COPY_ALL_CHARACTERS );
-		animDesired = LookupSequence( szAnim );
-		if (animDesired == -1)
-			animDesired = 0;
-
-		if ( GetSequence() != animDesired || !SequenceLoops() )
-		{
-			SetCycle( 0 );
-		}
-
-		// Tracker 24588:  In single player when firing own weapon this causes eye and punchangle to jitter
-		//if (!SequenceLoops())
-		//{
-		//	AddEffects( EF_NOINTERP );
-		//}
-
-		SetActivity( idealActivity );
-		ResetSequence( animDesired );
+		idealActivity = ACT_HOVER;	//!!!TEMP
 	}
-	else if (idealActivity == ACT_WALK)
-	{
-		if (GetActivity() != ACT_RANGE_ATTACK1 || IsActivityFinished())
-		{
-			if ( GetFlags() & FL_DUCKING )	// crouching
-			{
-				Q_strncpy( szAnim, "crouch_aim_" ,sizeof(szAnim));
-			}
-			else
-			{
-				Q_strncpy( szAnim, "ref_aim_" ,sizeof(szAnim));
-			}
-			Q_strncat( szAnim, m_szAnimExtension,sizeof(szAnim), COPY_ALL_CHARACTERS );
-			animDesired = LookupSequence( szAnim );
-			if (animDesired == -1)
-				animDesired = 0;
-			SetActivity( ACT_WALK );
-		}
-		else
-		{
-			animDesired = GetSequence();
-		}
-	}
-	else
-	{
-		if ( GetActivity() == idealActivity)
-			return;
-	
-		SetActivity( idealActivity );
 
-		animDesired = SelectWeightedSequence( m_Activity );
+	SetActivity( idealActivity );
 
-		// Already using the desired animation?
-		if (GetSequence() == animDesired)
-			return;
+//	if ( GetActivity() == idealActivity)
+//		return;
 
-		ResetSequence( animDesired );
-		SetCycle( 0 );
-		return;
-	}
+	animDesired = SelectWeightedSequence( m_Activity );
 
 	// Already using the desired animation?
 	if (GetSequence() == animDesired)
@@ -2893,6 +2928,10 @@ CBaseEntity	*CBasePlayer::GetHeldObject( void )
 //-----------------------------------------------------------------------------
 void CBasePlayer::Jump()
 {
+	if (!(m_nButtons & IN_DUCK)) 
+	{
+		SetAnimation( PLAYER_JUMP );
+	}
 }
 
 void CBasePlayer::Duck( )
@@ -3935,10 +3974,10 @@ void CBasePlayer::CheckTimeBasedDamage()
 //				OnTakeDamage(pev, pev, NERVEGAS_DAMAGE, DMG_GENERIC);	
 				bDuration = NERVEGAS_DURATION;
 				break;
-//			case itbd_Poison:
+			case itbd_Poison:
 //				OnTakeDamage( CTakeDamageInfo( this, this, POISON_DAMAGE, DMG_GENERIC ) );
-//				bDuration = POISON_DURATION;
-//				break;
+				bDuration = POISON_DURATION;
+				break;
 			case itbd_Radiation:
 //				OnTakeDamage(pev, pev, RADIATION_DAMAGE, DMG_GENERIC);
 				bDuration = RADIATION_DURATION;
@@ -4288,6 +4327,12 @@ void CBasePlayer::UpdatePlayerSound( void )
 
 	pSound = CSoundEnt::SoundPointerForIndex( CSoundEnt::ClientSoundIndex( edict() ) );
 
+	if ( m_iHealth > (sk_player_critical_health.GetInt() + 5) )
+	{
+		if ( m_bPlayerHeartbeat )
+			ToggleHeartbeat();
+	}
+
 	if ( !pSound )
 	{
 		Msg( "Client lost reserved sound!\n" );
@@ -4491,26 +4536,26 @@ void CBasePlayer::PostThink()
 			VPROF_SCOPE_END();
 
 			if ( GetFlags() & FL_ONGROUND )
-			{		
-				if (m_Local.m_flFallVelocity > 64 && !g_pGameRules->IsMultiplayer())
+			{
+				if (m_Local.m_flFallVelocity > 70 && !g_pGameRules->IsMultiplayer())
 				{
-					CSoundEnt::InsertSound ( SOUND_PLAYER, GetAbsOrigin(), m_Local.m_flFallVelocity, 0.2, this );
+					CSoundEnt::InsertSound( SOUND_PLAYER, GetAbsOrigin(), m_Local.m_flFallVelocity, 0.2, this );
 					// Msg( "fall %f\n", m_Local.m_flFallVelocity );
 				}
 				m_Local.m_flFallVelocity = 0;
 			}
 
-			// select the proper animation for the player character	
+			// select the proper animation for the singleplayer character	
 			VPROF( "CBasePlayer::PostThink-Animation" );
 			// If he's in a vehicle, sit down
 			if ( IsInAVehicle() )
 				SetAnimation( PLAYER_IN_VEHICLE );
-			else if (!GetAbsVelocity().x && !GetAbsVelocity().y)
-				SetAnimation( PLAYER_IDLE );
-			else if ((GetAbsVelocity().x || GetAbsVelocity().y) && ( GetFlags() & FL_ONGROUND ))
+			else if ((GetAbsVelocity().x || GetAbsVelocity().y))
 				SetAnimation( PLAYER_WALK );
 			else if (GetWaterLevel() > 1)
 				SetAnimation( PLAYER_WALK );
+			else
+				SetAnimation( PLAYER_IDLE );
 		}
 
 		// Don't allow bogus sequence on player
@@ -5054,6 +5099,7 @@ void CBasePlayer::Precache( void )
 	PrecacheScriptSound( "Player.FallGib" );
 	PrecacheScriptSound( "Player.Death" );
 	PrecacheScriptSound( "Player.Pain" );
+	PrecacheScriptSound( "Player.Jump" );
 	PrecacheScriptSound( "Player.BulletImpact" );
 	PrecacheScriptSound( "Player.PlasmaDamage" );
 	PrecacheScriptSound( "Player.SonicDamage" );
@@ -5224,6 +5270,9 @@ void CBasePlayer::OnRestore( void )
 	// Calculate this immediately
 	m_nVehicleViewSavedFrame = 0;
 
+	m_nAimYawPoseParam = LookupPoseParameter( "aim_yaw" );
+	m_nAimPitchPoseParam = LookupPoseParameter( "aim_pitch" );
+	m_nBodyYawPoseParam = LookupPoseParameter( "move_yaw" );
 	m_nBodyPitchPoseParam = LookupPoseParameter( "body_pitch" );
 }
 
@@ -6140,7 +6189,8 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 #ifdef HL2_EPISODIC
 		GiveAmmo( 5,	"Hopwire" );
 #endif	
-		GiveNamedItem( "weapon_357" );
+//		GiveNamedItem( "weapon_357" );
+		GiveNamedItem( "weapon_45" );
 //		GiveNamedItem( "weapon_alyxgun" );
 //		GiveNamedItem( "weapon_ar1" );
 		GiveNamedItem( "weapon_ar2" );
@@ -6158,13 +6208,12 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 //!		GiveNamedItem( "weapon_gpistol" );	//Super-secrit
 		GiveNamedItem( "weapon_hmg1" );
 //		GiveNamedItem( "weapon_irifle" );
-		GiveNamedItem( "weapon_lightrpg" );
+		GiveNamedItem( "weapon_flash" );
 //		GiveNamedItem( "weapon_mitcl" );
 		GiveNamedItem( "weapon_molotov" );
 		GiveNamedItem( "weapon_physcannon" );
 //		GiveNamedItem( "weapon_physgun" );
 		GiveNamedItem( "weapon_pistol" );
-//		GiveNamedItem( "weapon_revolver" );
 		GiveNamedItem( "weapon_rpg" );
 //		GiveNamedItem( "weapon_scrapgun" );
 		GiveNamedItem( "weapon_shotgun" );
@@ -6173,7 +6222,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_smg2" );
 		GiveNamedItem( "weapon_sniperrifle" );
 		GiveNamedItem( "weapon_stab" );
-		GiveNamedItem( "weapon_stun" );
+		GiveNamedItem( "weapon_concussive" );
 //		GiveNamedItem( "weapon_stunstick" );
 		GiveNamedItem( "weapon_supershotgun" );
 		GiveNamedItem( "weapon_swing" );
@@ -6183,11 +6232,10 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 #endif
 		if ( GetHealth() < 100 )
 		{
-			TakeHealth( 25, DMG_GENERIC );
+			TakeHealth( 10, DMG_GENERIC );
 		}
 		
 		gEvilImpulse101		= false;
-
 		break;
 
 	case 102:
@@ -9181,14 +9229,41 @@ void CBasePlayer::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 void CBasePlayer::SetModel( const char *szModelName )
 {
 	BaseClass::SetModel( szModelName );
+	m_nAimYawPoseParam = LookupPoseParameter( "aim_yaw" );
+	m_nAimPitchPoseParam = LookupPoseParameter( "aim_pitch" );
+	m_nBodyYawPoseParam = LookupPoseParameter( "move_yaw" );
 	m_nBodyPitchPoseParam = LookupPoseParameter( "body_pitch" );
+}
+
+void CBasePlayer::SetAimYaw( float flYaw )
+{
+	if ( m_nAimYawPoseParam >= 0 )
+	{
+		SetPoseParameter( m_nAimYawPoseParam, clamp( flYaw, -60, 60 ) );
+	}
+}
+
+void CBasePlayer::SetAimPitch( float flPitch )
+{
+	if ( m_nAimPitchPoseParam >= 0 )
+	{
+		SetPoseParameter( m_nAimPitchPoseParam, clamp( flPitch, -90, 90 ) );
+	}
+}
+
+void CBasePlayer::SetBodyYaw( float flYaw )
+{
+	if ( m_nBodyYawPoseParam >= 0 )
+	{
+		SetPoseParameter( m_nBodyYawPoseParam, clamp( flYaw, -90, 90 ) );
+	}
 }
 
 void CBasePlayer::SetBodyPitch( float flPitch )
 {
 	if ( m_nBodyPitchPoseParam >= 0 )
 	{
-		SetPoseParameter( m_nBodyPitchPoseParam, flPitch );
+		SetPoseParameter( m_nBodyPitchPoseParam, clamp( flPitch, -10, 10 ) );
 	}
 }
 

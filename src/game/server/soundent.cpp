@@ -85,12 +85,13 @@ bool CSound::FIsSound ( void )
 	case SOUND_PLAYER:
 	case SOUND_DANGER:
 	case SOUND_DANGER_SNIPERONLY:
-	case SOUND_THUMPER:
 	case SOUND_BULLET_IMPACT:
+	case SOUND_THUMPER:
 	case SOUND_BUGBAIT:
 	case SOUND_PHYSICS_DANGER:
 	case SOUND_MOVE_AWAY:
-	case SOUND_PLAYER_VEHICLE:
+	case SOUND_VEHICLE:
+	case SOUND_WEAPON:
 		return true;
 
 	default:
@@ -103,7 +104,7 @@ bool CSound::FIsSound ( void )
 // do we really need this function? If a sound isn't a sound,
 // it must be a scent. (sjb)
 //=========================================================
-bool CSound::FIsScent ( void )
+bool CSound::FIsScent( void )
 {
 	switch( m_iType )
 	{

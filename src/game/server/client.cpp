@@ -805,6 +805,17 @@ CON_COMMAND( give, "Give item to player.\n\tArguments: <item_name>" )
 	}
 }
 
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+CON_COMMAND_F( allammo, "Give all weapons and ammo", FCVAR_CHEAT )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( UTIL_GetCommandClient() ); 
+	if ( pPlayer && (gpGlobals->maxClients == 1 || sv_cheats->GetBool()))
+	{
+		engine->ClientCommand( UTIL_GetCommandClient()->edict(), "impulse 101" );
+		ClientPrint( pPlayer, HUD_PRINTCONSOLE, "Giving all weapons and ammo\n" );
+	}
+}
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -952,14 +963,15 @@ void CC_Player_PhysSwap( void )
 			else
 			{
 				DevMsg( "Attempting to switch to highest-priority consumable.\n");
-			//	CBaseCombatWeapon *pSwitch = Weapon_GetSlot( 5 );
-				pPlayer->SelectItem( "weapon_frag" );	//TEMP
+			//!	CBaseCombatWeapon *pWeaponGrenade = Weapon_GetSlot( 5 );
+			//!	pPlayer->SelectItem( pWeaponGrenade->GetClassname() );
+
+				pPlayer->SelectItem( "weapon_frag" );	//!!TODO; TEMP
 			}
 		}
 	}
 }
 static ConCommand physswap("phys_swap", CC_Player_PhysSwap, "Automatically swaps the current weapon for grenades and back again." );
-#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: Quickly switch to the bug bait, or back to previous item
@@ -991,6 +1003,7 @@ void CC_Player_BugBaitSwap( void )
 	}
 }
 static ConCommand bugswap("bug_swap", CC_Player_BugBaitSwap, "Automatically swaps the current weapon for the bug bait and back again.", FCVAR_CHEAT );
+#endif
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

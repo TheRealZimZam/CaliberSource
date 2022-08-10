@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: The only thing that doesnt shoot the player (most of the time)
+// Purpose: Talker npc
 //
-// Todo's; Friendly-fire responses
+// Todo's; Friendly-fire, smells and heard sound responses
 //=============================================================================//
 
 #include "cbase.h"
@@ -44,13 +44,13 @@ ConceptInfo_t g_ConceptInfos[] =
 	{ 	TLK_ANSWER_HELLO,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_ANSWER,	},
 	{ 	TLK_QUESTION,		SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_QUESTION, },
 	{ 	TLK_IDLE,			SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_TARGET_PLAYER, },
-	{ 	TLK_STARE,			SPEECH_IDLE, 		-1,		-1,		-1,		-1,		180,	 0,		AICF_DEFAULT | AICF_TARGET_PLAYER, },
+	{ 	TLK_STARE,			SPEECH_IDLE, 		-1,		-1,		-1,		-1,		120,	 0,		AICF_DEFAULT | AICF_TARGET_PLAYER, },
 	{ 	TLK_LOOK,			SPEECH_PRIORITY, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_TARGET_PLAYER, },
 	{ 	TLK_HELLO,			SPEECH_IDLE, 		5,		10,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_SPEAK_ONCE | AICF_PROPAGATE_SPOKEN | AICF_TARGET_PLAYER,	},
-	{ 	TLK_PHELLO,			SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_SPEAK_ONCE | AICF_PROPAGATE_SPOKEN | AICF_TARGET_PLAYER,	},
+	{ 	TLK_PLHELLO,		SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_SPEAK_ONCE | AICF_PROPAGATE_SPOKEN | AICF_TARGET_PLAYER,	},
 	{ 	TLK_HELLO_NPC,		SPEECH_IDLE, 		5,		10,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_QUESTION | AICF_SPEAK_ONCE,	},
-	{ 	TLK_PIDLE,			SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
-	{ 	TLK_PQUESTION,		SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_PLIDLE,			SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_PLQUESTION,		SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_SMELL,			SPEECH_IDLE, 		-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{	TLK_USE,			SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_STARTFOLLOW,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
@@ -63,13 +63,12 @@ ConceptInfo_t g_ConceptInfos[] =
 	{ 	TLK_PLHURT3,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_PLHURT,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_PLPUSH,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		15,		30,		AICF_DEFAULT,	},
-	{ 	TLK_PLRELOAD,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,	    60,		 0,		AICF_DEFAULT,	},
-	{ 	TLK_SHOT,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_PLRELOAD,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,	    60,		0,		AICF_DEFAULT | AICF_TARGET_PLAYER, },
+	{ 	TLK_PAIN,			SPEECH_PRIORITY, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_WOUND,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_MORTAL,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_SPEAK_ONCE,	},
-	{ 	TLK_SEE_COMBINE,	SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_HEARDSOUND,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_ENEMY_DEAD,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
-	{ 	TLK_ALYX_ENEMY_DEAD,SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_SELECTED,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_COMMANDED,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_COMMAND_FAILED,	SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
@@ -77,29 +76,31 @@ ConceptInfo_t g_ConceptInfos[] =
 	{ 	TLK_BETRAYED,		SPEECH_PRIORITY, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_ALLY_KILLED,	SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		15,		30,		AICF_DEFAULT,	},
 	{ 	TLK_ATTACKING,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_CHASING,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_HEAL,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_GIVEAMMO,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
-	{	TLK_HELP_ME,		SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		 7,		10,		AICF_DEFAULT,	},
-	{	TLK_PLYR_PHYSATK,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_DEATH,			SPEECH_PRIORITY, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{	TLK_HELPME,			SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		10,		15,		AICF_DEFAULT,	},
+	{	TLK_PHYSATTACK,		SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{	TLK_NEWWEAPON,		SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{	TLK_STARTCOMBAT,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		30,		 0,		AICF_DEFAULT,	},
-	{	TLK_WATCHOUT,		SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		30,		45,		AICF_DEFAULT,	},
-	{	TLK_MOBBED,			SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		10,		12,		AICF_DEFAULT,	},
-	{	TLK_MANY_ENEMIES,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		45,		60,		AICF_DEFAULT,	},
-	{ 	TLK_DANGER,			SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		5,		7,		AICF_DEFAULT,	},
-	{ 	TLK_PLDEAD,			SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		100,	 0,		AICF_DEFAULT,	},
-	{ 	TLK_HIDEANDRELOAD,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		 45,	60,		AICF_DEFAULT,	},
-	{ 	TLK_FLASHLIGHT_ILLUM,	SPEECH_PRIORITY,-1,		-1,		-1,		-1,		 -1,	-1,		AICF_DEFAULT,	},
-	{ 	TLK_FLASHLIGHT_ON,	SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		 -1,	-1,		AICF_DEFAULT,	},
-	{ 	TLK_FLASHLIGHT_OFF,	SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		 -1,	-1,		AICF_DEFAULT,	},
-	{ 	TLK_FOUNDPLAYER,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		 -1,	-1,		AICF_TARGET_PLAYER,	},
+	{	TLK_WATCHOUT,		SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		15,		30,		AICF_DEFAULT,	},
+	{	TLK_MOBBED,			SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		10,		15,		AICF_DEFAULT,	},
+	{	TLK_MANY_ENEMIES,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		15,		30,		AICF_DEFAULT,	},
+	{ 	TLK_DANGER,			SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		1,		5,		AICF_DEFAULT,	},
+	{ 	TLK_PLDEAD,			SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		100,	0,		AICF_DEFAULT,	},
+	{ 	TLK_HIDEANDRELOAD,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		15,		45,		AICF_DEFAULT,	},
+	{ 	TLK_FLASHLIGHT_ILLUM,	SPEECH_PRIORITY,-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_FLASHLIGHT_ON,	SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_FLASHLIGHT_OFF,	SPEECH_PRIORITY,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_FOUNDPLAYER,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_TARGET_PLAYER,	},
 	{ 	TLK_PLAYER_KILLED_NPC,				SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_ENEMY_BURNING,					SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_SPOTTED_ZOMBIE_WAKEUP,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_SPOTTED_HEADCRAB_LEAVING_ZOMBIE,SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_DANGER_ZOMBINE_GRENADE,			SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_BALLSOCKETED,					SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
-	{ 	TLK_INVESTIGATE,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		5,		7,		AICF_DEFAULT,	},
+	{ 	TLK_INVESTIGATE,	SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		15,		30,		AICF_DEFAULT,	},
 		
 	// Darkness mode
 	{ 	TLK_DARKNESS_LOSTPLAYER, SPEECH_IMPORTANT,-1,	-1,		-1,		-1,		 -1,	-1,		AICF_DEFAULT,	},
@@ -388,6 +389,9 @@ void CAI_PlayerAlly::DisplayDeathMessage( void )
 	if ( m_bGameEndAlly == false )
 		return;
 
+	if ( Classify() != CLASS_PLAYER_ALLY_VITAL )
+		return;
+
 	if ( npc_ally_deathmessage.GetBool() == 0 )
 		return;
 
@@ -525,9 +529,9 @@ void CAI_PlayerAlly::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
 		DeferAllIdleSpeech();
 	}
  
-	if ( GetState() == NPC_STATE_IDLE || GetState() == NPC_STATE_ALERT )
+	if ( GetState() == NPC_STATE_IDLE )
 	{
-		m_flNextIdleSpeechTime = gpGlobals->curtime + RandomFloat(5,10);
+		m_flNextIdleSpeechTime = gpGlobals->curtime + random->RandomFloat(5,10);
 	}
 	else
 	{
@@ -576,11 +580,11 @@ void CAI_PlayerAlly::PrescheduleThink( void )
 			{
 				SetSpeechTarget( selection.hSpeechTarget );
 				SpeakDispatchResponse( selection.concept.c_str(), selection.pResponse );
-				m_flNextIdleSpeechTime = gpGlobals->curtime + RandomFloat( 20,30 );
+				m_flNextIdleSpeechTime = gpGlobals->curtime + random->RandomFloat( 20,30 );
 			}
 			else
 			{
-				m_flNextIdleSpeechTime = gpGlobals->curtime + RandomFloat( 10,20 );
+				m_flNextIdleSpeechTime = gpGlobals->curtime + random->RandomFloat( 10,20 );
 			}
 		}
 	}
@@ -599,11 +603,10 @@ int CAI_PlayerAlly::SelectSchedule( void )
 		// sustained light wounds?
 		if ( m_iHealth <= m_iMaxHealth * 0.75 && IsAllowedToSpeak( TLK_WOUND ) && !GetExpresser()->SpokeConcept(TLK_WOUND) )
 		{
-			CTakeDamageInfo info;
-			PainSound( info );
+			Speak( TLK_WOUND );
 		}
 		// sustained heavy wounds?
-		else if ( m_iHealth <= m_iMaxHealth * 0.35 && IsAllowedToSpeak( TLK_MORTAL ) )
+		else if ( m_iHealth <= m_iMaxHealth * 0.35 && IsAllowedToSpeak( TLK_MORTAL ) && !GetExpresser()->SpokeConcept(TLK_MORTAL) )
 		{
 			Speak( TLK_MORTAL );
 		}
@@ -654,12 +657,29 @@ bool CAI_PlayerAlly::SelectIdleSpeech( AISpeechSelection_t *pSelection )
 	if ( !IsOkToSpeak( SPEECH_IDLE ) )
 		return false;
 
+	if ( GetBestScent() )
+	{
+		// Its a scent
+		switch( GetBestScent()->SoundTypeNoContext() )
+		{
+			case SOUND_CARCASS:
+			case SOUND_MEAT:
+			case SOUND_GARBAGE:
+				if ( SpeakIfAllowed( TLK_SMELL ) )
+					return true;
+				break;
+
+			default:
+				break;
+		}
+	}
+
 	CBasePlayer *pTarget = assert_cast<CBasePlayer *>(FindSpeechTarget( AIST_PLAYERS | AIST_FACING_TARGET ));
 	if ( pTarget )
 	{
 		if ( SelectSpeechResponse( TLK_HELLO, NULL, pTarget, pSelection ) )
 			return true;
-		
+
 		if ( GetTimePlayerStaring() > 6 && !IsMoving() )
 		{
 			if ( SelectSpeechResponse( TLK_STARE, NULL, pTarget, pSelection ) )
@@ -688,6 +708,35 @@ bool CAI_PlayerAlly::SelectAlertSpeech( AISpeechSelection_t *pSelection )
 			{
 				if ( SelectSpeechResponse( TLK_PLHURT, NULL, pTarget, pSelection ) )
 					return true;
+			}
+		}
+	}
+
+	CSound *pSound = GetBestSound();
+	if ( pSound )
+	{
+		if ( pSound->FIsSound() )
+		{
+			// Its a sound
+			switch( pSound->SoundTypeNoContext() )
+			{
+				//!!TODO; Soundtype - world and player sound should be spoken about, but not in the same vein as combat or bullets
+				case SOUND_COMBAT:
+			//!	case SOUND_WORLD:
+			//!	case SOUND_PLAYER:
+				case SOUND_BULLET_IMPACT:
+					if ( SpeakIfAllowed( TLK_HEARDSOUND, UTIL_VarArgs("sound_is_visible:%d", SoundIsVisible( pSound )) ) )
+						return true;
+					break;
+
+				case SOUND_DANGER:
+				case SOUND_PHYSICS_DANGER:
+					if ( SpeakIfAllowed( TLK_DANGER ) )
+						return true;
+					break;
+
+				default:
+					break;
 			}
 		}
 	}
@@ -989,20 +1038,6 @@ int CAI_PlayerAlly::TranslateSchedule( int schedule )
 			return speechSchedule;
 	}
 
-#if 0
-	switch( schedule )
-	{
-	case SCHED_CHASE_ENEMY_FAILED:
-		{
-			int baseType = BaseClass::TranslateSchedule(schedule);
-			if ( baseType != SCHED_CHASE_ENEMY_FAILED )
-				return baseType;
-
-			return SCHED_TAKE_COVER_FROM_ENEMY;
-		}
-		break;
-	}
-#endif
 	return BaseClass::TranslateSchedule( schedule );
 }
 
@@ -1010,8 +1045,35 @@ int CAI_PlayerAlly::TranslateSchedule( int schedule )
 //-----------------------------------------------------------------------------
 void CAI_PlayerAlly::OnStartSchedule( int schedule )
 {
-	if ( schedule == SCHED_HIDE_AND_RELOAD )
-		SpeakIfAllowed( TLK_HIDEANDRELOAD );
+#if 0
+	if ( IsOkToCombatSpeak() )
+	{
+		if ( schedule == SCHED_HIDE_AND_RELOAD )
+			Speak( TLK_HIDEANDRELOAD );
+		else if ( schedule == (SCHED_CHASE_ENEMY|SCHED_ESTABLISH_LINE_OF_FIRE))
+			Speak( TLK_CHASING );
+	}
+#else
+	switch ( schedule )
+	{
+		case SCHED_HIDE_AND_RELOAD:
+			SpeakIfAllowed( TLK_HIDEANDRELOAD );
+			break;
+
+		case SCHED_CHASE_ENEMY:
+		case SCHED_ESTABLISH_LINE_OF_FIRE:
+			SpeakIfAllowed( TLK_CHASING );
+			break;
+
+		case SCHED_INVESTIGATE_SOUND:
+			SpeakIfAllowed( TLK_INVESTIGATE );
+			break;
+
+		default:
+			break;
+	}
+#endif
+
 	BaseClass::OnStartSchedule( schedule );
 }
 
@@ -1021,6 +1083,13 @@ void CAI_PlayerAlly::StartTask( const Task_t *pTask )
 {
 	switch ( pTask->iTask )
 	{
+	case TASK_ANNOUNCE_ATTACK:
+		{
+			SpeakIfAllowed( TLK_ATTACKING );
+			BaseClass::StartTask( pTask );
+			break;
+		}
+
 	case TASK_MOVE_AWAY_PATH:
 		{
 			if ( HasCondition( COND_PLAYER_PUSHING ) && AI_IsSinglePlayer() )
@@ -1120,11 +1189,13 @@ Disposition_t CAI_PlayerAlly::IRelationType( CBaseEntity *pTarget )
 #ifdef ALLIES_CAN_BE_PROVOKED
 	if ( pTarget->IsPlayer() )
 	{
-		//TODO; This really needs some polishing, but it *kinda* works for now
-		if ( m_afMemory & bits_MEMORY_PROVOKED )
+		if ( HasMemory( bits_MEMORY_PROVOKED ) )
+			return D_HT;
+		else if ( HasMemory( bits_MEMORY_SUSPICIOUS ) )
 			return D_NU;
 	}
-#endif 
+#endif
+
 	return BaseClass::IRelationType( pTarget );
 }
 
@@ -1134,7 +1205,11 @@ void CAI_PlayerAlly::TraceAttack( const CTakeDamageInfo &info, const Vector &vec
 {
 	const char *pszHitLocCriterion = NULL;
 
-	if ( ptr->hitgroup == HITGROUP_LEFTLEG || ptr->hitgroup == HITGROUP_RIGHTLEG )
+	if ( ptr->hitgroup == HITGROUP_HEAD )
+	{
+		pszHitLocCriterion = "shotloc:head";
+	}
+	else if ( ptr->hitgroup == HITGROUP_LEFTLEG || ptr->hitgroup == HITGROUP_RIGHTLEG )
 	{
 		pszHitLocCriterion = "shotloc:leg";
 	}
@@ -1150,7 +1225,7 @@ void CAI_PlayerAlly::TraceAttack( const CTakeDamageInfo &info, const Vector &vec
 	// set up the speech modifiers
 	CFmtStrN<128> modifiers( "%s,damageammo:%s", pszHitLocCriterion, info.GetAmmoName() );
 
-	SpeakIfAllowed( TLK_SHOT, modifiers );
+	Speak( TLK_PAIN, modifiers );
 
 	BaseClass::TraceAttack( info, vecDir, ptr );
 }
@@ -1165,7 +1240,7 @@ int CAI_PlayerAlly::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	// Don't do damage reduction for DMG_GENERIC. This allows SetHealth inputs to still do full damage.
 	if ( subInfo.GetDamageType() != DMG_GENERIC )
 	{
-		if ( Classify() == CLASS_PLAYER_ALLY_VITAL && !(subInfo.GetDamageType() & DMG_CRUSH) )
+		if ( (Classify() == CLASS_PLAYER_ALLY_VITAL || m_bGameEndAlly) && !(subInfo.GetDamageType() & DMG_CRUSH) )
 		{
 			float flDamage = subInfo.GetDamage();
 			if ( flDamage > ( GetMaxHealth() * 0.25 ) )
@@ -1177,42 +1252,103 @@ int CAI_PlayerAlly::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	}
 #endif
 
-	// A supposed ally has shot me and its definitely not in good faith
+	// A supposed ally has shot me and im not in a barnacle
 	if ( m_NPCState != NPC_STATE_PRONE )
 	{
-		CBaseCombatCharacter *jackAss = info.GetAttacker()->MyCombatCharacterPointer();	//TEMPSOLUTION
-		if ( (info.GetAttacker()->GetFlags() & FL_CLIENT) && (jackAss && jackAss->IRelationType( this ) == D_LI) )	//TEMPSOLUTION
+		CBaseCombatCharacter *jackAss = info.GetAttacker()->MyCombatCharacterPointer();
+		bool bAttackedByPlayer = false;
+		bool bWasAccidental = true;
+
+		//CFmtStrN<128> modifiers( "attacked_by_player:%d,distance_from_attack:%f,was_accidental:%d", bAttackedByPlayer, EnemyDistance( jackAss ), bWasAccidental );
+
+		// its hopefully in good faith
+		if ( (jackAss && jackAss->IRelationType( this ) >= D_LI) )
 		{
-#ifdef ALLIES_CAN_BE_PROVOKED
-			// This is a heurstic to determine if the player intended to harm me
-			// If I have an enemy, we can't establish intent (may just be crossfire)
-			if ( GetEnemy() == NULL )
+			if ( (info.GetAttacker()->GetFlags() & FL_CLIENT) )
 			{
-				// You're a complete jackass.
+				// Player attacked me
+				bAttackedByPlayer = true;
+
+				// Store the players body direction
+				Vector	idiotDir = GetAbsOrigin() - jackAss->GetAbsOrigin();
+				VectorNormalize( idiotDir );
+				Vector	idiotBodyDir = jackAss->BodyDirection3D();
+				float idiotDot = DotProduct( idiotBodyDir, idiotDir );
+				if ( idiotDot > 0.97f )
+					bWasAccidental = false;
+
+#ifdef ALLIES_CAN_BE_PROVOKED
+				// I've already been attacked in bad faith, so it makes this easy
 				if (m_afMemory & bits_MEMORY_SUSPICIOUS)
 				{
-					SpeakIfAllowed( TLK_BETRAYED );
+					if ( random->RandomInt( 0, 1 ) )
+					{
+						if (IsOkToSpeak(SPEECH_PRIORITY))
+							Speak( TLK_BETRAYED );	//, modifiers
 
-					Remember( bits_MEMORY_PROVOKED );
+						Remember( bits_MEMORY_PROVOKED );
+						SetCondition( COND_PROVOKED );
 
-					CapabilitiesRemove(bits_CAP_NO_HIT_PLAYER);
+						CapabilitiesRemove(bits_CAP_NO_HIT_PLAYER);
+					}
+					else
+					{
+						// Look at the player very intensely
+						GetMotor()->SetIdealYawToTarget( jackAss->WorldSpaceCenter() );
+					}
 				}
 				else
 				{
-					// I know that was on purpose...
-					SpeakIfAllowed( TLK_NOSHOOT );
-					Remember( bits_MEMORY_SUSPICIOUS );
+					// Alright fine... lets do the logics now
+					if ( GetEnemy() == NULL )
+					{
+						if ( HasCondition( COND_HEAR_COMBAT ) )
+						{
+							// There's some shooting over there, it might have been a ricochet - lower chances of suspicion
+							if ( !bWasAccidental || HasCondition( COND_HEAVY_DAMAGE ) )
+							{
+								Remember( bits_MEMORY_SUSPICIOUS );
+							}
+						}
+						else
+						{
+							// I know that was on purpose...
+							Remember( bits_MEMORY_SUSPICIOUS );
+						}
+					}
+					else
+					{
+						// We are properly fighting, so be a little more forgiving
+						if ( subInfo.GetDamageType() & (DMG_BURN|DMG_BLAST|DMG_SONIC) )
+						{
+							// Watch what you're doing!
+							bWasAccidental = true;
+						}
+						else
+						{
+							// That was a little too close!
+							if ( !bWasAccidental || random->RandomInt( 0, 3 ) == 3 )
+								Remember( bits_MEMORY_SUSPICIOUS );
+						}
+					}
+#endif
+					if (IsOkToSpeakInResponseToPlayer())
+						Speak( TLK_NOSHOOT );	//, modifiers
 				}
 			}
 			else
 			{
-				// Watch what you're doing!
-				SpeakIfAllowed( TLK_NOSHOOT );
-			}
+				if (IsOkToCombatSpeak())
+					Speak( TLK_NOSHOOT );
+#if 0
+				// Tell the jackass to say sorry
+				if( jackAss->GetExpresser()->CanSpeakConcept( TLK_ANSWER ) )
+				{
+					jackAss->SpeakIfAllowed( TLK_ANSWER );
+				}
 #endif
+			}
 		}
-		//TODO; A friendly npc just blasted me, should say something and try to move out of the way
-
 	}
 
 	return BaseClass::OnTakeDamage_Alive( subInfo );
@@ -1283,9 +1419,26 @@ bool CAI_PlayerAlly::CreateVPhysics()
 }
 
 //-----------------------------------------------------------------------------
+void CAI_PlayerAlly::DeathSound( const CTakeDamageInfo &info )
+{
+	// Sentences don't play on dead NPCs
+	SentenceStop();
+
+	Speak( TLK_DEATH );
+}
+
+void CAI_PlayerAlly::BarnacleDeathSound( void )
+{
+	SentenceStop();
+	Speak( TLK_SELF_IN_BARNACLE );
+}
+
 void CAI_PlayerAlly::PainSound( const CTakeDamageInfo &info )
 {
-	SpeakIfAllowed( TLK_WOUND );
+	//TraceAttack takes care of this
+//!	SpeakIfAllowed( TLK_PAIN );
+
+	return BaseClass::PainSound( info );
 }
 
 //-----------------------------------------------------------------------------
@@ -1823,6 +1976,7 @@ AI_BEGIN_CUSTOM_NPC(talk_monster_base,CAI_PlayerAlly)
 		"		COND_HEAVY_DAMAGE"
 		"		COND_HEAR_DANGER"
 		"		COND_HEAR_COMBAT"
+		"		COND_SMELL"
 		"		COND_PLAYER_PUSHING"
 		"		COND_GIVE_WAY"
 	)

@@ -9,6 +9,7 @@
 #include "player.h"
 #include "filters.h"
 #include "func_break.h"
+#include "soundent.h"
 #include "decals.h"
 #include "explode.h"
 #include "in_buttons.h"
@@ -85,7 +86,7 @@ extern Vector		g_vecAttackDir;
 		"weapon_flaregun",			// 35
 		"weapon_slam",				// 36
 		"weapon_molotov",			// 37
-		"weapon_stun",				// 38
+		"weapon_concussive",		// 38
 		"weapon_frag",				// 39
 		"item_dynamic_resupply",	// 40
 	};
@@ -202,6 +203,7 @@ BEGIN_DATADESC( CBreakable )
 	DEFINE_FIELD( m_bTookPhysicsDamage, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_iszPropData, FIELD_STRING ),
 	DEFINE_INPUT( m_impactEnergyScale, FIELD_FLOAT, "physdamagescale" ),
+	DEFINE_KEYFIELD( m_bExtraImpactFX, FIELD_BOOLEAN, "extraimpactfx" ),
 	DEFINE_KEYFIELD( m_PerformanceMode, FIELD_INTEGER, "PerformanceMode" ),
 
 	DEFINE_INPUTFUNC( FIELD_VOID, "Break", InputBreak ),
@@ -221,6 +223,7 @@ BEGIN_DATADESC( CBreakable )
 	DEFINE_FIELD( m_flDmgModBullet, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flDmgModClub, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flDmgModExplosive, FIELD_FLOAT ),
+	DEFINE_FIELD( m_flDmgModFire, FIELD_FLOAT ),
 	DEFINE_FIELD( m_iszPhysicsDamageTableName, FIELD_STRING ),
 	DEFINE_FIELD( m_iszBreakableModel, FIELD_STRING ),
 	DEFINE_FIELD( m_iBreakableSkin, FIELD_INTEGER ),
@@ -349,6 +352,11 @@ void CBreakable::Spawn( void )
 	if ( m_impactEnergyScale == 0 )
 	{
 		m_impactEnergyScale = 1.0;
+	}
+	// this is a old prop, assume true
+	if ( m_bExtraImpactFX == NULL )
+	{
+		m_bExtraImpactFX = true;
 	}
 
 	CreateVPhysics();
@@ -796,9 +804,52 @@ void CBreakable::Break( CBaseEntity *pBreaker )
 
 void CBreakable::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
-	// random spark if this is a 'computer' object
-	if (random->RandomInt(0,1) )
+#ifndef HL1_DLL
+	if ( m_bExtraImpactFX && random->RandomInt(0,1) )
 	{
+		switch( m_Material )
+		{
+			// random spark if this is a 'computer' object
+			case matComputer:
+			{
+				g_pEffects->Sparks( ptr->endpos );
+
+				EmitSound( "Breakable.Computer" );
+			}
+			break;
+
+			// Send some smoke and embers - actual ignition is level-based
+			case matWood:
+			{
+				if ( info.GetDamageType() & (DMG_BURN|DMG_PLASMA) )
+				{
+					UTIL_Smoke( info.GetDamagePosition(), random->RandomInt( 10, 15 ), 10 );
+				}
+			}
+			break;
+
+			// Ricochet spark
+			case matMetal:
+			case matUnbreakableGlass:
+				if ( info.GetDamageType() & DMG_BULLET )
+				{
+					g_pEffects->Ricochet( ptr->endpos, (vecDir*-1.0f) );
+				}
+			break;
+
+			// Shoot some extra blood
+			case matFlesh:
+			{
+				//!!TODO; its not always red - figure something out here
+				UTIL_BloodImpact( ptr->endpos, vecDir, BLOOD_COLOR_RED, 1 );
+			}
+			break;
+		}
+	}
+#else
+	if ( random->RandomInt(0,1) )
+	{
+		// random spark if this is a 'computer' object
 		switch( m_Material )
 		{
 			case matComputer:
@@ -816,15 +867,9 @@ void CBreakable::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir,
 					g_pEffects->Ricochet( ptr->endpos, (vecDir*-1.0f) );
 				}
 			break;
-
-			case matFlesh:
-			{
-				//!!TODO; its not always red - figure something out here
-				UTIL_BloodImpact( ptr->endpos, vecDir, BLOOD_COLOR_RED, 1 );
-			}
-			break;
 		}
 	}
+#endif
 
 	BaseClass::TraceAttack( info, vecDir, ptr );
 }
@@ -929,6 +974,11 @@ int CBreakable::OnTakeDamage( const CTakeDamageInfo &info )
 		if ( subInfo.GetDamageType() & (DMG_SLASH|DMG_CLUB|DMG_VEHICLE) )
 		{
 			DamageSound();
+		}
+		// If you're about to explode, send out a danger sound
+		if ( Explodable() && ((GetFlags() & FL_ONFIRE) != 0 || m_iHealth < GetMaxHealth() / 2) )	//IsOnFire() is not working... i dunno
+		{
+			CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), GetExplosiveRadius(), 0.2, this );
 		}
 	}
 
@@ -1086,6 +1136,10 @@ void CBreakable::Die( void )
 
 			EmitSound( filter, entindex(), ep );	
 		}
+
+#ifndef HL1_DLL
+		CSoundEnt::InsertSound( SOUND_WORLD, GetAbsOrigin(), (512 * fvol), 0.2, this );
+#endif
 	}
 		
 	switch( m_Explosion )
@@ -1278,11 +1332,9 @@ CBasePlayer *CBreakable::HasPhysicsAttacker( float dt )
 
 //=============================================================================================================================
 // PUSHABLE
+// TODO; Forced vertex lighting - static lightmaps just look bad on these, do it here instead of per texture, cause'
+// every prop vmt is already lightmappedgeneric and alot of stuff in that folder is used statically often anyways.
 //=============================================================================================================================
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
 class CPushable : public CBreakable
 {
 public:
@@ -1294,33 +1346,23 @@ public:
 
 	virtual int	ObjectCaps( void ) { return BaseClass::ObjectCaps() | FCAP_ONOFF_USE; }
 
-	// breakables use an overridden takedamage
-	virtual int OnTakeDamage( const CTakeDamageInfo &info );
 	virtual void VPhysicsCollision( int index, gamevcollisionevent_t *pEvent );
 	unsigned int PhysicsSolidMaskForEntity( void ) const { return MASK_PLAYERSOLID; }
 };
-
 
 LINK_ENTITY_TO_CLASS( func_pushable, CPushable );
 
 
 void CPushable::Spawn( void )
 {
-	if ( HasSpawnFlags( SF_PUSH_BREAKABLE ) )
-	{
-		BaseClass::Spawn();
-	}
-	else
-	{
-		Precache();
+	BaseClass::Spawn();
 
-		SetSolid( SOLID_VPHYSICS );
+	SetSolid( SOLID_VPHYSICS );
 
-		SetMoveType( MOVETYPE_PUSH );
-		SetModel( STRING( GetModelName() ) );
+	SetMoveType( MOVETYPE_PUSH );
+	SetModel( STRING( GetModelName() ) );
 
-		CreateVPhysics();
-	}
+	CreateVPhysics();
 
 //#ifdef HL1_DLL
 	// Force HL1 Pushables to stay axially aligned.
@@ -1328,10 +1370,10 @@ void CPushable::Spawn( void )
 //#endif
 }
 
-
 bool CPushable::CreateVPhysics( void )
 {
 	VPhysicsInitNormal( SOLID_VPHYSICS, 0, false );
+#if 0
 	IPhysicsObject *pPhysObj = VPhysicsGetObject();
 	if ( pPhysObj )
 	{
@@ -1339,6 +1381,7 @@ bool CPushable::CreateVPhysics( void )
 //		Vector vecInertia = Vector(800, 800, 800);
 //		pPhysObj->SetInertia( vecInertia );
 	}
+#endif
 
 	return true;
 }
@@ -1346,7 +1389,6 @@ bool CPushable::CreateVPhysics( void )
 // Pull the func_pushable
 void CPushable::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
-#ifdef HL1_DLL
 	if( m_spawnflags & SF_PUSH_NO_USE )
 		return;
 
@@ -1359,25 +1401,17 @@ void CPushable::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 			PlayerPickupObject( pPlayer, this );
 		}
 	}
-#else
+
 	BaseClass::Use( pActivator, pCaller, useType, value );
-#endif
 }
 
-
-int CPushable::OnTakeDamage( const CTakeDamageInfo &info )
-{
-	if ( m_spawnflags & SF_PUSH_BREAKABLE )
-		return BaseClass::OnTakeDamage( info );
-
-	return 1;
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: Allows us to take damage from physics objects
 //-----------------------------------------------------------------------------
 void CPushable::VPhysicsCollision( int index, gamevcollisionevent_t *pEvent )
 {
+#ifdef HL1_DLL
 	int otherIndex = !index;
 	CBaseEntity *pOther = pEvent->pEntities[otherIndex];
 	if ( pOther->IsPlayer() )
@@ -1387,6 +1421,7 @@ void CPushable::VPhysicsCollision( int index, gamevcollisionevent_t *pEvent )
 		CBaseEntity::VPhysicsCollision( index, pEvent );
 		return;
 	}
+#endif
 
 	BaseClass::VPhysicsCollision( index, pEvent );
 }

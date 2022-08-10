@@ -369,6 +369,7 @@ int CAI_BaseNPC::TranslateSchedule( int scheduleType )
 	case SCHED_COMBAT_STAND:
 		{
 			// FIXME: never used?
+			// Assert( m_NPCState == NPC_STATE_COMBAT );
 		}
 		break;
 	case SCHED_COMBAT_WALK:
@@ -623,6 +624,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_SET_TOLERANCE_DISTANCE		5"
 	"		TASK_GET_PATH_TO_TARGET_WEAPON	0"
 //	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_NEW_WEAPON_CHEAT"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAIL"
 	"		TASK_WEAPON_RUN_PATH			0"
 	"		TASK_STOP_MOVING				0"
 	"		TASK_FACE_TARGET				0"
@@ -696,7 +698,7 @@ AI_DEFINE_SCHEDULE
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
 	"		COND_ENEMY_DEAD"
-	"		COND_LIGHT_DAMAGE"
+//	"		COND_LIGHT_DAMAGE"
 	"		COND_HEAVY_DAMAGE"
 	"		COND_ENEMY_OCCLUDED"
 	"		COND_NO_PRIMARY_AMMO"
@@ -721,7 +723,7 @@ AI_DEFINE_SCHEDULE
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
 	"		COND_ENEMY_DEAD"
-	"		COND_LIGHT_DAMAGE"
+//	"		COND_LIGHT_DAMAGE"
 	"		COND_HEAVY_DAMAGE"
 	"		COND_ENEMY_OCCLUDED"
 	"		COND_NO_SECONDARY_AMMO"
@@ -738,14 +740,17 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING			0"
-	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"	//FIXME; Hook to unique
+	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_COVER_LOW"
 	"		TASK_WAIT_INDEFINITE		0"
 	""
 	"	Interrupts"
-	"		COND_NEW_ENEMY"
 	"		COND_LIGHT_DAMAGE"
 	"		COND_HEAVY_DAMAGE"
 	"		COND_PROVOKED"
+	"		COND_CAN_RANGE_ATTACK1"
+	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK2"
 );
 
 //=========================================================
@@ -865,16 +870,18 @@ AI_DEFINE_SCHEDULE
 
 //=========================================================
 //  > AlertReact
-// React to the closest sound
+// Gives some time to react to the closest sound
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
  SCHED_ALERT_REACT_TO_COMBAT_SOUND,
 
- "	Tasks"
- "		TASK_SET_SCHEDULE			SCHEDULE:SCHED_ALERT_FACE_BESTSOUND"
- ""
- "	Interrupts"
+	"	Tasks"
+//	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_COMBAT_IDLE"	//Handled by transitions now
+	"		TASK_WAIT				0.2"
+	"		TASK_SET_SCHEDULE		SCHEDULE:SCHED_ALERT_FACE_BESTSOUND"
+	""
+	"	Interrupts"
  );
 
 
@@ -1115,6 +1122,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_STOP_MOVING			0"
 	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"		// Translated to cover
 	"		TASK_WAIT_FACE_ENEMY		2"
+	"		TASK_WAIT_FACE_ENEMY_RANDOM	2"
 	""
 	"	Interrupts"
 	"		COND_CAN_RANGE_ATTACK1"
@@ -1805,7 +1813,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_RUN_PATH					0"
 	"		TASK_WAIT_FOR_MOVEMENT			0"
 	"		TASK_REMEMBER					MEMORY:INCOVER"
-	"		TASK_FACE_ENEMY					0"
+//	"		TASK_FACE_ENEMY					0"
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"	// Translated to cover
 	""
 	"	Interrupts"
@@ -1902,13 +1910,15 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		 TASK_STOP_MOVING			0"
-	"		 TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE_FEAR"	//FIXME; Hook to unique??
+	"		 TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE_SCARED"
 	"		 TASK_FACE_ENEMY			0"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
 	"		COND_ENEMY_DEAD"
 	"		COND_SEE_ENEMY"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK2"
 );
 
 //=========================================================
@@ -2295,11 +2305,10 @@ AI_DEFINE_SCHEDULE
 	"		TASK_SET_SCHEDULE						SCHEDULE:SCHED_MOVE_AWAY_END"
 	""
 	"	Interrupts"
-	"		COND_NEW_ENEMY"
-	"		COND_CAN_RANGE_ATTACK1"
-	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_ENEMY_DEAD"
 	"		COND_CAN_MELEE_ATTACK1"
 	"		COND_CAN_MELEE_ATTACK2"
+	"		COND_HEAR_DANGER"
 );
 
 //=========================================================
@@ -2397,6 +2406,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_SET_TOLERANCE_DISTANCE		24"
 	"		TASK_GET_PATH_TO_RANDOM_NODE	300"
 	"		TASK_RUN_PATH_TIMED				4"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_BURNING_RUN"
 	""
 	"	Interrupts"
 );

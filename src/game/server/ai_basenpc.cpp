@@ -700,9 +700,8 @@ bool CAI_BaseNPC::PassesDamageFilter( const CTakeDamageInfo &info )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
-// Input  :
-// Output :
+// OnTakeDamage_Alive - takedamage function called when a npc
+// is damaged when alive.
 //-----------------------------------------------------------------------------
 int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
@@ -746,16 +745,6 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		m_iHealth = 1;
 	}
 
-#if 0
-	// HACKHACK Don't kill npcs in a script.  Let them break their scripts first
-	// THIS is a Half-Life 1 hack that's not cutting the mustard in the scripts
-	// that have been authored for Half-Life 2 thus far. (sjb)
-	if ( m_NPCState == NPC_STATE_SCRIPT )
-	{
-		SetCondition( COND_LIGHT_DAMAGE );
-	}
-#endif
-
 	// -----------------------------------
 	//  Fire outputs
  	// -----------------------------------
@@ -787,7 +776,7 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		}
 	}
 
-	if( (info.GetDamageType() & DMG_CRUSH) && !(info.GetDamageType() & DMG_PHYSGUN) && info.GetDamage() >= MIN_PHYSICS_FLINCH_DAMAGE )
+	if( (info.GetDamageType() & (DMG_CRUSH|DMG_PHYSGUN)) && info.GetDamage() >= MIN_PHYSICS_FLINCH_DAMAGE )
 	{
 		SetCondition( COND_PHYSICS_DAMAGE );
 	}
@@ -897,8 +886,8 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 
 //=========================================================
-// OnTakeDamage_Dying - takedamage function called when a npc's
-// corpse is damaged.
+// OnTakeDamage_Dying - takedamage function called when a npc
+// is damaged when dying.
 //=========================================================
 int CAI_BaseNPC::OnTakeDamage_Dying( const CTakeDamageInfo &info )
 {
@@ -914,6 +903,7 @@ int CAI_BaseNPC::OnTakeDamage_Dying( const CTakeDamageInfo &info )
 			}
 		}
 	}
+
 	return BaseClass::OnTakeDamage_Dying( info );
 }
 
@@ -942,20 +932,38 @@ int CAI_BaseNPC::OnTakeDamage_Dead( const CTakeDamageInfo &info )
 	// let the damage scoot the corpse around a bit.
 	if ( info.GetInflictor() && (info.GetAttacker()->GetSolid() != SOLID_TRIGGER) )
 	{
-		ApplyAbsVelocityImpulse( vecDir * -DamageForce( flDamage ) );
+		ApplyAbsVelocityImpulse( vecDir * -DamageForce( info.GetDamage() ) );
 	}
 
 #endif
 
+#if 0
 	// kill the corpse if enough damage was done to destroy the corpse and the damage is of a type that is allowed to destroy the corpse.
 	if ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) )
 	{
 		// Accumulate corpse gibbing damage, so you can gib with multiple hits
 		if ( m_takedamage != DAMAGE_EVENTS_ONLY )
 		{
+			if ( m_iHealth <= info.GetDamage() )
+			{
+				m_iHealth = -50;
+				Event_Gibbed( info );
+				return 0;
+			}
 			m_iHealth -= info.GetDamage() * 0.1;
 		}
 	}
+#else
+	// kill the corpse if enough damage was done to destroy the corpse and the damage is of a type that is allowed to destroy the corpse.
+	if ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) )
+	{
+		// Only classes that specifically request it are gibbed
+		if ( ShouldGib( info ) )
+		{
+			Event_Gibbed( info );
+		}
+	}
+#endif
 
 	if ( info.GetDamageType() & DMG_PLASMA )
 	{
@@ -1482,26 +1490,24 @@ void CBaseEntity::UpdateShotStatistics( const trace_t &tr )
 	}
 }
 
-
 //-----------------------------------------------------------------------------
 // Handle shot entering water
 //-----------------------------------------------------------------------------
-void CBaseEntity::HandleShotImpactingGlass( const FireBulletsInfo_t &info, 
-	const trace_t &tr, const Vector &vecDir, ITraceFilter *pTraceFilter )
+void CBaseEntity::HandleShotPenetrating( const FireBulletsInfo_t &info, 
+	const trace_t &tr, const Vector &vecDir, ITraceFilter *pTraceFilter, bool bHitGlass )
 {
 	// Move through the glass until we're at the other side
 	Vector	testPos = tr.endpos + ( vecDir * MAX_GLASS_PENETRATION_DEPTH );
 
 	CEffectData	data;
-
 	data.m_vNormal = tr.plane.normal;
 	data.m_vOrigin = tr.endpos;
-
-	DispatchEffect( "GlassImpact", data );
-
-	trace_t	penetrationTrace;
+	data.m_flScale = (info.m_iDamage/4);
+	if ( bHitGlass )
+		DispatchEffect( "GlassImpact", data );
 
 	// Re-trace as if the bullet had passed right through
+	trace_t	penetrationTrace;
 	UTIL_TraceLine( testPos, tr.endpos, MASK_SHOT, pTraceFilter, &penetrationTrace );
 
 	// See if we found the surface again
@@ -1516,8 +1522,8 @@ void CBaseEntity::HandleShotImpactingGlass( const FireBulletsInfo_t &info,
 
 	data.m_vNormal = penetrationTrace.plane.normal;
 	data.m_vOrigin = penetrationTrace.endpos;
-	
-	DispatchEffect( "GlassImpact", data );
+	if ( bHitGlass )
+		DispatchEffect( "GlassImpact", data );
 
 	// Refire the round, as if starting from behind the glass
 	FireBulletsInfo_t behindGlassInfo;
@@ -1562,7 +1568,6 @@ void CBaseEntity::CreateBubbleTrailTracer( const Vector &vecShotSrc, const Vecto
 	ComputeTracerStartPosition( vecShotSrc, &vecTracerSrc );
 	UTIL_BubbleTrail( vecTracerSrc, vecBubbleEnd, nBubbles );
 }
-
 
 //=========================================================
 //=========================================================
@@ -1952,7 +1957,7 @@ bool CAI_BaseNPC::QueryHearSound( CSound *pSound )
 	}
 
 	// Disregard footsteps from our own class type
-	if ( pSound->IsSoundType( SOUND_COMBAT ) && pSound->SoundChannel() == SOUNDENT_CHANNEL_NPC_FOOTSTEP )
+	if ( pSound->IsSoundType( SOUND_WORLD ) && pSound->SoundChannel() == SOUNDENT_CHANNEL_NPC_FOOTSTEP )
 	{
 		if ( pSound->m_hOwner && pSound->m_hOwner->ClassMatches( m_iClassname ) )
 				return false;
@@ -2132,7 +2137,7 @@ void CAI_BaseNPC::OnListened()
 				case SOUND_PHYSICS_DANGER:	condition = COND_HEAR_PHYSICS_DANGER;	break;
 				case SOUND_DANGER_SNIPERONLY:/* silence warning */					break;
 				case SOUND_MOVE_AWAY:		condition = COND_HEAR_MOVE_AWAY;		break;
-				case SOUND_PLAYER_VEHICLE:	condition = COND_HEAR_PLAYER;			break;
+				case SOUND_VEHICLE:			condition = COND_HEAR_VEHICLE;			break;
 
 				default:
 					DevMsg( "**ERROR: NPC %s hearing sound of unknown type %d!\n", GetClassname(), pCurrentSound->SoundType() );
@@ -2276,7 +2281,7 @@ void CAI_BaseNPC::TryRestoreHull(void)
 //=========================================================
 int CAI_BaseNPC::GetSoundInterests( void )
 {
-	return SOUND_WORLD | SOUND_COMBAT | SOUND_PLAYER | SOUND_PLAYER_VEHICLE | 
+	return SOUND_WORLD | SOUND_COMBAT | SOUND_PLAYER | SOUND_VEHICLE | 
 		SOUND_BULLET_IMPACT;
 }
 
@@ -2624,13 +2629,14 @@ void	CAI_BaseNPC::PopulatePoseParameters( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Set direction that the NPC aiming their gun
+// Purpose: Set direction that the NPC aiming thier gun
 //-----------------------------------------------------------------------------
 
 void CAI_BaseNPC::SetAim( const Vector &aimDir )
 {
 	QAngle angDir;
 	VectorAngles( aimDir, angDir );
+
 	float curPitch = GetPoseParameter( m_poseAim_Pitch );
 	float curYaw = GetPoseParameter( m_poseAim_Yaw );
 
@@ -2642,10 +2648,14 @@ void CAI_BaseNPC::SetAim( const Vector &aimDir )
 		// clamp and dampen movement
 		newPitch = curPitch + 0.8 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 20 ), curPitch );
 
+#if 0
 		float flRelativeYaw = UTIL_AngleDiff( angDir.y, GetAbsAngles().y );
-		// float flNewTargetYaw = UTIL_ApproachAngle( flRelativeYaw, curYaw, 20 );
-		// float newYaw = curYaw + 0.8 * UTIL_AngleDiff( flNewTargetYaw, curYaw );
 		newYaw = curYaw + UTIL_AngleDiff( flRelativeYaw, curYaw );
+#else
+		float flRelativeYaw = UTIL_AngleDiff( angDir.y, GetMotor()->GetIdealYaw() );
+		float flNewTargetYaw = UTIL_ApproachAngle( flRelativeYaw, curYaw, 20 );
+		newYaw = curYaw + 0.8 * UTIL_AngleDiff( flNewTargetYaw, curYaw );
+#endif
 	}
 	else
 	{
@@ -4262,7 +4272,6 @@ void CAI_BaseNPC::GatherAttackConditions( CBaseEntity *pTarget, float flDist )
 	ClearAttackConditions();
 	targetPos = pTarget->EyePosition();
 	bWeaponHasLOS = CurrentWeaponLOSCondition( targetPos, true );
-
 	AI_PROFILE_SCOPE_END();
 
 	if ( !bWeaponHasLOS )
@@ -4272,10 +4281,9 @@ void CAI_BaseNPC::GatherAttackConditions( CBaseEntity *pTarget, float flDist )
 		targetPos		= pTarget->BodyTarget( GetAbsOrigin() );
 		bWeaponHasLOS	= CurrentWeaponLOSCondition( targetPos, true );
 	}
-	else
-	{
+
+	if ( bWeaponHasLOS )
 		SetCondition( COND_WEAPON_HAS_LOS );
-	}
 
 	bool bWeaponIsReady = (GetActiveWeapon() && !IsWeaponStateChanging());
 
@@ -4677,6 +4685,12 @@ void CAI_BaseNPC::GatherConditions( void )
 				ClearCondition( COND_IN_PVS );
 		}
 
+		// Im on fire!!! Yeouch!
+		if( IsOnFire() )
+			SetCondition( COND_ON_FIRE );
+		else
+			ClearCondition( COND_ON_FIRE );
+
 		// Sample the environment. Do this unconditionally if there is a player in this
 		// npc's PVS. NPCs in COMBAT state are allowed to simulate when there is no player in
 		// the same PVS. This is so that any fights in progress will continue even if the player leaves the PVS.
@@ -4789,17 +4803,6 @@ void CAI_BaseNPC::PrescheduleThink( void )
 			// Throw away the request
 			m_iDesiredWeaponState = DESIREDWEAPONSTATE_IGNORE;
 		}
-	}
-
-	// Im on fire!!! Yeouch!
-	//FIXME; This might be better in gatherconditions???
-	if( IsOnFire() )
-	{
-		SetCondition( COND_ON_FIRE );
-	}
-	else
-	{
-		ClearCondition( COND_ON_FIRE );
 	}
 }
 
@@ -5241,19 +5244,15 @@ bool CAI_BaseNPC::Weapon_IsBetterAvailable()
 	{
 		if( GetActiveWeapon() )
 		{
-			m_flNextWeaponSearchTime = gpGlobals->curtime + 3;
+			m_flNextWeaponSearchTime = gpGlobals->curtime + 4;
 		}
 		else
 		{
+			// Look for a weapon frequently.
 			if( IsInPlayerSquad() )
-			{
-				// Look for a weapon frequently.
-				m_flNextWeaponSearchTime = gpGlobals->curtime + 1;
-			}
-			else
-			{
 				m_flNextWeaponSearchTime = gpGlobals->curtime + 2;
-			}
+			else
+				m_flNextWeaponSearchTime = gpGlobals->curtime + 3;
 		}
 
 		if ( Weapon_FindUsable( WEAPON_SEARCH_DELTA ) )
@@ -5345,13 +5344,11 @@ bool CAI_BaseNPC::WeaponLOSCondition(const Vector &ownerPos, const Vector &targe
 				}
 				bHaveLOS = false;
 			}
-			/* For grenades etc. check that player is clear?
 			// Check player position also
 			if (PlayerInRange( targetPos, 100 ))
 			{
 				SetCondition( COND_WEAPON_PLAYER_NEAR_TARGET );
 			}
-			*/
 		}
 
 		if ( bHaveLOS )
@@ -5567,8 +5564,8 @@ void CAI_BaseNPC::GatherEnemyConditions( CBaseEntity *pEnemy )
 {
 	AI_PROFILE_SCOPE(CAI_BaseNPC_GatherEnemyConditions);
 
-	ClearCondition( COND_ENEMY_FACING_ME  );
-	ClearCondition( COND_BEHIND_ENEMY   );
+	ClearCondition( COND_ENEMY_FACING_ME );
+	ClearCondition( COND_BEHIND_ENEMY );
 
 	// ---------------------------
 	//  Set visibility conditions
@@ -5670,15 +5667,44 @@ void CAI_BaseNPC::GatherEnemyConditions( CBaseEntity *pEnemy )
 			UpdateEnemyMemory(pEnemy,pEnemy->GetAbsOrigin());
 		}
 
-		// If it's not an NPC, assume it can't see me
-		if ( pEnemy->MyCombatCharacterPointer() && pEnemy->MyCombatCharacterPointer()->FInViewCone ( this ) )
+		// Check if he's targetting me specifically
+		if ( pEnemy->MyCombatCharacterPointer() && pEnemy->MyCombatCharacterPointer()->FInViewCone( this ) )
 		{
 			SetCondition( COND_ENEMY_FACING_ME );
 			ClearCondition( COND_BEHIND_ENEMY );
+
+			// If my enemy is a shooter grab his weapon range and half it, otherwise assume melee attacker
+			float fTargettingDistance;
+			if (pEnemy->MyCombatCharacterPointer()->GetActiveWeapon())
+				fTargettingDistance = 256 + (pEnemy->MyCombatCharacterPointer()->GetActiveWeapon()->m_fMaxRange1*0.5);
+			else
+				fTargettingDistance = 768;
+
+			if ( flDistToEnemy < fTargettingDistance)	//3072 - Dont bother checking if its a sniper or just really far away
+			{
+				Vector	enemyDir = GetAbsOrigin() - pEnemy->GetAbsOrigin();
+				VectorNormalize( enemyDir );
+				Vector	enemyBodyDir;
+
+				CBasePlayer *pPlayer = ToBasePlayer( pEnemy );
+				if ( GetEnemy()->IsPlayer() )
+					enemyBodyDir = pPlayer->BodyDirection3D();
+				else
+					AngleVectors( pEnemy->GetAbsAngles(), &enemyBodyDir );
+
+				float enemyDot = DotProduct( enemyBodyDir, enemyDir );
+
+				//FIXME: Need to refine this a bit
+				if ( enemyDot > 0.97f || pEnemy->MyCombatCharacterPointer()->GetEnemy() == this )	//If me enemy is the enemy of me
+					SetCondition( COND_ENEMY_TARGETTING_ME );
+				else
+					ClearCondition( COND_ENEMY_TARGETTING_ME );
+			}
 		}
 		else
 		{
 			ClearCondition( COND_ENEMY_FACING_ME );
+			ClearCondition( COND_ENEMY_TARGETTING_ME );
 			SetCondition( COND_BEHIND_ENEMY );
 		}
 	}
@@ -5959,7 +5985,7 @@ Activity CAI_BaseNPC::NPC_TranslateActivity( Activity eNewActivity )
 		case ACT_IDLE:
 			if (IsCrouching())
 			{
-				eNewActivity = ACT_COVER_LOW; //ACT_CROUCHIDLE
+				eNewActivity = ACT_CROUCHIDLE; //ACT_CROUCHIDLE
 				// This should be crouchidle (coverlow is for standoff and the like),
 				// but since most models are missing crouchidle anims, gotta use this instead for now
 			}
@@ -7704,6 +7730,16 @@ bool CAI_BaseNPC::CanBeAnEnemyOf( CBaseEntity *pEnemy )
 //			by distance.
 // Input  :
 // Output :
+// TODO; This needs to be looked at - the above text is bull, priority
+// seems to always be the only deciding factor, no matter if the enemy is visible or not
+//
+// Whats desired for caliber; enemies have slightly different base priorities, for example, 
+// all the human enemies prioritize zombies over each other - theyll still shoot at
+// eachother, but if you see a zombie shoot that first. Currently, if there are
+// any zombies that are known about on the map, all the human enemies freeze and 
+// completely focus on the zombie, and until that zombie is dead, they
+// completely ignore eachother, which is balls.
+//
 //-----------------------------------------------------------------------------
 
 CBaseEntity *CAI_BaseNPC::BestEnemy( void )
@@ -9452,10 +9488,6 @@ CanPlaySequence_t CAI_BaseNPC::CanPlaySequence( bool fDisregardNPCState, int int
 		return CANNOT_PLAY;
 	}
 
-	// An NPC in a vehicle cannot play a scripted sequence
-	if ( IsInAVehicle() )
-		return CANNOT_PLAY;
-
 	if ( fDisregardNPCState )
 	{
 		// ok to go, no matter what the npc state. (scripted AI)
@@ -9465,6 +9497,10 @@ CanPlaySequence_t CAI_BaseNPC::CanPlaySequence( bool fDisregardNPCState, int int
 
 		return eReturn;
 	}
+
+	// An NPC in a vehicle cannot play a scripted sequence
+	if ( IsInAVehicle() )
+		return CANNOT_PLAY;
 
 	if ( m_NPCState == NPC_STATE_NONE || m_NPCState == NPC_STATE_IDLE || m_IdealNPCState == NPC_STATE_IDLE )
 	{
@@ -10428,15 +10464,16 @@ CBaseEntity *CAI_BaseNPC::DropItem ( char *pszItemName, Vector vecPos, QAngle ve
 
 bool CAI_BaseNPC::ShouldFadeOnDeath( void )
 {
+	// No gibs
 	if ( g_RagdollLVManager.IsLowViolence() )
-	{
 		return true;
-	}
-	else
-	{
-		// if flagged to fade out
-		return HasSpawnFlags(SF_NPC_FADE_CORPSE);
-	}
+
+	// Running on DX8
+	if ( IsX360() )	//|| g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80
+		return true;
+
+	// if flagged to fade out
+	return HasSpawnFlags(SF_NPC_FADE_CORPSE);
 }
 
 //-----------------------------------------------------------------------------
@@ -10463,7 +10500,7 @@ bool CAI_BaseNPC::ShouldPlayIdleSound( void )
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::MakeAIFootstepSound( float volume, float duration )
 {
-	CSoundEnt::InsertSound( SOUND_COMBAT, EyePosition(), volume, duration, this, SOUNDENT_CHANNEL_NPC_FOOTSTEP );
+	CSoundEnt::InsertSound( SOUND_WORLD, EyePosition(), volume, duration, this, SOUNDENT_CHANNEL_NPC_FOOTSTEP );
 }
 
 //-----------------------------------------------------------------------------
@@ -13368,9 +13405,6 @@ bool CAI_BaseNPC::CanRunAScriptedNPCInteraction( bool bForced )
 	if ( !IsAlive() )
 		return false;
 
-	if ( IsOnFire() )
-		return false;
-
 	// Not while running scripted sequences
 	if ( m_hCine )
 		return false;
@@ -13383,6 +13417,9 @@ bool CAI_BaseNPC::CanRunAScriptedNPCInteraction( bool bForced )
 	else
 	{
 		if ( IsCrouching() )
+			return false;
+
+		if ( IsOnFire() )
 			return false;
 
 		if ( m_hForcedInteractionPartner || m_hInteractionPartner )
@@ -14003,23 +14040,19 @@ void CAI_BaseNPC::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 
 	// Append time since seen player
 	if ( m_flLastSawPlayerTime )
-	{
 		set.AppendCriteria( "timesinceseenplayer", UTIL_VarArgs( "%f", gpGlobals->curtime - m_flLastSawPlayerTime ) );
-	}
 	else
-	{
 		set.AppendCriteria( "timesinceseenplayer", "-1" );
-	}
 
 	// Append distance to my enemy
 	if ( GetEnemy() )
-	{
 		set.AppendCriteria( "distancetoenemy", UTIL_VarArgs( "%f", EnemyDistance(GetEnemy()) ) );
-	}
 	else
-	{
 		set.AppendCriteria( "distancetoenemy", "-1" );
-	}
+
+	// Am i in a squad?
+	if( GetSquad() != NULL )
+		set.AppendCriteria( "insquad", "1" );
 }
 
 //-----------------------------------------------------------------------------

@@ -134,6 +134,7 @@ private:
 	int			m_ExplosionMagnitude;
 	float		m_flPressureDelay;		// Delay before breaking when destoyed by pressure
 	int			m_iMinHealthDmg;		// minimum damage attacker must have to cause damage
+	bool		m_bExtraImpactFX;
 	bool		m_bTookPhysicsDamage;
 
 	string_t	m_iszPropData;

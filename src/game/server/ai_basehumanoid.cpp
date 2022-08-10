@@ -2,8 +2,9 @@
 //
 // Purpose: Humanoid baseclass - this doesnt contain any proper ai, all that still
 // needs to be defined in the subclass - this is for utility functions and very basic
-// states applicable to ALL human npcs like falling/jumping, heavydamage, sneakattacks, etc.
+// states applicable to ALL human npcs like falling/jumping, heavydamage, gibs, sneakattacks, etc.
 //
+// TODO; Limb gibbing
 //=============================================================================//
 
 #include "cbase.h"
@@ -58,7 +59,7 @@ void CAI_BaseHumanoid::CheckAmmo( void )
 {
 	BaseClass::CheckAmmo();
 
-	// FIXME: why isn't this a baseclass function?
+	// FIXME: why isn't this a baseclass function? NPCS with inate weapons could easily overwrite it
 	if (!GetActiveWeapon())
 		return;
 
@@ -109,6 +110,18 @@ void CAI_BaseHumanoid::BuildScheduleTestBits( )
 		SetCustomInterruptCondition( COND_ON_FIRE );
 	}
 #endif
+}
+
+//------------------------------------------------------------------------------
+bool CAI_BaseHumanoid::ShouldMoveAndShoot( void )
+{
+	if( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_TOO_FAR_TO_ATTACK ) )
+		return false;
+
+	if( GetEnemy() && g_pGameRules->IsSkillLevel( SKILL_EASY ) && HasCondition( COND_BEHIND_ENEMY, false ) )
+		return false;
+
+	return BaseClass::ShouldMoveAndShoot();
 }
 
 //-----------------------------------------------------------------------------
@@ -176,8 +189,10 @@ bool CAI_BaseHumanoid::ShouldPickADeathPose( void )
 	if ( IsCrouching() )
 		return false;
 
-//	if ( IsMoving() )
-//		return false;
+/*
+	if ( IsMoving() )
+		return false;
+*/
 
 #ifdef HL2_DLL
 	// Allow unique death animations - deathposes are meant to overwrite the generic ones
@@ -193,8 +208,8 @@ bool CAI_BaseHumanoid::ShouldPickADeathPose( void )
 
 bool CAI_BaseHumanoid::ShouldGib( const CTakeDamageInfo &info )
 {
-	if ( info.GetDamageType() & DMG_NEVERGIB )
-		 return false;
+	if ( info.GetDamageType() & (DMG_NEVERGIB|DMG_DISSOLVE) )
+		return false;
 
 	if ( ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) && m_iHealth < GIB_HEALTH_VALUE ) || ( info.GetDamageType() & DMG_ALWAYSGIB ) )
 		 return true;
@@ -202,6 +217,49 @@ bool CAI_BaseHumanoid::ShouldGib( const CTakeDamageInfo &info )
 	return false;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Sufficient fire damage has been done. Zombie ignites!
+//-----------------------------------------------------------------------------
+void CAI_BaseHumanoid::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bool bCalledByLevelDesigner )
+{
+	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
+
+#ifdef HL2_EPISODIC
+	if ( g_pGameRules->ShouldBurningPropsEmitLight() == true && GetEffectEntity() != NULL )
+	{
+		GetEffectEntity()->AddEffects( EF_DIMLIGHT );
+	}
+#endif // HL2_EPISODIC
+
+	if( !BehaviorSelectSchedule() )
+	{
+		Activity activity = GetActivity();
+		Activity burningActivity = activity;
+
+		if ( activity == ACT_WALK )
+		{
+			burningActivity = ACT_WALK_ON_FIRE;
+		}
+		else if ( activity == ACT_RUN )
+		{
+			burningActivity = ACT_RUN_ON_FIRE;
+		}
+		else if ( activity == ACT_IDLE )
+		{
+			burningActivity = ACT_IDLE_ON_FIRE;
+		}
+
+		if( HaveSequenceForActivity(burningActivity) )
+		{
+			// Make sure we have a sequence for this activity (torsos don't have any, for instance) 
+			// to prevent the baseNPC & baseAnimating code from throwing red level errors.
+			SetActivity( burningActivity );
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 ConVar	sk_backstab_distance( "sk_backstab_distance", "144.0" );	// 16 feet -- orig; 360.0f
 ConVar	sk_backstab_multiplier( "sk_backstab_multiplier", "5.0" );
 void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
@@ -249,6 +307,15 @@ void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 	BaseClass::TraceAttack( info, vecDir, ptr );
 }
 
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void CAI_BaseHumanoid::Event_Killed( const CTakeDamageInfo &info )
+{
+	BaseClass::Event_Killed( info );
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 int CAI_BaseHumanoid::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
 	// If I just got blasted and I should be knocked down, get KO'd!
@@ -261,8 +328,27 @@ int CAI_BaseHumanoid::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		{
 			// Get blasted!
 			m_bKnockedDown = true;
-			SetCondition( COND_KNOCKED_DOWN );
+			SetCondition( COND_STUNNED );
 		}
+
+		// !TODO; If the last bullet did so much damage i'm in the negatives
+#if 0
+		if ( info.GetDamageType() & (DMG_BUCKSHOT) && m_iHealth <= GIB_HEALTH_VALUE )
+		{
+			// I just got a limb blown off - send it flying
+			Vector vecLimbForce;
+			vecLimbForce.x = random->RandomFloat( -300, 300 );
+			vecLimbForce.y = random->RandomFloat( -300, 300 );
+			vecLimbForce.z = random->RandomFloat( 0, 250 );
+			CBaseEntity *pGib = CreateRagGib( "models/gibs/hgibs.mdl", info.GetDamagePosition(), GetAbsAngles(), vecLimbForce );
+
+			// don't collide with this thing ever
+			if ( pGib )
+			{
+				pGib->SetOwnerEntity( this );
+			}
+		}
+#endif
 	}
 
 	return BaseClass::OnTakeDamage_Alive( info );

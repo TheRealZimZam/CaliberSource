@@ -40,10 +40,10 @@
 #define TLK_STOP 			"TLK_STOP"
 #define TLK_NOSHOOT			"TLK_NOSHOOT"
 #define TLK_HELLO 			"TLK_HELLO"
-#define TLK_PHELLO 			"TLK_PHELLO"
+#define TLK_PLHELLO 		"TLK_PLHELLO"
 #define TLK_HELLO_NPC		"TLK_HELLO_NPC"
-#define TLK_PIDLE 			"TLK_PIDLE"
-#define TLK_PQUESTION 		"TLK_PQUESTION"
+#define TLK_PLIDLE 			"TLK_PLIDLE"
+#define TLK_PLQUESTION 		"TLK_PLQUESTION"
 #define TLK_PLHURT1 		"TLK_PLHURT1"
 #define TLK_PLHURT2 		"TLK_PLHURT2"
 #define TLK_PLHURT3 		"TLK_PLHURT3"
@@ -51,13 +51,12 @@
 #define TLK_PLPUSH 			"TLK_PLPUSH"
 #define TLK_PLRELOAD		"TLK_PLRELOAD"
 #define TLK_SMELL 			"TLK_SMELL"
-#define TLK_SHOT			"TLK_SHOT"
+#define TLK_PAIN			"TLK_PAIN"
 #define TLK_WOUND 			"TLK_WOUND"
 #define TLK_MORTAL 			"TLK_MORTAL"
 #define TLK_DANGER			"TLK_DANGER"
-#define TLK_SEE_COMBINE		"TLK_SEE_COMBINE"
+#define TLK_HEARDSOUND		"TLK_HEARDSOUND"
 #define TLK_ENEMY_DEAD		"TLK_ENEMY_DEAD"
-#define TLK_ALYX_ENEMY_DEAD "TLK_ALYX_ENEMY_DEAD"
 #define TLK_SELECTED		"TLK_SELECTED"	// selected by player in command mode.
 #define TLK_COMMANDED		"TLK_COMMANDED" // received orders from player in command mode
 #define TLK_COMMAND_FAILED	"TLK_COMMAND_FAILED" 
@@ -65,11 +64,12 @@
 #define TLK_BETRAYED		"TLK_BETRAYED"	// player killed an ally in front of me.
 #define TLK_ALLY_KILLED		"TLK_ALLY_KILLED" // witnessed an ally die some other way.
 #define TLK_ATTACKING		"TLK_ATTACKING" // about to fire my weapon at a target
+#define TLK_CHASING			"TLK_CHASING" // chasing an enemy
 #define TLK_HEAL			"TLK_HEAL" // healing someone
 #define TLK_GIVEAMMO		"TLK_GIVEAMMO" // giving ammo to someone
 #define TLK_DEATH			"TLK_DEATH"	// Death rattle
-#define TLK_HELP_ME			"TLK_HELP_ME" // call out to the player for help
-#define TLK_PLYR_PHYSATK	"TLK_PLYR_PHYSATK"	// Player's attacked me with a thrown physics object
+#define TLK_HELPME			"TLK_HELPME" // call out to the player for help
+#define TLK_PHYSATTACK		"TLK_PHYSATTACK"	// Player's attacked me with a thrown physics object
 #define TLK_NEWWEAPON		"TLK_NEWWEAPON"
 #define TLK_PLDEAD			"TLK_PLDEAD"
 #define TLK_HIDEANDRELOAD	"TLK_HIDEANDRELOAD"
@@ -316,6 +316,8 @@ public:
 
 	//---------------------------------
 
+	virtual void DeathSound( const CTakeDamageInfo &info );
+	virtual void BarnacleDeathSound( void );
 	virtual void PainSound( const CTakeDamageInfo &info );
 
 	//---------------------------------

@@ -44,18 +44,18 @@ enum SCOND_t
 	COND_REPEATED_DAMAGE,	// Damaged several times in a row
 	COND_ON_FIRE,			// Is currently on-fire
 	COND_STUNNED,			// Stunned by a attack
-	COND_KNOCKED_DOWN,		// Knocked down by a massive attack
 
 	COND_CAN_RANGE_ATTACK1,
 	COND_CAN_RANGE_ATTACK2,
 	COND_CAN_MELEE_ATTACK1,
 	COND_CAN_MELEE_ATTACK2,
 
-	COND_PROVOKED,			// Used to be (Player just went hostile), now used for random stuff??? (actbusy, operator, etc.)
+	COND_PROVOKED,			// Used to be (Player just went hostile), now used for random stuff??? (actbusy, operator, etc.) -- Moved to COND_WAY_CLEAR - W.M
 	COND_NEW_ENEMY,			// New enemy has entered sightline (repeats for each new enemy)
 
 	COND_ENEMY_TOO_FAR,		// Can we get rid of this one!?!?
 	COND_ENEMY_FACING_ME,
+	COND_ENEMY_TARGETTING_ME,
 	COND_BEHIND_ENEMY,		// Exactly *361 perpendicular to the future target
 	COND_ENEMY_DEAD,		// Enemy has just died
 	COND_ENEMY_UNREACHABLE,	// Not connected to me via node graph
@@ -78,17 +78,18 @@ enum SCOND_t
 	COND_HEALTH_ITEM_AVAILABLE,		// There's a healthkit available.
 	COND_GIVE_WAY,					// Another npc or player requested that I give way
 	COND_WAY_CLEAR,					// I no longer have to give way
-	COND_HEAR_DANGER,				// Near something dangerous (grenade, map-danger, etc.)
-	COND_HEAR_THUMPER,
-	COND_HEAR_BUGBAIT,
+
 	COND_HEAR_COMBAT,				// Heard combat sounds
 	COND_HEAR_WORLD,
 	COND_HEAR_PLAYER,
-	COND_HEAR_BULLET_IMPACT,		// Heard a bullet impact
+	COND_HEAR_DANGER,				// Near something dangerous (grenade, map-danger, etc.)
+	COND_HEAR_BULLET_IMPACT,		// Heard a bullet/weapon impact
+	COND_HEAR_THUMPER,
+	COND_HEAR_BUGBAIT,
 	COND_HEAR_PHYSICS_DANGER,
 	COND_HEAR_MOVE_AWAY,
+	COND_HEAR_VEHICLE,
 	COND_HEAR_SPOOKY,				// Zombies make this when Alyx is in darkness mode
-
 	COND_NO_HEAR_DANGER,			// Since we can't use ~CONDITION. Mutually exclusive with COND_HEAR_DANGER
 
 	COND_FLOATING_OFF_GROUND,

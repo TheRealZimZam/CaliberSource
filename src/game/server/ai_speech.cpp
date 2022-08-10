@@ -899,6 +899,12 @@ void CAI_ExpresserHost_NPC_DoModifyOrAppendCriteria( CAI_BaseNPC *pSpeaker, AI_C
   		set.AppendCriteria( "activity", pActivityName );
 	}
 
+//	const char *pModelName = STRING(pSpeaker->GetModelName());
+//	if ( pModelName )
+//	{
+  		set.AppendCriteria( "model", STRING(pSpeaker->GetModelName()) );
+//	}
+
 	static const char *pStateNames[] = { "None", "Idle", "Alert", "Combat", "Scripted", "PlayDead", "Dead" };
 	if ( (int)pSpeaker->m_NPCState < ARRAYSIZE(pStateNames) )
 	{
@@ -922,21 +928,15 @@ void CAI_ExpresserHost_NPC_DoModifyOrAppendCriteria( CAI_BaseNPC *pSpeaker, AI_C
 
 	CBaseCombatWeapon *weapon = pSpeaker->GetActiveWeapon();
 	if ( weapon )
-	{
 		set.AppendCriteria( "weapon", weapon->GetClassname() );
-	}
 	else
-	{
 		set.AppendCriteria( "weapon", "none" );
-	}
 
 	CBasePlayer *pPlayer = AI_GetSinglePlayer();
 	if ( pPlayer )
 	{
 		Vector distance = pPlayer->GetAbsOrigin() - pSpeaker->GetAbsOrigin();
-
 		set.AppendCriteria( "distancetoplayer", UTIL_VarArgs( "%f", distance.Length() ) );
-
 	}
 	else
 	{
@@ -944,22 +944,14 @@ void CAI_ExpresserHost_NPC_DoModifyOrAppendCriteria( CAI_BaseNPC *pSpeaker, AI_C
 	}
 
 	if ( pSpeaker->HasCondition( COND_SEE_PLAYER ) )
-	{
 		set.AppendCriteria( "seeplayer", "1" );
-	}
 	else
-	{
 		set.AppendCriteria( "seeplayer", "0" );
-	}
 
 	if ( pPlayer && pPlayer->FInViewCone( pSpeaker ) && pPlayer->FVisible( pSpeaker ) )
-	{
 		set.AppendCriteria( "seenbyplayer", "1" );
-	}
 	else
-	{
 		set.AppendCriteria( "seenbyplayer", "0" );
-	}
 }
 
 //-----------------------------------------------------------------------------

@@ -37,6 +37,7 @@ public:
 	CHL2GameMovement();
 
 // Overrides
+	virtual void HandleDuckingSpeedCrop();
 	virtual void FullLadderMove();
 	virtual bool LadderMove( void );
 	virtual bool OnLadder( trace_t &trace );

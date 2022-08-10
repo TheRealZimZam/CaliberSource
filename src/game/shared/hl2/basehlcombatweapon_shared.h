@@ -52,6 +52,7 @@ public:
 	virtual void	AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles );
 	virtual	float	CalcViewmodelBob( void );
 
+	virtual Vector	CalculateBulletSpread( void );
 	virtual Vector	GetBulletSpread( WeaponProficiency_t proficiency );
 	virtual float	GetSpreadBias( WeaponProficiency_t proficiency );
 

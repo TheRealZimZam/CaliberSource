@@ -47,6 +47,13 @@ BEGIN_PREDICTION_DATA( CBaseHLCombatWeapon )
 END_PREDICTION_DATA()
 
 ConVar sk_auto_reload_time( "sk_auto_reload_time", "12", FCVAR_REPLICATED );
+ConVar sk_realistic_spread( "sk_realistic_spread", "0", FCVAR_REPLICATED );
+ConVar sk_spread_moving_modifier( "sk_spread_moving_modifier", "1.1", FCVAR_REPLICATED );	// Moving/walking
+ConVar sk_spread_movingfast_modifier( "sk_spread_movingfast_modifier", "1.25", FCVAR_REPLICATED );	// Moving/jogging/sprinting
+ConVar sk_spread_flying_modifier( "sk_spread_flying_modifier", "1.4", FCVAR_REPLICATED );	// Jumping/flying/swimming
+ConVar sk_spread_crouch_modifier( "sk_spread_crouch_modifier", "0.8", FCVAR_REPLICATED );	// Crouching
+
+extern ConVar hl2_runspeed;
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -64,7 +71,7 @@ void CBaseHLCombatWeapon::ItemHolsterFrame( void )
 		return;
 
 	// If it's been longer than ten seconds, reload
-	if ( ( gpGlobals->curtime - m_flHolsterTime ) > sk_auto_reload_time.GetFloat() )
+	if ( ( gpGlobals->curtime - m_flHolsterTime ) > sk_auto_reload_time.GetFloat() && !m_bReloadsFullClip )
 	{
 		// Just load the clip with no animations
 		FinishReload();
@@ -370,6 +377,12 @@ void CBaseHLCombatWeapon::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &or
 }
 
 //-----------------------------------------------------------------------------
+Vector CBaseHLCombatWeapon::CalculateBulletSpread( void )
+{
+	return BaseClass::GetBulletSpread();
+}
+
+//-----------------------------------------------------------------------------
 Vector CBaseHLCombatWeapon::GetBulletSpread( WeaponProficiency_t proficiency )
 {
 	return BaseClass::GetBulletSpread( proficiency );
@@ -396,15 +409,51 @@ float CBaseHLCombatWeapon::CalcViewmodelBob( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : &origin - 
-//			&angles - 
-//			viewmodelindex - 
-//-----------------------------------------------------------------------------
 void CBaseHLCombatWeapon::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles )
 {
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Calculate bullet spread
+// NOTE; This is done for each shot, so try to keep it simple!
+//-----------------------------------------------------------------------------
+Vector CBaseHLCombatWeapon::CalculateBulletSpread( void )
+{
+	// Apply aiming factors for player AND npcs
+	float fSpreadModifier = 1.0f;
+
+	if ( sk_realistic_spread.GetBool() )
+	{
+		if ( GetOwner()->IsMoving() )
+			fSpreadModifier = sk_spread_moving_modifier.GetFloat();
+
+		if ( GetOwner() && GetOwner()->IsPlayer() )
+		{
+			CHL2_Player *pPlayer = assert_cast<CHL2_Player*>( GetOwner() );
+
+			if ( pPlayer->GetAbsVelocity().Length2D() > (hl2_runspeed.GetFloat() - 1.0f) )
+				fSpreadModifier = sk_spread_movingfast_modifier.GetFloat();
+
+			if ( pPlayer->GetFlags() & FL_DUCKING )
+				fSpreadModifier = sk_spread_crouch_modifier.GetFloat();
+
+			if ( !(pPlayer->GetFlags() & FL_ONGROUND) || pPlayer->GetMoveType( ) == MOVETYPE_LADDER )
+				fSpreadModifier = sk_spread_flying_modifier.GetFloat();
+		}
+	}
+
+	// UNDONE: Now get the original spread and make it into a float
+	// NOTE; Since this code only applies to weapons with default spread (weaponscript), im gonna take the easy way out here
+	float fHSpreadAmount;
+	float fVSpreadAmount;
+	fHSpreadAmount = GetHSpread() * fSpreadModifier;
+	fVSpreadAmount = GetVSpread() * fSpreadModifier;
+
+	// UNDONE: Then pack it back up into a vector
+	static Vector adjustedcone = Vector( fHSpreadAmount, ((fHSpreadAmount / 2) + (fVSpreadAmount / 2)), fVSpreadAmount );
+
+	return adjustedcone;
+}
 
 //-----------------------------------------------------------------------------
 Vector CBaseHLCombatWeapon::GetBulletSpread( WeaponProficiency_t proficiency )

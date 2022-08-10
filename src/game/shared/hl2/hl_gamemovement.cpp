@@ -7,6 +7,7 @@
 #include "hl_gamemovement.h"
 #include "in_buttons.h"
 #include "utlrbtree.h"
+#include "movevars_shared.h"
 #include "hl2_shareddefs.h"
 
 #ifdef HL2MP
@@ -139,6 +140,25 @@ void CReservePlayerSpot::Spawn()
 LINK_ENTITY_TO_CLASS( reserved_spot, CReservePlayerSpot );
 
 #endif
+
+//-----------------------------------------------------------------------------
+// Purpose: Crop the speed of the player when ducking and on the ground.
+//   Input: bInDuck - is the player already ducking
+//          bInAir - is the player in air
+// TODO; This should be hooked to walking speed
+//-----------------------------------------------------------------------------
+void CHL2GameMovement::HandleDuckingSpeedCrop( void )
+{
+	if ( !m_bSpeedCropped && ( player->GetFlags() & FL_DUCKING ) && ( player->GetGroundEntity() != NULL ) )
+	{
+		float frac = 0.44f;
+		mv->m_flForwardMove	*= frac;
+		mv->m_flSideMove	*= frac;
+		mv->m_flUpMove		*= frac;
+		m_bSpeedCropped		= true;
+	}
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : mounting - 
@@ -887,7 +907,6 @@ bool CHL2GameMovement::CheckLadderAutoMount( CFuncLadder *ladder, const Vector& 
 //-----------------------------------------------------------------------------
 bool CHL2GameMovement::LadderMove( void )
 {
-
 	if ( player->GetMoveType() == MOVETYPE_NOCLIP )
 	{
 		SetLadder( NULL );
@@ -992,17 +1011,16 @@ bool CHL2GameMovement::LadderMove( void )
 
 	float speed = player->MaxSpeed();
 
-
-	if ( mv->m_nButtons & IN_BACK )
-	{
-		forwardSpeed -= speed;
-	}
-	
 	if ( mv->m_nButtons & IN_FORWARD )
 	{
 		forwardSpeed += speed;
 	}
-	
+
+	if ( mv->m_nButtons & IN_BACK )
+	{
+		forwardSpeed -= speed * sv_backspeed.GetFloat();
+	}
+
 	if ( mv->m_nButtons & IN_MOVELEFT )
 	{
 		rightSpeed -= speed;
@@ -1094,8 +1112,8 @@ bool CHL2GameMovement::LadderMove( void )
 			}
 		}
 
-#ifdef _XBOX
-		if( sv_ladders_useonly.GetBool() )
+#if 1
+		if( sv_ladder_useonly.GetBool() )
 		{
 			// Stick up climbs up, stick down climbs down. No matter which way you're looking.
 			if ( mv->m_nButtons & IN_FORWARD )
@@ -1107,7 +1125,7 @@ bool CHL2GameMovement::LadderMove( void )
 				factor = -1.0f;
 			}
 		}
-#endif//_XBOX
+#endif	//_XBOX
 
 		mv->m_vecVelocity = MAX_CLIMB_SPEED * factor * ladderUp;
 	}

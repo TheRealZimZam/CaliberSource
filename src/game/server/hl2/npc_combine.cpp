@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright Â© 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Your classic malicious-military-marauders.
 // TODO's: Fix sentence prefix - the ifelite check works for now to get the demo out, but its gross and a better system would
@@ -6,7 +6,7 @@
 // The minimally invasive way I tried didnt work and I dont know how else to do it without a large re-write.
 // My idea is to have a think function interpret and store the finished sentence, and then play it when given the chance, 
 // rather than on a purely on-call basis as it is right now. I dont know about the perf costs of that, but
-// it shouldnt be too bad if its only updated every other think or something similar. - wm.
+// it shouldnt be too bad if its only updated every other think or something similar. - m.
 //
 // Auto-squadding, COND_COMBINE_DROP_GRENADE for tripmines, integrate with metrocops somehow??
 //

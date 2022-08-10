@@ -3031,20 +3031,6 @@ void C_BaseAnimating::ProcessMuzzleFlashEvent()
  
 			dlight_t *dl = effects->CL_AllocDlight ( LIGHT_INDEX_MUZZLEFLASH + index );
 			dl->origin = vAttachment;
-# if 0
-			// Disgusting hack just for testing
-			CBaseCombatWeapon *pWeapon = GetActiveWeapon();
-			if( FClassnameIs( pWeapon, "weapon_ar2" ) )
-			{
-				dl->color.r = 255;
-				dl->color.g = 192;
-				dl->color.b = 192;
-				dl->die = gpGlobals->curtime + 0.05f;
-				dl->radius = 256.0f;
-				dl->decay = 512.0f;
-				return true
-			}
-#endif
 			dl->color.r = 255;
 			dl->color.g = 192;
 			dl->color.b = 96;
@@ -3465,7 +3451,7 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 			{
 				options = "NPC_CombineS";
 			}
-
+#endif
 			Vector vel;
 			EstimateAbsVelocity( vel );
 
@@ -3479,7 +3465,6 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 				Q_snprintf( pSoundName, 256, "%s.FootstepLeft", options );
 			}
 			EmitSound( pSoundName );
-#endif
 		}
 		break;
 
@@ -3492,9 +3477,10 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 			{
 				options = "NPC_CombineS";
 			}
-
+#endif
 			Vector vel;
 			EstimateAbsVelocity( vel );
+
 			// If he's moving fast enough, play the run sound
 			if ( vel.Length2DSqr() > RUN_SPEED_ESTIMATE_SQR )
 			{
@@ -3505,7 +3491,6 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 				Q_snprintf( pSoundName, 256, "%s.FootstepRight", options );
 			}
 			EmitSound( pSoundName );
-#endif
 		}
 		break;
 
@@ -3553,7 +3538,7 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 	case AE_MUZZLEFLASH:
 		{
 			// Send out the effect for a player
-#if defined ( HL2MP ) || defined ( SDK_DLL ) // works for the modified CSS weapons included in the new template sdk.
+//#if defined ( HL2MP ) || defined ( SDK_DLL ) // works for the modified CSS weapons included in the new template sdk.
 			// HL2MP - Make third person muzzleflashes as reliable as the first person ones
 			// while in third person the view model dispatches the muzzleflash event - note: the weapon models dispatch them too, but not frequently.
 			if ( IsViewModel() )
@@ -3581,8 +3566,7 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 				if ( pWeapon && pWeapon->GetOwner() == C_BasePlayer::GetLocalPlayer() && ::input->CAM_IsThirdPerson() )
 					break;
 			}
-			
-#endif
+//#endif
 			DispatchMuzzleEffect( options, true );
 			break;
 		}
@@ -3864,7 +3848,8 @@ void C_BaseAnimating::FireObsoleteEvent( const Vector& origin, const QAngle& ang
 				bFirstPerson = false;
 				break;
 			}
-#if defined ( SDK_DLL )
+
+//#if defined ( SDK_DLL )
 			// HACKHACKHACK for third person. Will hacks ever be unnecessary? -- These Events are obsolete
 			// in third person, make first person muzzle flashes NOT dispatch!
 			if ( IsViewModel() )
@@ -3890,7 +3875,7 @@ void C_BaseAnimating::FireObsoleteEvent( const Vector& origin, const QAngle& ang
 					}
 				}
 			}
-#endif
+//#endif
 			if ( iAttachment != -1 && m_Attachments.Count() > iAttachment )
 			{
 				GetAttachment( iAttachment+1, attachOrigin, attachAngles );

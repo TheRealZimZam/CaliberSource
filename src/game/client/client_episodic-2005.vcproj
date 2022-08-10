@@ -649,6 +649,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\c_splash.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\c_splash.h"
+				>
+			</File>
+			<File
 				RelativePath=".\c_spotlight_end.cpp"
 				>
 			</File>
@@ -1394,6 +1402,10 @@
 			</File>
 			<File
 				RelativePath="..\shared\multiplay_gamerules.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\multiplayer_animstate.cpp"
 				>
 			</File>
 			<File
@@ -2452,6 +2464,14 @@
 				Name="HL2 DLL"
 				>
 				<File
+					RelativePath="..\shared\episodic\achievements_ep1.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\episodic\achievements_epx.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\shared\hl2\basehlcombatweapon_shared.cpp"
 					>
 				</File>
@@ -2461,6 +2481,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\c_ar2_explosion.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\c_assassin_smoke.cpp"
 					>
 				</File>
 				<File
@@ -2517,10 +2541,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\c_env_starfield.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\c_franz.cpp"
 					>
 				</File>
 				<File
@@ -2585,10 +2605,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\c_script_intro.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\c_south.cpp"
 					>
 				</File>
 				<File
@@ -2705,10 +2721,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\fx_hl2_tracers.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\fx_neardeath.cpp"
 					>
 				</File>
 				<File
@@ -4866,6 +4878,10 @@
 			</File>
 			<File
 				RelativePath="..\shared\multiplay_gamerules.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\multiplayer_animstate.h"
 				>
 			</File>
 			<File

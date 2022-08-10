@@ -38,7 +38,7 @@ public:
 	CHudPosture( const char *pElementName );
 	bool			ShouldDraw( void );
 
-#ifdef _X360 	// if not xbox 360, don't waste code space on this
+#ifdef HL2_DLL 	// _X360
 	virtual void	Init( void );
 	virtual void	Reset( void );
 	virtual void	OnTick( void );
@@ -98,7 +98,7 @@ CHudPosture::CHudPosture( const char *pElementName ) : CHudElement( pElementName
 //-----------------------------------------------------------------------------
 bool CHudPosture::ShouldDraw()
 {
-#ifdef _X360
+#ifdef HL2_DLL
 	return ( m_duckTimeout >= gpGlobals->curtime &&
 		CHudElement::ShouldDraw() );
 #else
@@ -106,7 +106,7 @@ bool CHudPosture::ShouldDraw()
 #endif
 }
 
-#ifdef _X360
+#ifdef HL2_DLL
 
 //-----------------------------------------------------------------------------
 // Purpose: 

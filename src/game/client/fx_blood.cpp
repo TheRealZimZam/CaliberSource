@@ -25,6 +25,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+//#define OLD_BLOOD_LIGHT 1
+
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectBloodSpray )
 CLIENTEFFECT_MATERIAL( "effects/blood_core" )
 CLIENTEFFECT_MATERIAL( "effects/blood_gore" )
@@ -85,8 +87,19 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 	
 	//Find area ambient light color and use it to tint smoke
 	Vector worldLight = WorldGetLightForPoint( origin, true );
+
+	float colorRamp = random->RandomFloat( 0.75f, 1.25f );
+#ifdef OLD_BLOOD_LIGHT
 	Vector color = Vector( (float)(worldLight[0] * r) / 255.0f, (float)(worldLight[1] * g) / 255.0f, (float)(worldLight[2] * b) / 255.0f );
-	float colorRamp;
+#else
+	// TODO; clamp worldlight value, so blood never shows up as %100 black - this is just some temp crap
+	Vector	color;
+	float	ramp = Bias( 1.0f * colorRamp, 0.25f );
+
+	color[0] = ( (float)(worldLight[0] * r) * ramp ) / 255.0f;
+	color[1] = ( (float)(worldLight[1] * g) * ramp ) / 255.0f;
+	color[2] = ( (float)(worldLight[2] * b) * ramp ) / 255.0f;
+#endif
 
 	int i;
 
@@ -195,7 +208,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 			return;
 
 		pSimple->SetSortOrigin( origin );
-		pSimple->SetGravity( 0 );
+		pSimple->SetGravity( 50 );
 
 		PMaterialHandle	hMaterial;
 		int	numBlood = random->RandomInt( 6, 8 );
@@ -227,8 +240,6 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 					pParticle->m_vecVelocity.Random( -spread, spread );
 					pParticle->m_vecVelocity += normal * random->RandomInt( 10, 100 );
 					//VectorNormalize( pParticle->m_vecVelocity );
-
-					colorRamp = random->RandomFloat( 0.75f, 1.25f );
 
 					pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
 					pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
@@ -273,8 +284,6 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 					pParticle->m_vecVelocity.Random( -spread, spread );
 					pParticle->m_vecVelocity += normal * random->RandomInt( 100, 200 );
 
-					colorRamp = random->RandomFloat( 0.75f, 1.25f );
-
 					pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
 					pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
 					pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
@@ -308,26 +317,36 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 
 	//Find area ambient light color and use it to tint smoke
 	Vector worldLight = WorldGetLightForPoint( origin, true );
-	
+
+#ifdef HL2MP
 	if ( gpGlobals->maxClients > 1 )
 	{
 		worldLight = Vector( 1.0, 1.0, 1.0 );
-		r = 96;
-		g = 0;
-		b = 10;
+	//	r = 96;
+	//	g = 0;
+	//	b = 0;
 	}
+#endif
 
+	float colorRamp = random->RandomFloat( 0.75f, 1.5f );
+#ifdef OLD_BLOOD_LIGHT
 	Vector color = Vector( (float)(worldLight[0] * r) / 255.0f, (float)(worldLight[1] * g) / 255.0f, (float)(worldLight[2] * b) / 255.0f );
-	float colorRamp;
+#else
+	// TODO; clamp worldlight value, so blood never shows up as %100 black - this is just some temp crap
+	Vector	color;
+	float	ramp = Bias( 1.0f * colorRamp, 0.25f );
 
-	Vector	offDir;
+	color[0] = ( (float)(worldLight[0] * r) * ramp ) / 255.0f;
+	color[1] = ( (float)(worldLight[1] * g) * ramp ) / 255.0f;
+	color[2] = ( (float)(worldLight[2] * b) * ramp ) / 255.0f;
+#endif
 
 	CSmartPtr<CBloodSprayEmitter> pSimple = CBloodSprayEmitter::Create( "bloodgore" );
 	if ( !pSimple )
 		return;
 
 	pSimple->SetSortOrigin( origin );
-	pSimple->SetGravity( 200 );
+	pSimple->SetGravity( 100 );
 	
 	// Setup a bounding box to contain the particles without (stops auto-updating)
 	pSimple->GetBinding().SetBBox( origin - Vector( 16, 16, 16 ), origin + Vector( 16, 16, 16 ) );
@@ -353,8 +372,6 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 
 		pParticle->m_vecVelocity	= dir * random->RandomFloat( 16.0f, 32.0f );
 		pParticle->m_vecVelocity[2] -= random->RandomFloat( 8.0f, 16.0f );
-
-		colorRamp = random->RandomFloat( 0.75f, 2.0f );
 
 		pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
 		pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
@@ -389,8 +406,6 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 
 			pParticle->m_vecVelocity	= dir * random->RandomFloat( 16.0f, 32.0f )*(i+1);
 			pParticle->m_vecVelocity[2] -= random->RandomFloat( 16.0f, 48.0f )*(i+1);
-
-			colorRamp = random->RandomFloat( 0.75f, 2.0f );
 
 			pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
 			pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
@@ -444,7 +459,7 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 
 		tParticle->m_flLifetime	= 0.0f;
 
-		offDir = RandomVector( -1.0f, 1.0f );
+		Vector offDir = RandomVector( -1.0f, 1.0f );
 
 		tParticle->m_vecVelocity = offDir * random->RandomFloat( 64.0f, 128.0f );
 
@@ -478,7 +493,8 @@ void FX_Gib( const Vector &origin, const Vector &normal, float scale, unsigned c
 	
 	//Find area ambient light color and use it to slightly tint blood
 	Vector worldLight = WorldGetLightForPoint( origin, true );
-	Vector color = Vector( (float)(worldLight[0] * r) / 128.0f, (float)(worldLight[1] * g) / 128.0f, (float)(worldLight[2] * b) / 128.0f );
+	Vector color = Vector( (float)(worldLight[0] * r) / 255.0f, (float)(worldLight[1] * g) / 255.0f, (float)(worldLight[2] * b) / 255.0f );
+
 	float colorRamp;
 
 	int i;
@@ -653,7 +669,7 @@ void BloodImpactCallback( const CEffectData & data )
 	if ( bFoundBlood == false )
 	{
 #endif
-// Until there's some better PFX available, use the old system
+// Keep all the game-generated FX on the old system for compatibility and easier testing
 	Vector vecPosition;
 	vecPosition = data.m_vOrigin;
 

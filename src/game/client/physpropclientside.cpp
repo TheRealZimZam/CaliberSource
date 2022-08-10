@@ -729,6 +729,7 @@ CBaseEntity *BreakModelCreateSingle( CBaseEntity *pOwner, breakmodel_t *pModel, 
 		pEntity->SetDmgModBullet( pBreakableOwner->GetDmgModBullet() );
 		pEntity->SetDmgModClub( pBreakableOwner->GetDmgModClub() );
 		pEntity->SetDmgModExplosive( pBreakableOwner->GetDmgModExplosive() );
+		pEntity->SetDmgModFire( pBreakableOwner->GetDmgModFire() );
 
 		// FIXME: If this was created from a client-side entity which was in the
 		// middle of ramping the fade scale, we're screwed.

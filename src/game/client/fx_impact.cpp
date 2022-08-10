@@ -6,7 +6,7 @@
 #include "cbase.h"
 #include "decals.h"
 #include "materialsystem/IMaterialVar.h"
-//#include "c_splash.h"
+#include "c_splash.h"
 #include "ieffects.h"
 #include "fx.h"
 #include "fx_impact.h"
@@ -192,7 +192,7 @@ char const *GetImpactDecal( C_BaseEntity *pEntity, int iMaterial, int iDamageTyp
 //------------------------------------------------------------------------------
 void LeakEffect( trace_t &tr )
 {
-	#if 0
+#if 1
 	Vector			diffuseColor, baseColor;
 	Vector			vTraceDir	= (tr.endpos - tr.startpos);
 	VectorNormalize(vTraceDir);
@@ -236,7 +236,7 @@ void LeakEffect( trace_t &tr )
 		pLeak->m_flSpeedRange	 = pLeak->m_flNoise * flForce;
 	}
 
-	pLeak->m_flSpawnRate		= pLeakVar->GetFloatValue();;
+	pLeak->m_flSpawnRate		= pLeakVar->GetFloatValue();
 	pLeak->m_flParticleLifetime = 10;
 	pLeak->m_flWidthMin			= 1;
 	pLeak->m_flWidthMax			= 5;
@@ -246,10 +246,10 @@ void LeakEffect( trace_t &tr )
 	VectorAngles( tr.plane.normal, angles );
 	pLeak->SetLocalAngles( angles );
 
-	pLeak->Start(&g_ParticleMgr, NULL);
+	pLeak->Start(ParticleMgr(), NULL);
 	pLeak->m_flStopEmitTime	= gpGlobals->curtime+5.0;
 	pLeak->SetNextClientThink(gpGlobals->curtime+20.0);
-	#endif
+#endif
 }
 
 //-----------------------------------------------------------------------------

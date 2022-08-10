@@ -110,7 +110,7 @@ void C_Splash::OnDataChanged(DataUpdateType_t updateType)
 	if(updateType == DATA_UPDATE_CREATED)
 	{
 		SetPos(GetAbsOrigin(), true);
-		Start(&g_ParticleMgr, NULL);
+		Start(ParticleMgr(), NULL);
 	}
 	InitParticleCollisions();
 }
@@ -256,7 +256,7 @@ bool C_Splash::SimulateAndRender(Particle *pParticle, ParticleDraw *pDraw, float
 	// NOTE: We need to do everything in screen space
 	Vector  delta;
 	Vector	start;
-	TransformParticle(g_ParticleMgr.GetModelView(), pSimpleParticle->m_Pos, start);
+	TransformParticle(m_pParticleMgr->GetModelView(), pSimpleParticle->m_Pos, start);
 
 	Vector3DMultiply( CurrentWorldToViewMatrix(), pSimpleParticle->m_vecVelocity, delta );
 

@@ -29,13 +29,28 @@ DECLARE_CLIENT_EFFECT( "ShellEject", ShellEjectCallback );
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void RifleShellEjectCallback( const CEffectData &data )
+void SMGShellEjectCallback( const CEffectData &data )
 {
 	// Use the gun angles to orient the shell
 	IClientRenderable *pRenderable = data.GetRenderable();
 	if ( pRenderable )
 	{
 		tempents->EjectBrass( data.m_vOrigin, data.m_vAngles, pRenderable->GetRenderAngles(), 1 );
+	}
+}
+
+DECLARE_CLIENT_EFFECT( "SMGShellEject", SMGShellEjectCallback );
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void RifleShellEjectCallback( const CEffectData &data )
+{
+	// Use the gun angles to orient the shell
+	IClientRenderable *pRenderable = data.GetRenderable();
+	if ( pRenderable )
+	{
+		tempents->EjectBrass( data.m_vOrigin, data.m_vAngles, pRenderable->GetRenderAngles(), 2 );
 	}
 }
 
@@ -50,10 +65,23 @@ void ShotgunShellEjectCallback( const CEffectData &data )
 	IClientRenderable *pRenderable = data.GetRenderable();
 	if ( pRenderable )
 	{
-		tempents->EjectBrass( data.m_vOrigin, data.m_vAngles, pRenderable->GetRenderAngles(), 2 );
+		tempents->EjectBrass( data.m_vOrigin, data.m_vAngles, pRenderable->GetRenderAngles(), 3 );
 	}
 }
 
 DECLARE_CLIENT_EFFECT( "ShotgunShellEject", ShotgunShellEjectCallback );
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void AR2ShellEjectCallback( const CEffectData &data )
+{
+	// Use the gun angles to orient the shell
+	IClientRenderable *pRenderable = data.GetRenderable();
+	if ( pRenderable )
+	{
+		tempents->EjectBrass( data.m_vOrigin, data.m_vAngles, pRenderable->GetRenderAngles(), 4 );
+	}
+}
 
+DECLARE_CLIENT_EFFECT( "AR2ShellEject", AR2ShellEjectCallback );

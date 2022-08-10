@@ -16,6 +16,10 @@
 #include "hud_crosshair.h"
 #include <vgui/ISurface.h>
 
+#if defined( REPLAY_ENABLED )
+#include "replay/ienginereplay.h"
+#endif
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -43,11 +47,21 @@ static ConVar fov_watcher( "_fov", "0", 0, "Automates fov command to server.", F
 //-----------------------------------------------------------------------------
 void CHud::Think(void)
 {
+#if defined( REPLAY_ENABLED )
+	// Don't draw this
+	extern IEngineClientReplay *g_EngineClientReplay;
+	const bool bPlayingReplay = g_pEngineClientReplay && g_pEngineClientReplay->IsPlayingReplayDemo();
+#endif
+
 	// Determine the visibility of all hud elements
 	for ( int i = 0; i < m_HudList.Size(); i++ )
 	{
 		// Visible?
 		bool visible = m_HudList[i]->ShouldDraw();
+
+#if defined( REPLAY_ENABLED )
+		visible = visible && !bPlayingReplay;
+#endif
 
 		m_HudList[i]->SetActive( visible );
 
@@ -150,7 +164,7 @@ void CHud::DrawProgressBar( int x, int y, int width, int height, float percentag
 //			clr - 
 //			type - 
 //-----------------------------------------------------------------------------
-void CHud::DrawIconProgressBar( int x, int y, CHudTexture *icon, CHudTexture *icon2, float percentage, Color& clr, int type )
+void CHud::DrawIconProgressBar( int x, int y, int width, int height, CHudTexture *icon, CHudTexture *icon2, float percentage, Color& clr, int type )
 {
 	if ( icon == NULL )
 		return;
@@ -159,8 +173,14 @@ void CHud::DrawIconProgressBar( int x, int y, CHudTexture *icon, CHudTexture *ic
 	percentage = min( 1.0f, percentage );
 	percentage = max( 0.0f, percentage );
 
-	int	height = icon->Height();
-	int	width  = icon->Width();
+	if ( !width )
+	{
+		width = icon->Width();
+	}
+	if ( !height )
+	{
+		height = icon->Height();
+	}
 
 	//Draw a vertical progress bar
 	if ( type == HUDPB_VERTICAL )
@@ -189,6 +209,22 @@ void CHud::DrawIconProgressBar( int x, int y, CHudTexture *icon, CHudTexture *ic
 		icon->DrawSelfCropped( 
 			x + barOfs, y, 
 			barOfs, 0, width - barOfs, height, // Cropped subrect
+			clr );
+	}
+	else if ( type == HUDPB_HORIZONTAL_INV )
+	{
+		int	barOfs = width - ( width * percentage );
+
+		//empty portion
+		icon->DrawSelfCropped( 
+			x + barOfs, y, 
+			barOfs, 0, width - barOfs, height, // Cropped subrect
+			clr );
+
+		//full portion
+		icon->DrawSelfCropped( 
+			x, y,
+			0, 0, barOfs, height, // Cropped subrect
 			clr );
 	}
 }

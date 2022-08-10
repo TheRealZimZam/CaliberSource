@@ -2469,9 +2469,11 @@ void CTempEnts::LevelInit()
 	m_pSpriteCombineFlash[0] = (model_t *)engine->LoadModel( "effects/combinemuzzle1.vmt" );
 	m_pSpriteCombineFlash[1] = (model_t *)engine->LoadModel( "effects/combinemuzzle2.vmt" );
 
-	m_pShells[0] = (model_t *) engine->LoadModel( "models/weapons/shell.mdl" );
-	m_pShells[1] = (model_t *) engine->LoadModel( "models/weapons/rifleshell.mdl" );
-	m_pShells[2] = (model_t *) engine->LoadModel( "models/weapons/shotgun_shell.mdl" );
+	m_pShells[0] = (model_t *) engine->LoadModel( "models/weapons/shell.mdl" );			//Pistol
+	m_pShells[1] = (model_t *) engine->LoadModel( "models/weapons/smgshell.mdl" );		//SMG/Magnum
+	m_pShells[2] = (model_t *) engine->LoadModel( "models/weapons/rifleshell.mdl" );	//AR2/HMG
+	m_pShells[3] = (model_t *) engine->LoadModel( "models/weapons/shotgunshell.mdl" );	//Shotgun
+	m_pShells[4] = (model_t *) engine->LoadModel( "models/weapons/big_casing.mdl" );	//Sniper/Cannon
 #endif
 
 #if defined( HL1_CLIENT_DLL )
@@ -3728,7 +3730,8 @@ void CTempEnts::MuzzleFlash_357_Player( ClientEntityHandle_t hEntity, int attach
 
 void CTempEnts::MuzzleFlash_357_NPC( ClientEntityHandle_t hEntity, int attachmentIndex )
 {
-	FX_MuzzleEffectAttached( 0.75f, hEntity, attachmentIndex );
+	//Draw the cloud of fire
+	FX_MuzzleEffectAttached( 1.0f, hEntity, attachmentIndex, NULL, true );
 }
 
 //==================================================
@@ -4336,9 +4339,10 @@ void CTempEnts::HL1EjectBrass( const Vector &vecPosition, const QAngle &angAngle
 }
 
 #define SHELLTYPE_PISTOL	0
-#define SHELLTYPE_RIFLE		1
-#define SHELLTYPE_SHOTGUN	2
-
+#define SHELLTYPE_SMG		1
+#define SHELLTYPE_RIFLE		2
+#define SHELLTYPE_SHOTGUN	3
+#define SHELLTYPE_AR2		4
 
 void CTempEnts::CSEjectBrass( const Vector &vecPosition, const QAngle &angVelocity, int nVelocity, int shellType, CBasePlayer *pShooter )
 {

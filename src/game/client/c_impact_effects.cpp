@@ -468,7 +468,7 @@ void FX_DebrisFlecks( const Vector& origin, trace_t *tr, char materialType, int 
 }
 
 #define	GLASS_SHARD_MIN_LIFE	2.5f
-#define	GLASS_SHARD_MAX_LIFE	5.0f
+#define	GLASS_SHARD_MAX_LIFE	8.0f
 #define	GLASS_SHARD_NOISE		0.8
 #define	GLASS_SHARD_GRAVITY		800
 #define	GLASS_SHARD_DAMPING		0.3
@@ -478,7 +478,7 @@ void FX_DebrisFlecks( const Vector& origin, trace_t *tr, char materialType, int 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void FX_GlassImpact( const Vector &pos, const Vector &normal )
+void FX_GlassImpact( const Vector &pos, const Vector &normal, int iScale )
 {
 	VPROF_BUDGET( "FX_GlassImpact", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	CSmartPtr<CSimple3DEmitter> pGlassEmitter = CSimple3DEmitter::Create( "FX_GlassImpact" );
@@ -490,7 +490,10 @@ void FX_GlassImpact( const Vector &pos, const Vector &normal )
 	// HACK: Blend a little toward white to match the materials...
 	VectorLerp( vecColor, Vector( 1, 1, 1 ), 0.3, vecColor );
 
-	float flShardSize	= random->RandomFloat( 2.0f, 6.0f );
+	if (iScale > 3)
+		iScale = 3;
+	else if (iScale < 1)
+		iScale = 1;
 
 	unsigned char color[3] = { 200, 200, 210 };
 
@@ -498,7 +501,8 @@ void FX_GlassImpact( const Vector &pos, const Vector &normal )
 	// Create glass shards
 	// ----------------------
 
-	int numShards = random->RandomInt( 2, 4 );
+	float flShardSize	= random->RandomFloat( 2.0f, 6.0f );
+	int numShards = random->RandomInt( 3, 6 ) * iScale;
 
 	for ( int i = 0; i < numShards; i++ )
 	{
@@ -534,9 +538,8 @@ void FX_GlassImpact( const Vector &pos, const Vector &normal )
 	color[2] = 92;
 
 	// ---------------------------
-	// Dust
+	// Cloud of shards
 	// ---------------------------
-
 	Vector	dir;
 	Vector	offset = pos + ( normal * 2.0f );
 	float	colorRamp;
@@ -548,19 +551,19 @@ void FX_GlassImpact( const Vector &pos, const Vector &normal )
 		newParticle.m_Pos = offset;
 
 		newParticle.m_flLifetime= 0.0f;
-		newParticle.m_flDieTime	= random->RandomFloat( 0.1f, 0.25f );
+		newParticle.m_flDieTime	= random->RandomFloat( 0.1f, 0.5f );
 		
 		dir[0] = normal[0] + random->RandomFloat( -0.8f, 0.8f );
 		dir[1] = normal[1] + random->RandomFloat( -0.8f, 0.8f );
 		dir[2] = normal[2] + random->RandomFloat( -0.8f, 0.8f );
 
-		newParticle.m_uchStartSize	= random->RandomInt( 1, 4 );
+		newParticle.m_uchStartSize	= random->RandomInt( 1, 3 ) * iScale;
 		newParticle.m_uchEndSize	= newParticle.m_uchStartSize * 8;
 
 		newParticle.m_vecVelocity	= dir * random->RandomFloat( 8.0f, 16.0f )*(i+1);
 		newParticle.m_vecVelocity[2] -= random->RandomFloat( 16.0f, 32.0f )*(i+1);
 
-		newParticle.m_uchStartAlpha	= random->RandomInt( 128, 255 );
+		newParticle.m_uchStartAlpha	= random->RandomInt( 128, 224 );
 		newParticle.m_uchEndAlpha	= 0;
 		
 		newParticle.m_flRoll		= random->RandomFloat( 0, 360 );
@@ -581,13 +584,13 @@ void FX_GlassImpact( const Vector &pos, const Vector &normal )
 	newParticle.m_Pos = offset;
 
 	newParticle.m_flLifetime		= 0.0f;
-	newParticle.m_flDieTime		= random->RandomFloat( 1.0f, 1.5f );
+	newParticle.m_flDieTime		= random->RandomFloat( 0.25f, 0.75f );
 
 	dir[0] = normal[0] + random->RandomFloat( -0.8f, 0.8f );
 	dir[1] = normal[1] + random->RandomFloat( -0.8f, 0.8f );
 	dir[2] = normal[2] + random->RandomFloat( -0.8f, 0.8f );
 
-	newParticle.m_uchStartSize	= random->RandomInt( 4, 8 );
+	newParticle.m_uchStartSize	= random->RandomInt( 4, 6 ) * iScale;
 	newParticle.m_uchEndSize		= newParticle.m_uchStartSize * 4.0f;
 
 	newParticle.m_vecVelocity = dir * random->RandomFloat( 2.0f, 8.0f );
@@ -610,7 +613,7 @@ void FX_GlassImpact( const Vector &pos, const Vector &normal )
 
 void GlassImpactCallback( const CEffectData &data )
 {
-	FX_GlassImpact( data.m_vOrigin, data.m_vNormal );
+	FX_GlassImpact( data.m_vOrigin, data.m_vNormal, data.m_flScale );
 }
 
 DECLARE_CLIENT_EFFECT( "GlassImpact", GlassImpactCallback );

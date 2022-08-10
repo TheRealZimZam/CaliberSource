@@ -188,9 +188,13 @@ void C_EnvScreenOverlay::ClientThink( void )
 // Effect types
 enum 
 {
-	SCREENEFFECT_EP2_ADVISOR_STUN,
 	SCREENEFFECT_EP1_INTRO,
+	SCREENEFFECT_WATERSPRAY,
+	SCREENEFFECT_RAINDROPS,
 	SCREENEFFECT_EP2_GROGGY,
+	SCREENEFFECT_EP2_ADVISOR_STUN,
+	SCREENEFFECT_CRITICAL_HEALTH,
+	SCREENEFFECT_FILMGRAIN,
 };
 
 // ============================================================================
@@ -252,16 +256,25 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 					pKeys->SetFloat( "duration", m_flDuration );
 					pKeys->SetInt( "fadeout", 0 );
 
-					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "episodic_intro", pKeys );
-					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "episodic_intro" );
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "introblur", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "introblur" );
 				}
-				else if ( m_nType == SCREENEFFECT_EP2_ADVISOR_STUN )
+				else if ( m_nType == SCREENEFFECT_WATERSPRAY )
 				{
 					// Set our keys
 					pKeys->SetFloat( "duration", m_flDuration );
 
-					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "episodic_stun", pKeys );
-					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "episodic_stun" );
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "waterspray", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "waterspray" );
+				}
+				else if ( m_nType == SCREENEFFECT_RAINDROPS )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+					pKeys->SetInt( "fadeout", 0 );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "raindrops", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "raindrops" );
 				}
 				else if ( m_nType == SCREENEFFECT_EP2_GROGGY )
 				{
@@ -275,7 +288,31 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "ep2_groggy", pKeys );
 					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "ep2_groggy" );
 				}
-                
+				else if ( m_nType == SCREENEFFECT_EP2_ADVISOR_STUN )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "episodic_stun", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "episodic_stun" );
+				}
+				else if ( m_nType == SCREENEFFECT_CRITICAL_HEALTH )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "neardeath", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "neardeath" );
+				}
+				else if ( m_nType == SCREENEFFECT_FILMGRAIN )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "filmgrain", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "filmgrain" );
+				}
+
 				pKeys->deleteThis();
 			}
 			break;
@@ -298,11 +335,28 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 				pKeys->SetFloat( "duration", m_flDuration );
 				pKeys->SetInt( "fadeout", 1 );
 
-				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "episodic_intro", pKeys );
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "introblur", pKeys );
 			}
-			else if ( m_nType == SCREENEFFECT_EP2_ADVISOR_STUN )
+			else if ( m_nType == SCREENEFFECT_WATERSPRAY )
 			{
-				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "episodic_stun" );
+				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "waterspray" );
+			}
+			else if ( m_nType == SCREENEFFECT_RAINDROPS )
+			{
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
+				{
+					return;
+				}
+				// Create a keyvalue block to set these params
+				KeyValues *pKeys = new KeyValues( "keys" );
+				if ( pKeys == NULL )
+					return;
+
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+				pKeys->SetInt( "fadeout", 1 );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "raindrops", pKeys );
 			}
 			else if ( m_nType == SCREENEFFECT_EP2_GROGGY )
 			{
@@ -320,6 +374,31 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 				pKeys->SetInt( "fadeout", 1 );
 
 				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "ep2_groggy", pKeys );
+			}
+			else if ( m_nType == SCREENEFFECT_EP2_ADVISOR_STUN )
+			{
+				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "episodic_stun" );
+			}
+			else if ( m_nType == SCREENEFFECT_CRITICAL_HEALTH )
+			{
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
+				{
+					return;
+				}
+				// Create a keyvalue block to set these params
+				KeyValues *pKeys = new KeyValues( "keys" );
+				if ( pKeys == NULL )
+					return;
+
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+				pKeys->SetInt( "fadeout", 1 );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "neardeath", pKeys );
+			}
+			else if ( m_nType == SCREENEFFECT_FILMGRAIN )
+			{
+				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "filmgrain" );
 			}
 
 			break;

@@ -1535,7 +1535,7 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 		// TERROR: Find an endpos
 		//!!!TODO; This is bad! a hardcoded endpoint doesnt work for ledges, or when the player is viewing from a high indoor position!
 		//!!! possible solution - determine if the player is viewing the particles from indoors (ie not in the trigger box),
-		//!!! if so, use the old logic that just falls through the floor until the lifetime ends - W.M
+		//!!! if so, use the old logic that just falls through the floor until the lifetime ends - M.M
 		float endposCompatibility = 96.0f; 
 		if ( r_RainCheck.GetInt() != 0 )
 		{

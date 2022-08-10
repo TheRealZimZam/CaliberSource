@@ -70,6 +70,7 @@ extern ConVar sensitivity;
 
 static C_BasePlayer *s_pLocalPlayer = NULL;
 
+static ConVar	cl_first_person_uses_world_model ( "cl_first_person_uses_world_model", "0", 0, "Does the playermodel render in first person?" );
 static ConVar	cl_customsounds ( "cl_customsounds", "0", 0, "Enable customized player sound playback" );
 static ConVar	spec_track		( "spec_track", "0", 0, "Tracks an entity in spec mode" );
 static ConVar	cl_smooth		( "cl_smooth", "1", 0, "Smooth view/eye origin after prediction errors" );
@@ -412,7 +413,6 @@ C_BasePlayer::~C_BasePlayer()
 		delete m_pFlashlight;
 	}
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -1610,7 +1610,7 @@ void C_BasePlayer::ThirdPersonSwitch( bool bThirdperson )
 //-----------------------------------------------------------------------------
 bool C_BasePlayer::ShouldDrawLocalPlayer()
 {
-	return input->CAM_IsThirdPerson() || ( ToolsEnabled() && ToolFramework_IsThirdPersonCamera() );
+	return input->CAM_IsThirdPerson() || ( ToolsEnabled() && ToolFramework_IsThirdPersonCamera() ) || cl_first_person_uses_world_model.GetBool();
 }
 
 //-----------------------------------------------------------------------------

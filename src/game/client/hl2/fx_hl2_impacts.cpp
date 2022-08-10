@@ -88,10 +88,16 @@ DECLARE_CLIENT_EFFECT( "MeleeImpact", MeleeImpactCallback );
 //-----------------------------------------------------------------------------
 void AR2ImpactCallback( const CEffectData &data )
 {
+	// Fast Lines
+	Vector vecNormal;
+	Vector vecPosition;
+	vecPosition = data.m_vOrigin;
+	vecNormal = data.m_vNormal;
+
 #ifdef _XBOX
 	// Impact sprite
-	FX_AddQuad( data.m_vOrigin, 
-				data.m_vNormal, 
+	FX_AddQuad( vecPosition, 
+				vecNormal, 
 				random->RandomFloat( 24, 32 ),
 				0,
 				0.75f, 
@@ -105,12 +111,6 @@ void AR2ImpactCallback( const CEffectData &data )
 				"effects/ar2_impact",
 				(FXQUAD_BIAS_SCALE|FXQUAD_BIAS_ALPHA) );
 #else
-	// Fast Lines
-	Vector vecNormal;
-	Vector vecPosition;
-	vecPosition = data.m_vOrigin;
-	vecNormal = data.m_vNormal;
-
 	FX_MicroExplosion( vecPosition, vecNormal );
 #endif
 }

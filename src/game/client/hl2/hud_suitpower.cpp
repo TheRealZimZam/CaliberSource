@@ -23,6 +23,7 @@ using namespace vgui;
 DECLARE_HUDELEMENT( CHudSuitPower );
 
 #define SUITPOWER_INIT -1
+#define SOLID_BAR 0
 
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
@@ -138,6 +139,43 @@ void CHudSuitPower::Paint()
 	if ( !pPlayer )
 		return;
 
+	int		r, g, b, a;
+	int		xpos = m_flBarInsetX, ypos = m_flBarInsetY;
+	Color	clrBar;
+
+	if ( !icon_bar )
+	{
+		icon_bar = gHUD.GetIcon( "progress_bar" );
+		icon_bar_empty = gHUD.GetIcon( "empty" );
+	}
+
+	if ( !icon_suit )
+	{
+		icon_suit = gHUD.GetIcon( "suit_full" );
+	}
+
+	if ( !icon_suit_empty )
+	{
+		icon_suit_empty = gHUD.GetIcon( "suit_empty" );
+	}
+
+	if ( !icon_bar )
+		return;
+
+	if ( pPlayer->m_HL2Local.m_flSuitPower < 20 )
+	{
+		(gHUD.m_clrCaution).GetColor( r, g, b, a );
+	}
+	else
+	{
+		(gHUD.m_clrNormal).GetColor( r, g, b, a );
+	}
+	clrBar.SetColor( r, g, b, a );
+
+#if SOLID_BAR
+	// Just draw a solid progress bar
+	gHUD.DrawIconProgressBar( xpos, ypos, m_flBarWidth, m_flBarHeight, icon_bar, icon_bar_empty, m_flSuitPower, clrBar, CHud::HUDPB_HORIZONTAL );
+#else
 	// get bar chunks
 	int chunkCount = m_flBarWidth / (m_flBarChunkWidth + m_flBarChunkGap);
 	int enabledChunks = (int)((float)chunkCount * (m_flSuitPower * 1.0f/100.0f) + 0.5f );
@@ -164,21 +202,16 @@ void CHudSuitPower::Paint()
 		}
 	}
 
-	// draw the suit power bar
-	surface()->DrawSetColor( m_AuxPowerColor );
-	int xpos = m_flBarInsetX, ypos = m_flBarInsetY;
+	// Draw the chunks
 	for (int i = 0; i < enabledChunks; i++)
 	{
-		surface()->DrawFilledRect( xpos, ypos, xpos + m_flBarChunkWidth, ypos + m_flBarHeight );
+		icon_bar->DrawSelf( xpos, ypos, m_flBarChunkWidth, m_flBarHeight, clrBar );
+
 		xpos += (m_flBarChunkWidth + m_flBarChunkGap);
 	}
-	// draw the exhausted portion of the bar.
-	surface()->DrawSetColor( Color( m_AuxPowerColor[0], m_AuxPowerColor[1], m_AuxPowerColor[2], m_iAuxPowerDisabledAlpha ) );
-	for (int i = enabledChunks; i < chunkCount; i++)
-	{
-		surface()->DrawFilledRect( xpos, ypos, xpos + m_flBarChunkWidth, ypos + m_flBarHeight );
-		xpos += (m_flBarChunkWidth + m_flBarChunkGap);
-	}
+#endif
+	// Draw the suit icon
+
 
 	// draw our name
 	surface()->DrawSetTextFont(m_hTextFont);
@@ -253,5 +286,4 @@ void CHudSuitPower::Paint()
 		}
 	}
 }
-
 

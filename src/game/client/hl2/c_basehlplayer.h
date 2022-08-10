@@ -15,6 +15,7 @@
 
 #include "c_baseplayer.h"
 #include "c_hl2_playerlocaldata.h"
+#include "multiplayer_animstate.h"
 
 class C_BaseHLPlayer : public C_BasePlayer
 {
@@ -24,6 +25,7 @@ public:
 	DECLARE_PREDICTABLE();
 
 						C_BaseHLPlayer();
+						~C_BaseHLPlayer();
 
 	virtual void		OnDataChanged( DataUpdateType_t updateType );
 
@@ -41,6 +43,8 @@ public:
 	bool				IsBreatherActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_BREATHER; }
 
 	virtual int			DrawModel( int flags );
+	virtual const		QAngle& GetRenderAngles();
+	virtual const		QAngle& EyeAngles( void );
 
 	LadderMove_t		*GetLadderMove() { return &m_HL2Local.m_LadderMove; }
 	virtual void		ExitLadder();
@@ -50,6 +54,8 @@ public:
 	virtual bool	CreateMove( float flInputSampleTime, CUserCmd *pCmd );
 	void			PerformClientSideObstacleAvoidance( float flFrameTime, CUserCmd *pCmd );
 	void			PerformClientSideNPCSpeedModifiers( float flFrameTime, CUserCmd *pCmd );
+	
+	virtual void	UpdateClientSideAnimation();
 
 	bool				IsWeaponLowered( void ) { return m_HL2Local.m_bWeaponLowered; }
 
@@ -62,7 +68,11 @@ public:
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible
-	
+	IPlayerAnimState *m_PlayerAnimState;
+
+	QAngle	m_angEyeAngles;
+	CInterpolatedVar< QAngle >	m_iv_angEyeAngles;
+
 	bool				TestMove( const Vector &pos, float fVertDist, float radius, const Vector &objPos, const Vector &objDir );
 
 	float				m_flZoomStart;

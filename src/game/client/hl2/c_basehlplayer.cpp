@@ -25,17 +25,26 @@ extern ConVar zoom_sensitivity_ratio;
 extern ConVar default_fov;
 extern ConVar sensitivity;
 
+#define	HL2MP_WALK_SPEED 100
+#define	HL2MP_JOG_SPEED 140
+#define	HL2MP_RUN_SPEED 200
+#define	HL2MP_SPRINT_SPEED 320
+#define SINGLEPLAYER_ANIMSTATE 1
+
 ConVar cl_npc_speedmod_intime( "cl_npc_speedmod_intime", "0.25", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
 ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
 
 IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropDataTable( RECVINFO_DT(m_HL2Local),0, &REFERENCE_RECV_TABLE(DT_HL2Local) ),
 	RecvPropBool( RECVINFO( m_fIsSprinting ) ),
+	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
+	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )
 	DEFINE_PRED_TYPEDESCRIPTION( m_HL2Local, C_HL2PlayerLocalData ),
 	DEFINE_PRED_FIELD( m_fIsSprinting, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+	DEFINE_PRED_FIELD( m_flPlaybackRate, FIELD_FLOAT, FTYPEDESC_OVERRIDE | FTYPEDESC_PRIVATE | FTYPEDESC_NOERRORCHECK ),
 END_PREDICTION_DATA()
 
 //-----------------------------------------------------------------------------
@@ -61,16 +70,39 @@ LINK_ENTITY_TO_CLASS( player, C_BaseHLPlayer );
 //-----------------------------------------------------------------------------
 // Constructor
 //-----------------------------------------------------------------------------
-C_BaseHLPlayer::C_BaseHLPlayer()
+C_BaseHLPlayer::C_BaseHLPlayer() :
+	m_iv_angEyeAngles( "C_BaseHLPlayer::m_iv_angEyeAngles" )
 {
 	AddVar( &m_Local.m_vecPunchAngle, &m_Local.m_iv_vecPunchAngle, LATCH_SIMULATION_VAR );
 	AddVar( &m_Local.m_vecPunchAngleVel, &m_Local.m_iv_vecPunchAngleVel, LATCH_SIMULATION_VAR );
+	AddVar( &m_angEyeAngles, &m_iv_angEyeAngles, LATCH_SIMULATION_VAR );
+
+#ifdef SINGLEPLAYER_ANIMSTATE
+// Base animstate
+	m_PlayerAnimState = CreatePlayerAnimState( this );
+#else
+	// Setup the movement data.
+	MultiPlayerMovementData_t movementData;
+	movementData.m_flBodyYawRate = 720.0f;
+	movementData.m_flRunSpeed = HL2MP_RUN_SPEED;
+	movementData.m_flWalkSpeed = HL2MP_WALK_SPEED;
+	movementData.m_flSprintSpeed = -1.0f;
+
+	// Create animation state for this player.
+	CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
+	m_PlayerAnimState->Init( this, movementData );
+#endif
 
 	m_flZoomStart		= 0.0f;
 	m_flZoomEnd			= 0.0f;
 	m_flZoomRate		= 0.0f;
 	m_flZoomStartTime	= 0.0f;
 	m_flSpeedMod		= cl_forwardspeed.GetFloat();
+}
+
+C_BaseHLPlayer::~C_BaseHLPlayer()
+{
+	m_PlayerAnimState->Release();
 }
 
 //-----------------------------------------------------------------------------
@@ -173,7 +205,7 @@ void C_BaseHLPlayer::Zoom( float FOVOffset, float time )
 //-----------------------------------------------------------------------------
 int C_BaseHLPlayer::DrawModel( int flags )
 {
-	// Not pitch for player
+	// No pitch for player
 	QAngle saveAngles = GetLocalAngles();
 
 	QAngle useAngles = saveAngles;
@@ -183,9 +215,31 @@ int C_BaseHLPlayer::DrawModel( int flags )
 
 	int iret = BaseClass::DrawModel( flags );
 
-	SetLocalAngles( saveAngles );
-
 	return iret;
+}
+
+const QAngle& C_BaseHLPlayer::GetRenderAngles()
+{
+	if ( IsRagdoll() )
+	{
+		return vec3_angle;
+	}
+	else
+	{
+		return m_PlayerAnimState->GetRenderAngles();
+	}
+}
+
+const QAngle& C_BaseHLPlayer::EyeAngles()
+{
+	if ( IsLocalPlayer() && g_nKillCamMode == OBS_MODE_NONE )
+	{
+		return BaseClass::EyeAngles();
+	}
+	else
+	{
+		return m_angEyeAngles;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -639,6 +693,13 @@ void C_BaseHLPlayer::PerformClientSideNPCSpeedModifiers( float flFrameTime, CUse
 	pCmd->sidemove = clamp( pCmd->sidemove, -m_flSpeedMod, m_flSpeedMod );
    
 	//Msg( "fwd %f right %f\n", pCmd->forwardmove, pCmd->sidemove );
+}
+
+void C_BaseHLPlayer::UpdateClientSideAnimation()
+{
+	m_PlayerAnimState->Update( EyeAngles()[YAW], EyeAngles()[PITCH] );
+
+	BaseClass::UpdateClientSideAnimation();
 }
 
 //-----------------------------------------------------------------------------

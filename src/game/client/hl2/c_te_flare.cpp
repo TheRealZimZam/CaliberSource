@@ -40,6 +40,7 @@ public:
 
 	float	m_flTimeBurnOut;
 	float	m_flScale;
+//	color32		m_flColor;
 	bool	m_bLight;
 	bool	m_bSmoke;
 	bool	m_bPropFlare;
@@ -58,6 +59,7 @@ private:
 IMPLEMENT_CLIENTCLASS_DT( C_Flare, DT_Flare, CFlare )
 	RecvPropFloat( RECVINFO( m_flTimeBurnOut ) ),
 	RecvPropFloat( RECVINFO( m_flScale ) ),
+//	RecvPropInt( RECVINFO( m_flColor ) ),
 	RecvPropInt( RECVINFO( m_bLight ) ),
 	RecvPropInt( RECVINFO( m_bSmoke ) ),
 	RecvPropInt( RECVINFO( m_bPropFlare ) ),
@@ -252,16 +254,17 @@ void C_Flare::Update( float timeDelta )
 	{
 		dlight_t *dl= effects->CL_AllocDlight( index );
 
-		
-
 		if ( m_bPropFlare == false )
 		{
 			dl->origin	= GetAbsOrigin();
+
 			dl->color.r = 255;
+			dl->color.g = random->RandomInt( 32, 64 );
+			dl->color.b = random->RandomInt( 32, 64 );
+
 			dl->die		= gpGlobals->curtime + 0.1f;
 
 			dl->radius	= baseScale * random->RandomFloat( 110.0f, 128.0f );
-			dl->color.g = dl->color.b = random->RandomInt( 32, 64 );
 		}
 		else
 		{

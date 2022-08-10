@@ -95,7 +95,7 @@ CHUDQuickInfo::CHUDQuickInfo( const char *pElementName ) :
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
-	SetHiddenBits( HIDEHUD_CROSSHAIR );
+	SetHiddenBits( HIDEHUD_CROSSHAIR | HIDEHUD_NEEDSUIT );
 }
 
 void CHUDQuickInfo::ApplySchemeSettings( IScheme *scheme )
@@ -386,7 +386,7 @@ void CHUDQuickInfo::Paint()
 			healthColor[3] = 255 * scalar;
 		}
 		
-		gHUD.DrawIconProgressBar( xCenter - (m_icon_lb->Width() * 2), yCenter, m_icon_lb, m_icon_lbe, ( 1.0f - healthPerc ), healthColor, CHud::HUDPB_VERTICAL );
+		gHUD.DrawIconProgressBar( xCenter - (m_icon_lb->Width() * 2), yCenter, 0, 0, m_icon_lb, m_icon_lbe, ( 1.0f - healthPerc ), healthColor, CHud::HUDPB_VERTICAL );
 	}
 
 	// Update our ammo
@@ -419,7 +419,7 @@ void CHUDQuickInfo::Paint()
 			ammoColor[3] = 255 * scalar;
 		}
 		
-		gHUD.DrawIconProgressBar( xCenter + m_icon_rb->Width(), yCenter, m_icon_rb, m_icon_rbe, ammoPerc, ammoColor, CHud::HUDPB_VERTICAL );
+		gHUD.DrawIconProgressBar( xCenter + m_icon_rb->Width(), yCenter, 0, 0, m_icon_rb, m_icon_rbe, ammoPerc, ammoColor, CHud::HUDPB_VERTICAL );
 	}
 }
 

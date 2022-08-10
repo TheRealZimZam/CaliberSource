@@ -64,7 +64,7 @@ CHudDev::CHudDev( const char *pElementName ) : CHudElement( pElementName ), Base
 	SetHiddenBits( HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
 
 	m_textureID_IconDev = vgui::surface()->CreateNewTextureID();
-	vgui::surface()->DrawSetTextureFile( m_textureID_IconDev, DEV_MATERIAL, true, false );
+	vgui::surface()->DrawSetTextureFile( m_textureID_IconDev, DEV_MATERIAL, true, true );
 }
 
 //-----------------------------------------------------------------------------
@@ -79,10 +79,10 @@ void CHudDev::VidInit()
 //-----------------------------------------------------------------------------
 bool CHudDev::ShouldDraw( void )
 {
-	if ( !developer.GetBool() )
-		return false;
+	if ( developer.GetBool() )
+		return true;
 
-	return true;
+	return false;
 }
 
 //-----------------------------------------------------------------------------

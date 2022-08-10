@@ -19,6 +19,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+static ConVar	hud_ammo( "hud_ammo", "1", FCVAR_ARCHIVE );
+
 using namespace vgui;
 
 //-----------------------------------------------------------------------------
@@ -326,6 +328,9 @@ void CHudAmmo::SetAmmo2(int ammo2, bool playAnimation)
 //-----------------------------------------------------------------------------
 void CHudAmmo::Paint( void )
 {
+	if ( !hud_ammo.GetInt() )
+		return;
+
 	BaseClass::Paint();
 
 #ifndef HL2MP
@@ -399,6 +404,9 @@ public:
 
 	virtual void Paint( void )
 	{
+		if ( !hud_ammo.GetInt() )
+			return;
+
 		BaseClass::Paint();
 
 #ifndef HL2MP

@@ -107,7 +107,7 @@ void C_AssassinSmoke::OnDataChanged(DataUpdateType_t updateType)
 
 	if(updateType == DATA_UPDATE_CREATED)
 	{
-		Start(&g_ParticleMgr, NULL);
+		Start(ParticleMgr(), NULL);
 	}
 }
 
@@ -129,8 +129,6 @@ void C_AssassinSmoke::Start(CParticleMgr *pParticleMgr, IPrototypeArgAccess *pAr
 
 	// Center of explosion.
 	Vector vCenter = GetAbsOrigin(); // HACKHACK.. when the engine bug is fixed, use origin.
-
-	
 	Vector velocity;
 
 	int i;

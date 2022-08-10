@@ -2,6 +2,8 @@
 //
 // Purpose:	Flamethrower test
 //
+//			Primary attack: Throw flame
+//			Secondary attack: Eject ignitable gas onto surfaces
 // TODO's: Actually properly code this thing
 //=============================================================================
 #include "cbase.h"
@@ -38,6 +40,8 @@ static const char *g_pFlameThrowerSound = "Weapon_Flamethrower.Flame";
 
 BEGIN_DATADESC( CWeaponFlameThrower )
 
+	DEFINE_FIELD( m_fDrainRate,	FIELD_FLOAT ),
+
 	DEFINE_FIELD( m_bSoundOn,	FIELD_BOOLEAN ),
 
 END_DATADESC()
@@ -46,7 +50,7 @@ IMPLEMENT_SERVERCLASS_ST(CWeaponFlameThrower, DT_WeaponFlameThrower)
 END_SEND_TABLE()
 
 LINK_ENTITY_TO_CLASS( weapon_flamethrower, CWeaponFlameThrower );
-PRECACHE_WEAPON_REGISTER(CWeaponFlameThrower);
+PRECACHE_WEAPON_REGISTER(weapon_flamethrower);
 
 acttable_t	CWeaponFlameThrower::m_acttable[] = 
 {
@@ -71,7 +75,8 @@ CWeaponFlameThrower::CWeaponFlameThrower( )
 	m_fMaxRange1		= 512;
 	m_fMinRange2		= 512;
 	m_fMaxRange2		= 768;
-	m_flNextPrimaryAttack = 0.25;
+	m_fDrainRate		= FLAMETHROWER_DRAINRATE;
+	m_flNextPrimaryAttack = 0.2;
 
 	if ( !sv_funmode.GetBool() )
 	{
@@ -86,6 +91,9 @@ CWeaponFlameThrower::CWeaponFlameThrower( )
 void CWeaponFlameThrower::Precache( void )
 {
 	UTIL_PrecacheOther("grenade_fireball");
+	
+	PrecacheScriptSound( g_pFlameThrowerSound );
+
 	BaseClass::Precache();
 }
 
@@ -158,9 +166,10 @@ void CWeaponFlameThrower::PrimaryAttack()
 						random->RandomFloat( -250, -500 ) ) );
 		}
 
-		pOwner->RemoveAmmo( 1.5, m_iPrimaryAmmoType );
+		pOwner->RemoveAmmo( 1, m_iPrimaryAmmoType );
 		SendWeaponAnim( GetPrimaryAttackActivity() );
 		pOwner->SetAnimation( PLAYER_ATTACK1 );
+		pOwner->SetAimTime( 3.0f );
 
 		m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
 	}
@@ -206,6 +215,7 @@ bool CWeaponFlameThrower::CanHolster( void )
 //-----------------------------------------------------------------------------
 bool CWeaponFlameThrower::Reload( void )
 {
+	// No reloading if we're currently spewing, gotta unignite first
 	if ( m_bFiring )
 		return false;
 

@@ -40,7 +40,10 @@ extern ConVar sk_plr_num_shotgun_pellets;
 extern ConVar npc_combine_drop_health;
 
 LINK_ENTITY_TO_CLASS( npc_combine_s, CNPC_CombineS );
-LINK_ENTITY_TO_CLASS( npc_ancorp_s, CNPC_CombineS );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_human_grunt, CNPC_CombineS );
+#endif
+LINK_ENTITY_TO_CLASS( npc_grunt, CNPC_CombineS );
 
 #define AE_SOLDIER_BLOCK_PHYSICS		20 // trying to block an incoming physics object
 
@@ -72,9 +75,13 @@ void CNPC_CombineS::Spawn( void )
 	}
 	m_flFieldOfView			= 0.3;	//*140
 
-	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
+	if ( !HasSpawnFlags( SF_NPC_START_EFFICIENT ) )
+	{
+		CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
+		CapabilitiesAdd( bits_CAP_DOORS_GROUP );
+	}
+
 	CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
-	CapabilitiesAdd( bits_CAP_DOORS_GROUP );
 
 	BaseClass::Spawn();
 
@@ -135,6 +142,14 @@ void CNPC_CombineS::DeathSound( const CTakeDamageInfo &info )
 	BaseClass::DeathSound( info );
 }
 
+void CNPC_CombineS::PainSound( const CTakeDamageInfo &info )
+{
+	// NOTE: The response system deals with this at the moment
+	if ( GetFlags() & FL_DISSOLVING )
+		return;
+
+	BaseClass::PainSound( info );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Soldiers use CAN_RANGE_ATTACK2 to indicate whether they can throw
@@ -189,6 +204,12 @@ void CNPC_CombineS::HandleAnimEvent( animevent_t *pEvent )
 {
 	switch( pEvent->event )
 	{
+	case NPC_EVENT_LEFTFOOT:
+			MakeAIFootstepSound( 240.0f );
+		break;
+	case NPC_EVENT_RIGHTFOOT:
+			MakeAIFootstepSound( 240.0f );
+		break;
 	case AE_SOLDIER_BLOCK_PHYSICS:
 		DevMsg( "BLOCKING!\n" );
 		m_fIsBlocking = true;

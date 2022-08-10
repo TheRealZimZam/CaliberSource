@@ -26,16 +26,19 @@
 
 class CWeaponSwing : public CBaseHLBludgeonWeapon
 {
-public:
 	DECLARE_CLASS( CWeaponSwing, CBaseHLBludgeonWeapon );
+public:
 
 	DECLARE_SERVERCLASS();
 	DECLARE_ACTTABLE();
+
+	DECLARE_DATADESC();
 
 	CWeaponSwing();
 
 	float		GetRange( void )		{	return	SWING_RANGE;	}
 	float		GetFireRate( void )		{	return BaseClass::GetCycleTime();	}	//SWING_REFIRE
+	int			GetDamageType( void )	{	return DMG_CLUB;	}
 
 	void		AddViewKick( void );
 	float		GetDamageForActivity( Activity hitActivity );
@@ -49,6 +52,47 @@ public:
 private:
 	// Animation event handlers
 	void HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+};
+
+// TODO; Better system needed here, this is just temp for demo
+class CWeaponBat : public CWeaponSwing
+{
+public:
+	DECLARE_CLASS( CWeaponBat, CWeaponSwing );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponBat();
+};
+
+class CWeaponCrowbar : public CWeaponSwing
+{
+public:
+	DECLARE_CLASS( CWeaponCrowbar, CWeaponSwing );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponCrowbar();
+};
+
+class CWeaponHammer : public CWeaponSwing
+{
+public:
+	DECLARE_CLASS( CWeaponHammer, CWeaponSwing );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponHammer();
+};
+
+class CWeaponPipe : public CWeaponSwing
+{
+public:
+	DECLARE_CLASS( CWeaponPipe, CWeaponSwing );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponPipe();
 };
 
 #endif // WEAPON_BAT_H

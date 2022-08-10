@@ -2011,7 +2011,7 @@ float CProtoSniper::GetBulletSpeed()
 
 	if( IsFastSniper() )
 	{
-		speed *= 1.5f;
+		speed *= 1.25f;
 	}
 
 	return speed;

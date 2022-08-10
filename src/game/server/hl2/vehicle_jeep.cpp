@@ -1154,6 +1154,8 @@ void CPropJeep::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 		// Player's using the crate.
 		// Fill up his SMG ammo.
 		pPlayer->GiveAmmo( 300, "SMG1");
+		pPlayer->GiveAmmo( 200, "Pistol");
+		pPlayer->GiveAmmo( 100, "Buckshot");
 		
 		if ( ( GetSequence() != LookupSequence( "ammo_open" ) ) && ( GetSequence() != LookupSequence( "ammo_close" ) ) )
 		{
@@ -1427,7 +1429,7 @@ void CPropJeep::CreateDangerSounds( void )
 
 		// 0.3 seconds ahead of the jeep
 		vecSpot = vecStart + vecDir * (speed * 1.1f);
-		CSoundEnt::InsertSound( SOUND_DANGER | SOUND_CONTEXT_PLAYER_VEHICLE, vecSpot, radius, soundDuration, this, 0 );
+		CSoundEnt::InsertSound( SOUND_VEHICLE | SOUND_CONTEXT_PLAYER_VEHICLE, vecSpot, radius, soundDuration, this, 0 );
 		CSoundEnt::InsertSound( SOUND_PHYSICS_DANGER | SOUND_CONTEXT_PLAYER_VEHICLE, vecSpot, radius, soundDuration, this, 1 );
 		//NDebugOverlay::Box(vecSpot, Vector(-radius,-radius,-radius),Vector(radius,radius,radius), 255, 0, 255, 0, soundDuration);
 

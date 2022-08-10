@@ -2,6 +2,8 @@
 //
 // Purpose: 
 //
+//			Primary attack: fire missile
+//			Secondary attack: toggle guidance
 // TODO; Attach the rocketflare [CTempEnts::RocketFlare( const Vector& pos )]
 //=============================================================================//
 
@@ -105,6 +107,7 @@ BEGIN_DATADESC( CMissile )
 
 	DEFINE_FIELD( m_hOwner,					FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hRocketTrail,			FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hRocketFlare,			FIELD_EHANDLE ),
 	DEFINE_FIELD( m_flAugerTime,			FIELD_TIME ),
 	DEFINE_FIELD( m_flMarkDeadTime,			FIELD_TIME ),
 	DEFINE_FIELD( m_flGracePeriodEndsAt,	FIELD_TIME ),
@@ -120,9 +123,11 @@ BEGIN_DATADESC( CMissile )
 
 END_DATADESC()
 LINK_ENTITY_TO_CLASS( rpg_missile, CMissile );
+LINK_ENTITY_TO_CLASS( missile, CMissile );
 
 class CWeaponRPG;
 
+#define	RPG_FLARE_SPRITE	"sprites/animglow01.vmt"
 
 //-----------------------------------------------------------------------------
 // Constructor
@@ -130,6 +135,7 @@ class CWeaponRPG;
 CMissile::CMissile()
 {
 	m_hRocketTrail = NULL;
+	m_hRocketFlare = NULL;
 	m_bCreateDangerSounds = false;	//In a perfect world, this would be true
 }
 
@@ -148,6 +154,7 @@ void CMissile::Precache( void )
 	PrecacheModel( "models/weapons/w_missile.mdl" );
 	PrecacheModel( "models/weapons/w_missile_launch.mdl" );
 	PrecacheModel( "models/weapons/w_missile_closed.mdl" );
+	PrecacheModel( RPG_FLARE_SPRITE );
 }
 
 
@@ -243,8 +250,6 @@ void CMissile::DumbFire( void )
 
 	// Smoketrail.
 	CreateSmokeTrail();
-	// Flare
-	CreateFlare();
 }
 
 //-----------------------------------------------------------------------------
@@ -379,6 +384,12 @@ void CMissile::Explode( void )
 		m_hRocketTrail = NULL;
 	}
 
+	if( m_hRocketFlare )
+	{
+		UTIL_Remove( m_hRocketFlare );
+		m_hRocketFlare = NULL;
+	}
+
 	if ( m_hOwner != NULL )
 	{
 		m_hOwner->NotifyRocketDied();
@@ -438,8 +449,25 @@ void CMissile::CreateSmokeTrail( void )
 
 void CMissile::CreateFlare( void )
 {
+	if ( m_hRocketFlare )
+		return;
 
+	// Light isn't on.
+	m_hRocketFlare = CSprite::SpriteCreate( RPG_FLARE_SPRITE, GetLocalOrigin(), true );
+	CSprite *pSprite = (CSprite *)m_hRocketFlare.Get();
 
+	if( m_hRocketFlare != NULL )
+	{
+		pSprite->SetParent( this );
+//!		pSprite->SetAttachment( this, 0 );
+		pSprite->SetTransparency( kRenderGlow, m_clrRender->r, m_clrRender->g, m_clrRender->b, 200, kRenderFxNoDissipation );	//TODO; Configurable values here
+		pSprite->SetScale( 0.75 );
+		pSprite->m_flSpriteFramerate = random->RandomInt(15,20);
+		pSprite->m_flFrame = random->RandomInt(0,1);
+
+		pSprite->FollowEntity( this );
+		pSprite->TurnOn();
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -476,10 +504,11 @@ void CMissile::IgniteThink( void )
 		}
 	}
 
-	// Smoketrail.
 	CreateSmokeTrail();
-	// Flare
-	CreateFlare();
+	if ( HasSpawnFlags( SF_ROCKET_FLARE ) )
+	{
+		CreateFlare();
+	}
 }
 
 
@@ -971,9 +1000,11 @@ CAPCMissile *CAPCMissile::Create( const Vector &vecOrigin, const QAngle &vecAngl
 {
 	CAPCMissile *pMissile = (CAPCMissile *)CBaseEntity::Create( "apc_missile", vecOrigin, vecAngles, pOwner );
 	pMissile->SetOwnerEntity( pOwner );
+	pMissile->AddSpawnFlags( SF_ROCKET_FLARE );
 	pMissile->Spawn();
 	pMissile->SetAbsVelocity( vecVelocity );
 	pMissile->AddFlag( FL_NOTARGET );
+	pMissile->SetRenderColor( 200, 150, 0 );
 	pMissile->AddEffects( EF_NOSHADOW );
 	return pMissile;
 }
@@ -1006,7 +1037,6 @@ void CAPCMissile::Init()
 	SetTouch( &CAPCMissile::APCMissileTouch );
 	m_flLastHomingSpeed = APC_HOMING_SPEED;
 	CreateDangerSounds( true );
-
 
 	if( g_pGameRules->GetAutoAimMode() == AUTOAIM_ON_CONSOLE )
 	{
@@ -1377,7 +1407,7 @@ void CAPCMissile::ComputeActualDotPosition( CLaserDot *pLaserDot, Vector *pActua
 }
 
 #define	RPG_BEAM_SPRITE		"effects/laser1_noz.vmt"
-#define	RPG_LASER_SPRITE	"sprites/redglow1.vmt"
+#define	RPG_LASER_SPRITE	"sprites/orangeglow1.vmt"
 
 //=============================================================================
 // RPG
@@ -1624,6 +1654,8 @@ void CWeaponRPG::PrimaryAttack( void )
 	m_hMissile = CMissile::Create( muzzlePoint, vecAngles, GetOwner()->edict() );
 
 	m_hMissile->m_hOwner = this;
+//	m_hMissile->AddSpawnFlags( SF_ROCKET_FLARE );
+	m_hMissile->SetRenderColor( 200, 150, 0 );
 
 	// If the shot is clear to the player, give the missile a grace period
 	trace_t	tr;
@@ -1695,7 +1727,10 @@ void CWeaponRPG::DecrementAmmo( CBaseCombatCharacter *pOwner )
 //-----------------------------------------------------------------------------
 void CWeaponRPG::SuppressGuiding( bool state )
 {
-	m_bHideGuiding = state;
+//	m_bHideGuiding = state;
+
+	if ( m_bHideGuiding )
+		return;
 
 	if ( m_hLaserDot == NULL )
 	{
@@ -1746,10 +1781,6 @@ void CWeaponRPG::ItemPostFrame( void )
 		StartGuiding();
 		m_bInitialStateUpdate = false;
 	}
-//	else
-//	{
-//		return;
-//	}
 
 	// Supress our guiding effects if we're lowered
 	if ( GetIdealActivity() == ACT_VM_IDLE_LOWERED || GetIdealActivity() == ACT_VM_RELOAD )
@@ -1905,10 +1936,12 @@ void CWeaponRPG::ToggleGuiding( void )
 {
 	if ( IsGuiding() )
 	{
+		m_bHideGuiding = true;
 		StopGuiding();
 	}
 	else
 	{
+		m_bHideGuiding = false;
 		StartGuiding();
 	}
 }
@@ -2027,8 +2060,12 @@ bool CWeaponRPG::Reload( void )
 		return false;
 
 	WeaponSound( RELOAD );
-	
 	SendWeaponAnim( ACT_VM_RELOAD );
+	// Play the player's reload animation
+	if ( pOwner->IsPlayer() )
+	{
+		( ( CBasePlayer * )pOwner)->SetAnimation( PLAYER_RELOAD );
+	}
 
 	return true;
 }
@@ -2398,8 +2435,8 @@ void CLaserDot::MakeInvisible( void )
 IMPLEMENT_SERVERCLASS_ST(CWeaponLightRPG, DT_WeaponLightRPG)
 END_SEND_TABLE()
 
-LINK_ENTITY_TO_CLASS( weapon_lightrpg, CWeaponLightRPG );
-PRECACHE_WEAPON_REGISTER(weapon_lightrpg);
+LINK_ENTITY_TO_CLASS( weapon_flash, CWeaponLightRPG );
+PRECACHE_WEAPON_REGISTER(weapon_flash);
 
 BEGIN_DATADESC( CWeaponLightRPG )
 

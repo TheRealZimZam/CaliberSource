@@ -15,10 +15,6 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-// Shouldnt this be a convar? (for difficulty tuning)
-//#define FRAG_GRENADE_BLOP_FREQUENCY			1.0f
-//#define FRAG_GRENADE_BLOP_FAST_FREQUENCY	0.25f
-
 ConVar	grenade_blip_frequency	( "grenade_blip_frequency",	"1");
 #define FRAG_GRENADE_BLOP_FREQUENCY		grenade_blip_frequency.GetFloat()
 
@@ -61,10 +57,10 @@ public:
 	void	DelayThink();
 	void	VPhysicsUpdate( IPhysicsObject *pPhysics );
 	void	OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_t reason );
-	void	SetCombineSpawned( bool combineSpawned ) { m_combineSpawned = combineSpawned; }
-	bool	IsCombineSpawned( void ) const { return m_combineSpawned; }
-	void	SetPunted( bool punt ) { m_punted = punt; }
-	bool	WasPunted( void ) const { return m_punted; }
+	void	SetCombineSpawned( bool combineSpawned ) { m_bCombineSpawned = combineSpawned; }
+	bool	IsCombineSpawned( void ) const { return m_bCombineSpawned; }
+	void	SetPunted( bool punt ) { m_bPunted = punt; }
+	bool	WasPunted( void ) const { return m_bPunted; }
 
 	// this function only used in episodic.
 #ifdef HL2_EPISODIC
@@ -78,9 +74,9 @@ protected:
 	CHandle<CSpriteTrail>	m_pGlowTrail;
 
 	float	m_flNextBlipTime;
-	bool	m_inSolid;
-	bool	m_combineSpawned;
-	bool	m_punted;
+	bool	m_bInSolid;
+	bool	m_bCombineSpawned;
+	bool	m_bPunted;
 };
 
 LINK_ENTITY_TO_CLASS( npc_grenade_frag, CGrenadeFrag );
@@ -91,9 +87,9 @@ BEGIN_DATADESC( CGrenadeFrag )
 	DEFINE_FIELD( m_pMainGlow, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_pGlowTrail, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_flNextBlipTime, FIELD_TIME ),
-	DEFINE_FIELD( m_inSolid, FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_combineSpawned, FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_punted, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bInSolid, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bCombineSpawned, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bPunted, FIELD_BOOLEAN ),
 	
 	// Function Pointers
 	DEFINE_THINKFUNC( DelayThink ),
@@ -129,7 +125,7 @@ void CGrenadeFrag::Spawn( void )
 	}
 
 	m_takedamage	= DAMAGE_YES;
-	m_iHealth		= 15;
+	m_iHealth		= 25;	//15
 
 	SetSize( -Vector(4,4,4), Vector(4,4,4) );
 	SetCollisionGroup( COLLISION_GROUP_WEAPON );
@@ -140,8 +136,8 @@ void CGrenadeFrag::Spawn( void )
 
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 
-	m_combineSpawned	= false;
-	m_punted			= false;
+	m_bCombineSpawned	= false;
+	m_bPunted			= false;
 
 	BaseClass::Spawn();
 }
@@ -195,14 +191,14 @@ void CGrenadeFrag::CreateEffects( void )
 	else
 	{
 		// Start up the smoke trail
-		m_pGlowTrail	= CSpriteTrail::SpriteTrailCreate( "sprites/xbeam2.vmt", GetLocalOrigin(), true );	//sprites/smoke.vmt
+		m_pGlowTrail	= CSpriteTrail::SpriteTrailCreate( "sprites/smoke.vmt", GetLocalOrigin(), true );	//sprites/smoke1.vmt
 
 		if ( m_pGlowTrail != NULL )
 		{
 			m_pGlowTrail->FollowEntity( this );
 			m_pGlowTrail->SetAttachment( this, nAttachment );
-			m_pGlowTrail->SetTransparency( kRenderTransAdd, 96, 96, 96, 64, kRenderFxNone );
-			m_pGlowTrail->SetStartWidth( 4.0f );
+			m_pGlowTrail->SetTransparency( kRenderTransAdd, 128, 128, 128, 128, kRenderFxNone );
+			m_pGlowTrail->SetStartWidth( 2.0f );
 			m_pGlowTrail->SetEndWidth( 1.0f );
 			m_pGlowTrail->SetLifeTime( 0.25f );
 		}
@@ -271,16 +267,16 @@ void CGrenadeFrag::VPhysicsUpdate( IPhysicsObject *pPhysics )
 #endif
 	if ( tr.startsolid )
 	{
-		if ( !m_inSolid )
+		if ( !m_bInSolid )
 		{
 			// UNDONE: Do a better contact solution that uses relative velocity?
 			vel *= -GRENADE_COEFFICIENT_OF_RESTITUTION; // bounce backwards
 			pPhysics->SetVelocity( &vel, NULL );
 		}
-		m_inSolid = true;
+		m_bInSolid = true;
 		return;
 	}
-	m_inSolid = false;
+	m_bInSolid = false;
 	if ( tr.DidHit() )
 	{
 		Vector dir = vel;
@@ -308,7 +304,7 @@ void CGrenadeFrag::Precache( void )
 
 	PrecacheModel( "sprites/redglow1.vmt" );
 	PrecacheModel( "sprites/bluelaser1.vmt" );
-	PrecacheModel( "sprites/xbeam2.vmt" );
+	PrecacheModel( "sprites/smoke.vmt" );
 
 	BaseClass::Precache();
 }
@@ -327,8 +323,12 @@ void CGrenadeFrag::OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_t r
 {
 	SetThrower( pPhysGunUser );
 
-#ifdef HL2MP
-	SetTimer( FRAG_GRENADE_GRACE_TIME_AFTER_PICKUP, FRAG_GRENADE_GRACE_TIME_AFTER_PICKUP / 2);
+#ifndef _XBOX
+	if ( !WasPunted() )
+	{
+		SetPunted( true );
+		SetTimer( FRAG_GRENADE_GRACE_TIME_AFTER_PICKUP, FRAG_GRENADE_GRACE_TIME_AFTER_PICKUP / 2);
+	}
 
 	BlipSound();
 	m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLOP_FAST_FREQUENCY;
@@ -341,10 +341,6 @@ void CGrenadeFrag::OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_t r
 		BlipSound();
 		m_flNextBlipTime = gpGlobals->curtime + FRAG_GRENADE_BLOP_FAST_FREQUENCY;
 	}
-#endif
-
-#ifdef HL2_EPISODIC
-	SetPunted( true );
 #endif
 
 	BaseClass::OnPhysGunPickup( pPhysGunUser, reason );

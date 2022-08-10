@@ -2,7 +2,7 @@
 //
 // Purpose:	Knife - Stab, stab, stab
 //
-// TODO's; Add multiple model support, optimize
+// TODO's; Better system for variants, optimize
 // $NoKeywords: $
 //=============================================================================//
 
@@ -37,6 +37,9 @@ END_SEND_TABLE()
 LINK_ENTITY_TO_CLASS( weapon_stab, CWeaponStab );
 PRECACHE_WEAPON_REGISTER( weapon_stab );
 #endif
+
+BEGIN_DATADESC( CWeaponStab )
+END_DATADESC()
 
 acttable_t CWeaponStab::m_acttable[] = 
 {
@@ -202,3 +205,57 @@ void CWeaponStab::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatChar
 		break;
 	}
 }
+
+
+//-----------------------------------------------------------------------------
+// Bottle
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponBottle, DT_WeaponBottle)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_bottle, CWeaponBottle );
+PRECACHE_WEAPON_REGISTER(weapon_bottle);
+
+CWeaponBottle::CWeaponBottle( )
+{
+}
+
+//-----------------------------------------------------------------------------
+// Knife
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponKnife, DT_WeaponKnife)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_knife, CWeaponKnife );
+PRECACHE_WEAPON_REGISTER(weapon_knife);
+
+CWeaponKnife::CWeaponKnife( )
+{
+}
+
+//-----------------------------------------------------------------------------
+// Rebar
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponRebar, DT_WeaponRebar)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_rebar, CWeaponRebar );
+PRECACHE_WEAPON_REGISTER(weapon_rebar);
+
+CWeaponRebar::CWeaponRebar( )
+{
+}
+
+//-----------------------------------------------------------------------------
+// Shank
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponShank, DT_WeaponShank)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_shank, CWeaponShank );
+PRECACHE_WEAPON_REGISTER(weapon_shank);
+
+CWeaponShank::CWeaponShank( )
+{
+}
+

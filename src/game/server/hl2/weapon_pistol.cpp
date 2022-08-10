@@ -4,7 +4,7 @@
 //
 //			Primary attack: single accurate shot(s).
 //			Secondary attack: innaccurate burst.
-// TODO's:  Fix burst
+// TODO's:  Burst for npcs - gotta set secondary attack conds
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -21,12 +21,14 @@
 #include "game.h"
 #include "vstdlib/random.h"
 #include "gamestats.h"
+#include "te_effect_dispatch.h"	//TEMPTEMP
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	PISTOL_FASTEST_REFIRE_TIME		0.2f
+#define	PISTOL_FASTEST_REFIRE_TIME		sk_pistol_refire_time.GetFloat()	//0.2f
 
+ConVar	sk_pistol_refire_time( "sk_pistol_refire_time",	"0.2");
 ConVar	sk_pistol_burst_accuracy_scale( "sk_pistol_burst_accuracy_scale",	"2.5");	//7 DEGREES
 extern ConVar sv_funmode;
 
@@ -75,16 +77,32 @@ public:
 		return cone;
 	}
 
-	virtual int		GetMinBurst() { return 4; }
-	virtual int		GetMaxBurst() { return 4; }
+	// Size of burst
+	virtual int		GetMinBurst()
+	{
+		if ( GetOwner() && GetOwner()->IsNPC() )
+			return 1;
+		else
+			return 4;
+	}
+	virtual int		GetMaxBurst() { return GetMinBurst(); }
+
+	// time between shots
+	virtual float	GetMinRestTime() { return PISTOL_FASTEST_REFIRE_TIME; }
+	virtual float	GetMaxRestTime()
+	{
+		Class_T OwnerClass = GetOwner()->Classify();
+
+		if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
+			 OwnerClass == CLASS_CITIZEN_REBEL	)
+			 return (BaseClass::GetFireRate() * 3);
+
+		return (BaseClass::GetFireRate() * 2.5);
+	}
 
 	virtual float GetFireRate( void )
 	{
-		// This is default fire-rate (primary attack) holding it down
-		if ( GetOwner() && GetOwner()->IsNPC() )
-			return BaseClass::GetFireRate() + 0.25f;	//0.5f
-
-		return BaseClass::GetFireRate();	//0.35f
+		return BaseClass::GetCycleTime();
 	}
 	
 	DECLARE_ACTTABLE();
@@ -148,6 +166,7 @@ CWeaponPistol::CWeaponPistol( void )
 
 	if ( !sv_funmode.GetBool() )
 	{
+		m_bReloadsFullClip	= true;
 		m_bCanJam			= true;
 	}
 	m_bReloadsSingly	= false;
@@ -186,6 +205,14 @@ void CWeaponPistol::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCh
 			WeaponSound( SINGLE_NPC );
 			pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
 			pOperator->DoMuzzleFlash();
+
+			//Temp effect until model is done with CL_EVENT_EJECTBRASS1, like the smg
+			CEffectData data;
+			data.m_vOrigin = pOperator->WorldSpaceCenter() + RandomVector( -4, 4 );
+			data.m_vAngles = QAngle( 90, random->RandomInt( 0, 360 ), 0 );
+			data.m_nEntIndex = entindex();
+			DispatchEffect( "ShellEject", data );
+
 			m_iClip1 = m_iClip1 - 1;
 		}
 		break;
@@ -247,6 +274,7 @@ void CWeaponPistol::PistolFire( Vector vSpread, float flCycleTime, bool bBurstFi
 	// player "shoot" animation
 	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+	pPlayer->SetAimTime( 1.0f );
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, GetOwner() );
 
@@ -424,14 +452,14 @@ public:
 	}
 	
 	virtual int		GetMinBurst() { return 1; }
-	virtual int		GetMaxBurst() { return 3; }
+	virtual int		GetMaxBurst() { return 1; }
 
 	virtual float GetFireRate( void ) 
 	{
 		if ( GetOwner() && GetOwner()->IsNPC() )
 		{
 			// NPC value
-			return 0.5f;
+			return 0.55f;
 		}
 		else
 		{

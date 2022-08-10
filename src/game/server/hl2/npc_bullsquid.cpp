@@ -89,6 +89,9 @@ int	g_interactionBullsquidThrow		= 0;
 #define		BSQUID_AE_WHIP_SND	( 7 )
 
 LINK_ENTITY_TO_CLASS( npc_bullsquid, CNPC_Bullsquid );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_bullchicken, CNPC_Bullsquid );
+#endif
 
 int ACT_SQUID_EXCITED;
 int ACT_SQUID_EAT;

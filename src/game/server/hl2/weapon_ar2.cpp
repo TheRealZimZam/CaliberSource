@@ -45,6 +45,7 @@ ConVar sk_weapon_ar2_alt_fire_radius( "sk_weapon_ar2_alt_fire_radius", "10" );
 ConVar sk_weapon_ar2_alt_fire_duration( "sk_weapon_ar2_alt_fire_duration", "2" );
 ConVar sk_weapon_ar2_alt_fire_mass( "sk_weapon_ar2_alt_fire_mass", "150" );
 ConVar sk_weapon_ar2_ducking_bonus( "sk_weapon_ar2_ducking_bonus", "0.25");
+extern ConVar sv_funmode;
 
 #define AR2_ZOOM_RATE	0.5f	// Interval between zoom levels in seconds.
 
@@ -77,6 +78,7 @@ acttable_t	CWeaponAR2::m_acttable[] =
 	{ ACT_WALK_AIM,					ACT_WALK_AIM_RIFLE,				true },	// FIXME: hook to AR2 unique
 	{ ACT_RUN,						ACT_RUN_RIFLE,					true },	// FIXME: hook to AR2 unique
 	{ ACT_RUN_AIM,					ACT_RUN_AIM_RIFLE,				true },	// FIXME: hook to AR2 unique
+	{ ACT_SPRINT,					ACT_RUN_RIFLE_STIMULATED,		true },
 
 // Readiness activities (not aiming)
 	{ ACT_IDLE_RELAXED,				ACT_IDLE_AR2_RELAXED,			false },//never aims
@@ -127,6 +129,11 @@ CWeaponAR2::CWeaponAR2( )
 
 	m_fMinRange2	= 256;
 	m_fMaxRange2	= 1024;
+
+	if ( !sv_funmode.GetBool() )
+	{
+		m_bReloadsFullClip	= true;
+	}
 
 	m_nShotsFired	= 0;
 	m_nVentPose		= -1;
@@ -321,6 +328,7 @@ void CWeaponAR2::PrimaryAttack( void )
 
 	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+	pPlayer->SetAimTime( 3.0f );
 
 	// Register a muzzleflash for the AI
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );

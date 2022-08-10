@@ -26,30 +26,30 @@ ConVar    sk_plr_dmg_crowbar		( "sk_plr_dmg_crowbar","0");
 ConVar    sk_npc_dmg_crowbar		( "sk_npc_dmg_crowbar","0");
 
 //-----------------------------------------------------------------------------
-// CWeaponCrowbar
+// CWeaponCrowbarOld
 //-----------------------------------------------------------------------------
 
-IMPLEMENT_SERVERCLASS_ST(CWeaponCrowbar, DT_WeaponCrowbar)
+IMPLEMENT_SERVERCLASS_ST(CWeaponCrowbarOld, DT_WeaponCrowbarOld)
 END_SEND_TABLE()
 
 #ifndef HL2MP
-LINK_ENTITY_TO_CLASS( weapon_crowbar, CWeaponCrowbar );
-PRECACHE_WEAPON_REGISTER( weapon_crowbar );
+LINK_ENTITY_TO_CLASS( weapon_crowbarold, CWeaponCrowbarOld );
+PRECACHE_WEAPON_REGISTER( weapon_crowbarold );
 #endif
 
-acttable_t CWeaponCrowbar::m_acttable[] = 
+acttable_t CWeaponCrowbarOld::m_acttable[] = 
 {
 	{ ACT_MELEE_ATTACK1,	ACT_MELEE_ATTACK_SWING, true },
 	{ ACT_IDLE,				ACT_IDLE_ANGRY_MELEE,	false },
 	{ ACT_IDLE_ANGRY,		ACT_IDLE_ANGRY_MELEE,	false },
 };
 
-IMPLEMENT_ACTTABLE(CWeaponCrowbar);
+IMPLEMENT_ACTTABLE(CWeaponCrowbarOld);
 
 //-----------------------------------------------------------------------------
 // Constructor
 //-----------------------------------------------------------------------------
-CWeaponCrowbar::CWeaponCrowbar( void )
+CWeaponCrowbarOld::CWeaponCrowbarOld( void )
 {
 }
 
@@ -58,7 +58,7 @@ CWeaponCrowbar::CWeaponCrowbar( void )
 // Input  : hitActivity - currently played activity
 // Output : Damage amount
 //-----------------------------------------------------------------------------
-float CWeaponCrowbar::GetDamageForActivity( Activity hitActivity )
+float CWeaponCrowbarOld::GetDamageForActivity( Activity hitActivity )
 {
 	if ( ( GetOwner() != NULL ) && ( GetOwner()->IsPlayer() ) )
 		return sk_plr_dmg_crowbar.GetFloat();
@@ -69,7 +69,7 @@ float CWeaponCrowbar::GetDamageForActivity( Activity hitActivity )
 //-----------------------------------------------------------------------------
 // Purpose: Add in a view kick for this weapon
 //-----------------------------------------------------------------------------
-void CWeaponCrowbar::AddViewKick( void )
+void CWeaponCrowbarOld::AddViewKick( void )
 {
 	CBasePlayer *pPlayer  = ToBasePlayer( GetOwner() );
 	
@@ -91,7 +91,7 @@ void CWeaponCrowbar::AddViewKick( void )
 //-----------------------------------------------------------------------------
 ConVar sk_crowbar_lead_time( "sk_crowbar_lead_time", "0.9" );
 
-int CWeaponCrowbar::WeaponMeleeAttack1Condition( float flDot, float flDist )
+int CWeaponCrowbarOld::WeaponMeleeAttack1Condition( float flDot, float flDist )
 {
 	// Attempt to lead the target (needed because citizens can't hit manhacks with the crowbar!)
 	CAI_BaseNPC *pNPC	= GetOwner()->MyNPCPointer();
@@ -140,7 +140,7 @@ int CWeaponCrowbar::WeaponMeleeAttack1Condition( float flDot, float flDist )
 //-----------------------------------------------------------------------------
 // Animation event handlers
 //-----------------------------------------------------------------------------
-void CWeaponCrowbar::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+void CWeaponCrowbarOld::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
 	// Trace up or down based on where the enemy is...
 	// But only if we're basically facing that direction
@@ -188,7 +188,7 @@ void CWeaponCrowbar::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCh
 //-----------------------------------------------------------------------------
 // Animation event
 //-----------------------------------------------------------------------------
-void CWeaponCrowbar::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+void CWeaponCrowbarOld::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
 	switch( pEvent->event )
 	{

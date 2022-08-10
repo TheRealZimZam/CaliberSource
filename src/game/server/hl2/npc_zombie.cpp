@@ -165,6 +165,9 @@ private:
 
 LINK_ENTITY_TO_CLASS( npc_zombie, CZombie );
 LINK_ENTITY_TO_CLASS( npc_zombie_torso, CZombie );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_zombie, CZombie );
+#endif
 
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -260,15 +263,11 @@ void CZombie::Spawn( void )
 {
 	Precache();
 
-	if( FClassnameIs( this, "npc_zombie" ) )
-	{
-		m_fIsTorso = false;
-	}
-	else
-	{
-		// This was placed as an npc_zombie_torso
+	// This was placed as an npc_zombie_torso
+	if( FClassnameIs( this, "npc_zombie_torso" ) )
 		m_fIsTorso = true;
-	}
+	else
+		m_fIsTorso = false;
 
 	m_fIsHeadless = false;
 

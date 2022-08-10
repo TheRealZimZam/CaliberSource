@@ -47,7 +47,7 @@ class CNPC_Assassin : public CAI_BaseActor
 public:
 	CNPC_Assassin( void );
 	
-	Class_T		Classify( void )			{ return CLASS_COMBINE;	}
+	Class_T		Classify( void )			{ return CLASS_STALKER;	}
 	int			GetSoundInterests( void )	{ return (SOUND_WORLD|SOUND_COMBAT|SOUND_PLAYER|SOUND_DANGER|SOUND_BULLET_IMPACT|SOUND_MOVE_AWAY);	}
 	virtual float	GetJumpGravity() const		{ return 1.8f; }
 	
@@ -64,13 +64,14 @@ public:
 	void		StartTask( const Task_t *pTask );
 	void		RunTask( const Task_t *pTask );
 	void		OnScheduleChange( void );
-	void		GatherEnemyConditions( CBaseEntity *pEnemy );
+//	void		GatherEnemyConditions( CBaseEntity *pEnemy );
 	void		BuildScheduleTestBits( void );
 	void		Event_Killed( const CTakeDamageInfo &info );
 
 	bool		FValidateHintType ( CAI_Hint *pHint );
 	bool		IsJumpLegal(const Vector &startPos, const Vector &apex, const Vector &endPos) const;
 	bool		MovementCost( int moveType, const Vector &vecStart, const Vector &vecEnd, float *pCost );
+	bool		IsFrustrated() { return (m_iFrustration > 5); }
 
 	float		MaxYawSpeed( void );
 
@@ -92,10 +93,12 @@ private:
 	//=========================================================
 	// Private conditions
 	//=========================================================
+/*
 	enum Assassin_Conds
 	{
 		COND_ASSASSIN_ENEMY_TARGETTING_ME = LAST_SHARED_CONDITION,
 	};
+*/
 
 	//=========================================================
 	// Assassin schedules
@@ -106,6 +109,7 @@ private:
 		SCHED_ASSASSIN_EVADE,
 		SCHED_ASSASSIN_STALK_ENEMY,
 		SCHED_ASSASSIN_LUNGE,
+		SCHED_ASSASSIN_SMOKE,
 	};
 
 	//=========================================================
@@ -115,6 +119,7 @@ private:
 	{
 		TASK_ASSASSIN_GET_PATH_TO_VANTAGE_POINT = LAST_SHARED_TASK,
 		TASK_ASSASSIN_EVADE,
+		TASK_ASSASSIN_SMOKE,
 		TASK_ASSASSIN_SET_EYE_STATE,
 		TASK_ASSASSIN_LUNGE,
 	};
@@ -126,12 +131,13 @@ private:
 
 	int			m_nNumFlips;
 	int			m_nLastFlipType;
+	int			m_iFrustration;
 	float		m_flNextFlipTime;	//Next earliest time the assassin can flip again
 	float		m_flNextLungeTime;
 	float		m_flNextShotTime;
+	float		m_flNextSmokeTime;
 
-	bool		m_bEvade;
-	bool		m_bAggressive;		// Sets certain state, including whether or not her eye is visible
+//	bool		m_bAggressive;		// Start throwing grenades/Focus on melee
 	bool		m_bBlinkState;
 
 	CSprite				*m_pEyeSprite;

@@ -18,7 +18,7 @@
 //---------------------------------------------------------
 // Applies ammo quantity scale.
 //---------------------------------------------------------
-int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName, bool bSuppressSound = false )
+int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName, bool bSuppressSound = true )
 {
 	int iAmmoType = GetAmmoDef()->Index(pszAmmoName);
 	if (iAmmoType == -1)
@@ -62,9 +62,9 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 
 #define SIZE_AMMO_SNIPER			4	// Comes in a strip like a bolt rifle, but is loaded seperately
 // Both shotguns use the same ammo, so average out their magazine size (better solution L8R)
-#define SIZE_AMMO_BUCKSHOT			4
+#define SIZE_AMMO_BUCKSHOT			5
 #define SIZE_AMMO_BUCKSHOT_MAG		7
-#define SIZE_AMMO_BUCKSHOT_LARGE	16	//Bigger box based on smaller box, for sweeper use clips
+#define SIZE_AMMO_BUCKSHOT_LARGE	15	//Bigger box based on smaller box, for sweeper use clips
 #define SIZE_AMMO_SLUG_MAG			7
 #define SIZE_AMMO_CROSSBOW			1
 #define SIZE_AMMO_FLAMER			100	// One tank
@@ -80,10 +80,17 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 //	>> BoxSRounds
 // Pistol clip
 // ========================================================================
-class CItem_BoxSRounds : public CItem
+class CItem_BoxPistolRounds : public CItem
 {
 public:
-	DECLARE_CLASS( CItem_BoxSRounds, CItem );
+	DECLARE_CLASS( CItem_BoxPistolRounds, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxsrounds.mdl");
+
+		PrecacheScriptSound( "Item.Magazine_Touch" );
+	}
 
 	void Spawn( void )
 	{ 
@@ -91,14 +98,13 @@ public:
 		SetModel( "models/items/boxsrounds.mdl" );
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxsrounds.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL, "Pistol"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -109,8 +115,50 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_box_srounds, CItem_BoxSRounds);	//OBSELETE - DO NOT USE
-LINK_ENTITY_TO_CLASS(item_ammo_pistol, CItem_BoxSRounds);
+LINK_ENTITY_TO_CLASS(item_box_srounds, CItem_BoxPistolRounds);	//OBSELETE - DO NOT USE
+LINK_ENTITY_TO_CLASS(item_ammo_pistol, CItem_BoxPistolRounds);
+
+// ========================================================================
+//	>> BoxMRounds
+// SMG1 clip
+// ========================================================================
+class CItem_BoxSMGRounds : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_BoxSMGRounds, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxmrounds.mdl");
+
+		PrecacheScriptSound( "Item.Magazine_Touch" );
+	}
+
+	void Spawn( void )
+	{ 
+		Precache( );
+		SetModel( "models/items/boxmrounds.mdl");
+		BaseClass::Spawn( );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1, "SMG1"))
+		{
+			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_box_mrounds, CItem_BoxSMGRounds);	//OBSELETE - DO NOT USE
+LINK_ENTITY_TO_CLASS(item_ammo_smg1, CItem_BoxSMGRounds);
+
 
 // ========================================================================
 //	>> LargeBoxSRounds
@@ -121,21 +169,27 @@ class CItem_LargeBoxSRounds : public CItem
 public:
 	DECLARE_CLASS( CItem_LargeBoxSRounds, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxsrounds.mdl");
+
+		PrecacheScriptSound( "Item.SRounds_Touch" );
+	}
+
 	void Spawn( void )
 	{ 
 		Precache( );
 		SetModel( "models/items/boxsrounds.mdl" );
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxsrounds.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		//This seems super-hacky, find a better solution not-so-pronto
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL_LARGE, "Pistol") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.SRounds_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.SRounds_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -148,29 +202,36 @@ public:
 LINK_ENTITY_TO_CLASS(item_large_box_srounds, CItem_LargeBoxSRounds);
 LINK_ENTITY_TO_CLASS(item_ammo_pistol_large, CItem_LargeBoxSRounds);	//OBSELETE - DO NOT USE
 
+
 // ========================================================================
-//	>> BoxMRounds
-// SMG1 clip
+//	>> HMGBox
+// HMG Clip - inbetween medium and large
 // ========================================================================
-class CItem_BoxMRounds : public CItem
+class CItem_HMGBox : public CItem
 {
 public:
-	DECLARE_CLASS( CItem_BoxMRounds, CItem );
+	DECLARE_CLASS( CItem_HMGBox, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxmrounds.mdl");
+
+		PrecacheScriptSound( "Item.HMGRounds_Touch" );
+	}
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/boxmrounds.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxmrounds.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1, "SMG1"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG2, "HMG"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.HMGRounds_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.HMGRounds_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -180,8 +241,7 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_box_mrounds, CItem_BoxMRounds);	//OBSELETE - DO NOT USE
-LINK_ENTITY_TO_CLASS(item_ammo_smg1, CItem_BoxMRounds);
+LINK_ENTITY_TO_CLASS(item_ammo_hmg, CItem_HMGBox);
 
 // ========================================================================
 //	>> LargeBoxMRounds
@@ -192,20 +252,26 @@ class CItem_LargeBoxMRounds : public CItem
 public:
 	DECLARE_CLASS( CItem_LargeBoxMRounds, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxmrounds.mdl");
+
+		PrecacheScriptSound( "Item.MRounds_Touch" );
+	}
+
 	void Spawn( void )
 	{ 
 		Precache( );
 		SetModel( "models/items/boxmrounds.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxmrounds.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "AR2"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "HMG"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.MRounds_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.MRounds_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -219,52 +285,17 @@ LINK_ENTITY_TO_CLASS(item_large_box_mrounds, CItem_LargeBoxMRounds);
 LINK_ENTITY_TO_CLASS(item_ammo_smg1_large, CItem_LargeBoxMRounds);	//OBSELETE - DO NOT USE
 
 // ========================================================================
-//	>> HMGBox
-// HMG Clip - inbetween medium and large
+//	>> CItem_BoxAR1Rounds
+// AR1 Clip
 // ========================================================================
-class CItem_HMGBox : public CItem
+#if 0
+class CItem_BoxAR1Rounds : public CItem
 {
 public:
-	DECLARE_CLASS( CItem_HMGBox, CItem );
+	DECLARE_CLASS( CItem_BoxAR1Rounds, CItem );
 
 	void Spawn( void )
 	{
-		Precache( );
-		SetModel( "models/items/boxmrounds.mdl");
-		BaseClass::Spawn( );
-	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxmrounds.mdl");
-	}
-	bool MyTouch( CBasePlayer *pPlayer )
-	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG2, "HMG"))
-		{
-			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
-			{
-				UTIL_Remove(this);	
-			}
-			return true;
-		}
-		return false;
-	}
-};
-LINK_ENTITY_TO_CLASS(item_ammo_smg2, CItem_HMGBox);	//OBSELETE - DO NOT USE
-LINK_ENTITY_TO_CLASS(item_ammo_hmg, CItem_HMGBox);
-
-
-// ========================================================================
-//	>> BoxLRounds
-// AR2 Clip
-// ========================================================================
-class CItem_BoxLRounds : public CItem
-{
-public:
-	DECLARE_CLASS( CItem_BoxLRounds, CItem );
-
-	void Spawn( void )
-	{ 
 		Precache( );
 		SetModel( "models/items/combine_rifle_cartridge01.mdl");
 		BaseClass::Spawn( );
@@ -275,7 +306,7 @@ public:
 	}
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2, "AR2"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR1, "AR1"))
 		{
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
@@ -286,34 +317,38 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_box_lrounds, CItem_BoxLRounds);	//OBSELETE - DO NOT USE
-LINK_ENTITY_TO_CLASS(item_ammo_ar2, CItem_BoxLRounds);
-
+LINK_ENTITY_TO_CLASS(item_ammo_ar1, CItem_BoxAR1Rounds);
+#endif
 
 // ========================================================================
-//	>> LargeBoxLRounds
-// Box of general large/caseless rounds (ar2, magnum, scrapgun)
+//	>> BoxLRounds
+// AR2 Clip
 // ========================================================================
-class CItem_LargeBoxLRounds : public CItem
+class CItem_BoxAR2Rounds : public CItem
 {
 public:
-	DECLARE_CLASS( CItem_LargeBoxLRounds, CItem );
+	DECLARE_CLASS( CItem_BoxAR2Rounds, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");
+
+		PrecacheScriptSound( "Item.Magazine_Touch" );
+	}
 
 	void Spawn( void )
 	{ 
 		Precache( );
-		SetModel( "models/items/357ammobox.mdl");
+		SetModel( "models/items/combine_rifle_cartridge01.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/357ammobox.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		//This seems super-hacky, find a better solution not-so-pronto
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "AR2") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_357_LARGE, "357") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SNIPER, "SniperRound"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2, "AR2"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -323,9 +358,8 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_large_box_lrounds, CItem_LargeBoxLRounds);
-LINK_ENTITY_TO_CLASS(item_ammo_ar2_large, CItem_LargeBoxLRounds);	//OBSELETE - DO NOT USE
-
+LINK_ENTITY_TO_CLASS(item_box_lrounds, CItem_BoxAR2Rounds);	//OBSELETE - DO NOT USE
+LINK_ENTITY_TO_CLASS(item_ammo_ar2, CItem_BoxAR2Rounds);
 
 // ========================================================================
 //	>> CItem_Box357Rounds
@@ -339,7 +373,10 @@ public:
 	void Precache( void )
 	{
 		PrecacheModel ("models/items/357ammo.mdl");
+
+		PrecacheScriptSound( "Item.Magazine_Touch" );
 	}
+
 	void Spawn( void )
 	{ 
 		Precache( );
@@ -351,6 +388,8 @@ public:
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_357, "357"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -361,7 +400,6 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS(item_ammo_357, CItem_Box357Rounds);
-
 
 // ========================================================================
 //	>> CItem_LargeBox357Rounds
@@ -376,6 +414,7 @@ public:
 	{
 		PrecacheModel ("models/items/357ammobox.mdl");
 	}
+
 	void Spawn( void )
 	{ 
 		Precache( );
@@ -397,6 +436,89 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS(item_ammo_357_large, CItem_LargeBox357Rounds);	//OBSELETE - DO NOT USE
+
+// ========================================================================
+//	>> BoxSniperRounds
+// Scrapgun clip
+// ========================================================================
+class CItem_BoxSniperRounds : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_BoxSniperRounds, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxsniperrounds.mdl");
+
+		PrecacheScriptSound( "Item.LRounds_Touch" );
+	}
+
+	void Spawn( void )
+	{
+		Precache( );
+		SetModel( "models/items/boxsniperrounds.mdl");
+		BaseClass::Spawn( );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_BOX_SNIPER_ROUNDS, "SniperRound"))
+		{
+			CPASAttenuationFilter filter( pPlayer, "Item.LRounds_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.LRounds_Touch" );
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}	
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_sniper, CItem_BoxSniperRounds);
+
+
+// ========================================================================
+//	>> LargeBoxLRounds
+// Box of general large/caseless rounds (ar2, magnum, scrapgun)
+// ========================================================================
+class CItem_LargeBoxLRounds : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_LargeBoxLRounds, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/357ammobox.mdl");
+
+		PrecacheScriptSound( "Item.LRounds_Touch" );
+	}
+
+	void Spawn( void )
+	{ 
+		Precache( );
+		SetModel( "models/items/357ammobox.mdl");
+		BaseClass::Spawn( );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		//This seems super-hacky, find a better solution not-so-pronto
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "AR2") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_357_LARGE, "357") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SNIPER, "SniperRound"))
+		{
+			CPASAttenuationFilter filter( pPlayer, "Item.LRounds_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.LRounds_Touch" );
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}	
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_large_box_lrounds, CItem_LargeBoxLRounds);
+LINK_ENTITY_TO_CLASS(item_ammo_ar2_large, CItem_LargeBoxLRounds);	//OBSELETE - DO NOT USE
 
 
 // ========================================================================
@@ -434,42 +556,6 @@ public:
 };
 LINK_ENTITY_TO_CLASS(item_ammo_crossbow, CItem_BoxXBowRounds);
 
-#if 0
-// ========================================================================
-//	>> CItem_BoxAR1Rounds
-// AR1 Clip
-// ========================================================================
-class CItem_BoxAR1Rounds : public CItem
-{
-public:
-	DECLARE_CLASS( CItem_BoxAR1Rounds, CItem );
-
-	void Spawn( void )
-	{
-		Precache( );
-		SetModel( "models/items/combine_rifle_cartridge01.mdl");
-		BaseClass::Spawn( );
-	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");
-	}
-	bool MyTouch( CBasePlayer *pPlayer )
-	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR1, "AR1"))
-		{
-			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
-			{
-				UTIL_Remove(this);	
-			}	
-			return true;
-		}
-		return false;
-	}
-};
-LINK_ENTITY_TO_CLASS(item_ammo_ar1, CItem_BoxAR1Rounds);
-#endif
-
 // ========================================================================
 //	>> FlareRound
 // Single flare
@@ -479,20 +565,26 @@ class CItem_FlareRound : public CItem
 public:
 	DECLARE_CLASS( CItem_FlareRound, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/flare.mdl");
+
+		PrecacheScriptSound( "Item.FlareRound_Touch" );
+	}
+
 	void Spawn( void )
 	{
 		Precache( );
 		SetModel( "models/items/flare.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/flare.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, 1, "FlareRound"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.FlareRound_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.FlareRound_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -504,7 +596,6 @@ public:
 };
 LINK_ENTITY_TO_CLASS(item_flare_round, CItem_FlareRound);
 
-
 // ========================================================================
 //	>> BoxFlareRounds
 // Flaregun clip
@@ -514,20 +605,26 @@ class CItem_BoxFlareRounds : public CItem
 public:
 	DECLARE_CLASS( CItem_BoxFlareRounds, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxflares.mdl");
+
+		PrecacheScriptSound( "Item.FlareRound_Touch" );
+	}
+
 	void Spawn( void )
 	{
 		Precache( );
 		SetModel( "models/items/boxflares.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxflares.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_BOX_FLARE_ROUNDS, "FlareRound"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.FlareRound_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.FlareRound_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -548,20 +645,26 @@ class CItem_RPG_Round : public CItem
 public:
 	DECLARE_CLASS( CItem_RPG_Round, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/weapons/w_missile_closed.mdl");
+
+		PrecacheScriptSound( "Item.RPGRound_Touch" );
+	}
+
 	void Spawn( void )
 	{
 		Precache( );
 		SetModel( "models/weapons/w_missile_closed.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/weapons/w_missile_closed.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_RPG_ROUND, "RPG_Round"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.RPGRound_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.RPGRound_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -584,20 +687,26 @@ class CItem_AR2_Grenade : public CItem
 public:
 	DECLARE_CLASS( CItem_AR2_Grenade, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/ar2_grenade.mdl");
+
+		PrecacheScriptSound( "Item.AR2Round_Touch" );
+	}
+
 	void Spawn( void )
 	{
 		Precache( );
 		SetModel( "models/items/ar2_grenade.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/ar2_grenade.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_GRENADE, "SMG1_Grenade"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.AR2Round_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.AR2Round_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -610,42 +719,6 @@ public:
 LINK_ENTITY_TO_CLASS(item_ar2_grenade, CItem_AR2_Grenade);
 LINK_ENTITY_TO_CLASS(item_ammo_smg1_grenade, CItem_AR2_Grenade);
 
-
-// ========================================================================
-//	>> BoxSniperRounds
-// Scrapgun clip
-// ========================================================================
-class CItem_BoxSniperRounds : public CItem
-{
-public:
-	DECLARE_CLASS( CItem_BoxSniperRounds, CItem );
-
-	void Spawn( void )
-	{
-		Precache( );
-		SetModel( "models/items/boxsniperrounds.mdl");
-		BaseClass::Spawn( );
-	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxsniperrounds.mdl");
-	}
-	bool MyTouch( CBasePlayer *pPlayer )
-	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_BOX_SNIPER_ROUNDS, "SniperRound"))
-		{
-			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
-			{
-				UTIL_Remove(this);	
-			}	
-			return true;
-		}
-		return false;
-	}
-};
-LINK_ENTITY_TO_CLASS(item_box_sniper_rounds, CItem_BoxSniperRounds);
-
-
 // ========================================================================
 //	>> BoxBuckshot
 // ========================================================================
@@ -654,20 +727,26 @@ class CItem_BoxBuckshot : public CItem
 public:
 	DECLARE_CLASS( CItem_BoxBuckshot, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxbuckshot.mdl");
+
+		PrecacheScriptSound( "Item.BoxBuckshot_Touch" );
+	}
+
 	void Spawn( void )
 	{ 
 		Precache( );
 		SetModel( "models/items/boxbuckshot.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxbuckshot.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_BUCKSHOT, "Buckshot"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.BoxBuckshot_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.BoxBuckshot_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -688,20 +767,26 @@ class CItem_LargeBoxBuckshot : public CItem
 public:
 	DECLARE_CLASS( CItem_LargeBoxBuckshot, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxbuckshot.mdl");
+
+		PrecacheScriptSound( "Item.BoxBuckshot_Touch" );
+	}
+
 	void Spawn( void )
 	{ 
 		Precache( );
 		SetModel( "models/items/boxbuckshot.mdl");
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxbuckshot.mdl");
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_BUCKSHOT_LARGE, "Buckshot"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.BoxBuckshot_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.BoxBuckshot_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -722,20 +807,26 @@ class CItem_ClipBuckshot : public CItem
 public:
 	DECLARE_CLASS( CItem_ClipBuckshot, CItem );
 
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
+
+		PrecacheScriptSound( "Item.Magazine_Touch" );
+	}
+
 	void Spawn( void )
 	{ 
 		Precache( );
 		SetModel( "models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
 		BaseClass::Spawn( );
 	}
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
-	}
+
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_BUCKSHOT_MAG, "Buckshot"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -798,7 +889,10 @@ public:
 	void Precache( void )
 	{
 		PrecacheModel ("models/items/flametank.mdl");
+
+		PrecacheScriptSound( "Item.FlameTank_Touch" );
 	}
+
 	void Spawn( void )
 	{
 		Precache( );
@@ -810,6 +904,8 @@ public:
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_FLAMER, "Flamer"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.FlameTank_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.FlameTank_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	
@@ -835,7 +931,10 @@ public:
 	void Precache( void )
 	{
 		PrecacheModel ("models/items/flametank_large.mdl");
+
+		PrecacheScriptSound( "Item.FlameTank_Touch" );
 	}
+
 	void Spawn( void )
 	{
 		Precache( );
@@ -847,6 +946,8 @@ public:
 	{
 		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PROJECTOR, "Flamer"))
 		{
+			CPASAttenuationFilter filter( pPlayer, "Item.FlameTank_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.FlameTank_Touch" );
 			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
 			{
 				UTIL_Remove(this);	

@@ -63,18 +63,18 @@ ConVar player_throwforce( "player_throwforce", "1000" );
 ConVar physcannon_dmg_glass( "physcannon_dmg_glass", "15" );
 ConVar physcannon_right_turrets( "physcannon_right_turrets", "0" );
 
-extern ConVar hl2_normspeed;
+extern ConVar hl2_jogspeed;
 extern ConVar hl2_walkspeed;
 
-#define PHYSCANNON_BEAM_SPRITE "sprites/orangelight1.vmt"
-#define PHYSCANNON_GLOW_SPRITE "sprites/glow04_noz.vmt"
-#define PHYSCANNON_ENDCAP_SPRITE "sprites/orangeflare1.vmt"
-#define PHYSCANNON_CENTER_GLOW "sprites/orangecore1.vmt"
-#define PHYSCANNON_BLAST_SPRITE "sprites/orangecore2.vmt"
+#define PHYSCANNON_BEAM_SPRITE "sprites/physcannon_bluelight1.vmt"
+#define PHYSCANNON_GLOW_SPRITE "sprites/physcannon_blueglow.vmt"
+#define PHYSCANNON_ENDCAP_SPRITE "sprites/physcannon_blueflare1.vmt"
+#define PHYSCANNON_CENTER_GLOW "sprites/physcannon_bluecore1.vmt"
+#define PHYSCANNON_BLAST_SPRITE "sprites/physcannon_bluecore2.vmt"
  
-#define MEGACANNON_BEAM_SPRITE "sprites/lgtning_noz.vmt"
-#define MEGACANNON_GLOW_SPRITE "sprites/blueflare1_noz.vmt"
-#define MEGACANNON_ENDCAP_SPRITE "sprites/blueflare1_noz.vmt"
+#define MEGACANNON_BEAM_SPRITE "sprites/physcannon_bluelight1b.vmt"
+#define MEGACANNON_GLOW_SPRITE "sprites/physcannon_blueglow.vmt"
+#define MEGACANNON_ENDCAP_SPRITE "sprites/physcannon_blueflare1.vmt"
 #define MEGACANNON_CENTER_GLOW "effects/fluttercore.vmt"
 #define MEGACANNON_BLAST_SPRITE "effects/fluttercore.vmt"
 
@@ -852,7 +852,7 @@ void CGrabController::DetachEntity( bool bClearVelocity )
 			}
 			else
 			{
-				ClampPhysicsVelocity( pPhys, hl2_normspeed.GetFloat() * 1.5f, 2.0f * 360.0f );
+				ClampPhysicsVelocity( pPhys, hl2_jogspeed.GetFloat() * 1.5f, 2.0f * 360.0f );
 			}
 
 		}
@@ -2406,7 +2406,7 @@ bool CWeaponPhysCannon::AttachObject( CBaseEntity *pObject, const Vector &vPosit
 		pOwner->EnableSprint( false );
 
 		float	loadWeight = ( 1.0f - GetLoadPercentage() );
-		float	maxSpeed = hl2_walkspeed.GetFloat() + ( ( hl2_normspeed.GetFloat() - hl2_walkspeed.GetFloat() ) * loadWeight );
+		float	maxSpeed = hl2_walkspeed.GetFloat() + ( ( hl2_jogspeed.GetFloat() - hl2_walkspeed.GetFloat() ) * loadWeight );
 
 		//Msg( "Load perc: %f -- Movement speed: %f/%f\n", loadWeight, maxSpeed, hl2_normspeed.GetFloat() );
 		pOwner->SetMaxSpeed( maxSpeed );
@@ -2853,7 +2853,7 @@ void CWeaponPhysCannon::DetachObject( bool playSound, bool wasLaunched )
 	if( pOwner != NULL )
 	{
 		pOwner->EnableSprint( true );
-		pOwner->SetMaxSpeed( hl2_normspeed.GetFloat() );
+		pOwner->SetMaxSpeed( hl2_jogspeed.GetFloat() );
 		
 		if( wasLaunched )
 		{

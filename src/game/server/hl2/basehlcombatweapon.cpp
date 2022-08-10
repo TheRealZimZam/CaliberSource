@@ -9,12 +9,23 @@
 #include "basehlcombatweapon.h"
 #include "soundent.h"
 #include "ai_basenpc.h"
+#include "hl2_player.h"
 #include "game.h"
 #include "in_buttons.h"
 #include "GameStats.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
+
+#if 0
+ConVar sk_realistic_spread( "sk_realistic_spread", "0");
+ConVar sk_spread_moving_modifier( "sk_spread_moving_modifier", "1.1", FCVAR_REPLICATED );	// Moving/walking
+ConVar sk_spread_movingfast_modifier( "sk_spread_movingfast_modifier", "1.25", FCVAR_REPLICATED );	// Moving/jogging/sprinting
+ConVar sk_spread_flying_modifier( "sk_spread_flying_modifier", "1.4", FCVAR_REPLICATED );	// Jumping/flying/swimming
+ConVar sk_spread_crouch_modifier( "sk_spread_crouch_modifier", "0.8", FCVAR_REPLICATED );	// Crouching
+
+extern ConVar hl2_runspeed;
+#endif
 
 IMPLEMENT_SERVERCLASS_ST( CHLMachineGun, DT_HLMachineGun )
 END_SEND_TABLE()
@@ -29,17 +40,22 @@ BEGIN_DATADESC( CHLMachineGun )
 
 END_DATADESC()
 
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
 CHLMachineGun::CHLMachineGun( void )
 {
 }
 
+//-----------------------------------------------------------------------------
 const Vector &CHLMachineGun::GetBulletSpread( void )
 {
-	static Vector cone = VECTOR_CONE_3DEGREES;
+#if 0
+	static Vector cone = VECTOR_CONE_5DEGREES;
+
+	if ( GetHSpread() != NULL )
+	{
+		cone = CalculateBulletSpread();
+	}
+#endif
+	static Vector cone = VECTOR_CONE_5DEGREES;
 
 	if ( GetHSpread() != NULL )
 	{
@@ -117,7 +133,9 @@ void CHLMachineGun::PrimaryAttack( void )
 	}
 
 	SendWeaponAnim( GetPrimaryAttackActivity() );
+	//player "shoot" animation
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+	pPlayer->SetAimTime( 2.0f );
 
 	// Register a muzzleflash for the AI
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );

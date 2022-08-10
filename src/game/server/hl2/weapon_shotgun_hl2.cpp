@@ -24,7 +24,7 @@
 #include "tier0/memdbgon.h"
 
 #define VECTOR_CONE_SHOTGUN		Vector( 0.10461, 0.10461, 0.09589 )
-#define SHOTGUN_KICKBACK		4	// Range for punchangle when firing.
+#define SHOTGUN_KICKBACK		3	// Range for punchangle when firing.
 
 //ConVar sk_weapon_shotgun_lerp( "sk_weapon_shotgun_lerp", "3.0" );	//NOT USED
 
@@ -81,7 +81,6 @@ public:
 	void FinishReload( void );
 	void CheckHolsterReload( void );
 	void Pump( void );
-	void HalfPump( void );	//For secondary fire
 //	void WeaponIdle( void );
 	void ItemHolsterFrame( void );
 	void ItemPostFrame( void );
@@ -91,7 +90,6 @@ public:
 
 	const char *GetTracerType( void ) { return "ShotgunTracer"; }
 	void FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
-	void FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
 	void Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
 	void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
@@ -223,32 +221,6 @@ void CWeaponShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool
 }
 
 //-----------------------------------------------------------------------------
-void CWeaponShotgun::FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles )
-{
-	Vector vecShootOrigin, vecShootDir;
-	CAI_BaseNPC *npc = pOperator->MyNPCPointer();
-	ASSERT( npc != NULL );
-	WeaponSound( DOUBLE_NPC );
-	pOperator->DoMuzzleFlash();
-	m_iClip1 = m_iClip1 - 2;
-
-	if ( bUseWeaponAngles )
-	{
-		QAngle	angShootDir;
-		GetAttachment( LookupAttachment( "muzzle" ), vecShootOrigin, angShootDir );
-		AngleVectors( angShootDir, &vecShootDir );
-	}
-	else 
-	{
-		vecShootOrigin = pOperator->Weapon_ShootPosition();
-		vecShootDir = npc->GetActualShootTrajectory( vecShootOrigin );
-	}
-
-	int NumPellets = sk_npc_num_shotgun_pellets.GetInt() * 2;
-	pOperator->FireBullets( NumPellets, vecShootOrigin, vecShootDir, (VECTOR_CONE_SHOTGUN * 1.25), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 1 );
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CWeaponShotgun::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
@@ -300,9 +272,9 @@ float CWeaponShotgun::GetMinRestTime()
 	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
 		 OwnerClass == CLASS_CITIZEN_REBEL	||
 		 OwnerClass == CLASS_METROPOLICE	)
-		 return 1.1f;
-
-	return GetFireRate();
+		 return 1.2f;
+	
+	return 0.9f;
 }
 
 //-----------------------------------------------------------------------------
@@ -315,15 +287,28 @@ float CWeaponShotgun::GetMaxRestTime()
 		 OwnerClass == CLASS_METROPOLICE	)
 		 return 1.6f;
 
-	return GetFireRate() + 0.4f;
+	return 1.2f;
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Time between successive shots in a burst.
+// Purpose: Time between successive shots in a burst. Also returned for EP2
+// NOTENOTE; This is only for the AI! Player firerate is controlled through
+// the attack functions, and (currently) uses the viewmodel sequence duration
 //-----------------------------------------------------------------------------
 float CWeaponShotgun::GetFireRate()
 {
-	return BaseClass::GetFireRate();
+#if 0
+	if( GetOwner() && GetOwner()->Classify() == CLASS_METROPOLICE )
+	{
+		return 1.0f;
+	}
+	if( GetOwner() && GetOwner()->Classify() == CLASS_CITIZEN_PASSIVE )
+	{
+		return 1.2f;
+	}
+#endif
+	//TODO; this should really just grab the duration of the pump animation
+	return 0.9f;
 }
 
 //-----------------------------------------------------------------------------
@@ -482,25 +467,8 @@ void CWeaponShotgun::Pump( void )
 	// Finish reload animation
 	SendWeaponAnim( ACT_SHOTGUN_PUMP );
 
-	pOwner->m_flNextAttack	= gpGlobals->curtime + GetFireRate();	//SequenceDuration
-	m_flNextPrimaryAttack	= gpGlobals->curtime + GetFireRate();	//SequenceDuration
-}
-
-void CWeaponShotgun::HalfPump( void )
-{
-	CBaseCombatCharacter *pOwner  = GetOwner();
-
-	if ( pOwner == NULL )
-		return;
-
-	m_bNeedPump = false;
-
-	WeaponSound( SPECIAL1 );
-
-	// Half pump animation - load a second shell without ejecting the first
-	SendWeaponAnim( ACT_VM_PULLBACK );
-
-	SecondaryAttack();
+	pOwner->m_flNextAttack	= gpGlobals->curtime + SequenceDuration();
+	m_flNextPrimaryAttack	= gpGlobals->curtime + SequenceDuration();
 }
 
 //-----------------------------------------------------------------------------
@@ -599,15 +567,12 @@ void CWeaponShotgun::SecondaryAttack( void )
 
 	// Fire the bullets
 	int NumPellets = sk_plr_num_shotgun_pellets.GetInt() * 2;
-	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, (VECTOR_CONE_SHOTGUN * 1.25), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, false, false );
+	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, VECTOR_CONE_SHOTGUN * 1.25, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, false, false );
 
 	pPlayer->ViewPunch( QAngle( -(NumPellets/2), random->RandomFloat( -(SHOTGUN_KICKBACK + 1), (SHOTGUN_KICKBACK + 1) ), 0 ) );
 
 	Vector	recoilForce = pPlayer->BodyDirection3D() * -( NumPellets * 5.0f );
 	recoilForce[2] += 128.0f;
-
-	//TODO; Clamp force?
-	// Naaahhhh this is fun
 
 	pPlayer->ApplyAbsVelocityImpulse( recoilForce );
 	if ( pPlayer->GetHealth() > 2 )

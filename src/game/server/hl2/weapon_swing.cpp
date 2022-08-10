@@ -2,7 +2,7 @@
 //
 // Purpose:		Bat - breaking eggs
 //
-// TODO's; Add model-changing support, optimize
+// TODO's; Better system for variants, optimize
 // $NoKeywords: $
 //=============================================================================//
 
@@ -37,6 +37,9 @@ END_SEND_TABLE()
 LINK_ENTITY_TO_CLASS( weapon_swing, CWeaponSwing );
 PRECACHE_WEAPON_REGISTER( weapon_swing );
 #endif
+
+BEGIN_DATADESC( CWeaponSwing )
+END_DATADESC()
 
 acttable_t CWeaponSwing::m_acttable[] = 
 {
@@ -201,4 +204,57 @@ void CWeaponSwing::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCha
 		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
 		break;
 	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Bat
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponBat, DT_WeaponBat)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_bat, CWeaponBat );
+PRECACHE_WEAPON_REGISTER(weapon_bat);
+
+CWeaponBat::CWeaponBat( )
+{
+}
+
+//-----------------------------------------------------------------------------
+// Crowbar
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponCrowbar, DT_WeaponCrowbar)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_crowbar, CWeaponCrowbar );
+PRECACHE_WEAPON_REGISTER(weapon_crowbar);
+
+CWeaponCrowbar::CWeaponCrowbar( )
+{
+}
+
+//-----------------------------------------------------------------------------
+// Hammer
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponHammer, DT_WeaponHammer)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_hammer, CWeaponHammer );
+PRECACHE_WEAPON_REGISTER(weapon_hammer);
+
+CWeaponHammer::CWeaponHammer( )
+{
+}
+
+//-----------------------------------------------------------------------------
+// Pipe
+//-----------------------------------------------------------------------------
+//IMPLEMENT_SERVERCLASS_ST(CWeaponPipe, DT_WeaponPipe)
+//END_SEND_TABLE()
+
+LINK_ENTITY_TO_CLASS( weapon_pipe, CWeaponPipe );
+PRECACHE_WEAPON_REGISTER(weapon_pipe);
+
+CWeaponPipe::CWeaponPipe( )
+{
 }

@@ -15,6 +15,7 @@
 #include "ai_interactions.h"
 #include "ai_tacticalservices.h"
 #include "npc_assassin.h"
+#include "assassin_smoke.h"
 #include "soundent.h"
 #include "game.h"
 #include "npcevent.h"
@@ -50,7 +51,8 @@ int ACT_ASSASSIN_FLIP_LEFT;
 int ACT_ASSASSIN_FLIP_RIGHT;
 int ACT_ASSASSIN_FLIP_BACK;
 int ACT_ASSASSIN_FLIP_FORWARD;
-int ACT_ASSASSIN_PERCH;
+int ACT_ASSASSIN_PERCH;	// Perching on a ledge
+int ACT_ASSASSIN_SMOKE;	// Smokebomb
 
 //-----------------------------------------------------------------------------
 // Purpose: Class Constructor
@@ -69,6 +71,9 @@ END_SEND_TABLE()
 #endif
 
 LINK_ENTITY_TO_CLASS( npc_assassin, CNPC_Assassin );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_human_assassin, CNPC_Assassin );	//Not human, but backwards compat is always nice, even if its slightly borked
+#endif
 
 //---------------------------------------------------------
 // Save/Restore
@@ -76,11 +81,11 @@ LINK_ENTITY_TO_CLASS( npc_assassin, CNPC_Assassin );
 BEGIN_DATADESC( CNPC_Assassin )
 	DEFINE_FIELD( m_nNumFlips,	FIELD_INTEGER ),
 	DEFINE_FIELD( m_nLastFlipType, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iFrustration,	FIELD_INTEGER ),
 	DEFINE_FIELD( m_flNextFlipTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextLungeTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextShotTime, FIELD_TIME ),
-	DEFINE_FIELD( m_bEvade,		FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_bAggressive, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_flNextSmokeTime, FIELD_TIME ),
 	DEFINE_FIELD( m_bBlinkState, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_pEyeSprite,	FIELD_CLASSPTR ),
 	DEFINE_FIELD( m_pEyeTrail,	FIELD_CLASSPTR ),
@@ -93,12 +98,17 @@ void CNPC_Assassin::Precache( void )
 {
 	PrecacheModel( "models/assassin.mdl" );
 
-	PrecacheScriptSound( "NPC_Assassin.ShootPistol" );
 	PrecacheScriptSound( "Zombie.AttackHit" );
-	PrecacheScriptSound( "Assassin.AttackMiss" );
+	PrecacheScriptSound( "NPC_Assassin.AttackMiss" );
 	PrecacheScriptSound( "NPC_Assassin.Footstep" );
+	PrecacheScriptSound( "NPC_Assassin.Movement" );
+	PrecacheScriptSound( "NPC_Assassin.Shoot" );
+	PrecacheScriptSound( "NPC_Assassin.Taunt" );
+	PrecacheScriptSound( "NPC_Assassin.EyeCharge" );
+	PrecacheScriptSound( "NPC_Assassin.EyeDie" );
 
 	PrecacheModel( "sprites/redglow1.vmt" );
+	PrecacheModel( "sprites/bluelaser1.vmt" );
 
 	BaseClass::Precache();
 }
@@ -119,7 +129,7 @@ void CNPC_Assassin::Spawn( void )
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_STEP );
-	SetBloodColor( BLOOD_COLOR_RED );
+	SetBloodColor( BLOOD_COLOR_BLUE );
 	
 	m_iHealth			= sk_assassin_health.GetFloat();
 	m_flFieldOfView		= 0.1;	//*170
@@ -155,10 +165,12 @@ void CNPC_Assassin::Spawn( void )
 		m_pEyeTrail->SetLifeTime( 0.75f );
 	}
 
-	NPCInit();
+	m_flNextFlipTime = gpGlobals->curtime;
+	m_flNextLungeTime = gpGlobals->curtime;
+	m_flNextShotTime = gpGlobals->curtime;
+	m_flNextSmokeTime = gpGlobals->curtime;
 
-	m_bEvade = false;
-	m_bAggressive = false;
+	NPCInit();
 }
 
 //-----------------------------------------------------------------------------
@@ -325,7 +337,7 @@ void CNPC_Assassin::FirePistol( int hand )
 	UTIL_MuzzleFlash( muzzlePos, muzzleAngle, 0.5f, 1 );
 
 	CPASAttenuationFilter filter( this );
-	EmitSound( filter, entindex(), "NPC_Assassin.ShootPistol" );
+	EmitSound( filter, entindex(), "NPC_Assassin.Shoot" );
 }
 
 //---------------------------------------------------------
@@ -375,8 +387,7 @@ void CNPC_Assassin::HandleAnimEvent( animevent_t *pEvent )
 		}
 		else
 		{
-			EmitSound( "Assassin.AttackMiss" );
-			//EmitSound( "Assassin.AttackMiss" );
+			EmitSound( "NPC_Assassin.AttackMiss" );
 		}
 
 		return;
@@ -416,13 +427,15 @@ bool CNPC_Assassin::MovementCost( int moveType, const Vector &vecStart, const Ve
 //---------------------------------------------------------
 int CNPC_Assassin::SelectSchedule( void )
 {
-
-	int nSched = SelectFlinchSchedule();
-	if ( nSched != SCHED_NONE )
-		return nSched;
-
 	if ( m_NPCState != NPC_STATE_SCRIPT)
 	{
+		// Assasses dont big flinch
+		if ( HasCondition( COND_HEAVY_DAMAGE ) )
+		{
+			if ( CanFlinch() )
+				return SCHED_SMALL_FLINCH;
+		}
+
 		// We've been told to move away from a target to make room for a grenade to be thrown at it
 		if ( HasCondition( COND_HEAR_MOVE_AWAY ) )
 		{
@@ -506,6 +519,7 @@ int CNPC_Assassin::SelectSchedule( void )
 			if ( HasCondition( COND_ENEMY_DEAD ) )
 			{
 				// call base class, all code to handle dead enemies is centralized there.
+				m_iFrustration = 0;
 				return BaseClass::SelectSchedule();
 			}
 
@@ -537,18 +551,26 @@ int CNPC_Assassin::SelectSchedule( void )
 				}
 				return SCHED_TAKE_COVER_FROM_ENEMY;
 			}
-			
-			// -----------
+
 			// Need to move
-			// -----------
-			if ( /*(	HasCondition( COND_SEE_ENEMY ) && HasCondition( COND_ASSASSIN_ENEMY_TARGETTING_ME ) && random->RandomInt( 0, 32 ) == 0 && m_flNextFlipTime < gpGlobals->curtime ) )*/
-					( m_nNumFlips > 0 ) || 
-					( ( HasCondition ( COND_LIGHT_DAMAGE ) && random->RandomInt( 0, 2 ) == 0 ) ) || ( HasCondition ( COND_HEAVY_DAMAGE ) ) )
+			if ( HasCondition( COND_REPEATED_DAMAGE ) )
 			{
+				m_iFrustration++;
+
+				// Getting hosed, pop smoke and run away!
+				if ( m_flNextSmokeTime > gpGlobals->curtime )
+					return SCHED_ASSASSIN_SMOKE;
+			}
+
+			if ( (HasCondition( COND_SEE_ENEMY ) && HasCondition( COND_ENEMY_TARGETTING_ME ) && random->RandomInt( 0, 32 ) == 0 && m_flNextFlipTime < gpGlobals->curtime)
+					|| ((HasCondition( COND_LIGHT_DAMAGE ) && random->RandomInt( 0, 2 ) == 0 )) || HasCondition( COND_HEAVY_DAMAGE ) )
+			{
+				// Got hit, try to flip away
 				if ( m_nNumFlips <= 0 )
 				{
 					m_nNumFlips = random->RandomInt( 1, 2 );
 				}
+				m_iFrustration++;
 
 				return SCHED_ASSASSIN_EVADE;
 			}
@@ -557,10 +579,13 @@ int CNPC_Assassin::SelectSchedule( void )
 			if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
 				return SCHED_MELEE_ATTACK1;
 
-			// Can shoot
+			// Can lunge
 			if ( HasCondition( COND_CAN_RANGE_ATTACK2 ) )
 			{
-				m_flNextLungeTime	= gpGlobals->curtime + 2.0f;
+				// Lunge towards the enemy
+				m_flNextLungeTime	= gpGlobals->curtime + 4.0f;
+				if ( IsFrustrated() )
+					m_flNextLungeTime	= gpGlobals->curtime + 1.0f;
 				m_nLastFlipType		= FLIP_FORWARD;
 
 				return SCHED_ASSASSIN_LUNGE;
@@ -572,9 +597,14 @@ int CNPC_Assassin::SelectSchedule( void )
 
 			// Face our enemy
 			if ( HasCondition( COND_SEE_ENEMY ) )
-				return SCHED_COMBAT_FACE;
+			{
+				// Spotted
+				if ( HasCondition( COND_ENEMY_FACING_ME ) )
+					m_iFrustration++;
 
-			// ALERT( at_console, "stand\n");
+				return SCHED_COMBAT_FACE;
+			}
+
 			return SCHED_ASSASSIN_FIND_VANTAGE_POINT;
 		}
 		break;
@@ -588,7 +618,7 @@ int CNPC_Assassin::SelectSchedule( void )
 //-----------------------------------------------------------------------------
 void CNPC_Assassin::PrescheduleThink( void )
 {
-	if ( GetActivity() == ACT_RUN || GetActivity() == ACT_WALK)
+	if ( GetActivity() == ACT_RUN || GetActivity() == ACT_WALK )
 	{
 		CPASAttenuationFilter filter( this );
 
@@ -596,9 +626,12 @@ void CNPC_Assassin::PrescheduleThink( void )
 		iStep = ! iStep;
 		if (iStep)
 		{
+			MakeAIFootstepSound( 120.0f );
 			EmitSound( filter, entindex(), "NPC_Assassin.Footstep" );
 		}
 	}
+	
+	BaseClass::PrescheduleThink();
 }
 
 //-----------------------------------------------------------------------------
@@ -828,6 +861,23 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 		}
 		break;
 
+	case TASK_ASSASSIN_SMOKE:
+		{
+			if ( GetEnemy() )
+			{
+				EmitSound( "NPC_Assassin.Smoke" );
+				m_flNextSmokeTime = gpGlobals->curtime + 20.0f;
+				SetWait( 0.25 );
+				break;
+			}
+			else
+			{
+				TaskFail( "No enemy to spray smoke towards!\n" );
+				break;
+			}
+		}
+		break;
+
 	default:
 		BaseClass::StartTask( pTask );
 		break;
@@ -842,16 +892,21 @@ void CNPC_Assassin::RunTask( const Task_t *pTask )
 	switch( pTask->iTask )
 	{
 	case TASK_ASSASSIN_EVADE:
-
 		AutoMovement();
-
 		if ( IsActivityFinished() )
 		{
 			TaskComplete();
 		}
-
 		break;
-		
+
+	case TASK_ASSASSIN_SMOKE:
+		if ( IsWaitFinished() )
+		{
+			//!	CreateAssassinSmoke( this->GetAbsOrigin() );
+			TaskComplete();
+		}
+		break;
+
 	default:
 		BaseClass::RunTask( pTask );
 		break;
@@ -902,8 +957,7 @@ const Vector &CNPC_Assassin::GetViewOffset( void )
 
 	//FIXME: Use eye attachment?
 	// If we're crouching, offset appropriately
-	if ( ( GetActivity() == ACT_ASSASSIN_PERCH ) ||
-		 ( GetActivity() == ACT_RANGE_ATTACK1 ) )
+	if ( IsCrouching() || ( GetActivity() == ACT_ASSASSIN_PERCH ) )	//|| ( GetActivity() == ACT_RANGE_ATTACK1 )
 	{
 		eyeOffset = Vector( 0, 0, 24.0f );
 	}
@@ -920,7 +974,29 @@ const Vector &CNPC_Assassin::GetViewOffset( void )
 //-----------------------------------------------------------------------------
 void CNPC_Assassin::OnScheduleChange( void )
 {
-	//TODO: Change eye state?
+	// We have an enemy
+	if ( GetEnemy() )
+	{
+		if ( HasCondition( COND_SEE_ENEMY ) )
+			SetEyeState( ASSASSIN_EYE_SEE_TARGET );
+		else
+			SetEyeState( ASSASSIN_EYE_SEEKING_TARGET );
+	}
+	else
+	{
+		if ( HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_HEAR_DANGER ) )
+		{
+			SetEyeState( ASSASSIN_EYE_SEEKING_TARGET );
+		}
+		else if ( m_NPCState == NPC_STATE_ALERT || (HasCondition( COND_HEAR_COMBAT ) || HasCondition( COND_SMELL )) )
+		{
+			SetEyeState( ASSASSIN_EYE_ACTIVE );
+		}
+		else
+		{
+			SetEyeState( ASSASSIN_EYE_DORMANT );
+		}
+	}
 
 	BaseClass::OnScheduleChange();
 }
@@ -947,7 +1023,6 @@ void CNPC_Assassin::SetEyeState( eyeState_t state )
 		m_pEyeTrail->SetColor( 255, 0, 0 );
 		m_pEyeTrail->SetScale( 8.0f );
 		m_pEyeTrail->SetBrightness( 164 );
-
 		break;
 
 	case ASSASSIN_EYE_SEEKING_TARGET: //Ping-pongs
@@ -968,7 +1043,12 @@ void CNPC_Assassin::SetEyeState( eyeState_t state )
 			m_pEyeSprite->SetScale( 0.2f, 0.1f );
 			m_pEyeSprite->SetBrightness( 64, 0.1f );
 		}
+		break;
 
+	case ASSASSIN_EYE_ACTIVE: //Normal red
+		m_pEyeSprite->SetColor( 255, 0, 0 );
+		m_pEyeSprite->SetScale( 0.1f );
+		m_pEyeSprite->SetBrightness( 0 );
 		break;
 
 	case ASSASSIN_EYE_DORMANT: //Fade out and scale down
@@ -989,17 +1069,18 @@ void CNPC_Assassin::SetEyeState( eyeState_t state )
 		m_pEyeTrail->SetBrightness( 0 );
 		break;
 
-	case ASSASSIN_EYE_ACTIVE:
-		m_pEyeSprite->SetColor( 255, 0, 0 );
-		m_pEyeSprite->SetScale( 0.1f );
-		m_pEyeSprite->SetBrightness( 0 );
-		break;
+	}
+
+	if ( state != ASSASSIN_EYE_DEAD )
+	{
+		EmitSound( "NPC_Assassin.EyeCharge" );
 	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+#if 0
 void CNPC_Assassin::GatherEnemyConditions( CBaseEntity *pEnemy )
 {
 	ClearCondition( COND_ASSASSIN_ENEMY_TARGETTING_ME );
@@ -1033,6 +1114,7 @@ void CNPC_Assassin::GatherEnemyConditions( CBaseEntity *pEnemy )
 		}
 	}
 }
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -1048,7 +1130,7 @@ void CNPC_Assassin::BuildScheduleTestBits( void )
 	//Become interrupted if we're targetted when shooting an enemy
 	if ( IsCurSchedule( SCHED_RANGE_ATTACK1 ) )
 	{
-		SetCustomInterruptCondition( COND_ASSASSIN_ENEMY_TARGETTING_ME );
+		SetCustomInterruptCondition( COND_ENEMY_TARGETTING_ME );
 	}
 	
 }
@@ -1063,10 +1145,10 @@ void CNPC_Assassin::Event_Killed( const CTakeDamageInfo &info )
 
 	// Turn off the eye
 	SetEyeState( ASSASSIN_EYE_DEAD );
+	EmitSound( "NPC_Assassin.EyeDie" );
 	
 	// Turn off the pistols
 	SetBodygroup( 1, 0 );
-
 }
 
 //-----------------------------------------------------------------------------
@@ -1082,6 +1164,7 @@ AI_BEGIN_CUSTOM_NPC( npc_assassin, CNPC_Assassin )
 	DECLARE_ACTIVITY(ACT_ASSASSIN_FLIP_BACK)
 	DECLARE_ACTIVITY(ACT_ASSASSIN_FLIP_FORWARD)
 	DECLARE_ACTIVITY(ACT_ASSASSIN_PERCH)
+	DECLARE_ACTIVITY(ACT_ASSASSIN_SMOKE)
 
 	//Adrian: events go here
 	DECLARE_ANIMEVENT( AE_ASSASIN_FIRE_PISTOL_RIGHT )
@@ -1090,34 +1173,34 @@ AI_BEGIN_CUSTOM_NPC( npc_assassin, CNPC_Assassin )
 
 	DECLARE_TASK(TASK_ASSASSIN_GET_PATH_TO_VANTAGE_POINT)
 	DECLARE_TASK(TASK_ASSASSIN_EVADE)
+	DECLARE_TASK(TASK_ASSASSIN_SMOKE)
 	DECLARE_TASK(TASK_ASSASSIN_SET_EYE_STATE)
 	DECLARE_TASK(TASK_ASSASSIN_LUNGE)
 
-	DECLARE_CONDITION(COND_ASSASSIN_ENEMY_TARGETTING_ME)
+//	DECLARE_CONDITION(COND_ASSASSIN_ENEMY_TARGETTING_ME)
 
 	//=========================================================
 	// ASSASSIN_STALK_ENEMY
 	//=========================================================
-
 	DEFINE_SCHEDULE
 	(
 		SCHED_ASSASSIN_STALK_ENEMY,
 
 		"	Tasks"
 		"		TASK_STOP_MOVING						0"
+		"		TASK_ASSASSIN_SET_EYE_STATE				ASSASSIN_EYE_DORMANT"
 		"		TASK_PLAY_SEQUENCE_FACE_ENEMY			ACTIVITY:ACT_ASSASSIN_PERCH"
 		"	"
 		"	Interrupts"
-		"		COND_ASSASSIN_ENEMY_TARGETTING_ME"
+		"		COND_ENEMY_TARGETTING_ME"
 		"		COND_SEE_ENEMY"
 		"		COND_LIGHT_DAMAGE"
 		"		COND_HEAVY_DAMAGE"
 	)
 
 	//=========================================================
-	// > ASSASSIN_FIND_VANTAGE_POINT
+	// > Find somewhere secluded to perch
 	//=========================================================
-
 	DEFINE_SCHEDULE
 	(
 		SCHED_ASSASSIN_FIND_VANTAGE_POINT,
@@ -1153,7 +1236,7 @@ AI_BEGIN_CUSTOM_NPC( npc_assassin, CNPC_Assassin )
 	)	
 
 	//=========================================================
-	// Assassin needs to avoid the player
+	// Lunging attack at an enemy
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
@@ -1168,5 +1251,24 @@ AI_BEGIN_CUSTOM_NPC( npc_assassin, CNPC_Assassin )
 		"	Interrupts"
 		"		COND_TASK_FAILED"
 	)	
+
+	//=========================================================
+	// Smoke the area and run away
+	//=========================================================
+	DEFINE_SCHEDULE
+	(
+		SCHED_ASSASSIN_SMOKE,
+
+		"	Tasks"
+		"		TASK_SET_FAIL_SCHEDULE		SCHEDULE:SCHED_RUN_FROM_ENEMY"
+		"		TASK_STOP_MOVING			0"
+		"		TASK_FACE_ENEMY				0"
+		"		TASK_ASSASSIN_SMOKE			0"
+		"		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_ASSASSIN_SMOKE"
+		"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_TAKE_COVER_FROM_ENEMY"
+		"	"
+		"	Interrupts"
+		"		COND_TASK_FAILED"
+	)
 
 AI_END_CUSTOM_NPC()

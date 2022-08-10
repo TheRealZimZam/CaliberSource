@@ -33,7 +33,7 @@ struct SquadCandidate_t;
 #define SF_CITIZEN_RANDOM_HEAD_MALE	( 1 << 22 )	//4194304
 #define SF_CITIZEN_RANDOM_HEAD_FEMALE ( 1 << 23 )//8388608
 #define SF_CITIZEN_USE_RENDER_BOUNDS ( 1 << 24 )//16777216
-#define SF_CITIZEN_LEADER ( 1 << 25 )//33554432	Leader/Rebel citizen
+#define SF_CITIZEN_UPGRADED ( 1 << 25 )//33554432	Leader/Rebel citizen
 
 //-------------------------------------
 // Animation events
@@ -42,9 +42,9 @@ struct SquadCandidate_t;
 enum CitizenType_t
 {
 	CT_DEFAULT,
-	CT_DOWNTRODDEN,
 	CT_REFUGEE,
 	CT_CRIMINAL,
+	CT_DOWNTRODDEN,
 	CT_REBEL,
 	CT_UNIQUE
 };
@@ -57,6 +57,7 @@ enum CitizenExpressionTypes_t
 	CIT_EXP_UNASSIGNED,	// Defaults to this, selects other in spawn.
 
 	CIT_EXP_SCARED,
+	CIT_EXP_NERVOUS,
 	CIT_EXP_NORMAL,
 	CIT_EXP_ANGRY,
 
@@ -94,6 +95,7 @@ public:
 	string_t 		GetModelName() const;
 	
 	Class_T 		Classify();
+	Disposition_t	IRelationType( CBaseEntity *pTarget );
 
 	bool 			ShouldAlwaysThink();
 
@@ -143,10 +145,10 @@ public:
 	//---------------------------------
 	// Combat
 	//---------------------------------
+//!	int				RangeAttack2Conditions( float flDot, float flDist ); // For thrown/molotov attack
+	
 	bool 			OnBeginMoveAndShoot();
 	void 			OnEndMoveAndShoot();
-	
-//!!!virtual bool	UseAttackSquadSlots()	{ return false; }
 
 	bool			IsManhackMeleeCombatant();
 	
@@ -163,13 +165,12 @@ public:
 	float			GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info );
 	virtual	bool	AllowedToIgnite( void ) { return true; }
 //	bool			bCriticalHealth = ((float)GetHealth() / (float)GetMaxHealth() < 0.25f);
-	bool			IsInjured() { return ((float)GetHealth() / (float)GetMaxHealth() <= 0.25f); }
 
 	//---------------------------------
 	// Commander mode
 	//---------------------------------
-	bool			m_bIsRebel;
-	bool			IsLeader() { return m_bIsRebel; }
+	bool			m_bIsUpgraded;
+	bool			IsUpgraded() { return m_bIsUpgraded; }
 	bool 			IsCommandable();
 	bool			IsPlayerAlly( CBasePlayer *pPlayer = NULL );
 	bool			CanJoinPlayerSquad();
@@ -297,7 +298,6 @@ private:
 
 	int				m_nInspectActivity;
 	float			m_flNextFearSoundTime;
-	float			m_flStopManhackFlinch;
 	float			m_fNextInspectTime;		// Next time I'm allowed to get inspected by a scanner
 	float			m_flPlayerHealTime;
 	float			m_flNextHealthSearchTime; // Next time I'm allowed to look for a healthkit
@@ -307,6 +307,7 @@ private:
 	int				m_iAmmoAmount;
 	bool			m_bRPGAvoidPlayer;
 	bool			m_bShouldPatrol;
+	bool			m_bCanPanic;
 	string_t		m_iszOriginalSquad;
 	float			m_flTimeJoinedPlayerSquad;
 	bool			m_bWasInPlayerSquad;
@@ -325,6 +326,8 @@ private:
 
 	float			m_flTimePlayerStare;	// The game time at which the player started staring at me.
 	float			m_flTimeNextHealStare;	// Next time I'm allowed to heal a player who is staring at me.
+	
+	string_t		m_SecondaryType;	//Secondary thrown weapon
 
 	//-----------------------------------------------------
 	//	Outputs

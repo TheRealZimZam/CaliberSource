@@ -21,18 +21,18 @@
 #define	CROWBAR_REFIRE	0.4f
 
 //-----------------------------------------------------------------------------
-// CWeaponCrowbar
+// CWeaponCrowbarOld
 //-----------------------------------------------------------------------------
 
-class CWeaponCrowbar : public CBaseHLBludgeonWeapon
+class CWeaponCrowbarOld : public CBaseHLBludgeonWeapon
 {
 public:
-	DECLARE_CLASS( CWeaponCrowbar, CBaseHLBludgeonWeapon );
+	DECLARE_CLASS( CWeaponCrowbarOld, CBaseHLBludgeonWeapon );
 
 	DECLARE_SERVERCLASS();
 	DECLARE_ACTTABLE();
 
-	CWeaponCrowbar();
+	CWeaponCrowbarOld();
 
 	float		GetRange( void )		{	return	CROWBAR_RANGE;	}
 	float		GetFireRate( void )		{	return	CROWBAR_REFIRE;	}

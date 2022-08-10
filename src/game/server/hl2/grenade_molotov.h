@@ -22,20 +22,28 @@
 #include "basegrenade_shared.h"
 #include "smoke_trail.h"
 
-class CGrenade_Molotov : public CBaseGrenade
+#define	MOLOTOV_NO_COLLIDE_TIME	0.15		//Time spent before activation - can bounce within this timeframe
+#define	MOLOTOV_BREAK_VELOCITY	350			//Dentonate if smashing against something and going faster than this
+#define	MOLOTOV_FUSE_TIME_MIN 	3			//Dentonate if i've been rolling around for this long
+#define	MOLOTOV_FUSE_TIME_MAX 	5
+
+class CGrenadeMolotov : public CBaseGrenade
 {
 public:
-	DECLARE_CLASS( CGrenade_Molotov, CBaseGrenade );
+	DECLARE_CLASS( CGrenadeMolotov, CBaseGrenade );
 
 	virtual void	Spawn( void );
 	virtual void	Precache( void );
 	virtual void	Detonate( void );
+	void			ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity );
 	void			MolotovTouch( CBaseEntity *pOther );
 	void			MolotovThink( void );
 
 protected:
 
 	SmokeTrail		*m_pFireTrail;
+	float			m_fSpawnTime;
+	float			m_fFuseTime;
 
 	DECLARE_DATADESC();
 };

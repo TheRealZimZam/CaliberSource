@@ -12,6 +12,8 @@
 
 #include "player.h"
 #include "hl2_playerlocaldata.h"
+#include "multiplayer_animstate.h"
+#include "hl2_player_shared.h"
 #include "simtimer.h"
 #include "soundenvelope.h"
 
@@ -199,6 +201,7 @@ public:
 	bool IsZooming( void );
 	void CheckSuitZoom( void );
 
+	virtual void SetAnimation( PLAYER_ANIM playerAnim );
 	
 	// Walking
 	void StartWalking( void );
@@ -320,6 +323,12 @@ protected:
 	virtual void		PlayUseDenySound();
 
 private:
+
+	// Copyed from EyeAngles() so we can send it to the client.
+	CNetworkQAngle( m_angEyeAngles );
+
+	IPlayerAnimState	*m_PlayerAnimState;
+
 	bool				CommanderExecuteOne( CAI_BaseNPC *pNpc, const commandgoal_t &goal, CAI_BaseNPC **Allies, int numAllies );
 
 	void				OnSquadMemberKilled( inputdata_t &data );
@@ -333,7 +342,7 @@ private:
 
 	bool				m_bSprintEnabled;		// Used to disable sprint temporarily
 	bool				m_bIsAutoSprinting;		// A proxy for holding down the sprint key.
-	float				m_fAutoSprintMinTime;	// Minimum time to maintain autosprint regardless of player speed. 
+	float				m_fAutoSprintMinTime;	// Minimum time to maintain autosprint regardless of player speed.
 
 	CNetworkVar( bool, m_fIsSprinting );
 	CNetworkVarForDerived( bool, m_fIsWalking );

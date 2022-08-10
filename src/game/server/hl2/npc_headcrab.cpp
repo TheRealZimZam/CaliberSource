@@ -2515,6 +2515,9 @@ void CHeadcrab::BiteSound( void )
 }
 
 LINK_ENTITY_TO_CLASS( npc_headcrab, CHeadcrab );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_headcrab, CHeadcrab );
+#endif
 
 //---------------------------------------------------------
 // Save/Restore

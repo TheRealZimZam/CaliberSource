@@ -13,6 +13,7 @@
 #include "engine/IEngineSound.h"
 #include "explode.h"
 #include "Sprite.h"
+#include "soundent.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -404,6 +405,7 @@ void CSatchelCharge::BounceSound( void )
 	if (gpGlobals->curtime > m_flNextBounceSoundTime)
 	{
 		EmitSound( "SatchelCharge.Bounce" );
+		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 200, 1.0, this );
 
 		m_flNextBounceSoundTime = gpGlobals->curtime + 0.1;
 	}

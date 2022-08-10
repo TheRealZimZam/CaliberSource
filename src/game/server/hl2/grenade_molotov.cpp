@@ -38,6 +38,7 @@ BEGIN_DATADESC( CGrenadeMolotov )
 
 	DEFINE_FIELD( m_pFireTrail, FIELD_CLASSPTR ),
 	DEFINE_FIELD( m_fSpawnTime, FIELD_TIME ),
+	DEFINE_FIELD( m_fFuseTime,	FIELD_TIME ),
 
 	// Function Pointers
 	DEFINE_ENTITYFUNC( MolotovTouch ),
@@ -47,11 +48,23 @@ END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( grenade_molotov, CGrenadeMolotov );
 
+void CGrenadeMolotov::Precache( void )
+{
+	BaseClass::Precache();
+
+	PrecacheModel("models/weapons/w_molotov.mdl");
+
+	UTIL_PrecacheOther("_firesmoke");
+	
+	PrecacheScriptSound( "GrenadeMolotov.Detonate" );
+}
+
+//-----------------------------------------------------------------------------
 void CGrenadeMolotov::Spawn( void )
 {
 	Precache( );
 
-	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
+	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_CUSTOM );	//MOVECOLLIDE_FLY_BOUNCE
 	SetSolid( SOLID_BBOX );
 	SetCollisionGroup( COLLISION_GROUP_PROJECTILE );
 //!	AddEffects( EF_NOINTERP );
@@ -68,10 +81,11 @@ void CGrenadeMolotov::Spawn( void )
 	m_DmgRadius		= sk_molotov_radius.GetFloat();
 
 	m_takedamage	= DAMAGE_YES;
-	m_iHealth		= 1;
+	m_iHealth		= 5;
 	m_fSpawnTime	= gpGlobals->curtime;
+	m_fFuseTime		= gpGlobals->curtime + random->RandomFloat(MOLOTOV_FUSE_TIME_MIN, MOLOTOV_FUSE_TIME_MAX);
 
-	SetGravity( 1.0 );
+	SetGravity( 1.2 );	// A bit more gravity for a nice arching trajectory
 	SetFriction( 0.8 );  // Give a little bounce so can flatten
 	SetSequence( 1 );
 
@@ -102,11 +116,23 @@ void CGrenadeMolotov::Spawn( void )
 //-----------------------------------------------------------------------------
 void CGrenadeMolotov::MolotovTouch( CBaseEntity *pOther )
 {
-	// If I'm live go ahead and blow up
 	if (m_bIsLive)
 	{
-		Detonate();
+		if ( GetAbsVelocity().Length() > MOLOTOV_BREAK_VELOCITY )
+		{
+			Detonate();
+		}
 	}
+
+	SetAbsVelocity( GetAbsVelocity() * 0.8 );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Temp collision for simulated roll
+//-----------------------------------------------------------------------------
+void CGrenadeMolotov::ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity )
+{
+	ResolveFlyCollisionBounce( trace, vecVelocity, 0.4 );
 }
 
 //-----------------------------------------------------------------------------
@@ -239,6 +265,11 @@ void CGrenadeMolotov::MolotovThink( void )
 		}
 	}
 
+	if ( m_fFuseTime <= gpGlobals->curtime )
+	{
+		Detonate();
+	}
+
 	// See if I can lose my owner (has dropper moved out of way?)
 	// Want do this so owner can throw the brickbat
 	if (GetOwnerEntity())
@@ -257,16 +288,5 @@ void CGrenadeMolotov::MolotovThink( void )
 	}
 
 	SetNextThink( gpGlobals->curtime + 0.1f );
-}
-
-void CGrenadeMolotov::Precache( void )
-{
-	BaseClass::Precache();
-
-	PrecacheModel("models/weapons/w_molotov.mdl");
-
-	UTIL_PrecacheOther("_firesmoke");
-	
-	PrecacheScriptSound( "GrenadeMolotov.Detonate" );
 }
 

@@ -26,16 +26,18 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define SNIPER_CONE_PLAYER					vec3_origin	// Spread cone when fired by the player.
+#define SNIPER_CONE_PLAYER					Vector( 0.06976, 0.06976, 0.06976 )	// Spread cone when fired by the player.
+#define SNIPER_CONE_PLAYER_ZOOMED			vec3_origin	// Spread cone when fired by the player.
 #define SNIPER_CONE_NPC						vec3_origin	// Spread cone when fired by NPCs.
 #define SNIPER_BULLET_COUNT_PLAYER			1			// Fire n bullets per shot fired by the player.
 #define SNIPER_BULLET_COUNT_NPC				1			// Fire n bullets per shot fired by NPCs.
 #define SNIPER_TRACER_FREQUENCY_PLAYER		0			// Draw a tracer every nth shot fired by the player.
 #define SNIPER_TRACER_FREQUENCY_NPC			0			// Draw a tracer every nth shot fired by NPCs.
-#define SNIPER_KICKBACK						3			// Range for punchangle when firing.
+#define SNIPER_KICKBACK						6			// Range for punchangle when firing.
 
 #define SNIPER_ZOOM_RATE					0.2			// Interval between zoom levels in seconds.
 
+ConVar sk_sniper_zoomout_on_reload( "sk_sniper_zoomout_on_reload", "1" );
 
 //-----------------------------------------------------------------------------
 // Discrete zoom levels for the scope.
@@ -149,14 +151,13 @@ void CWeaponSniperRifle::Precache( void )
 const Vector &CWeaponSniperRifle::GetBulletSpread( void )
 {
 	static Vector cone;
-	cone = SNIPER_CONE_PLAYER;
+	cone = ( m_nZoomLevel != 0 ) ? SNIPER_CONE_PLAYER_ZOOMED : SNIPER_CONE_PLAYER;
 
 	if ( GetOwner() && GetOwner()->IsNPC() )
 		cone = SNIPER_CONE_NPC;
 
 	return cone;
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Turns off the zoom when the rifle is holstered.
@@ -286,7 +287,13 @@ bool CWeaponSniperRifle::Reload( void )
 	{
 		return false;
 	}
-		
+
+	if ( m_nZoomLevel != 0 && sk_sniper_zoomout_on_reload.GetBool() )
+	{
+		m_nZoomLevel = 2;
+		Zoom();
+	}
+
 	if (pOwner->GetAmmoCount(m_iPrimaryAmmoType) > 0)
 	{
 		int primary		= min(GetMaxClip1() - m_iClip1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));
@@ -298,8 +305,13 @@ bool CWeaponSniperRifle::Reload( void )
 			// and otherwise steals channel away from fire sound
 			WeaponSound(RELOAD);
 			SendWeaponAnim( ACT_VM_RELOAD );
+			// Play the player's reload animation
+			if ( pOwner->IsPlayer() )
+			{
+				( ( CBasePlayer * )pOwner)->SetAnimation( PLAYER_RELOAD );
+			}
 
-			m_flNextPrimaryAttack	= gpGlobals->curtime + SequenceDuration();
+			m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
 
 			m_bInReload = true;
 		}
@@ -341,6 +353,7 @@ void CWeaponSniperRifle::PrimaryAttack( void )
 
 		// player "shoot" animation
 		pPlayer->SetAnimation( PLAYER_ATTACK1 );
+		pPlayer->SetAimTime( 2.0f );
 
 		// Don't fire again until fire animation has completed
 		m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
@@ -355,6 +368,10 @@ void CWeaponSniperRifle::PrimaryAttack( void )
 		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 600, 0.2 );
 
 		QAngle vecPunch(-SNIPER_KICKBACK, random->RandomFloat( -SNIPER_KICKBACK, SNIPER_KICKBACK ), 0);
+		if ( m_nZoomLevel != 0 )
+		{
+			QAngle vecPunch((-SNIPER_KICKBACK * 0.25), random->RandomFloat( (-SNIPER_KICKBACK * 0.25), (SNIPER_KICKBACK * 0.25) ), 0);
+		}
 		pPlayer->ViewPunch(vecPunch);
 
 		// Indicate out of ammo condition if we run out of ammo.

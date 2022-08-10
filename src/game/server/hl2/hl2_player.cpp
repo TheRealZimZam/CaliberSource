@@ -58,6 +58,8 @@
 extern ConVar weapon_showproficiency;
 extern ConVar autoaim_max_dist;
 
+#define PLAYER_MODEL "models/player.mdl"
+
 // Do not touch with without seeing me, please! (sjb)
 // For consistency's sake, enemy gunfire is traced against a scaled down
 // version of the player's hull, not the hitboxes for the player's model
@@ -79,28 +81,28 @@ extern int gEvilImpulse101;
 
 ConVar sv_autojump( "sv_autojump", "0" );
 
-ConVar hl2_slowspeed( "hl2_slowspeed", "120" );
-ConVar hl2_walkspeed( "hl2_walkspeed", "170" );
-ConVar hl2_normspeed( "hl2_normspeed", "240" );
-ConVar hl2_sprintspeed( "hl2_sprintspeed", "300" );
+ConVar hl2_walkspeed( "player_walkspeed", "120" );
+ConVar hl2_jogspeed( "player_jogspeed", "170" );
+ConVar hl2_runspeed( "player_runspeed", "240" );
+ConVar hl2_sprintspeed( "player_sprintspeed", "300" );
 
-ConVar hl2_darkness_flashlight_factor ( "hl2_darkness_flashlight_factor", "1" );
+ConVar hl2_darkness_flashlight_factor( "hl2_darkness_flashlight_factor", "1" );
 
-#ifdef HL2MP
-	#define	HL2_SLOW_SPEED 100
-	#define	HL2_WALK_SPEED 140
-	#define	HL2_NORM_SPEED 200
-	#define	HL2_SPRINT_SPEED 320
-	#define	HL2_ACCELERATION 1
-	#define	HL2_DECELERATION 1
-#else
-	#define	HL2_SLOW_SPEED hl2_slowspeed.GetFloat()
-	#define	HL2_WALK_SPEED hl2_walkspeed.GetFloat()
-	#define	HL2_NORM_SPEED hl2_normspeed.GetFloat()
-	#define	HL2_SPRINT_SPEED hl2_sprintspeed.GetFloat()
-	#define	HL2_ACCELERATION 1
-	#define	HL2_DECELERATION 1
-#endif
+#define	HL2MP_WALK_SPEED 100
+#define	HL2MP_JOG_SPEED 140
+#define	HL2MP_RUN_SPEED 200
+#define	HL2MP_SPRINT_SPEED 320
+#define	HL2MP_ACCELERATION 1
+#define	HL2MP_DECELERATION 1
+#define SINGLEPLAYER_ANIMSTATE 1
+
+#define	HL2_WALK_SPEED hl2_walkspeed.GetFloat()
+#define	HL2_JOG_SPEED hl2_jogspeed.GetFloat()
+#define	HL2_RUN_SPEED hl2_runspeed.GetFloat()
+#define	HL2_SPRINT_SPEED hl2_sprintspeed.GetFloat()
+#define	HL2_ACCELERATION 1
+#define	HL2_DECELERATION 1
+
 
 ConVar player_showpredictedposition( "player_showpredictedposition", "0" );
 ConVar player_showpredictedposition_timestep( "player_showpredictedposition_timestep", "1.0" );
@@ -395,6 +397,24 @@ END_DATADESC()
 
 CHL2_Player::CHL2_Player()
 {
+#ifdef SINGLEPLAYER_ANIMSTATE
+// Base animstate
+	m_PlayerAnimState = CreatePlayerAnimState( this );
+#else
+	// Setup the movement data.
+	MultiPlayerMovementData_t movementData;
+	movementData.m_flBodyYawRate = 720.0f;
+	movementData.m_flRunSpeed = HL2MP_RUN_SPEED;
+	movementData.m_flWalkSpeed = HL2MP_WALK_SPEED;
+	movementData.m_flSprintSpeed = -1.0f;
+
+	// Create animation state for this player.
+	CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
+	m_PlayerAnimState->Init( this, movementData );
+#endif
+	UseClientSideAnimation();
+	m_angEyeAngles.Init();
+
 	m_nNumMissPositions	= 0;
 	m_pPlayerAISquad = 0;
 	m_bSprintEnabled = true;
@@ -428,12 +448,19 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropDataTable(SENDINFO_DT(m_HL2Local), &REFERENCE_SEND_TABLE(DT_HL2Local), SendProxy_SendLocalDataTable),
 	SendPropBool( SENDINFO(m_fIsSprinting) ),
 //!	SendPropInt( SENDINFO( m_bHasLongJump ), 1, SPROP_UNSIGNED ),
+
+	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
+	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
+	
+	SendPropExclude( "DT_BaseAnimating", "m_flPlaybackRate" ),
 END_SEND_TABLE()
 
 
 void CHL2_Player::Precache( void )
 {
 	BaseClass::Precache();
+
+	PrecacheModel(PLAYER_MODEL);
 
 	PrecacheScriptSound( "HL2Player.SprintNoPower" );
 	PrecacheScriptSound( "HL2Player.SprintStart" );
@@ -473,6 +500,7 @@ void CHL2_Player::EquipSuit( bool bPlayEffects )
 {
 	MDLCACHE_CRITICAL_SECTION();
 	BaseClass::EquipSuit();
+	InitSprinting();
 	
 	m_HL2Local.m_bDisplayReticle = true;
 
@@ -486,6 +514,7 @@ void CHL2_Player::EquipSuit( bool bPlayEffects )
 void CHL2_Player::RemoveSuit( void )
 {
 	BaseClass::RemoveSuit();
+	StopSprinting();
 
 	m_HL2Local.m_bDisplayReticle = false;
 }
@@ -525,18 +554,9 @@ void CHL2_Player::HandleSpeedChanges( void )
 	}
 
 	bool bIsWalking = IsWalking();
-	// have suit, pressing button, not sprinting or ducking
-	bool bWantWalking;
-	
-	if( IsSuitEquipped() )
-	{
-		bWantWalking = (m_nButtons & IN_WALK) && !IsSprinting() && !(m_nButtons & IN_DUCK);
-	}
-	else
-	{
-		bWantWalking = true;
-	}
-	
+	// pressing button and not sprinting or ducking
+	bool bWantWalking = (m_nButtons & IN_WALK) && !IsSprinting() && !(m_nButtons & IN_DUCK);
+
 	if( bIsWalking != bWantWalking )
 	{
 		if ( bWantWalking )
@@ -929,6 +949,14 @@ void CHL2_Player::PostThink( void )
 	{
 		 HandleAdmireGlovesAnimation();
 	}
+	
+	QAngle angles = GetLocalAngles();
+	angles[PITCH] = 0;
+	SetLocalAngles( angles );
+	
+	// Store the eye angles pitch so the client can compute its animation state correctly.
+	m_angEyeAngles = EyeAngles();
+	m_PlayerAnimState->Update( m_angEyeAngles[YAW], m_angEyeAngles[PITCH] );
 }
 
 void CHL2_Player::StartAdmireGlovesAnimation( void )
@@ -1135,11 +1163,8 @@ void CHL2_Player::PlayerRunCommand(CUserCmd *ucmd, IMoveHelper *moveHelper)
 //-----------------------------------------------------------------------------
 void CHL2_Player::Spawn(void)
 {
-
 #ifndef HL2MP
-#ifndef PORTAL
-	SetModel( "models/player.mdl" );
-#endif
+	SetModel( PLAYER_MODEL );
 #endif
 
 	BaseClass::Spawn();
@@ -1150,16 +1175,13 @@ void CHL2_Player::Spawn(void)
 	//
 	//m_flMaxspeed = 320;
 
-	if ( !IsSuitEquipped() )
-		 StartWalking();
+	InitSprinting();
 
 	SuitPower_SetCharge( 100 );
 
 	m_Local.m_iHideHUD |= HIDEHUD_CHAT;
 
 	m_pPlayerAISquad = g_AI_SquadManager.FindCreateSquad(AllocPooledString(PLAYER_SQUADNAME));
-
-	InitSprinting();
 
 	// Setup our flashlight values
 #ifdef HL2_EPISODIC
@@ -1181,10 +1203,65 @@ void CHL2_Player::UpdateLocatorPosition( const Vector &vecPosition )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Set the activity based on an event or current state
+//-----------------------------------------------------------------------------
+void CHL2_Player::SetAnimation( PLAYER_ANIM playerAnim )
+{
+//! Are all TODO's
+	switch ( playerAnim )
+	{
+		case PLAYER_JUMP:
+		{
+//!			DoAnimationEvent( PLAYERANIMEVENT_JUMP );
+			break;
+		}
+		case PLAYER_SUPERJUMP:
+		{
+//!			DoAnimationEvent( PLAYERANIMEVENT_DOUBLEJUMP );
+			break;
+		}
+		case PLAYER_DIE:
+		{
+			if ( m_lifeState == LIFE_ALIVE )
+			{
+//!				DoAnimationEvent( PLAYERANIMEVENT_DIE );
+			}
+			break;
+		}
+		case PLAYER_ATTACK1:
+		{
+			RestartGesture( Weapon_TranslateActivity( ACT_GESTURE_RANGE_ATTACK1 ));
+//!			DoAnimationEvent( PLAYERANIMEVENT_PRIMARY_ATTACK );
+			break;
+		}
+		case PLAYER_RELOAD:
+		{
+			RestartGesture( Weapon_TranslateActivity( ACT_GESTURE_RELOAD ));
+//!			DoAnimationEvent( PLAYERANIMEVENT_RELOAD );
+			break;
+		}
+	}
+
+#if 0
+	if ( !m_PlayerAnimState )
+	{
+		BaseClass::SetAnimation( playerAnim );
+	}
+#endif
+}
+
+//-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 void CHL2_Player::InitSprinting( void )
 {
-	StopSprinting();
+	if ( !IsSuitEquipped() )
+	{
+		StopWalking();
+	}
+	else
+	{
+		StopSprinting();
+	}
 }
 
 
@@ -1258,11 +1335,11 @@ void CHL2_Player::StopSprinting( void )
 
 	if( IsSuitEquipped() )
 	{
-		SetMaxSpeed( HL2_NORM_SPEED );
+		SetMaxSpeed( HL2_RUN_SPEED );
 	}
 	else
 	{
-		SetMaxSpeed( HL2_WALK_SPEED );
+		SetMaxSpeed( HL2_JOG_SPEED );
 	}
 
 	m_fIsSprinting = false;
@@ -1302,7 +1379,14 @@ void CHL2_Player::StartWalking( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::StopWalking( void )
 {
-	SetMaxSpeed( HL2_NORM_SPEED );
+	if( IsSuitEquipped() )
+	{
+		SetMaxSpeed( HL2_RUN_SPEED );
+	}
+	else
+	{
+		SetMaxSpeed( HL2_JOG_SPEED );
+	}
 	m_fIsWalking = false;
 }
 
@@ -1408,6 +1492,12 @@ void CHL2_Player::InitVCollision( const Vector &vecAbsOrigin, const Vector &vecA
 
 CHL2_Player::~CHL2_Player( void )
 {
+	// Clears the animation state.
+	if ( m_PlayerAnimState != NULL )
+	{
+		m_PlayerAnimState->Release();
+		m_PlayerAnimState = NULL;
+	}
 }
 
 //-----------------------------------------------------------------------------

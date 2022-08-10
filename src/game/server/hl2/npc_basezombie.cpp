@@ -13,7 +13,6 @@
 // In either state, a severely injured Zombie will release its headcrab, which
 // will immediately go after the player. The Zombie will then die (ragdoll).
 //
-// TODO; TASK_ZOMBIE_RELEASE_HEADCRAB Should include the animation sequence in the task
 //=============================================================================//
 
 #include "cbase.h"
@@ -96,9 +95,9 @@ envelopePoint_t envDefaultZombieMoanVolume[] =
 
 //
 // When the zombie has health < m_iMaxHealth * this value, it will
-// try to release its headcrab.
-#define ZOMBIE_RELEASE_HEALTH_FACTOR	0.5
-
+// consider releasing its headcrab.
+#define ZOMBIE_RELEASE_HEALTH_MIN	1
+#define ZOMBIE_RELEASE_HEALTH_MAX	10
 //
 // The heaviest physics object that a zombie should try to swat. (kg)
 #define ZOMBIE_MAX_PHYSOBJ_MASS		60
@@ -122,7 +121,7 @@ envelopePoint_t envDefaultZombieMoanVolume[] =
 // After taking damage, ignore further damage for n seconds. This keeps the zombie
 // from being interrupted while.
 //
-#define ZOMBIE_FLINCH_DELAY			3
+#define ZOMBIE_FLINCH_DELAY			1
 
 
 #define ZOMBIE_BURN_TIME		10 // If ignited, burn for this many seconds
@@ -132,12 +131,20 @@ envelopePoint_t envDefaultZombieMoanVolume[] =
 //=========================================================
 // private activities
 //=========================================================
+#if 0
 int CNPC_BaseZombie::ACT_ZOM_SWATLEFTMID;
 int CNPC_BaseZombie::ACT_ZOM_SWATRIGHTMID;
 int CNPC_BaseZombie::ACT_ZOM_SWATLEFTLOW;
 int CNPC_BaseZombie::ACT_ZOM_SWATRIGHTLOW;
 int CNPC_BaseZombie::ACT_ZOM_RELEASECRAB;
-int CNPC_BaseZombie::ACT_ZOM_FALL;
+//int CNPC_BaseZombie::ACT_ZOM_FALL;
+#endif
+int ACT_ZOM_SWATLEFTMID;
+int ACT_ZOM_SWATRIGHTMID;
+int ACT_ZOM_SWATLEFTLOW;
+int ACT_ZOM_SWATRIGHTLOW;
+int ACT_ZOM_RELEASECRAB;
+//int ACT_ZOM_FALL;
 
 ConVar	sk_zombie_dmg_one_slash( "sk_zombie_dmg_one_slash","0");
 ConVar	sk_zombie_dmg_both_slash( "sk_zombie_dmg_both_slash","0");
@@ -700,7 +707,7 @@ void CNPC_BaseZombie::TraceAttack( const CTakeDamageInfo &info, const Vector &ve
 		// Zombie gets across-the-board damage reduction for buckshot. This compensates for the recent changes which
 		// make the shotgun much more powerful, and returns the zombies to a level that has been playtested extensively.(sjb)
 		// This normalizes the buckshot damage to what it used to be on normal (5 dmg per pellet. Now it's 8 dmg per pellet). 
-		infoCopy.ScaleDamage( 0.625 );
+		infoCopy.ScaleDamage( 0.675 );
 	}
 
 	BaseClass::TraceAttack( infoCopy, vecDir, ptr );
@@ -764,13 +771,13 @@ bool CNPC_BaseZombie::ShouldBecomeTorso( const CTakeDamageInfo &info, float flDa
 //-----------------------------------------------------------------------------
 HeadcrabRelease_t CNPC_BaseZombie::ShouldReleaseHeadcrab( const CTakeDamageInfo &info, float flDamageThreshold )
 {
-	if ( m_iHealth <= 0 )
+	if ( m_iHealth <= m_flReleaseThreshold )
 	{
 		if ( info.GetDamageType() & DMG_REMOVENORAGDOLL )
 			return RELEASE_NO;
 
-		// If I was killed by an explosion, send the crab flying.
-		if ( info.GetDamageType() & (DMG_BLAST|DMG_SNIPER) )
+		// If I was killed by an explosion or smacked off with a crowbar, send the crab flying.
+		if ( info.GetDamageType() & (DMG_BLAST|DMG_SNIPER|DMG_CLUB) )
 			return RELEASE_RAGDOLL;
 
 		// If I was shocked or plasma'd, vaporize.
@@ -782,28 +789,23 @@ HeadcrabRelease_t CNPC_BaseZombie::ShouldReleaseHeadcrab( const CTakeDamageInfo 
 			return RELEASE_RAGDOLL_SLICED_OFF;
 		}
 
-#if 0
-		// If I was thwapped with a crowbar
-		if ( info.GetDamageType() & DMG_CLUB )
-			return RELEASE_RAGDOLL;
-#endif
-
 		// Finally, if I was killed by a bullet...
-		if ( info.GetDamageType() & DMG_BULLET )
+		if ( info.GetDamageType() & DMG_BULLET && m_bHeadShot )
 		{
-			if ( m_bHeadShot )
+			// Go limp
+			if ( flDamageThreshold > 0.25 )
 			{
-				// Go limp
-				if ( flDamageThreshold > 0.25 )
-				{
-					// Enough force to kill the crab.
-					return RELEASE_RAGDOLL;
-				}
-				return RELEASE_IMMEDIATE;
+				// Enough force to kill the crab.
+				return RELEASE_RAGDOLL;
 			}
-			// Seize and release the crab
-			return RELEASE_SCHEDULED;
+		//!	return RELEASE_IMMEDIATE;
 		}
+
+		// Seize and release the crab
+		if ( SelectWeightedSequence( (Activity)ACT_ZOM_RELEASECRAB ) != ACTIVITY_NOT_AVAILABLE )
+			return RELEASE_SCHEDULED;
+		else
+			return RELEASE_IMMEDIATE;
 	}
 
 	return RELEASE_NO;
@@ -871,37 +873,6 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	}
 	else
 	{
-		HeadcrabRelease_t release = ShouldReleaseHeadcrab( info, flDamageThreshold );
-		
-		switch( release )
-		{
-		case RELEASE_IMMEDIATE:
-			ReleaseHeadcrab( EyePosition(), vec3_origin, true, true );
-			break;
-
-		case RELEASE_RAGDOLL:
-			// Go a little easy on headcrab ragdoll force. They're light!
-			ReleaseHeadcrab( EyePosition(), inputInfo.GetDamageForce() * 0.25, true, false, true );
-			break;
-
-		case RELEASE_RAGDOLL_SLICED_OFF:
-			{
-				EmitSound( "Slicer.Slice" );
-				Vector vecForce = inputInfo.GetDamageForce() * 0.1;
-				vecForce += Vector( 0, 0, 2000.0 );
-				ReleaseHeadcrab( EyePosition(), vecForce, true, false, true );
-			}
-			break;
-
-		case RELEASE_VAPORIZE:
-			RemoveHead();
-			break;
-
-		case RELEASE_SCHEDULED:
-			SetCondition( COND_ZOMBIE_RELEASECRAB );
-			break;
-		}
-
 		if( ShouldBecomeTorso( info, flDamageThreshold ) )
 		{
 			bool bHitByCombineCannon = (inputInfo.GetAmmoType() == GetAmmoDef()->Index("CombineHeavyCannon"));
@@ -934,6 +905,38 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 			else if ( random->RandomInt(1, 3) == 1 )
 				DieChopped( info );
 		}
+
+		HeadcrabRelease_t release = ShouldReleaseHeadcrab( info, flDamageThreshold );
+		switch( release )
+		{
+		case RELEASE_IMMEDIATE:
+			ReleaseHeadcrab( EyePosition(), vec3_origin, true, true );
+			break;
+
+		case RELEASE_RAGDOLL:
+			// Go a little easy on headcrab ragdoll force. They're light!
+			ReleaseHeadcrab( EyePosition(), inputInfo.GetDamageForce() * 0.25, true, false, true );
+			break;
+
+		case RELEASE_RAGDOLL_SLICED_OFF:
+			{
+				EmitSound( "Slicer.Slice" );
+				Vector vecForce = inputInfo.GetDamageForce() * 0.1;
+				vecForce += Vector( 0, 0, 2000.0 );
+				ReleaseHeadcrab( EyePosition(), vecForce, true, false, true );
+			}
+			break;
+
+		case RELEASE_VAPORIZE:
+			RemoveHead();
+			break;
+
+		case RELEASE_SCHEDULED:
+			m_iHealth = ZOMBIE_RELEASE_HEALTH_MIN;
+			SetCondition( COND_ZOMBIE_RELEASECRAB );
+			return 0;
+
+		}
 	}
 
 	if( tookDamage > 0 && (info.GetDamageType() & (DMG_BURN|DMG_DIRECT)) && m_ActBusyBehavior.IsActive() ) 
@@ -947,6 +950,17 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	m_bHeadShot = false;
 
 	return tookDamage;
+}
+
+bool CNPC_BaseZombie::CanFlinch( void )
+{
+	if ( HasCondition( COND_ZOMBIE_RELEASECRAB ) )
+		return false;
+
+	if ( m_flNextFlinch >= gpGlobals->curtime )
+		return false;
+
+	return BaseClass::CanFlinch();
 }
 
 //-----------------------------------------------------------------------------
@@ -1692,9 +1706,11 @@ void CNPC_BaseZombie::Spawn( void )
 
 	m_flNextSwat = gpGlobals->curtime;
 	m_flNextSwatScan = gpGlobals->curtime;
-	m_pMoanSound = NULL;
 
+	m_pMoanSound = NULL;
 	m_flNextMoanSound = gpGlobals->curtime + 9999;
+
+	m_flReleaseThreshold = random->RandomFloat( ZOMBIE_RELEASE_HEALTH_MIN, ZOMBIE_RELEASE_HEALTH_MAX );
 
 	SetZombieModel();
 
@@ -1719,6 +1735,7 @@ void CNPC_BaseZombie::Precache( void )
 	PrecacheScriptSound( "Slicer.Slice" );
 	PrecacheScriptSound( "NPC_BaseZombie.PoundDoor" );
 	PrecacheScriptSound( "NPC_BaseZombie.Swat" );
+	PrecacheScriptSound( "AI_BaseNPC.SwishSound" );
 
 	PrecacheModel( GetLegsModel() );
 	PrecacheModel( GetTorsoModel() );
@@ -1796,22 +1813,15 @@ int CNPC_BaseZombie::TranslateSchedule( int scheduleType )
 //-----------------------------------------------------------------------------
 void CNPC_BaseZombie::BuildScheduleTestBits( void )
 {
+	// Everything should be interrupted if we get killed.
+	SetCustomInterruptCondition( COND_ZOMBIE_RELEASECRAB );
+
 	// Ignore damage if we were recently damaged or we're attacking.
 	if ( GetActivity() == ACT_MELEE_ATTACK1 )
 	{
 		ClearCustomInterruptCondition( COND_LIGHT_DAMAGE );
 		ClearCustomInterruptCondition( COND_HEAVY_DAMAGE );
 	}
-#ifndef HL2_EPISODIC
-	else if ( m_flNextFlinch >= gpGlobals->curtime )
-	{
-		ClearCustomInterruptCondition( COND_LIGHT_DAMAGE );
-		ClearCustomInterruptCondition( COND_HEAVY_DAMAGE );
-	}
-#endif // !HL2_EPISODIC
-
-	// Everything should be interrupted if we get killed.
-	SetCustomInterruptCondition( COND_ZOMBIE_RELEASECRAB );
 
 	BaseClass::BuildScheduleTestBits();
 }
@@ -1866,11 +1876,9 @@ int	CNPC_BaseZombie::SelectFailSchedule( int failedSchedule, int failedTask, AI_
 //---------------------------------------------------------
 int CNPC_BaseZombie::SelectSchedule( void )
 {
+	// Death waits for no man. Or zombie. Or something.
 	if ( HasCondition( COND_ZOMBIE_RELEASECRAB ) )
-	{
-		// Death waits for no man. Or zombie. Or something.
 		return SCHED_ZOMBIE_RELEASECRAB;
-	}
 
 	if ( BehaviorSelectSchedule() )
 	{
@@ -2029,7 +2037,7 @@ void CNPC_BaseZombie::GatherConditions( void )
 		}
 	}
 
-	if( (m_hPhysicsEnt != NULL) && gpGlobals->curtime >= m_flNextSwat && HasCondition( COND_SEE_ENEMY ) && !HasCondition( COND_ZOMBIE_RELEASECRAB ) )
+	if( (m_hPhysicsEnt != NULL) && gpGlobals->curtime >= m_flNextSwat && HasCondition( COND_SEE_ENEMY ) )
 	{
 		SetCondition( COND_ZOMBIE_CAN_SWAT_ATTACK );
 	}
@@ -2128,17 +2136,10 @@ void CNPC_BaseZombie::StartTask( const Task_t *pTask )
 
 	case TASK_ZOMBIE_RELEASE_HEADCRAB:
 		{
-			// make the crab look like it's pushing off the body
-			Vector vecForward;
-			Vector vecVelocity;
-
-			AngleVectors( GetAbsAngles(), &vecForward );
-
-			vecVelocity = vecForward * 30;
-			vecVelocity.z += 100;
-
-			ReleaseHeadcrab( EyePosition(), vecVelocity, true, true );
-			TaskComplete();
+			SetIdealActivity( (Activity)ACT_ZOM_RELEASECRAB );
+			SetActivity( GetIdealActivity() );
+			// Seize for a random time, then pop and die
+			SetWait( random->RandomFloat( 0.2, pTask->flTaskData ) );	//TODO; Ideally, this would get the time of the sequence
 		}
 		break;
 
@@ -2177,6 +2178,25 @@ void CNPC_BaseZombie::RunTask( const Task_t *pTask )
 		if( IsActivityFinished() )
 		{
 			TaskComplete();
+		}
+		break;
+
+	case TASK_ZOMBIE_RELEASE_HEADCRAB:
+		{
+			if ( IsWaitFinished() )
+			{
+				// make the crab look like it's pushing off the body
+				Vector vecForward;
+				Vector vecVelocity;
+
+				AngleVectors( GetAbsAngles(), &vecForward );
+
+				vecVelocity = vecForward * 30;
+				vecVelocity.z += 100;
+
+				ReleaseHeadcrab( EyePosition(), vecVelocity, true, true );
+				TaskComplete();
+			}
 		}
 		break;
 
@@ -2628,8 +2648,7 @@ Activity CNPC_BaseZombie::NPC_TranslateActivity( Activity baseAct )
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 Vector CNPC_BaseZombie::BodyTarget( const Vector &posSrc, bool bNoisy ) 
-{ 
-	
+{
 	if( IsCurSchedule(SCHED_BIG_FLINCH) || m_ActBusyBehavior.IsActive() )
 	{
 		// This zombie is assumed to be standing up. 
@@ -2726,7 +2745,7 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 	DECLARE_ACTIVITY( ACT_ZOM_SWATLEFTLOW )
 	DECLARE_ACTIVITY( ACT_ZOM_SWATRIGHTLOW )
 	DECLARE_ACTIVITY( ACT_ZOM_RELEASECRAB )
-	DECLARE_ACTIVITY( ACT_ZOM_FALL )
+//	DECLARE_ACTIVITY( ACT_ZOM_FALL )
 
 	DECLARE_CONDITION( COND_ZOMBIE_CAN_SWAT_ATTACK )
 	DECLARE_CONDITION( COND_ZOMBIE_RELEASECRAB )
@@ -2750,6 +2769,9 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 
 	DECLARE_INTERACTION( g_interactionZombieMeleeWarning )
 
+	//=========================================================
+	// SwatItem
+	//=========================================================
 	DEFINE_SCHEDULE
 	(
 		SCHED_ZOMBIE_MOVE_SWATITEM,
@@ -2764,14 +2786,10 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"		TASK_ZOMBIE_SWAT_ITEM			0"
 		"	"
 		"	Interrupts"
-		"		COND_ZOMBIE_RELEASECRAB"
 		"		COND_ENEMY_DEAD"
 		"		COND_NEW_ENEMY"
 	)
 
-	//=========================================================
-	// SwatItem
-	//=========================================================
 	DEFINE_SCHEDULE
 	(
 		SCHED_ZOMBIE_SWATITEM,
@@ -2783,7 +2801,6 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"		TASK_ZOMBIE_SWAT_ITEM			0"
 		"	"
 		"	Interrupts"
-		"		COND_ZOMBIE_RELEASECRAB"
 		"		COND_ENEMY_DEAD"
 		"		COND_NEW_ENEMY"
 	)
@@ -2799,7 +2816,6 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"		TASK_MELEE_ATTACK1				0"
 		"	"
 		"	Interrupts"
-		"		COND_ZOMBIE_RELEASECRAB"
 		"		COND_ENEMY_DEAD"
 		"		COND_NEW_ENEMY"
 	)
@@ -2807,7 +2823,6 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 	//=========================================================
 	// ChaseEnemy
 	//=========================================================
-#ifdef HL2_EPISODIC
 	DEFINE_SCHEDULE
 	(
 		SCHED_ZOMBIE_CHASE_ENEMY,
@@ -2831,36 +2846,9 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"		COND_TOO_CLOSE_TO_ATTACK"
 		"		COND_TASK_FAILED"
 		"		COND_ZOMBIE_CAN_SWAT_ATTACK"
-		"		COND_ZOMBIE_RELEASECRAB"
 		"		COND_HEAVY_DAMAGE"
 	)
-#else 
-	DEFINE_SCHEDULE
-	(
-		SCHED_ZOMBIE_CHASE_ENEMY,
 
-		"	Tasks"
-		"		 TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY_FAILED"
-		"		 TASK_SET_TOLERANCE_DISTANCE	24"
-		"		 TASK_GET_CHASE_PATH_TO_ENEMY	600"
-		"		 TASK_RUN_PATH					0"
-		"		 TASK_WAIT_FOR_MOVEMENT			0"
-		"		 TASK_FACE_ENEMY				0"
-		"	"
-		"	Interrupts"
-		"		COND_NEW_ENEMY"
-		"		COND_ENEMY_DEAD"
-		"		COND_ENEMY_UNREACHABLE"
-		"		COND_CAN_RANGE_ATTACK1"
-		"		COND_CAN_MELEE_ATTACK1"
-		"		COND_CAN_RANGE_ATTACK2"
-		"		COND_CAN_MELEE_ATTACK2"
-		"		COND_TOO_CLOSE_TO_ATTACK"
-		"		COND_TASK_FAILED"
-		"		COND_ZOMBIE_CAN_SWAT_ATTACK"
-		"		COND_ZOMBIE_RELEASECRAB"
-	)
-#endif // HL2_EPISODIC
 
 
 	//=========================================================
@@ -2870,13 +2858,12 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		SCHED_ZOMBIE_RELEASECRAB,
 
 		"	Tasks"
-		"		TASK_PLAY_PRIVATE_SEQUENCE					ACTIVITY:ACT_ZOM_RELEASECRAB"
-		"		TASK_ZOMBIE_RELEASE_HEADCRAB				0"
+//		"		TASK_PLAY_SEQUENCE					ACTIVITY:ACT_ZOM_RELEASECRAB"
+		"		TASK_ZOMBIE_RELEASE_HEADCRAB				0.8"	//max amount of time to spend seizing
 		"		TASK_ZOMBIE_DIE								0"
 		"	"
 		"	Interrupts"
-		"		COND_TASK_FAILED"
-	//	"		COND_NO_CUSTOM_INTERRUPTS"
+		"		COND_NO_CUSTOM_INTERRUPTS"
 	)
 
 
@@ -2960,7 +2947,6 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"		COND_CAN_MELEE_ATTACK1"
 		"		COND_CAN_RANGE_ATTACK2"
 		"		COND_CAN_MELEE_ATTACK2"
-		"		COND_ZOMBIE_RELEASECRAB"
 	)
 
 	//=========================================================
@@ -2983,7 +2969,6 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"		COND_CAN_MELEE_ATTACK1"
 		"		COND_CAN_RANGE_ATTACK2"
 		"		COND_CAN_MELEE_ATTACK2"
-		"		COND_ZOMBIE_RELEASECRAB"
 	)
 
 	//=========================================================

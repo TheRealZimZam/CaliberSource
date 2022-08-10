@@ -31,9 +31,46 @@ void CAI_HolsterBehavior::StartTask( const Task_t *pTask )
 {
 	switch( pTask->iTask )
 	{
-	case TASK_RANGE_ATTACK1:
-		BaseClass::StartTask( pTask );
-		break;
+	case TASK_HOLSTER_WEAPON:
+		{
+			if ( !GetOuter()->GetActiveWeapon() )
+			{
+				TaskFail( "No active weapon to holster" );
+				return;
+			}
+
+			// For some odd reason we are already holstered, or cant do holster animations
+			if ( GetOuter()->IsWeaponHolstered() || !GetOuter()->CanHolsterWeapon() )
+			{
+				m_bWeaponOut = false;
+				TaskComplete();
+			}
+			else
+			{
+				GetOuter()->SetDesiredWeaponState( DESIREDWEAPONSTATE_HOLSTERED );
+			}
+			break;
+		}
+	case TASK_DRAW_WEAPON:
+		{
+			if ( !GetOuter()->GetActiveWeapon() )
+			{
+				TaskFail( "No active weapon to draw" );
+				return;
+			}
+
+			// For some odd reason we are already drew, or cant do holster animations
+			if ( !GetOuter()->IsWeaponHolstered() || !GetOuter()->CanHolsterWeapon() )
+			{
+				m_bWeaponOut = true;
+				TaskComplete();
+			}
+			else
+			{
+				GetOuter()->SetDesiredWeaponState( DESIREDWEAPONSTATE_UNHOLSTERED );
+			}
+			break;
+		}
 	default:
 		BaseClass::StartTask( pTask );
 		break;
@@ -49,9 +86,24 @@ void CAI_HolsterBehavior::RunTask( const Task_t *pTask )
 {
 	switch( pTask->iTask )
 	{
-	case TASK_RANGE_ATTACK1:
-		BaseClass::RunTask( pTask );
-		break;
+	case TASK_HOLSTER_WEAPON:
+		{
+			if ( !GetOuter()->IsWeaponStateChanging() )
+			{
+				m_bWeaponOut = false;
+				TaskComplete();
+			}
+			break;
+		}
+	case TASK_DRAW_WEAPON:
+		{
+			if ( !GetOuter()->IsWeaponStateChanging() )
+			{
+				m_bWeaponOut = true;
+				TaskComplete();
+			}
+			break;
+		}
 	default:
 		BaseClass::RunTask( pTask );
 		break;
@@ -71,13 +123,21 @@ bool CAI_HolsterBehavior::CanSelectSchedule()
 	if ( GetOuter()->HasCondition( COND_RECEIVED_ORDERS ) )
 		return false;
 
+	if ( GetOuter()->IsInAScript() )
+		return false;
+
 	if ( GetEnemy() )
 	{
-		// make sure weapon is out
+		// make sure weapon is out when fighting
 		if (!m_bWeaponOut)
 		{
 			return true;
 		}
+	}
+	else if ( GetOuter()->GetState() == NPC_STATE_IDLE && m_bWeaponOut )
+	{
+		// if i should be going back to idle, put it away
+		return true;
 	}
 
 	return false;
@@ -90,20 +150,17 @@ bool CAI_HolsterBehavior::CanSelectSchedule()
 //-----------------------------------------------------------------------------
 int CAI_HolsterBehavior::SelectSchedule()
 {
-	return BaseClass::SelectSchedule();
+	if (!m_bWeaponOut)
+		return SCHED_DRAW_WEAPON;
+	else
+		return SCHED_HOLSTER_WEAPON;
 }
-
-
-
-
 
 
 AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER( CAI_HolsterBehavior )
 
 	DECLARE_TASK( TASK_HOLSTER_WEAPON )
 	DECLARE_TASK( TASK_DRAW_WEAPON )
-
-	// DECLARE_CONDITION( COND_ )
 
 	//=========================================================
 	//=========================================================

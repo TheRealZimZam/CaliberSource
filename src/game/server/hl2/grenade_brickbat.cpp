@@ -226,7 +226,6 @@ public:
 LINK_ENTITY_TO_CLASS( grenade_rockbb, CGrenadeRockBB );
 PRECACHE_REGISTER(grenade_rockbb);
 
-
 //=====================================================================
 //	> BeerBottle
 //=====================================================================
@@ -268,8 +267,89 @@ void CGrenadeBottle::Detonate( void )
 
 	UTIL_Remove( this );
 }
-
 LINK_ENTITY_TO_CLASS( grenade_beerbottle, CGrenadeBottle );
 PRECACHE_REGISTER(grenade_beerbottle);
 
+//=====================================================================
+//	> Rock
+//=====================================================================
+class CGrenadeShoe : public CGrenade_Brickbat
+{
+public:
+	DECLARE_CLASS( CGrenadeShoe, CGrenade_Brickbat );
+
+	void Spawn(void)
+	{
+		m_nType = BRICKBAT_SHOE;
+		SetModel( "models/props_junk/Shoe.mdl" );
+		BaseClass::Spawn();
+	}
+	void Precache( void )
+	{
+		PrecacheModel("models/props_junk/Shoe.mdl");
+		BaseClass::Precache();
+	}
+};
+LINK_ENTITY_TO_CLASS( grenade_shoe, CGrenadeShoe );
+PRECACHE_REGISTER(grenade_shoe);
+
+//=====================================================================
+//	> Rat
+//=====================================================================
+class CGrenadeRat : public CGrenade_Brickbat
+{
+public:
+	DECLARE_CLASS( CGrenadeRat, CGrenade_Brickbat );
+
+	void Spawn(void)
+	{
+		m_nType = BRICKBAT_RAT;
+		m_bExplodes	= true;
+		SetModel( "models/props_junk/Shoe.mdl" );
+		BaseClass::Spawn();
+	}
+	void Precache( void )
+	{
+		PrecacheModel("models/props_junk/Shoe.mdl");
+		BaseClass::Precache();
+	}
+	void CGrenadeRat::Detonate( void )
+	{
+		trace_t trace;
+
+		UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + GetAbsVelocity(), MASK_SOLID, this, COLLISION_GROUP_NONE, &trace);
+		UTIL_DecalTrace( &trace, "BeerSplash" );
+
+		EmitSound( "GrenadeBottle.Detonate" );
+
+		CSoundEnt::InsertSound(SOUND_COMBAT, GetAbsOrigin(), 400, 0.5);
+
+		UTIL_Remove( this );
+	}
+};
+LINK_ENTITY_TO_CLASS( grenade_headcrab, CGrenadeRat );
+PRECACHE_REGISTER(grenade_headcrab);
+
+//=====================================================================
+//	> Rock
+//=====================================================================
+class CGrenadePan : public CGrenade_Brickbat
+{
+public:
+	DECLARE_CLASS( CGrenadePan, CGrenade_Brickbat );
+
+	void Spawn(void)
+	{
+		m_nType = BRICKBAT_COOKWARE;
+		SetModel( "models/props_junk/Shoe.mdl" );
+		BaseClass::Spawn();
+	}
+	void Precache( void )
+	{
+		PrecacheModel("models/props_junk/Shoe.mdl");
+		BaseClass::Precache();
+	}
+};
+LINK_ENTITY_TO_CLASS( grenade_cookware, CGrenadePan );
+PRECACHE_REGISTER(grenade_cookware);
 

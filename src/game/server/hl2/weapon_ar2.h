@@ -38,8 +38,8 @@ public:
 
 	void	AddViewKick( void );
 
-	int		GetMinBurst( void ) { return 2; }
-	int		GetMaxBurst( void ) { return 5; }
+	int		GetMinBurst( void ) { return 2; }	//TODO; Smaller burst from npcs when firing long range
+	int		GetMaxBurst( void ) { return 5; }	//TODO; Smaller burst from npcs when firing long range
 	virtual float	GetMinRestTime();
 	virtual float	GetMaxRestTime();
 	float	GetFireRate( void );
@@ -58,16 +58,13 @@ public:
 	{
 		static Vector cone;
 
-		if( GetOwner() && GetOwner()->IsPlayer() )
+		if( GetOwner() && GetOwner()->IsPlayer() && m_bZoomed )
 		{
-			cone = ( m_bZoomed ) ? VECTOR_CONE_1DEGREES : VECTOR_CONE_3DEGREES;
-		}
-		else
-		{
-			cone = VECTOR_CONE_4DEGREES;
+			cone = VECTOR_CONE_1DEGREES;
+			return cone;
 		}
 
-		return cone;
+		return BaseClass::GetBulletSpread();
 	}
 
 	const WeaponProficiencyInfo_t *GetProficiencyValues();

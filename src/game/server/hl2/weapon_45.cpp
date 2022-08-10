@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		Three-Fiddy-Seven Magdump
+// Purpose:		45-70 Mares leg
 //
-// TODO; Add a 0.3 sec prefiring delay (pulling the hammer)
+// TODO; 
 //=============================================================================//
 
 #include "cbase.h"
@@ -23,26 +23,25 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	MAGNUM_REFIRE_TIME		0.6f
-#define	MAGNUM_ACCURACY_SHOT_PENALTY_TIME		0.75f	// Applied amount of time each shot adds to the time we must recover from. Should be a bit over firerate
-#define	MAGNUM_ACCURACY_MAXIMUM_PENALTY_TIME	2.0f	// Maximum penalty to deal out
+#define	CONTENDER_REFIRE_TIME		0.6f
+#define	CONTENDER_ACCURACY_SHOT_PENALTY_TIME		0.75f	// Applied amount of time each shot adds to the time we must recover from. Should be a bit over firerate
+#define	CONTENDER_ACCURACY_MAXIMUM_PENALTY_TIME	2.0f	// Maximum penalty to deal out
 
-ConVar	sk_magnum_use_new_accuracy( "sk_magnum_use_new_accuracy", "1" );
 extern ConVar sv_funmode;
 
 //-----------------------------------------------------------------------------
-// CWeapon357
+// CWeapon45
 //-----------------------------------------------------------------------------
 
-class CWeapon357 : public CBaseHLCombatWeapon
+class CWeapon45 : public CBaseHLCombatWeapon
 {
 	DECLARE_DATADESC();
 
 public:
 
-	DECLARE_CLASS( CWeapon357, CBaseHLCombatWeapon );
+	DECLARE_CLASS( CWeapon45, CBaseHLCombatWeapon );
 
-	CWeapon357( void );
+	CWeapon45( void );
 
 	DECLARE_SERVERCLASS();
 
@@ -69,22 +68,16 @@ public:
 			
 		static Vector cone;
 
-		if ( sk_magnum_use_new_accuracy.GetBool() )
-		{
-			float ramp = RemapValClamped(	m_flAccuracyPenalty, 
-											0.0f, 
-											MAGNUM_ACCURACY_MAXIMUM_PENALTY_TIME, 
-											0.0f, 
-											1.0f ); 
+		cone = VECTOR_CONE_2DEGREES;
 
-			// If the player wants to break his wrist, give him the accuracy of one
-			VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_9DEGREES, ramp, cone );
-		}
-		else
-		{
-			// Old value
-			cone = VECTOR_CONE_2DEGREES;
-		}
+		float ramp = RemapValClamped(	m_flAccuracyPenalty, 
+										0.0f, 
+										CONTENDER_ACCURACY_MAXIMUM_PENALTY_TIME, 
+										0.0f, 
+										1.0f ); 
+
+		// If the player wants to break his wrist, give him the accuracy of one
+		VectorLerp( VECTOR_CONE_1DEGREES, VECTOR_CONE_9DEGREES, ramp, cone );
 
 		return cone;
 	}
@@ -114,13 +107,13 @@ private:
 	int		m_nNumShotsFired;
 };
 
-IMPLEMENT_SERVERCLASS_ST( CWeapon357, DT_Weapon357 )
+IMPLEMENT_SERVERCLASS_ST( CWeapon45, DT_Weapon45 )
 END_SEND_TABLE()
 
-LINK_ENTITY_TO_CLASS( weapon_357, CWeapon357 );
-PRECACHE_WEAPON_REGISTER( weapon_357 );
+LINK_ENTITY_TO_CLASS( weapon_45, CWeapon45 );
+PRECACHE_WEAPON_REGISTER( weapon_45 );
 
-BEGIN_DATADESC( CWeapon357 )
+BEGIN_DATADESC( CWeapon45 )
 
 	DEFINE_FIELD( m_flSoonestPrimaryAttack, FIELD_TIME ),
 	DEFINE_FIELD( m_flLastAttackTime,		FIELD_TIME ),
@@ -129,7 +122,7 @@ BEGIN_DATADESC( CWeapon357 )
 
 END_DATADESC()
 
-acttable_t	CWeapon357::m_acttable[] = 
+acttable_t	CWeapon45::m_acttable[] = 
 {
 	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_PISTOL,		true },
 	{ ACT_RELOAD,					ACT_RELOAD_PISTOL,				true },
@@ -149,12 +142,12 @@ acttable_t	CWeapon357::m_acttable[] =
 };
 
 
-IMPLEMENT_ACTTABLE( CWeapon357 );
+IMPLEMENT_ACTTABLE( CWeapon45 );
 
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
-CWeapon357::CWeapon357( void )
+CWeapon45::CWeapon45( void )
 {
 	m_flSoonestPrimaryAttack = gpGlobals->curtime;
 	m_flAccuracyPenalty = 0.0f;
@@ -173,7 +166,7 @@ CWeapon357::CWeapon357( void )
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CWeapon357::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+void CWeapon45::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 
@@ -201,7 +194,7 @@ void CWeapon357::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatChara
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CWeapon357::PrimaryAttack( void )
+void CWeapon45::PrimaryAttack( void )
 {
 	// Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
@@ -221,9 +214,8 @@ void CWeapon357::PrimaryAttack( void )
 	}
 
 	m_flLastAttackTime = gpGlobals->curtime;
-	m_flSoonestPrimaryAttack = gpGlobals->curtime + MAGNUM_REFIRE_TIME;
-//	m_flNextPrimaryAttack = gpGlobals->curtime + 0.6;
-//	m_flNextSecondaryAttack = gpGlobals->curtime + 0.6;
+	m_flSoonestPrimaryAttack = gpGlobals->curtime + CONTENDER_REFIRE_TIME;
+
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 600, 0.2, GetOwner() );
 
 	//Disorient the player
@@ -232,7 +224,7 @@ void CWeapon357::PrimaryAttack( void )
 	BaseClass::PrimaryAttack();
 
 	// Add an accuracy penalty which can move past our maximum penalty time if we're really spastic
-	m_flAccuracyPenalty += MAGNUM_ACCURACY_SHOT_PENALTY_TIME;
+	m_flAccuracyPenalty += CONTENDER_ACCURACY_SHOT_PENALTY_TIME;
 
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
@@ -247,7 +239,7 @@ void CWeapon357::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CWeapon357::DryFire( void )
+void CWeapon45::DryFire( void )
 {
 	WeaponSound( EMPTY );
 	SendWeaponAnim( ACT_VM_DRYFIRE );
@@ -259,7 +251,7 @@ void CWeapon357::DryFire( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeapon357::UpdatePenaltyTime( void )
+void CWeapon45::UpdatePenaltyTime( void )
 {
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 
@@ -270,14 +262,14 @@ void CWeapon357::UpdatePenaltyTime( void )
 	if ( ( ( pOwner->m_nButtons & IN_ATTACK ) == false ) && ( m_flSoonestPrimaryAttack < gpGlobals->curtime ) )
 	{
 		m_flAccuracyPenalty -= gpGlobals->frametime;
-		m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, MAGNUM_ACCURACY_MAXIMUM_PENALTY_TIME );
+		m_flAccuracyPenalty = clamp( m_flAccuracyPenalty, 0.0f, CONTENDER_ACCURACY_MAXIMUM_PENALTY_TIME );
 	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeapon357::ItemPreFrame( void )
+void CWeapon45::ItemPreFrame( void )
 {
 	UpdatePenaltyTime();
 
@@ -287,7 +279,7 @@ void CWeapon357::ItemPreFrame( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeapon357::ItemBusyFrame( void )
+void CWeapon45::ItemBusyFrame( void )
 {
 	UpdatePenaltyTime();
 
@@ -297,7 +289,7 @@ void CWeapon357::ItemBusyFrame( void )
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CWeapon357::ItemPostFrame( void )
+void CWeapon45::ItemPostFrame( void )
 {
 	BaseClass::ItemPostFrame();
 
@@ -313,7 +305,7 @@ void CWeapon357::ItemPostFrame( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-bool CWeapon357::Reload( void )
+bool CWeapon45::Reload( void )
 {
 	bool fRet = DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
 	if ( fRet )

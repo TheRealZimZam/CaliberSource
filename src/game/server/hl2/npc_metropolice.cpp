@@ -147,7 +147,6 @@ int ACT_DEACTIVATE_BATON;
  
 LINK_ENTITY_TO_CLASS( npc_metropolice, CNPC_MetroPolice );
 LINK_ENTITY_TO_CLASS( npc_police, CNPC_MetroPolice );
-LINK_ENTITY_TO_CLASS( npc_ancorp_g, CNPC_MetroPolice );
 
 BEGIN_DATADESC( CNPC_MetroPolice )
 
@@ -647,12 +646,12 @@ void CNPC_MetroPolice::Spawn( void )
 	{
 		CapabilitiesAdd( bits_CAP_TURN_HEAD | bits_CAP_ANIMATEDFACE );
 		CapabilitiesAdd( bits_CAP_AIM_GUN | bits_CAP_MOVE_SHOOT );
+		CapabilitiesAdd( bits_CAP_DUCK | bits_CAP_DOORS_GROUP );
+		CapabilitiesAdd( bits_CAP_USE_SHOT_REGULATOR );
 	}
 	CapabilitiesAdd( bits_CAP_MOVE_GROUND );
 	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_NO_HIT_SQUADMATES );
 	CapabilitiesAdd( bits_CAP_SQUAD );
-	CapabilitiesAdd( bits_CAP_DUCK | bits_CAP_DOORS_GROUP );
-	CapabilitiesAdd( bits_CAP_USE_SHOT_REGULATOR );
 
 	m_HackedGunPos = Vector ( 0, 0, 55 );
 
@@ -1406,8 +1405,15 @@ int CNPC_MetroPolice::GetSoundInterests( void )
 		break;
 
 	default:
-		return SOUND_WORLD | SOUND_COMBAT | SOUND_PLAYER | SOUND_PLAYER_VEHICLE | SOUND_DANGER | 
-		SOUND_PHYSICS_DANGER | SOUND_BULLET_IMPACT | SOUND_MOVE_AWAY;
+		return	SOUND_COMBAT			|
+				SOUND_WORLD				|
+				SOUND_PLAYER			|
+				SOUND_DANGER			|
+				SOUND_PHYSICS_DANGER	|
+				SOUND_BULLET_IMPACT		|
+				SOUND_MOVE_AWAY			|
+				SOUND_VEHICLE			|
+				SOUND_WEAPON;
 		break;
 	}
 }
@@ -2595,7 +2601,7 @@ int CNPC_MetroPolice::SelectSchedule( void )
 	}
 
 #if 0
-	if ( HasCondition( COND_KNOCKED_DOWN ) )
+	if ( HasCondition( COND_STUNNED ) )
 	{
 		if ( !IsRunningDynamicInteraction() )
 		{
@@ -2684,7 +2690,7 @@ int CNPC_MetroPolice::SelectSchedule( void )
 					AnnounceTakeCoverFromDanger( pSound );
 					return SCHED_TAKE_COVER_FROM_BEST_SOUND;
 				}
-				if (!HasCondition( COND_SEE_ENEMY ) && ( pSound->m_iType & (SOUND_PLAYER | SOUND_PLAYER_VEHICLE | SOUND_COMBAT) ))
+				if (!HasCondition( COND_SEE_ENEMY ) && ( pSound->m_iType & (SOUND_PLAYER | SOUND_VEHICLE | SOUND_COMBAT) ))
 				{
 					GetMotor()->SetIdealYawToTarget( pSound->GetSoundReactOrigin() );
 				}

@@ -95,6 +95,9 @@ public:
 };
 
 LINK_ENTITY_TO_CLASS( npc_cockroach, CNPC_Insect );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_cockroach, CNPC_Insect );
+#endif
 LINK_ENTITY_TO_CLASS( npc_roach, CNPC_Insect );
 LINK_ENTITY_TO_CLASS( npc_rat, CNPC_Rat );
 

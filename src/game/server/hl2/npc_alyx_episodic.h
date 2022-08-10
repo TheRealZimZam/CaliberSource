@@ -50,8 +50,6 @@ public:
 	Vector  GetActualShootPosition( const Vector &shootOrigin );
 	void	OnUpdateShotRegulator();
 	bool	IsCrouchedActivity( Activity activity );
-	bool	OnBeginMoveAndShoot();
-	void	SpeakAttacking( void );
 
 	virtual float	GetJumpGravity() const		{ return 1.8f; }
 

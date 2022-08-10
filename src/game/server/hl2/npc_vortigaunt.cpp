@@ -171,6 +171,9 @@ BEGIN_DATADESC( CNPC_Vortigaunt )
 
 END_DATADESC()
 LINK_ENTITY_TO_CLASS( npc_vortigaunt, CNPC_Vortigaunt );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_alien_slave, CNPC_Vortigaunt );
+#endif
 
 // for special behavior with rollermines
 static bool IsRoller( CBaseEntity *pRoller )
@@ -676,13 +679,15 @@ void CNPC_Vortigaunt::RunTask( const Task_t *pTask )
 //=========================================================
 int CNPC_Vortigaunt::GetSoundInterests ( void) 
 {
-	return	SOUND_WORLD	|
-			SOUND_COMBAT	|
-			SOUND_CARCASS	|
-			SOUND_MEAT		|
-			SOUND_GARBAGE	|
-			SOUND_DANGER	|
-			SOUND_PLAYER;
+	return	SOUND_COMBAT			|
+			SOUND_WORLD				|
+			SOUND_PLAYER			|
+			SOUND_DANGER			|
+			SOUND_CARCASS			|
+			SOUND_MEAT				|
+			SOUND_GARBAGE			|
+			SOUND_MOVE_AWAY			|
+			SOUND_WEAPON;
 }
 
 //-----------------------------------------------------------------------------
@@ -1097,12 +1102,14 @@ void CNPC_Vortigaunt::HandleAnimEvent( animevent_t *pEvent )
 
 	if ( pEvent->event == AE_NPC_LEFTFOOT )
 	{
+		MakeAIFootstepSound( 200.0f );
 		EmitSound( "NPC_Vortigaunt.FootstepLeft", pEvent->eventtime );
 		return;
 	}
 
 	if ( pEvent->event == AE_NPC_RIGHTFOOT )
 	{
+		MakeAIFootstepSound( 200.0f );
 		EmitSound( "NPC_Vortigaunt.FootstepRight", pEvent->eventtime );
 		return;
 	}

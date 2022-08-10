@@ -1410,11 +1410,13 @@ void CNPC_Stalker::HandleAnimEvent( animevent_t *pEvent )
 	{
 		case NPC_EVENT_LEFTFOOT:
 			{
+				MakeAIFootstepSound( 180.0f );
 				EmitSound( "NPC_Stalker.FootstepLeft", pEvent->eventtime );
 			}
 			break;
 		case NPC_EVENT_RIGHTFOOT:
 			{
+				MakeAIFootstepSound( 180.0f );
 				EmitSound( "NPC_Stalker.FootstepRight", pEvent->eventtime );
 			}
 			break;

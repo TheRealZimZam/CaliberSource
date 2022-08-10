@@ -145,6 +145,7 @@ public:
 	virtual float GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info );
 	void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	virtual bool	CanFlinch( void );
 	virtual float	GetReactionDelay( CBaseEntity *pEnemy ) { return 0.0; }
 
 	virtual int SelectSchedule( void );
@@ -265,6 +266,7 @@ protected:
 	float m_flNextSwatScan;
 	float m_crabHealth;
 	float m_flMoanPitch;
+	float m_flReleaseThreshold;		//When the crab considers getting the hell out of dodge
 
 	EHANDLE	m_hObstructor;
 
@@ -272,12 +274,14 @@ protected:
 
 	int m_iMoanSound; // each zombie picks one of the 4 and keeps it.
 
+#if 0
 	static int ACT_ZOM_SWATLEFTMID;
 	static int ACT_ZOM_SWATRIGHTMID;
 	static int ACT_ZOM_SWATLEFTLOW;
 	static int ACT_ZOM_SWATRIGHTLOW;
 	static int ACT_ZOM_RELEASECRAB;
-	static int ACT_ZOM_FALL;
+//	static int ACT_ZOM_FALL;
+#endif
 
 	DECLARE_DATADESC();
 

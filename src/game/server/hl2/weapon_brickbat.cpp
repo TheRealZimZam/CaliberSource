@@ -46,10 +46,11 @@ struct BrickbatAmmo_s
 
 BrickbatAmmo_s	BrickBatAmmoArray[NUM_BRICKBAT_AMMO_TYPES] =
 {
-	{ "grenade_rockbb",			BRICKBAT_ROCK,			5,	"models/weapons/v_bb_bottle.mdl",		"models/props_junk/Rock001a.mdl" },
+	{ "grenade_rockbb",			BRICKBAT_ROCK,			4,	"models/weapons/v_bb_bottle.mdl",		"models/props_junk/Rock001a.mdl" },
 	{ "grenade_beerbottle",		BRICKBAT_BOTTLE,		3,	"models/weapons/v_bb_bottle.mdl",		"models/weapons/w_bb_bottle.mdl" },
-//	{ "grenade_headcrab",		BRICKBAT_HEADCRAB,		1,	"models/weapons/v_bb_headcrab.mdl",		"models/hc_squashed01.mdl" },
-	{ "grenade_crematorhead",	BRICKBAT_CREMATORHEAD,	1,	"models/weapons/v_bb_crematorhead.mdl",	"models/cremator_head.mdl" },
+	{ "grenade_shoe",			BRICKBAT_SHOE,			2,	"models/weapons/v_bb_crematorhead.mdl",	"models/cremator_head.mdl" },
+	{ "grenade_headcrab",		BRICKBAT_RAT,			1,	"models/weapons/v_bb_headcrab.mdl",		"models/hc_squashed01.mdl" },
+	{ "grenade_cookware",		BRICKBAT_COOKWARE,		3,	"models/weapons/v_bb_crematorhead.mdl",	"models/cremator_head.mdl" },
 };
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponBrickbat, DT_WeaponBrickbat)

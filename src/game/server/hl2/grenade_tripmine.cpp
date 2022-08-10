@@ -12,6 +12,7 @@
 #include "vstdlib/random.h"
 #include "engine/IEngineSound.h"
 #include "explode.h"
+#include "soundent.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -92,7 +93,7 @@ void CTripmineGrenade::Spawn( void )
 
 	m_flPowerUp = gpGlobals->curtime + 2.0;
 	
-	SetThink( &CTripmineGrenade::PowerupThink );	//WarningThink
+	SetThink( &CTripmineGrenade::WarningThink );
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	m_takedamage		= DAMAGE_YES;
@@ -131,11 +132,11 @@ void CTripmineGrenade::WarningThink( void )
 {
 	// set to power up
 	SetThink( &CTripmineGrenade::PowerupThink );
-	SetNextThink( gpGlobals->curtime + 1.0f );	//TODO; Convar, this is how long it takes to arm
+	SetNextThink( gpGlobals->curtime + 0.5f );	//TODO; Convar, this is how long it takes to arm
 }
 
 
-void CTripmineGrenade::PowerupThink( void  )
+void CTripmineGrenade::PowerupThink( void )
 {
 	if (gpGlobals->curtime > m_flPowerUp)
 	{
@@ -149,7 +150,8 @@ void CTripmineGrenade::PowerupThink( void  )
 			m_vAttachedPosition = m_hAttachEntity.Get()->GetAbsOrigin();
 
 		// play enabled sound
-		EmitSound( "TripmineGrenade.PowerUp" );;
+		EmitSound( "TripmineGrenade.PowerUp" );
+		CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), m_DmgRadius, 1.0, this );
 	}
 	SetNextThink( gpGlobals->curtime + 0.1f );
 }

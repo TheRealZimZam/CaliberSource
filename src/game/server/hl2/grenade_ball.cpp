@@ -2,8 +2,8 @@
 //
 // Purpose: 	Fire/Acid/Spitball
 //
-// TODO; Clamp the amount of running hiss sounds, more than one flamethrower firing at once
-// is going to break things
+// TODO; Clamp the amount of running hiss sounds ASAP, more than one flamethrower
+// firing at once breaks things
 //=============================================================================//
 
 #include "cbase.h"
@@ -11,6 +11,7 @@
 #include "Sprite.h"
 #include "soundent.h"
 #include "decals.h"
+//#include "cbasespriteprojectile.h"
 #include "smoke_trail.h"
 #include "hl2_shareddefs.h"
 #include "vstdlib/random.h"
@@ -114,7 +115,7 @@ void CGrenadeBall::Spawn( void )
 	m_DmgRadius			= 0;
 	m_flSpitLifeTime	= -1;
 	m_flSpitGroundLifeTime	= 0;
-	m_flNextDamageTime = 0.5;
+	m_flNextDamageTime = 0;
 	m_iMaxSplatDecals = 0;
 	m_bHitGround	= false;
 
@@ -298,7 +299,7 @@ void CGrenadeBall::GrenadeSpitTouch( CBaseEntity *pOther )
 		DispatchEffect( "watersplash", data );
 		if ( nSpitType == FIRE )
 		{
-			// TODO; A water-flavored dustcloud might be cool here
+			// TODO; A water-flavored embercloud might be cool here
 			Detonate();
 		}
 	}
@@ -341,7 +342,6 @@ void CGrenadeBall::GrenadeSpitTouch( CBaseEntity *pOther )
 		{
 			pTraceEnt->TakeDamage( CTakeDamageInfo( this, GetThrower(), m_flDamage, DMG_BURN ) );
 		}
-		m_flNextDamageTime = 0.4f;
 	}
 
 	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), m_DmgRadius * 2.0f, 0.5f, GetThrower() );
@@ -356,9 +356,8 @@ void CGrenadeBall::Detonate(void)
 		// All the spit damage is in the touch logic
 		int DmgType = DMG_BURN;
 		if ( nSpitType == ACID )
-		{
 			DmgType = DMG_ACID;
-		}
+
 		RadiusDamage( CTakeDamageInfo( this, GetThrower(), m_flDamage, DmgType ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 	}
 	EmitSound( m_pHitSound );

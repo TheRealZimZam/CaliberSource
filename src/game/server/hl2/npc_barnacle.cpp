@@ -71,6 +71,9 @@ int	g_interactionBarnacleVictimGrab		= 0;
 int g_interactionBarnacleVictimBite     = 0;
 
 LINK_ENTITY_TO_CLASS( npc_barnacle, CNPC_Barnacle );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_barnacle, CNPC_Barnacle );
+#endif
 
 // Tongue Spring constants
 #define BARNACLE_TONGUE_SPRING_CONSTANT_HANGING			10000

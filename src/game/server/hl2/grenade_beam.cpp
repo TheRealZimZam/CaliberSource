@@ -253,6 +253,7 @@ void CGrenadeBeam::GrenadeBeamTouch( CBaseEntity *pOther )
 	// --------------------------------------
 	//  Smoke or bubbles effect
 	// --------------------------------------
+#if 0
 	if (UTIL_PointContents ( GetAbsOrigin() ) & MASK_WATER)
 	{
 		UTIL_Bubbles(GetAbsOrigin()-Vector(3,3,3),GetAbsOrigin()+Vector(3,3,3),10);
@@ -261,6 +262,8 @@ void CGrenadeBeam::GrenadeBeamTouch( CBaseEntity *pOther )
 	{
 		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(5, 10), 10);
 	}
+#endif
+	Smoke();
 
 	// --------------------------------------------
 	//  Play burn sounds

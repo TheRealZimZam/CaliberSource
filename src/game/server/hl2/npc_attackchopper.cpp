@@ -969,7 +969,7 @@ void CNPC_AttackHelicopter::Precache( void )
 	}
 	PrecacheScriptSound( "NPC_AttackHelicopter.DropMine" );
 	PrecacheScriptSound( "NPC_AttackHelicopter.BadlyDamagedAlert" );
-	PrecacheScriptSound( "NPC_AttackHelicopter.CrashingAlarm1" );
+	PrecacheScriptSound( "NPC_AttackHelicopter.CrashingAlarm" );
 	PrecacheScriptSound( "NPC_AttackHelicopter.MegabombAlert" );
 
 	PrecacheScriptSound( "NPC_AttackHelicopter.RotorBlast" );

@@ -15,6 +15,8 @@
 #include "weapon_physcannon.h"
 #include "hl2_player.h"
 #include "smoke_trail.h"
+#include "Sprite.h"
+#include "SpriteTrail.h"
 #include "ai_basenpc_physicsflyer.h"
 
 //-----------------------------------------------------------------------------
@@ -54,7 +56,7 @@ enum ScannerInspectAct_t
 
 // Scanner movement vars
 #define	SCANNER_BANK_RATE				30
-#define	SCANNER_MAX_SPEED				250
+//#define	SCANNER_MAX_SPEED				250
 #define	SCANNER_MAX_DIVE_BOMB_SPEED		2500
 #define SCANNER_SQUAD_FLY_DIST			500		// How far to scanners stay apart
 #define SCANNER_SQUAD_HELP_DIST			3000	// How far will I fly to help
@@ -156,7 +158,9 @@ protected:
 private:
 	bool	GetGoalDirection( Vector *vOut );
 
-	void	StartSmokeTrail( void );
+	void	StartFlyTrail( void );
+	void	StopFlyTrail( void );
+	void	StartDamagedSmokeTrail( void );
 
 	// Take damage from being thrown by a physcannon 
 	void TakeDamageFromPhyscannon( CBasePlayer *pPlayer );
@@ -209,6 +213,7 @@ private:
 	float					m_flLastPhysicsInfluenceTime;
 
 	// Attacks
+	CHandle<CSpriteTrail>	m_pConTrail;
 	SmokeTrail			*m_pSmokeTrail;
 
 protected:

@@ -21,7 +21,9 @@ class CWeaponRPG;
 class CWeaponLightRPG;
 class CLaserDot;
 class RocketTrail;
- 
+
+#define SF_ROCKET_FLARE			(1 << 16)
+
 //###########################################################################
 //	>> CMissile		(missile launcher class is below this one!)
 //###########################################################################
@@ -78,11 +80,13 @@ protected:
 
 	// Creates the smoke trail
 	void CreateSmokeTrail( void );
+	void CreateFlare( void );
 
 	// Gets the shooting position 
 	void GetShootPosition( CLaserDot *pLaserDot, Vector *pShootPosition );
 
-	CHandle<RocketTrail>	m_hRocketTrail;
+	CHandle<RocketTrail>	m_hRocketTrail;		// Smoke trail
+	CHandle<CSprite>		m_hRocketFlare;		// Flare at the tip
 	float					m_flAugerTime;		// Amount of time to auger before blowing up anyway
 	float					m_flMarkDeadTime;
 	float					m_flDamage;

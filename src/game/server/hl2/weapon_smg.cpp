@@ -4,7 +4,7 @@
 //
 //	Primary attack: Shooty thingy.
 //	Secondary attack: Grenade launcher.
-// TODO's; Secondary attack needs to be re-thought
+// TODO's; SMG1 Fires normal ar2 grenade, SMG2 fires airburst
 //=============================================================================//
 
 #include "cbase.h"
@@ -16,6 +16,7 @@
 #include "game.h"
 #include "in_buttons.h"
 #include "grenade_ar2.h"
+#include "grenade_shrapnel.h"
 #include "AI_Memory.h"
 #include "soundent.h"
 #include "rumble_shared.h"
@@ -27,8 +28,9 @@
 #define	COMBINE_MIN_GRENADE_CLEAR_DIST 250
 #define	SMG_EASY_DAMPEN 0.5f
 
-ConVar sk_weapon_smg1_lerp( "sk_weapon_smg1_lerp", "6.0" );
-ConVar sk_weapon_smg2_lerp( "sk_weapon_smg2_lerp", "4.0" );
+//ConVar sk_weapon_smg1_lerp( "sk_weapon_smg1_lerp", "6.0" );
+//ConVar sk_weapon_smg2_lerp( "sk_weapon_smg2_lerp", "4.0" );
+ConVar sk_weapon_smg2_grenade_launchspeed( "sk_weapon_smg2_grenade_launchspeed", "1000" );
 
 extern ConVar sk_plr_dmg_smg1_grenade;
 extern ConVar sk_npc_dmg_smg1_grenade;
@@ -45,6 +47,7 @@ public:
 	DECLARE_DATADESC();
 
 	void	Precache( void );
+	void	ItemPostFrame( void );
 	void	SecondaryAttack( void );
 
 	bool	Reload( void );
@@ -78,6 +81,7 @@ public:
 
 protected:
 	void	FireGrenade( void );
+	bool	m_bUseAirburstGrenade;
 	Vector	m_vecTossVelocity;
 	float	m_flNextGrenadeCheck;
 	int		m_lastGrenadeCondition;
@@ -108,6 +112,7 @@ acttable_t	CHLGrenadeLauncher::m_acttable[] =
 	{ ACT_WALK_AIM,					ACT_WALK_AIM_RIFLE,				true },
 	{ ACT_RUN,						ACT_RUN_RIFLE,					true },
 	{ ACT_RUN_AIM,					ACT_RUN_AIM_RIFLE,				true },
+	{ ACT_SPRINT,					ACT_RUN_RIFLE_STIMULATED,		true },
 	
 // Readiness activities (not aiming)
 	{ ACT_IDLE_RELAXED,				ACT_IDLE_SMG1_RELAXED,			false },//never aims
@@ -160,6 +165,7 @@ CHLGrenadeLauncher::CHLGrenadeLauncher( )
 	m_fMaxRange2		= 1280;
 
 	m_bAltFiresUnderwater = false;
+	m_bUseAirburstGrenade = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -168,8 +174,36 @@ CHLGrenadeLauncher::CHLGrenadeLauncher( )
 void CHLGrenadeLauncher::Precache( void )
 {
 	UTIL_PrecacheOther("grenade_ar2");
+	UTIL_PrecacheOther("grenade_shrapnel");
 
 	BaseClass::Precache();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Allows firing as fast as button is pressed
+//-----------------------------------------------------------------------------
+void CHLGrenadeLauncher::ItemPostFrame( void )
+{
+	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+
+	if ( pOwner == NULL )
+		return;
+
+	// If its an airburst grenade, detonate it
+	if ( (pOwner->m_afButtonPressed & IN_ATTACK2) && m_bUseAirburstGrenade )
+	{
+		CBaseEntity *pEntity = NULL;
+		while ((pEntity = gEntList.FindEntityByClassname( pEntity, "grenade_ar2_airburst" )) != NULL)
+		{
+			CGrenadeAR2Airburst *pGrenade = dynamic_cast<CGrenadeAR2Airburst *>(pEntity);
+			if (pGrenade->GetThrower() && GetOwner() && pGrenade->GetThrower() == GetOwner())
+			{
+				pGrenade->ManualDetonate();	// Go boom as soon as you can
+			}
+		}
+	}
+
+	BaseClass::ItemPostFrame();
 }
 
 //-----------------------------------------------------------------------------
@@ -250,7 +284,6 @@ void CHLGrenadeLauncher::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCom
 			pGrenade->SetAbsVelocity( vecThrow );
 //			pGrenade->SetLocalAngularVelocity( QAngle( 0, 400, 0 ) );
 			pGrenade->SetLocalAngularVelocity( RandomAngle(-400, 400) );
-			pGrenade->SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE ); 
 			pGrenade->SetThrower( GetOwner() );
 			pGrenade->SetDamage(sk_npc_dmg_smg1_grenade.GetFloat());
 
@@ -294,22 +327,32 @@ Activity CHLGrenadeLauncher::GetPrimaryAttackActivity( void )
 //-----------------------------------------------------------------------------
 bool CHLGrenadeLauncher::Reload( void )
 {
-	//TODO; Seperate reload anim for secondary
-	bool fRet;
+	//Seperate reload anim for secondary
+#if 0
+	bool Ammo2;
+	Ammo2 = DefaultReload( 0, GetMaxClip2(), ACT_VM_RELOAD2 );
+
+	if ( UsesClipsForAmmo2() && m_iClip1 != 0 && m_iClip2 == 0 ) 
+	{
+		WeaponSound( SPECIAL1 );
+		return Ammo2;
+	}
+#endif
+
+	bool Ammo1;
+	Ammo1 = DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
 	float fCacheTime = m_flNextSecondaryAttack;
 
-	fRet = DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
-	if ( fRet )
+	if ( Ammo1 )
 	{
 		// Undo whatever the reload process has done to our secondary
 		// attack timer. We allow you to interrupt reloading to fire
 		// a grenade.
 		m_flNextSecondaryAttack = GetOwner()->m_flNextAttack = fCacheTime;
-
 		WeaponSound( RELOAD );
 	}
 
-	return fRet;
+	return Ammo1;
 }
 
 //-----------------------------------------------------------------------------
@@ -357,27 +400,40 @@ void CHLGrenadeLauncher::FireGrenade( void )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 
-	// MUST call sound before removing a round from the clip of a CMachineGun
-	BaseClass::WeaponSound( WPN_DOUBLE );
-
 	Vector vecSrc = pPlayer->Weapon_ShootPosition();
 	Vector vecThrow;
 	// Don't autoaim on grenade tosses
 	AngleVectors( pPlayer->EyeAngles() + pPlayer->GetPunchAngle(), &vecThrow );
-	VectorScale( vecThrow, 1000.0f, vecThrow );
+	VectorScale( vecThrow, sk_weapon_smg2_grenade_launchspeed.GetFloat(), vecThrow );	//Quake is around 800
 	
 	//Create the grenade
 	QAngle angles;
 	VectorAngles( vecThrow, angles );
-	CGrenadeAR2 *pGrenade = (CGrenadeAR2*)Create( "grenade_ar2", vecSrc, angles, pPlayer );
-	pGrenade->SetAbsVelocity( vecThrow );
 
-	pGrenade->SetLocalAngularVelocity( RandomAngle( -400, 400 ) );
-	pGrenade->SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE ); 
-	pGrenade->SetThrower( GetOwner() );
-	pGrenade->SetDamage( sk_plr_dmg_smg1_grenade.GetFloat() );
+	if ( m_bUseAirburstGrenade )
+	{
+		CGrenadeAR2 *aGrenade;
+		aGrenade = (CGrenadeAR2Airburst*)Create( "grenade_ar2_airburst", vecSrc, angles, pPlayer );
+		aGrenade->SetLocalAngularVelocity( RandomAngle( -1, 1 ) );	//Dont tumble, stay straight
+		aGrenade->SetAbsVelocity( vecThrow );
+		aGrenade->SetThrower( GetOwner() );
+	}
+	else
+	{
+		CGrenadeShrapnel *sGrenade;
+		sGrenade = (CGrenadeShrapnel*)Create( "grenade_shrapnel", vecSrc, angles, pPlayer );
+		sGrenade->SetLocalAngularVelocity( RandomAngle( -400, 400 ) );
+		sGrenade->SetAbsVelocity( vecThrow );
+		sGrenade->SetThrower( GetOwner() );
+	}
+
+	// MUST call sound before removing a round from the clip of a CMachineGun
+	BaseClass::WeaponSound( WPN_DOUBLE );
 
 	SendWeaponAnim( ACT_VM_SECONDARYATTACK );
+	//player "shoot" animation
+	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+	pPlayer->SetAimTime( 2.0f );
 
 	//Disorient the player
 	pPlayer->RumbleEffect( RUMBLE_357, 0, RUMBLE_FLAGS_NONE );
@@ -389,12 +445,9 @@ void CHLGrenadeLauncher::FireGrenade( void )
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 1000, 0.2, GetOwner(), SOUNDENT_CHANNEL_WEAPON );
 
-	//player "shoot" animation
-	pPlayer->SetAnimation( PLAYER_ATTACK1 );
-
 	//Can blow up after a short delay (so have time to release mouse button)
 	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
-	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration() + 0.5f;
+	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
 
 	//Register a muzzleflash for the AI.
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );	
@@ -452,26 +505,19 @@ int CHLGrenadeLauncher::WeaponRangeAttack2Condition( float flDot, float flDist )
 	// --------------------------------------
 	//  Get target vector
 	// --------------------------------------
-	Vector vecTarget;
+	Vector vecTarget = vecEnemyLKP;	// Launch it to where you last saw them
 	if ( random->RandomInt( 0, 1 ) )
 	{
 		// Guess where they are
-		vecTarget = pEnemy->WorldSpaceCenter();
-	}
-	else
-	{
-		// Launch it to where you last saw them
-		vecTarget = vecEnemyLKP;
+		vecTarget = vecEnemyLKP + pEnemy->GetAbsVelocity();
 	}
 
-#if 0
 	if ( ( vecTarget - npcOwner->GetLocalOrigin() ).Length2D() <= COMBINE_MIN_GRENADE_CLEAR_DIST )
 	{
 		// crap, I don't want to blow myself up
 		m_flNextGrenadeCheck = gpGlobals->curtime + 1; // one full second.
 		return COND_NONE;
 	}
-#endif
 
 	// ---------------------------------------------------------------------
 	// Are any friendlies near the intended grenade impact area?
@@ -504,7 +550,7 @@ int CHLGrenadeLauncher::WeaponRangeAttack2Condition( float flDot, float flDist )
 		// don't check again for a while.
 		// JAY: HL1 keeps checking - test?
 		//m_flNextGrenadeCheck = gpGlobals->curtime;
-		m_flNextGrenadeCheck = gpGlobals->curtime + 0.5; // 1/2 second.
+		m_flNextGrenadeCheck = gpGlobals->curtime + 0.3; // 1/3 second.
 		return COND_CAN_RANGE_ATTACK2;
 	}
 	else
@@ -552,6 +598,7 @@ public:
 
 	int		GetMinBurst() { return 3; }
 	int		GetMaxBurst() { return 6; }
+
 	virtual float	GetMinRestTime();
 	virtual float	GetMaxRestTime();
 
@@ -586,9 +633,12 @@ CWeaponSMG1::CWeaponSMG1( )
 
 	if ( !sv_funmode.GetBool() )
 	{
+		m_bReloadsFullClip	= true;
 		m_bCanJam			= true;
 	}
+
 	m_bAltFiresUnderwater = false;
+	m_bUseAirburstGrenade = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -652,8 +702,8 @@ float CWeaponSMG1::GetMaxRestTime()
 //-----------------------------------------------------------------------------
 void CWeaponSMG1::AddViewKick( void )
 {
-	#define	SMG1_MAX_VERTICAL_KICK		3.0f	//Degrees TODO; Convar
-	#define	SMG1_SLIDE_LIMIT			4.0f	//Seconds TODO; Convar
+	#define	SMG1_MAX_VERTICAL_KICK		3.5f	//Degrees TODO; Convar
+	#define	SMG1_SLIDE_LIMIT			3.0f	//Seconds TODO; Convar
 	
 	//Get the view kick
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
@@ -716,7 +766,13 @@ CWeaponSMG2::CWeaponSMG2( )
 	m_fMinRange2		= 224;
 	m_fMaxRange2		= 1280;
 
+	if ( !sv_funmode.GetBool() )
+	{
+		m_bReloadsFullClip	= true;
+	}
+
 	m_bAltFiresUnderwater = false;
+	m_bUseAirburstGrenade = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -780,8 +836,8 @@ float CWeaponSMG2::GetMaxRestTime()
 //-----------------------------------------------------------------------------
 void CWeaponSMG2::AddViewKick( void )
 {
-	#define	SMG2_MAX_VERTICAL_KICK		2.5f	//Degrees TODO; Convar
-	#define	SMG2_SLIDE_LIMIT			5.0f	//Seconds TODO; Convar
+	#define	SMG2_MAX_VERTICAL_KICK		2.0f	//Degrees TODO; Convar
+	#define	SMG2_SLIDE_LIMIT			1.0f	//Seconds TODO; Convar
 
 	//Get the view kick
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );

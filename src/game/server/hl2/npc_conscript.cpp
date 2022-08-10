@@ -287,7 +287,7 @@ int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		}
 		else if ( !(GetEnemy()->IsPlayer()) && (m_lifeState != LIFE_DEAD ))
 		{
-			Speak( TLK_SHOT );
+			Speak( TLK_PAIN );
 		}
 	}
 #endif

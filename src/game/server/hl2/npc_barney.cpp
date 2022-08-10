@@ -87,8 +87,10 @@ public:
 	DEFINE_CUSTOM_AI;
 };
 
-
 LINK_ENTITY_TO_CLASS( npc_barney, CNPC_Barney );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_barney, CNPC_Barney );
+#endif
 
 //---------------------------------------------------------
 // 

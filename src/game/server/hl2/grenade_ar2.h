@@ -16,10 +16,15 @@
 
 #include "basegrenade_shared.h"
 
-#define	MAX_AR2_NO_COLLIDE_TIME 0.2		//Time spent before activation - can bounce within this timeframe
-#define	AR2_AIRBURST_DIST 64			//Distance from nearest target to detonate
+#define	AR2_AIRBURST_NO_COLLIDE_TIME 0.2	//Time spent before activation - can bounce within this timeframe
+#define	AR2_AIRBURST_DIST 64				//Distance from nearest target to detonate
+//#define OLD_SMOKE_TRAIL 1
 
+#ifdef OLD_SMOKE_TRAIL
 class SmokeTrail;
+#else
+class CSpriteTrail;
+#endif
 class CWeaponAR2;
 
 class CGrenadeAR2 : public CBaseGrenade	//CBaseGrenadeContact
@@ -27,21 +32,31 @@ class CGrenadeAR2 : public CBaseGrenade	//CBaseGrenadeContact
 public:
 	DECLARE_CLASS( CGrenadeAR2, CBaseGrenade );
 
-	CHandle< SmokeTrail > m_hSmokeTrail;
-	float				 m_fSpawnTime;
-	float				m_fDangerRadius;
+	void EXPORT				Detonate(void);
+	CGrenadeAR2(void);
+
+	DECLARE_DATADESC();
 
 	void		Spawn( void );
 	void		Precache( void );
 	void 		GrenadeAR2Touch( CBaseEntity *pOther );
 	void		GrenadeAR2Think( void );
+	void		BounceSound( void );
 	void		Event_Killed( const CTakeDamageInfo &info );
 
-public:
-	void EXPORT				Detonate(void);
-	CGrenadeAR2(void);
+	// New Movement
+	void		ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity );
+	bool		CreateVPhysics( void );
 
-	DECLARE_DATADESC();
+protected:
+#ifdef OLD_SMOKE_TRAIL
+	CHandle<SmokeTrail>	m_hSmokeTrail;
+#else
+	CHandle<CSpriteTrail>	m_hSmokeTrail;
+#endif
+	float				m_fSpawnTime;
+	float				m_fDangerRadius;
+	bool 				m_bWantsToDetonate;
 };
 
 //Airburst/player variant
@@ -52,6 +67,20 @@ public:
 
 	void 		GrenadeAR2Touch( CBaseEntity *pOther );
 	void		GrenadeAR2Think( void );
+	void		ManualDetonate( void );
+	void EXPORT				Detonate(void);
+
+};
+
+//Shrapnel variant
+class CGrenadeAR2Shrapnel : public CGrenadeAR2
+{
+public:
+	DECLARE_CLASS( CGrenadeAR2Shrapnel, CGrenadeAR2 );
+
+	void 		GrenadeAR2Touch( CBaseEntity *pOther );
+	void		GrenadeAR2Think( void );
+	void EXPORT				Detonate(void);
 
 };
 

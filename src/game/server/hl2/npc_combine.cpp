@@ -571,12 +571,6 @@ bool CNPC_Combine::ShouldMoveAndShoot()
 	if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 		return false;
 
-	if( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_TOO_FAR_TO_ATTACK ) )
-		return false;
-
-	if( HasCondition( COND_BEHIND_ENEMY, false ) && g_pGameRules->IsSkillLevel( SKILL_EASY ) )
-		return false;
-
 	// Only move-and-shoot when on the Assault
 	if( IsCurSchedule( SCHED_COMBINE_ASSAULT, false ) )
 		return true;
@@ -904,7 +898,7 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 					}
 					else
 					{
-						SetActivity(ACT_COWER); // This is really crouch idle???
+						SetActivity(ACT_CROUCHIDLE);
 					}
 				}
 				// -------------------------------------------------------------
@@ -1560,8 +1554,13 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 				return ( Activity )ACT_COMBINE_THROW_GRENADE;
 			}
 		break;
+		
+		case ACT_RANGE_ATTACK_THROW:
+			eNewActivity = ACT_COMBINE_THROW_GRENADE;
+			break;
 
 		case ACT_RUN:
+		case ACT_RUN_AIM:
 			if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 			{
 				// limp!
@@ -1575,6 +1574,7 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 		break;
 
 		case ACT_WALK:
+		case ACT_WALK_AIM:
 			if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 			{
 				// limp!
@@ -1622,7 +1622,15 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 //-----------------------------------------------------------------------------
 int CNPC_Combine::GetSoundInterests( void )
 {
-	return	SOUND_WORLD | SOUND_COMBAT | SOUND_PLAYER | SOUND_DANGER | SOUND_PHYSICS_DANGER | SOUND_BULLET_IMPACT | SOUND_MOVE_AWAY;
+	return	SOUND_COMBAT			|
+			SOUND_WORLD				|
+			SOUND_PLAYER			|
+			SOUND_DANGER			|
+			SOUND_PHYSICS_DANGER	|
+			SOUND_BULLET_IMPACT		|
+			SOUND_MOVE_AWAY			|
+			SOUND_VEHICLE			|
+			SOUND_WEAPON;
 }
 
 //-----------------------------------------------------------------------------
@@ -1798,7 +1806,7 @@ int CNPC_Combine::SelectSchedule( void )
 
 #if 0
 			// Remove nearby tripmines/satchels
-			if ( HasCondition( COND_SMELL ) )
+			if ( HasCondition( COND_HEAR_THUMPER ) )
 			{
 				// If I see one by myself just avoid it
 				
@@ -1879,7 +1887,7 @@ int CNPC_Combine::SelectCombatSchedule()
 
 			if ( HasCondition( COND_SEE_ENEMY ) )
 			{
-				AnnounceEnemyType( pEnemy );
+				SpeakSentence( 0 );
 				// This increases the chance of nading' an increasingly large enemy mob
 #if 0
 				if( OccupyStrategySlot( SQUAD_SLOT_GRENADE1 ) && random->RandomFloat( 0, 100 ) < COMBINE_GRENADE_CHANCE )
@@ -2361,7 +2369,7 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 				float flDist = EnemyDistance(pEnemy);
 
 				Vector vecTarget = vecEnemyLKP + pEnemy->GetAbsVelocity();
-				if( pEnemy && pEnemy->IsPlayer() && HasCondition( COND_ENEMY_OCCLUDED ) && GetGrenadeConditions(0, flDist, vecTarget) )
+				if( pEnemy && HasCondition( COND_ENEMY_OCCLUDED ) && GetGrenadeConditions(0, flDist, vecTarget) && pEnemy->IsPlayer() )
 				{
 					// If I could throw a grenade where I think the enemy is,
 					// do so first, then move into LOS!
@@ -2424,7 +2432,7 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 	case SCHED_COMBINE_COVER_AND_RELOAD:
 		{
 #if 0
-			// Empty the clip if the enemy is in my face
+			// Empty whats left if the enemy is in my face
 			float flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
 			if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) && flDistToEnemy < 300 )
 			{
@@ -2716,7 +2724,6 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 				CGrenadeAR2 *pGrenade = (CGrenadeAR2*)Create( "grenade_ar2", Weapon_ShootPosition(), vec3_angle, this );
 				pGrenade->SetAbsVelocity( m_vecTossVelocity );
 				pGrenade->SetLocalAngularVelocity( QAngle( random->RandomFloat( -100, -500 ), 0, 0 ) );
-				pGrenade->SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE ); 
 				pGrenade->SetThrower( this );
 				pGrenade->SetDamage( sk_npc_dmg_smg1_grenade.GetFloat() );
 				
@@ -3013,11 +3020,11 @@ void CNPC_Combine::SpeakSentence( int sentenceType )
 
 	switch( sentenceType )
 	{
-	case 0: // assault
-		AnnounceAssault();
+	case 0: // Spotted enemy
+		AnnounceEnemyType( GetEnemy() );
 		break;
 
-	case 1: // press attack
+	case 1: // assault/press attack
 		AnnounceAssault();
 		break;
 
@@ -4042,11 +4049,11 @@ DEFINE_SCHEDULE
  "	Tasks "
  "		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE"
  "		TASK_WAIT_FACE_ENEMY			0.2"
-//"		TASK_SET_TOLERANCE_DISTANCE		48"
+ "		TASK_SET_TOLERANCE_DISTANCE		48"
  "		TASK_COMBINE_SET_STANDING		1"
  "		TASK_GET_PATH_TO_ENEMY_LKP_LOS	0"
  "		TASK_RUN_PATH					0"
- "		TASK_SPEAK_SENTENCE				0"
+ "		TASK_SPEAK_SENTENCE				1"
  "		TASK_WAIT_FOR_MOVEMENT			0"
  "		TASK_COMBINE_IGNORE_ATTACKS		0.0"
  "		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
@@ -4169,6 +4176,12 @@ DEFINE_SCHEDULE
 
  //=========================================================
  // SCHED_HIDE_AND_RELOAD
+ //	SCHED_COVER_AND_RELOAD
+ //	Hide and reload - Find a place where the enemy can
+ // %100 not see you, and reload in safety
+ // Cover and reload - Find a place where the enemy
+ // cant hit you, try to reload, but dont if the enemy
+ // is pursuing
  //=========================================================
  DEFINE_SCHEDULE
  (
@@ -4390,7 +4403,7 @@ DEFINE_SCHEDULE
  //=========================================================
  // SCHED_COMBINE_GRENADE_COVER1
  //
- // Roll grenade then run to cover.
+ // Toss grenade then run to cover.
  //=========================================================
  DEFINE_SCHEDULE
  (
@@ -4535,7 +4548,7 @@ DEFINE_SCHEDULE
  // 	SCHED_COMBINE_RANGE_ATTACK2	
  //
  //	secondary range attack. Overriden because base class stops attacking when the enemy is occluded.
- //	combines's grenade toss requires the enemy be occluded.
+ //	combines's grenade throw requires the enemy be occluded.
  //=========================================================
  DEFINE_SCHEDULE
  (

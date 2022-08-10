@@ -844,13 +844,9 @@ const char *CFastZombie::GetMoanSound( int nSound )
 void CFastZombie::FootstepSound( bool fRightFoot )
 {
 	if( fRightFoot )
-	{
 		EmitSound( "NPC_FastZombie.FootstepRight" );
-	}
 	else
-	{
 		EmitSound( "NPC_FastZombie.FootstepLeft" );
-	}
 }
 
 //-----------------------------------------------------------------------------

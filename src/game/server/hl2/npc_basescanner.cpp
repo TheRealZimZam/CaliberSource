@@ -49,6 +49,7 @@ BEGIN_DATADESC( CNPC_BaseScanner )
 
 	// DEFINE_FIELD( m_bHasSpoken,			FIELD_BOOLEAN ),
 
+	DEFINE_FIELD( m_pConTrail,			FIELD_EHANDLE ),
 	DEFINE_FIELD( m_pSmokeTrail,			FIELD_CLASSPTR ),
 
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetDistanceOverride", InputSetDistanceOverride ),
@@ -59,6 +60,10 @@ END_DATADESC()
 
 ConVar	sk_scanner_dmg_dive( "sk_scanner_dmg_dive","0");
 ConVar	sk_scanner_dmg_deflect( "sk_scanner_dmg_deflect","0.5");
+ConVar	sk_scanner_idlespeed( "sk_scanner_idlespeed","250");
+#define SCANNER_SPEED		sk_scanner_idlespeed.GetFloat()
+ConVar	sk_scanner_maxspeed( "sk_scanner_maxspeed","280");
+#define SCANNER_MAX_SPEED		sk_scanner_maxspeed.GetFloat()
 
 //-----------------------------------------------------------------------------
 // Think contexts
@@ -118,6 +123,7 @@ void CNPC_BaseScanner::Spawn(void)
 	m_nFlyMode = SCANNER_FLY_PATROL;
 	AngleVectors( GetLocalAngles(), &m_vCurrentBanking );
 	m_fHeadYaw = 0;
+	m_pConTrail = NULL;
 	m_pSmokeTrail = NULL;
 
 	SetCurrentVelocity( vec3_origin );
@@ -393,7 +399,8 @@ int CNPC_BaseScanner::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	// Start smoking when we're nearly dead
 	if ( m_iHealth < ( m_iMaxHealth - ( m_iMaxHealth / 4 ) ) )
 	{
-		StartSmokeTrail();
+		StartDamagedSmokeTrail();
+		UTIL_Smoke( info.GetDamagePosition(), random->RandomInt( 10, 15 ), 10 );
 	}
 
 	return (BaseClass::OnTakeDamage_Alive( info ));
@@ -423,7 +430,7 @@ void CNPC_BaseScanner::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 {
 	if ( info.GetDamageType() & DMG_BULLET )
 	{
-		g_pEffects->Ricochet(ptr->endpos,ptr->plane.normal);
+		g_pEffects->Ricochet(ptr->endpos, ptr->plane.normal);
 	}
 	BaseClass::TraceAttack( info, vecDir, ptr );
 }
@@ -585,6 +592,7 @@ void CNPC_BaseScanner::Gib( void )
 	ExplosionCreate( WorldSpaceCenter(), GetAbsAngles(), this, 64, 64, false );
 
 	// Turn off any smoke trail
+	StopFlyTrail();
 	if ( m_pSmokeTrail )
 	{
 		m_pSmokeTrail->m_ParticleLifetime = 0;
@@ -722,7 +730,8 @@ void CNPC_BaseScanner::AttackDivebomb( void )
 
 	m_takedamage = DAMAGE_NO;
 
-	StartSmokeTrail();
+	StopFlyTrail();
+	StartDamagedSmokeTrail();
 }
 
 //------------------------------------------------------------------------------
@@ -893,15 +902,45 @@ void CNPC_BaseScanner::InputSetFlightSpeed(inputdata_t &inputdata)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Start contrail
 //-----------------------------------------------------------------------------
-void CNPC_BaseScanner::StartSmokeTrail( void )
+void CNPC_BaseScanner::StartFlyTrail( void )
+{
+	if ( m_pConTrail != NULL )
+		return;
+
+	// Start up the smoke trail
+	m_pConTrail	= CSpriteTrail::SpriteTrailCreate( "sprites/smoke.vmt", GetLocalOrigin(), true );
+
+	if ( m_pConTrail != NULL )
+	{
+		m_pConTrail->SetTransparency( kRenderTransAdd, 96, 96, 96, 96, kRenderFxNone );
+		m_pConTrail->SetStartWidth( 6.0f );
+		m_pConTrail->SetEndWidth( 4.0f );
+		m_pConTrail->SetLifeTime( 0.8f );
+
+		m_pConTrail->FollowEntity( this );
+	}
+}
+
+void CNPC_BaseScanner::StopFlyTrail( void )
+{
+	if ( m_pConTrail )
+	{
+		UTIL_Remove(m_pConTrail);
+		m_pConTrail = NULL;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Start smoketrail
+//-----------------------------------------------------------------------------
+void CNPC_BaseScanner::StartDamagedSmokeTrail( void )
 {
 	if ( m_pSmokeTrail != NULL )
 		return;
 
 	m_pSmokeTrail = SmokeTrail::CreateSmokeTrail();
-
 	if ( m_pSmokeTrail )
 	{
 		m_pSmokeTrail->m_SpawnRate = 10;
@@ -1005,6 +1044,11 @@ void CNPC_BaseScanner::MoveExecute_Alive(float flInterval)
 		flCurrentDynamo += 360.0;
 	}
 	SetPoseParameter( m_nPoseDynamo, flCurrentDynamo );
+
+	if (m_pConTrail == NULL)
+	{
+		StartFlyTrail();
+	}
 
 	PlayFlySound();
 }
@@ -1549,7 +1593,7 @@ int CNPC_BaseScanner::DrawDebugTextOverlays(void)
 float CNPC_BaseScanner::GetHeadTurnRate( void ) 
 { 
 	if ( GetEnemy() )
-		return 800.0f;
+		return 700.0f;
 
 	return 350.0f;
 }
@@ -1713,7 +1757,11 @@ void CNPC_BaseScanner::PainSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 float CNPC_BaseScanner::GetMaxSpeed()
 {
-	return SCANNER_MAX_SPEED;
+	if ( GetEnemy() )
+	{
+		return SCANNER_MAX_SPEED;
+	}
+	return SCANNER_SPEED;
 }
 
 //-----------------------------------------------------------------------------

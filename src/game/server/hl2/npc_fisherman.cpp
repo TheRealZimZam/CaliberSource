@@ -225,6 +225,8 @@ void CNPC_Fisherman::DeathSound( const CTakeDamageInfo &info )
 {
 	// Sentences don't play on dead NPCs
 	SentenceStop();
+	
+	return BaseClass::DeathSound( info );
 }
 
 //-----------------------------------------------------------------------------

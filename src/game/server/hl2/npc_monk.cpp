@@ -15,6 +15,7 @@
 #include "engine/IEngineSound.h"
 #include "ai_behavior.h"
 #include "ai_behavior_assault.h"
+#include "ai_behavior_follow.h"
 #include "ai_behavior_lead.h"
 #include "npcevent.h"
 #include "ai_playerally.h"
@@ -102,6 +103,7 @@ private:
 	void	InputPerfectAccuracyOff( inputdata_t &inputdata );
 	
 	CAI_AssaultBehavior		m_AssaultBehavior;
+	CAI_FollowBehavior		m_FollowBehavior;
 	CAI_LeadBehavior		m_LeadBehavior;
 	int						m_iNumZombies;
 	int						m_iDangerousZombies;
@@ -112,6 +114,7 @@ private:
 
 BEGIN_DATADESC( CNPC_Monk )
 //					m_AssaultBehavior
+//					m_FollowBehavior
 //					m_LeadBehavior
 	DEFINE_FIELD( m_iNumZombies, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iDangerousZombies, FIELD_INTEGER ),
@@ -130,9 +133,10 @@ LINK_ENTITY_TO_CLASS( npc_monk, CNPC_Monk );
 //-----------------------------------------------------------------------------
 bool CNPC_Monk::CreateBehaviors()
 {
-	AddBehavior( &m_LeadBehavior );
 	AddBehavior( &m_AssaultBehavior );
-	
+	AddBehavior( &m_FollowBehavior );
+	AddBehavior( &m_LeadBehavior );
+
 	return BaseClass::CreateBehaviors();
 }
 
@@ -140,10 +144,11 @@ bool CNPC_Monk::CreateBehaviors()
 //-----------------------------------------------------------------------------
 int CNPC_Monk::GetSoundInterests()
 {
-	return	SOUND_WORLD		|
-			SOUND_COMBAT	|
+	return	SOUND_COMBAT	|
+			SOUND_WORLD		|
 			SOUND_PLAYER	|
-			SOUND_DANGER;
+			SOUND_DANGER	|
+			SOUND_BULLET_IMPACT;
 }
 
 //-----------------------------------------------------------------------------
@@ -214,24 +219,6 @@ Activity CNPC_Monk::NPC_TranslateActivity( Activity eNewActivity )
 				eNewActivity = ACT_RUN_AIM;
 			}
 		}
-	}
-
-	// We need these so that we can pick up the shotgun to throw it in the balcony scene
-	if ( eNewActivity == ACT_IDLE_ANGRY_SHOTGUN )
-	{
-		eNewActivity = ACT_IDLE_ANGRY_SMG1;
-	}
-	else if ( eNewActivity == ACT_WALK_AIM_SHOTGUN )
-	{
-		eNewActivity = ACT_WALK_AIM_RIFLE;
-	}
-	else if ( eNewActivity == ACT_RUN_AIM_SHOTGUN )
-	{
-		eNewActivity = ACT_RUN_AIM_RIFLE;
-	}
-	else if ( eNewActivity == ACT_RANGE_ATTACK_SHOTGUN_LOW )
-	{
-		return ACT_RANGE_ATTACK_SMG1_LOW;
 	}
 
 	return eNewActivity;
@@ -592,7 +579,7 @@ void CNPC_Monk::GatherConditions()
 	if( m_iDangerousZombies >= 3 || (GetEnemy() && GetHealth() < 25) )
 	{
 		// I see many zombies, or I'm quite injured.
-		SpeakIfAllowed( TLK_HELP_ME );
+		SpeakIfAllowed( TLK_HELPME );
 	}
 
 	// NOTE!!!!!! This code assumes grigori is using annabelle!

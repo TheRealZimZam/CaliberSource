@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		Nailbomb
+// Purpose: Launched Grenade
 //
 // $Workfile:     $
 // $Date:         $
@@ -16,31 +16,28 @@
 
 #include "basegrenade_shared.h"
 
-class CParticleSystem;
+#define	SHRAPNEL_NO_COLLIDE_TIME 0.2	//Time spent before activation - will blow up after this long
 
-#define SHRAPNEL_GRAVITY 600
-
-class CGrenadeShrapnel : public CBaseGrenade
+class CGrenadeShrapnel : public CBaseGrenade	//CBaseGrenadeContact
 {
+public:
 	DECLARE_CLASS( CGrenadeShrapnel, CBaseGrenade );
 
-public:
-						CGrenadeShrapnel( void );
+	CGrenadeShrapnel(void);
 
-	virtual void		Spawn( void );
-	virtual void		Precache( void );
-	virtual void		Event_Killed( const CTakeDamageInfo &info );
-
-	virtual	unsigned int	PhysicsSolidMaskForEntity( void ) const { return ( BaseClass::PhysicsSolidMaskForEntity() | CONTENTS_WATER ); }
-
-	void 				GrenadeSpitTouch( CBaseEntity *pOther );
-	void				Detonate( void );
-	void				Think( void );
-
-private:
 	DECLARE_DATADESC();
-	
-	bool			m_bPlaySound;
+
+	void		Spawn( void );
+	void		Precache( void );
+	void 		GrenadeShrapnelTouch( CBaseEntity *pOther );
+	void		GrenadeShrapnelThink( void );
+	void		Event_Killed( const CTakeDamageInfo &info );
+
+	void		Detonate(void);
+
+protected:
+	float				m_fSpawnTime;
+
 };
 
 #endif	//GRENADESHRAPNEL_H

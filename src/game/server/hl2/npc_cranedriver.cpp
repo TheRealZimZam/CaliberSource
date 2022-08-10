@@ -638,7 +638,7 @@ void CNPC_CraneDriver::InputForcePickup( inputdata_t &inputdata )
 		m_hPickupTarget = gEntList.FindEntityByName( NULL, iszPickupName, NULL, inputdata.pActivator, inputdata.pCaller );
 		m_bForcedPickup = true;
 		m_bForcedDropoff = false;
-		SetCondition( COND_PROVOKED );
+		SetCondition( COND_WAY_CLEAR );
 		CLEARBITS( m_spawnflags, SF_VEHICLEDRIVER_INACTIVE );
 	}
 }
@@ -661,7 +661,7 @@ void CNPC_CraneDriver::InputForceDrop( inputdata_t &inputdata )
 		m_bForcedPickup = false;
 		m_bForcedDropoff = true;
 		SetDesiredPosition( pEntity->GetAbsOrigin() );
-		SetCondition( COND_PROVOKED );
+		SetCondition( COND_WAY_CLEAR );
 		CLEARBITS( m_spawnflags, SF_VEHICLEDRIVER_INACTIVE );
 	}
 }
@@ -703,7 +703,7 @@ AI_BEGIN_CUSTOM_NPC( npc_cranedriver, CNPC_CraneDriver )
 		"		COND_NEW_ENEMY"
 		"		COND_ENEMY_OCCLUDED"
 		"		COND_ENEMY_TOO_FAR"
-		"		COND_PROVOKED"
+		"		COND_WAY_CLEAR"
 	)
 
 	DEFINE_SCHEDULE
@@ -736,7 +736,7 @@ AI_BEGIN_CUSTOM_NPC( npc_cranedriver, CNPC_CraneDriver )
 		"		COND_NEW_ENEMY"
 		"		COND_ENEMY_OCCLUDED"
 		"		COND_ENEMY_TOO_FAR"
-		"		COND_PROVOKED"
+		"		COND_WAY_CLEAR"
 	)
 
 	DEFINE_SCHEDULE
@@ -769,7 +769,7 @@ AI_BEGIN_CUSTOM_NPC( npc_cranedriver, CNPC_CraneDriver )
 		"		COND_TOO_CLOSE_TO_ATTACK"
 		"		COND_TASK_FAILED"
 		"		COND_LOST_ENEMY"
-		"		COND_PROVOKED"
+		"		COND_WAY_CLEAR"
 	)
 
 	DEFINE_SCHEDULE

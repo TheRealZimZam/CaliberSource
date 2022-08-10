@@ -2,7 +2,8 @@
 //
 // Purpose: Magazine-fed auto shotgun used by soldiers.
 //
-//			Primary attack: single barrel shot.
+//			Primary attack: single barrel shot
+//			Secondary attack:
 //
 // TODO's: Use machinegun recoil, do 1 damage to the player per shot after constant firing after 3 rounds
 //=============================================================================//
@@ -24,7 +25,8 @@
 #include "tier0/memdbgon.h"
 
 #define VECTOR_CONE_SUPERSHOTGUN		Vector( 0.12206, 0.12206, 0.11334 )
-#define SUPERSHOTGUN_KICKBACK			2	// Range for punchangle when firing.
+#define SUPERSHOTGUN_KICKBACK			2	// Base kickback
+
 ConVar sk_weapon_supershotgun_lerp( "sk_weapon_supershotgun_lerp", "5.0" );
 
 extern ConVar sk_auto_reload_time;
@@ -73,9 +75,12 @@ public:
 
 	Activity	GetPrimaryAttackActivity( void );
 
+	bool	Reload( void );
 //	void	WeaponIdle( void );
+	void	ItemPostFrame( void );
 	void	ItemHolsterFrame( void );
 	void	PrimaryAttack( void );
+	void	SecondaryAttack( void );
 
 	const char *GetTracerType( void ) { return "ShotgunTracer"; }
 	void	FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
@@ -91,6 +96,7 @@ public:
 private:
 	float	m_flLastAttackTime;
 	int		m_nNumShotsFired;
+	bool	m_bLastfire;
 };
 
 IMPLEMENT_SERVERCLASS_ST( CWeaponSuperShotgun, DT_WeaponSuperShotgun )
@@ -117,6 +123,7 @@ acttable_t	CWeaponSuperShotgun::m_acttable[] =
 	{ ACT_WALK_AIM,					ACT_WALK_AIM_SHOTGUN,				true },
 	{ ACT_RUN,						ACT_RUN_RIFLE,						true },
 	{ ACT_RUN_AIM,					ACT_RUN_AIM_SHOTGUN,				true },
+	{ ACT_SPRINT,					ACT_RUN_RIFLE_STIMULATED,			true },
 
 // Readiness activities (not aiming)
 	{ ACT_IDLE_RELAXED,				ACT_IDLE_SHOTGUN_RELAXED,		false },//never aims
@@ -172,6 +179,7 @@ CWeaponSuperShotgun::CWeaponSuperShotgun( void )
 	m_bReloadsSingly	= false;
 	if ( !sv_funmode.GetBool() )
 	{
+		m_bReloadsFullClip	= true;
 		m_bCanJam			= true;
 	}
 
@@ -179,6 +187,7 @@ CWeaponSuperShotgun::CWeaponSuperShotgun( void )
 	m_fMaxRange1		= 768;
 	
 	m_nNumShotsFired = 0;
+	m_bLastfire = false;
 	m_flLastAttackTime = gpGlobals->curtime;
 }
 
@@ -194,6 +203,12 @@ void CWeaponSuperShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator,
 	WeaponSound( SINGLE_NPC );
 	pOperator->DoMuzzleFlash();
 	m_iClip1 = m_iClip1 - 1;
+
+	// Last round in the clip, clang after next shot
+	if ( m_iClip1 <= 1 )
+	{
+		m_bLastfire = true;
+	}
 
 	if ( bUseWeaponAngles )
 	{
@@ -252,8 +267,7 @@ float CWeaponSuperShotgun::GetMinRestTime()
 	Class_T OwnerClass = GetOwner()->Classify();
 
 	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
-		 OwnerClass == CLASS_METROPOLICE	||
-		 OwnerClass == CLASS_COMBINE	)
+		 OwnerClass == CLASS_METROPOLICE	)
 		 return 0.9f;
 
 	return 0.6f;
@@ -265,8 +279,7 @@ float CWeaponSuperShotgun::GetMaxRestTime()
 	Class_T OwnerClass = GetOwner()->Classify();
 
 	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
-		 OwnerClass == CLASS_METROPOLICE	||
-		 OwnerClass == CLASS_COMBINE	)
+		 OwnerClass == CLASS_METROPOLICE	)
 		 return 1.2f;
 
 	return 0.9f;
@@ -287,6 +300,19 @@ float CWeaponSuperShotgun::GetFireRate()
 	return BaseClass::GetCycleTime();
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Reload mercy
+//-----------------------------------------------------------------------------
+bool CWeaponSuperShotgun::Reload( void )
+{
+	int iActivity = ACT_VM_RELOAD;
+	if ( m_iClip1 > 1 )
+	{
+		iActivity = ACT_VM_RELOAD2;
+	}
+
+	return DefaultReload( GetMaxClip1(), GetMaxClip2(), iActivity );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose:
@@ -308,14 +334,7 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 		return;
 	}
 
-	if ( ( gpGlobals->curtime - m_flLastAttackTime ) > 0.5f )
-	{
-		m_nNumShotsFired = 0;
-	}
-	else
-	{
-		m_nNumShotsFired++;
-	}
+	m_nNumShotsFired++;
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 
@@ -325,11 +344,18 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 	// player """shoot""" animation
 	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+	pPlayer->SetAimTime( 2.0f );
 
 	// Don't fire again until fire animation has completed
 	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
 	m_flLastAttackTime = gpGlobals->curtime + SequenceDuration();
 	m_iClip1--;
+
+	// Last round in the clip, clang after next shot
+	if ( m_iClip1 == 1 )
+	{
+		m_bLastfire = true;
+	}
 
 	Vector	vecSrc		= pPlayer->Weapon_ShootPosition( );
 	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
@@ -339,7 +365,8 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 
 	//Disorient the player
-	pPlayer->ViewPunch( QAngle( random->RandomFloat( -SUPERSHOTGUN_KICKBACK, -1 ), random->RandomFloat( -SUPERSHOTGUN_KICKBACK, SUPERSHOTGUN_KICKBACK ), 0 ) );
+	pPlayer->ViewPunch( QAngle( random->RandomFloat( -SUPERSHOTGUN_KICKBACK - m_nNumShotsFired, -1 ), random->RandomFloat( -SUPERSHOTGUN_KICKBACK - m_nNumShotsFired, SUPERSHOTGUN_KICKBACK + m_nNumShotsFired ), 0 ) );
+
 	Vector	recoilForce = pPlayer->BodyDirection2D() * -( SUPERSHOTGUN_KICKBACK + (sk_plr_num_shotgun_pellets.GetInt() * m_nNumShotsFired) );
 	recoilForce[2] += 96.0f;
 	pPlayer->ApplyAbsVelocityImpulse( recoilForce );
@@ -359,7 +386,7 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 Activity CWeaponSuperShotgun::GetPrimaryAttackActivity( void )
 {
-	if ( m_nNumShotsFired < 1 )
+	if ( m_nNumShotsFired <= 1 )
 		return ACT_VM_PRIMARYATTACK;
 
 	//TEMP; Shotgun doesnt have recoil anims yet
@@ -371,6 +398,42 @@ Activity CWeaponSuperShotgun::GetPrimaryAttackActivity( void )
 		return ACT_VM_RECOIL2;
 */
 	return ACT_VM_PRIMARYATTACK;	//ACT_VM_RECOIL3
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Stab
+//-----------------------------------------------------------------------------
+void CWeaponSuperShotgun::SecondaryAttack( void )
+{
+	// Only the player fires this way so we can cast
+	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+	if ( !pOwner )
+		return;
+
+	//!!!TODO; Basic stab - no need for complicated melee code here
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CWeaponSuperShotgun::ItemPostFrame( void )
+{
+	// Clang
+	if ( m_bLastfire )
+	{
+		CPASAttenuationFilter filter( GetOwner() );
+		EmitSound( filter, GetOwner()->entindex(), "Weapon_SuperShotgun.Lastfire" ); 
+
+		m_bLastfire = false;
+	}
+
+	// Reset to default kick
+	if ( ( gpGlobals->curtime - m_flLastAttackTime ) > 0.5f )
+	{
+		m_nNumShotsFired = 0;
+	}
+
+	BaseClass::ItemPostFrame();
 }
 
 //-----------------------------------------------------------------------------

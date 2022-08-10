@@ -1811,7 +1811,7 @@ void CPropAirboat::ProcessMovement( CBasePlayer *pPlayer, CMoveData *pMoveData )
 		// Play a sound around us to make NPCs pay attention to us
 		if ( m_VehiclePhysics.GetThrottle() > 0 )
 		{
-			CSoundEnt::InsertSound( SOUND_PLAYER_VEHICLE, pPlayer->GetAbsOrigin(), 3500, 0.1f, pPlayer, SOUNDENT_CHANNEL_REPEATED_PHYSICS_DANGER );
+			CSoundEnt::InsertSound( SOUND_VEHICLE, pPlayer->GetAbsOrigin(), 3500, 0.1f, pPlayer, SOUNDENT_CHANNEL_REPEATED_PHYSICS_DANGER );
 		}
 	}
 

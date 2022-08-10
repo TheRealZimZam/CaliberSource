@@ -16,8 +16,8 @@
 #include "soundenvelope.h"
 
 #define	FLAMETHROWER_VELOCITY	400.0f
-#define	FLAMETHROWER_FIRERATE	0.1f	// Eject a fire blob entity this often.
-#define	FLAMETHROWER_DRAINRATE	0.05f	// Drain ammo this fast
+#define	FLAMETHROWER_DRAINRATE	0.05f	// Drain a singular ammo every this amount of time while on
+#define	FLAMETHROWER_FIRERATE	0.1f	// Actually eject a fire blob entity this often.
 #define FLAMETHROWER_SPREAD_ANGLE		15.0	// How far the flame particles will spread from the center.
 
 //=========================================================
@@ -51,10 +51,11 @@ public:
 	DECLARE_ACTTABLE();
 
 private:
+	float					m_fDrainRate;
+
 	// Start/stop the fire sound.
 	bool					m_bSoundOn;	// Is the sound on?
 	bool					m_bFiring;	// Are we firing?
-	
 };
 
 #endif // WEAPON_FLAME_THROWER_H

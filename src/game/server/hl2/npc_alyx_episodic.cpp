@@ -352,7 +352,7 @@ void CNPC_Alyx::Spawn()
 	m_fCombatStartTime = 0.0f;
 	m_fCombatEndTime   = 0.0f;
 
-	m_AnnounceAttackTimer.Set( 3, 5 );
+//	m_AnnounceAttackTimer.Set( 3, 5 );
 }
 
 //=========================================================
@@ -948,7 +948,7 @@ void CNPC_Alyx::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo &
 	// comment on killing npc's
 	if ( pVictim->IsNPC() )
 	{
-		SpeakIfAllowed( TLK_ALYX_ENEMY_DEAD );
+		SpeakIfAllowed( TLK_ENEMY_DEAD );
 	}
 
 	// Alyx builds a proxy for the dead enemy so she has something to shoot at for a short time after
@@ -1889,13 +1889,6 @@ void CNPC_Alyx::StartTask( const Task_t *pTask )
 		// Don't do the half second wait here that the PlayerCompanion class does. (sbj) 1/4/2006
 		TaskComplete();
 		break;
-
-	case TASK_ANNOUNCE_ATTACK:
-		{
-			SpeakAttacking();
-			BaseClass::StartTask( pTask );
-			break;
-		}
 
 	case TASK_ALYX_BUILD_COMBAT_FACE_PATH:
 		{
@@ -2878,10 +2871,7 @@ bool CNPC_Alyx::EnemyIsValidCrouchTarget( CBaseEntity *pEnemy )
 //-----------------------------------------------------------------------------
 void CNPC_Alyx::ModifyOrAppendCriteria( AI_CriteriaSet &set )
 {
-	AIEnemiesIter_t iter;
 	float fLengthOfLastCombat;
-	int	iNumEnemies;
-
 	if ( GetState() == NPC_STATE_COMBAT )
 	{
 		fLengthOfLastCombat = gpGlobals->curtime - m_fCombatStartTime;
@@ -2890,10 +2880,11 @@ void CNPC_Alyx::ModifyOrAppendCriteria( AI_CriteriaSet &set )
 	{
 		fLengthOfLastCombat = m_fCombatEndTime - m_fCombatStartTime;
 	}
-	
 	set.AppendCriteria( "combat_length", UTIL_VarArgs( "%.3f", fLengthOfLastCombat ) );
 
-	iNumEnemies = 0;
+#if 0
+	AIEnemiesIter_t iter;
+	int	iNumEnemies = 0;
 	for ( AI_EnemyInfo_t *pEMemory = GetEnemies()->GetFirst(&iter); pEMemory != NULL; pEMemory = GetEnemies()->GetNext(&iter) )
 	{
 		if ( pEMemory->hEnemy->IsAlive() && ( pEMemory->hEnemy->Classify() != CLASS_BULLSEYE ) )
@@ -2902,8 +2893,9 @@ void CNPC_Alyx::ModifyOrAppendCriteria( AI_CriteriaSet &set )
 		}
 	}
 	set.AppendCriteria( "num_enemies", UTIL_VarArgs( "%d", iNumEnemies ) );
-	set.AppendCriteria( "darkness_mode", UTIL_VarArgs( "%d", HasCondition( COND_ALYX_IN_DARK ) ) );
 	set.AppendCriteria( "water_level", UTIL_VarArgs( "%d", GetWaterLevel() ) );
+#endif
+	set.AppendCriteria( "darkness_mode", UTIL_VarArgs( "%d", HasCondition( COND_ALYX_IN_DARK ) ) );
 
 	CHL2_Player *pPlayer = assert_cast<CHL2_Player*>( UTIL_PlayerByIndex( 1 ) );
 	set.AppendCriteria( "num_companions", UTIL_VarArgs( "%d", pPlayer ? pPlayer->GetNumSquadCommandables() : 0 ) );
@@ -3097,32 +3089,6 @@ bool CNPC_Alyx::IsCrouchedActivity( Activity activity )
 		return true;
 	}
 	return false;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-bool CNPC_Alyx::OnBeginMoveAndShoot()
-{
-	if ( BaseClass::OnBeginMoveAndShoot() )
-	{
-		SpeakAttacking();
-		return true;
-	}
-
-	return false;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_Alyx::SpeakAttacking( void )
-{
-	if ( GetActiveWeapon() && m_AnnounceAttackTimer.Expired() )
-	{
-		SpeakIfAllowed( TLK_ATTACKING, UTIL_VarArgs("attacking_with_weapon:%s", GetActiveWeapon()->GetClassname()) );
-		m_AnnounceAttackTimer.Set( 3, 5 );
-	}
 }
 
 //-----------------------------------------------------------------------------

@@ -14,6 +14,7 @@
 #include "IEffects.h"
 #include "engine/IEngineSound.h"
 #include "weapon_flaregun.h"
+#include "gamestats.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -51,6 +52,7 @@ BEGIN_DATADESC( CFlare )
 	DEFINE_FIELD( m_flTimeBurnOut,	FIELD_TIME ),
 	DEFINE_KEYFIELD( m_flScale,		FIELD_FLOAT, "scale" ),
 	DEFINE_KEYFIELD( m_flDuration,	FIELD_FLOAT, "duration" ),
+//	DEFINE_KEYFIELD( m_flColor,		FIELD_COLOR32,		"color" ),
 	DEFINE_FIELD( m_flNextDamage,	FIELD_TIME ),
 	DEFINE_SOUNDPATCH( m_pBurnSound ),
 	DEFINE_FIELD( m_bFading,		FIELD_BOOLEAN ),
@@ -76,6 +78,7 @@ END_DATADESC()
 IMPLEMENT_SERVERCLASS_ST( CFlare, DT_Flare )
 	SendPropFloat( SENDINFO( m_flTimeBurnOut ), 0,	SPROP_NOSCALE ),
 	SendPropFloat( SENDINFO( m_flScale ), 0, SPROP_NOSCALE ),
+//	SendPropInt( SENDINFO( m_flColor ), 0, SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_bLight ), 1, SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_bSmoke ), 1, SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_bPropFlare ), 1, SPROP_UNSIGNED ),
@@ -715,7 +718,9 @@ void CFlaregun::PrimaryAttack( void )
 	m_iClip1 = m_iClip1 - 1;
 
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
+	pOwner->SetAnimation( PLAYER_ATTACK1 );
 	pOwner->m_flNextAttack = gpGlobals->curtime + 1;
+	pOwner->SetAimTime( gpGlobals->curtime + SequenceDuration() );
 
 	CFlare *pFlare = CFlare::Create( pOwner->Weapon_ShootPosition(), pOwner->EyeAngles(), pOwner, FLARE_DURATION );
 
@@ -728,6 +733,9 @@ void CFlaregun::PrimaryAttack( void )
 	pFlare->SetAbsVelocity( forward * 1500 );
 
 	WeaponSound( SINGLE );
+
+	m_iPrimaryAttacks++;
+	gamestats->Event_WeaponFired( pOwner, true, GetClassname() );
 }
 
 //-----------------------------------------------------------------------------

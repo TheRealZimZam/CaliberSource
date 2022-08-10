@@ -675,11 +675,12 @@ void CNPC_CombineGunship::Precache( void )
 	PrecacheScriptSound( "NPC_CombineGunship.Pain" );
 	PrecacheScriptSound( "NPC_CombineGunship.CannonStopSound" );
 
-	PrecacheScriptSound( "NPC_CombineGunship.DyingSound" );
-	PrecacheScriptSound( "NPC_CombineGunship.CannonSound" );
-	PrecacheScriptSound( "NPC_CombineGunship.RotorSound" );
-	PrecacheScriptSound( "NPC_CombineGunship.ExhaustSound" );
-	PrecacheScriptSound( "NPC_CombineGunship.RotorBlastSound" );
+	PrecacheScriptSound( "NPC_CombineGunship.Crashing" );
+	PrecacheScriptSound( "NPC_CombineGunship.CannonFire" );
+	PrecacheScriptSound( "NPC_CombineGunship.Intake" );
+	PrecacheScriptSound( "NPC_CombineGunship.Rotors" );
+	PrecacheScriptSound( "NPC_CombineGunship.Exhaust" );
+	PrecacheScriptSound( "NPC_CombineGunship.RotorBlast" );
 
 	if ( hl2_episodic.GetBool() == true )
 	{
@@ -1863,7 +1864,7 @@ void CNPC_CombineGunship::Event_Killed( const CTakeDamageInfo &info )
 
 	// BUGBUG: Isn't this sound just going to get stomped when the base class calls StopLoopingSounds() ??
 	CPASAttenuationFilter filter2( this );
-	m_pRotorSound = controller.SoundCreate( filter2, entindex(), "NPC_CombineGunship.DyingSound" );
+	m_pRotorSound = controller.SoundCreate( filter2, entindex(), "NPC_CombineGunship.Crashing" );
 	controller.Play( m_pRotorSound, 1.0, 100 );
 
 	m_OnDeath.FireOutput( info.GetAttacker(), this );
@@ -2348,10 +2349,11 @@ void CNPC_CombineGunship::InitializeRotorSound( void )
 	
 	CPASAttenuationFilter filter( this );
 
-	m_pCannonSound		= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.CannonSound" );
-	m_pRotorSound		= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.RotorSound" );
-	m_pAirExhaustSound	= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.ExhaustSound" );
-	m_pAirBlastSound	= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.RotorBlastSound" );
+	m_pCannonSound		= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.CannonFire" );
+	m_pRotorSound		= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.Rotors" );
+	m_pRotorBlast		= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.RotorBlast" );
+	m_pAirExhaustSound	= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.Exhaust" );
+	m_pAirBlastSound	= controller.SoundCreate( filter, entindex(), "NPC_CombineGunship.Intake" );
 	
 	controller.Play( m_pCannonSound, 0.0, 100 );
 	controller.Play( m_pAirExhaustSound, 0.0, 100 );
@@ -3121,6 +3123,12 @@ void CNPC_CombineGunship::StopLoopingSounds( void )
 	{
 		controller.SoundDestroy( m_pRotorSound );
 		m_pRotorSound = NULL;
+	}
+
+	if ( m_pRotorBlast )
+	{
+		controller.SoundDestroy( m_pRotorBlast );
+		m_pRotorBlast = NULL;
 	}
 
 	if ( m_pAirExhaustSound )

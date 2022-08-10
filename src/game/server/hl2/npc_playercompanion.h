@@ -254,6 +254,7 @@ public:
 	virtual void 	LocateEnemySound() {};
 
 	bool			IsValidEnemy( CBaseEntity *pEnemy );
+	bool			IsInjured() { return ((float)GetHealth() / (float)GetMaxHealth() <= 0.25f); }
 	bool			IsLightDamage( const CTakeDamageInfo &info );
 	bool			IsHeavyDamage( const CTakeDamageInfo &info );
 	bool 			IsSafeFromFloorTurret( const Vector &vecLocation, CBaseEntity *pTurret );
@@ -337,15 +338,11 @@ protected:
 		SCHED_PC_TAKE_COVER_FROM_BEST_SOUND,
 //!		SCHED_PC_DIVE_TOWARDS_COVER,
 		SCHED_PC_FLEE_FROM_BEST_SOUND,
-		SCHED_PC_TAKE_COVER,
 		SCHED_PC_FAIL_TAKE_COVER_TURRET,
 		SCHED_PC_FAKEOUT_MORTAR,
 		SCHED_PC_GET_OFF_COMPANION,
 		SCHED_PC_RANGE_ATTACK1,
 		SCHED_PC_SPOT_ENEMY,
-		SCHED_PC_ESTABLISH_LOF_WAIT,
-		SCHED_PC_MOVE_TO_WEAPON_RANGE,
-		SCHED_PC_ESTABLISH_LINE_OF_FIRE,
 		SCHED_PC_COMBAT_FACE,
 		SCHED_PC_KNOCKDOWN,
 		SCHED_PC_INVESTIGATE_SOUND,
@@ -366,6 +363,8 @@ private:
 	bool			m_bWeightPathsInCover;
 	bool			m_bFirstEncounter;	// only alert everyone else during the first encounter.
 //	float			m_flNextCrouchTime;
+	float			m_flNextEvadeTime;
+	float			m_flNextSoundTime;	// Should this be moved up a level??
 
 	enum eCoverType
 	{
@@ -413,6 +412,7 @@ protected:
 	int		m_iNumConsecutiveBarrelsExploded;  // Companions keep track of the # of consecutive barrels exploded by the player and speaks a response as it increases
 	int		m_iNumConsecutivePlayerKills;  // Alyx keeps track of the # of consecutive kills by the player and speaks a response as it increases
 	bool	m_bAnnoyed;			// I lost this enemy before, but he just reappeared - start being more aggressive!
+	bool	m_bInvestigated;	// I've already investigated this sound, now we're just gonna run there!
 
 	//-----------------------------------------------------
 
@@ -420,7 +420,7 @@ protected:
 
 	//-----------------------------------------------------
 	
-	CSimpleSimTimer m_AnnounceAttackTimer;
+//	CSimpleSimTimer m_AnnounceAttackTimer;
 
 	//-----------------------------------------------------
 

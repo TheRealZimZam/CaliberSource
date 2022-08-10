@@ -38,6 +38,9 @@ public:
 };
 
 LINK_ENTITY_TO_CLASS( npc_kleiner, CNPC_Kleiner );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_scientist, CNPC_Kleiner );
+#endif
 
 //-----------------------------------------------------------------------------
 // Classify - indicates this NPC's place in the 

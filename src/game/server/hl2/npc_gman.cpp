@@ -35,15 +35,21 @@ public:
 	Class_T Classify( void );
 	void	HandleAnimEvent( animevent_t *pEvent );
 	virtual Disposition_t IRelationType(CBaseEntity *pTarget);
-	int		GetSoundInterests ( void );
+	int		GetSoundInterests( void );
 	bool	CreateBehaviors( void );
 	int		SelectSchedule( void );
+
+	int		OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo );
+//	void	TraceAttack( CBaseEntity *pAttacker, float flDamage, const Vector &vecDir, trace_t *ptr, int bitsDamageType);
 
 private:
 	CAI_FollowBehavior	m_FollowBehavior;
 };
 
 LINK_ENTITY_TO_CLASS( npc_gman, CNPC_GMan );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_gman, CNPC_GMan );
+#endif
 LINK_ENTITY_TO_CLASS( npc_stranger, CNPC_GMan );
 
 BEGIN_DATADESC( CNPC_GMan )
@@ -165,6 +171,30 @@ int CNPC_GMan::SelectSchedule( void )
 
 	return BaseClass::SelectSchedule();
 }
+
+//=========================================================
+// Override all damage
+//=========================================================
+int CNPC_GMan::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
+{
+	m_iHealth = m_iMaxHealth / 2; // always trigger the 50% damage aitrigger
+
+	if ( inputInfo.GetDamage() > 0 )
+		 SetCondition( COND_LIGHT_DAMAGE );
+
+	if ( inputInfo.GetDamage() >= 20 )
+		 SetCondition( COND_HEAVY_DAMAGE );
+
+	return true;
+}
+
+#if 0
+void CNPC_GMan::TraceAttack( CBaseEntity *pAttacker, float flDamage, const Vector &vecDir, trace_t *ptr, int bitsDamageType)
+{
+	g_pEffects->Ricochet( ptr->endpos, ptr->plane.normal );
+//	AddMultiDamage( pevAttacker, this, flDamage, bitsDamageType );
+}
+#endif
 
 //-----------------------------------------------------------------------------
 // AI Schedules Specific to this NPC

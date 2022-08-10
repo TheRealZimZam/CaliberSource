@@ -46,8 +46,7 @@ extern ConVar sk_plr_dmg_ar2;
 extern ConVar npc_combine_drop_health;
 
 LINK_ENTITY_TO_CLASS( npc_combine_e, CNPC_CombineE );
-LINK_ENTITY_TO_CLASS( npc_atf_e, CNPC_CombineE );
-LINK_ENTITY_TO_CLASS( npc_atf_sniper, CNPC_CombineE );
+LINK_ENTITY_TO_CLASS( npc_elite, CNPC_CombineE );
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -343,11 +342,13 @@ void CNPC_CombineE::HandleAnimEvent( animevent_t *pEvent )
 	{
 	case NPC_EVENT_LEFTFOOT:
 		{
+			MakeAIFootstepSound( 240.0f );
 			EmitSound( "NPC_CombineE.FootstepLeft", pEvent->eventtime );
 		}
 		break;
 	case NPC_EVENT_RIGHTFOOT:
 		{
+			MakeAIFootstepSound( 240.0f );
 			EmitSound( "NPC_CombineE.FootstepRight", pEvent->eventtime );
 		}
 		break;

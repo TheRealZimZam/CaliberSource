@@ -26,11 +26,13 @@
 
 class CWeaponStab : public CBaseHLBludgeonWeapon
 {
-public:
 	DECLARE_CLASS( CWeaponStab, CBaseHLBludgeonWeapon );
+public:
 
 	DECLARE_SERVERCLASS();
 	DECLARE_ACTTABLE();
+	
+	DECLARE_DATADESC();
 
 	CWeaponStab();
 
@@ -50,6 +52,51 @@ public:
 private:
 	// Animation event handlers
 	void HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+};
+
+// TODO; Better system needed here, this is just temp for demo
+class CWeaponBottle : public CWeaponStab
+{
+public:
+	DECLARE_CLASS( CWeaponBottle, CWeaponStab );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponBottle();
+
+};
+
+class CWeaponKnife : public CWeaponStab
+{
+public:
+	DECLARE_CLASS( CWeaponKnife, CWeaponStab );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponKnife();
+
+};
+
+class CWeaponRebar : public CWeaponStab
+{
+public:
+	DECLARE_CLASS( CWeaponRebar, CWeaponStab );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponRebar();
+
+};
+
+class CWeaponShank : public CWeaponStab
+{
+public:
+	DECLARE_CLASS( CWeaponShank, CWeaponStab );
+
+//	DECLARE_SERVERCLASS();
+
+	CWeaponShank();
+
 };
 
 #endif // WEAPON_KNIFE_H

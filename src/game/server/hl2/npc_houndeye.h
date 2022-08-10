@@ -24,6 +24,10 @@ class CNPC_Houndeye : public CAI_BaseNPC
 {
 	DECLARE_CLASS( CNPC_Houndeye, CAI_BaseNPC );
 
+	DEFINE_CUSTOM_AI;
+	
+	DECLARE_DATADESC();
+
 public:
 	void			Spawn( void );
 	void			Precache( void );
@@ -54,6 +58,7 @@ public:
 	bool			IsAnyoneInSquadAttacking( void );
 	void			SpeakSentence( int sentenceType );
 
+private:
 	float			m_flNextSecondaryAttack;
 	bool			m_bLoopClockwise;
 
@@ -63,9 +68,6 @@ public:
 	bool			m_fAsleep;// some houndeyes sleep in idle mode if this is set, the houndeye is lying down
 	bool			m_fDontBlink;// don't try to open/close eye if this bit is set!
 
-	DEFINE_CUSTOM_AI;
-	
-	DECLARE_DATADESC();
 };
 
 

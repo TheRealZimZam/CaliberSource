@@ -1,187 +1,208 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Launched Grenade
 //
-// $Workfile:     $
-// $Date:         $
 // $NoKeywords: $
 //=============================================================================//
-
 #include "cbase.h"
 #include "grenade_shrapnel.h"
 #include "soundent.h"
 #include "decals.h"
-#include "smoke_trail.h"
-#include "hl2_shareddefs.h"
+#include "gamerules.h"
+#include "ammodef.h"
+#include "shake.h"
 #include "vstdlib/random.h"
 #include "engine/IEngineSound.h"
-#include "soundenvelope.h"
-#include "ai_utils.h"
-#include "te_effect_dispatch.h"
+#include "world.h"
+
+#ifdef PORTAL
+	#include "portal_util_shared.h"
+#endif
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar    sk_shrapnel_dmg		( "sk_shrapnel_dmg","0");
+extern short	g_sModelIndexFireball;			// (in combatweapon.cpp) holds the index for the smoke cloud
 
-LINK_ENTITY_TO_CLASS( grenade_shrapnel, CGrenadeShrapnel );
+// Moved to HL2_SharedGameRules because these are referenced by shared AmmoDef functions
+extern ConVar    sk_plr_dmg_buckshot;
+extern ConVar    sk_npc_dmg_buckshot;
+
+ConVar	sk_shrapnel_cone			("sk_shrapnel_cone","0.105");
+#define SHRAPNEL_VECTOR_CONE		sk_shrapnel_cone.GetFloat()	//Vector( 0.10461, 0.10461, 0.10461 )
+
+ConVar	  sk_shrapnel_bullet_amt	( "sk_shrapnel_bullet_amt","8");	//Amount of bullets fired
 
 BEGIN_DATADESC( CGrenadeShrapnel )
 
-	DEFINE_FIELD( m_bPlaySound, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_fSpawnTime, FIELD_TIME ),
 
 	// Function pointers
 	DEFINE_ENTITYFUNC( GrenadeShrapnelTouch ),
+	DEFINE_THINKFUNC( GrenadeShrapnelThink ),
 
 END_DATADESC()
 
-//-----------------------------------------------------------------------------
-// Purpose: Constructor
-// Input  :
-// Output :
-//-----------------------------------------------------------------------------
+LINK_ENTITY_TO_CLASS( grenade_shrapnel, CGrenadeShrapnel );
+
+void CGrenadeShrapnel::Precache( void )
+{
+	PrecacheModel("models/Weapons/ar2_grenade.mdl");	//!!!TEMP
+
+	PrecacheScriptSound( "GrenadeShrapnel.Detonate" );
+}
+
 CGrenadeShrapnel::CGrenadeShrapnel(void)
 {
 
 }
 
-//-----------------------------------------------------------------------------
-void CGrenadeShrapnel::Precache( void )
-{
-	// m_nSquidSpitSprite = PrecacheModel("sprites/greenglow1.vmt");// client side spittle.
-
-	PrecacheModel("models/Weapons/w_shrapnel.mdl");
-	PrecacheModel("models/Weapons/shrapnel.mdl");
-
-	PrecacheScriptSound( "GrenadeShrapnel.Fuse" );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
 void CGrenadeShrapnel::Spawn( void )
 {
 	Precache( );
+
+	SetModel( "models/Weapons/ar2_grenade.mdl");	//!!!TEMP
+
 	SetSolid( SOLID_BBOX );
 	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
-	SetSolidFlags( FSOLID_NOT_STANDABLE );
-	SetCollisionGroup( COLLISION_GROUP_WEAPON );
 
-	SetModel( "models/Weapons/w_shrapnel.mdl" );
-	UTIL_SetSize( this, vec3_origin, vec3_origin );
+	// Hits everything but debris
+	SetCollisionGroup( COLLISION_GROUP_PROJECTILE );
+	UTIL_SetSize(this, Vector(-3, -3, -3), Vector(3, 3, 3));
 
-	SetUse( &CBaseGrenade::DetonateUse );
+	SetUse( &CGrenadeShrapnel::DetonateUse );
 	SetTouch( &CGrenadeShrapnel::GrenadeShrapnelTouch );
+	SetThink( &CGrenadeShrapnel::GrenadeShrapnelThink );
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
-	m_flDamage		= sk_shrapnel_dmg.GetFloat();
-	m_DmgRadius		= 1;
-	m_takedamage	= DAMAGE_NO;
-	m_iHealth		= 1;
+	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
+	{
+		m_flDamage = sk_plr_dmg_buckshot.GetFloat();
+	}
+	else
+	{
+		m_flDamage = sk_npc_dmg_buckshot.GetFloat();
+	}
 
-	SetGravity( UTIL_ScaleForGravity( SPIT_GRAVITY ) );
-	SetFriction( 0.8f );
+	m_DmgRadius		= 0;
+	m_takedamage	= DAMAGE_YES;
+	m_bIsLive		= false;
+	m_iHealth		= 1;		//Can be blown-up midair by other explosives n' such
 
-	AddEFlags( EFL_FORCE_CHECK_TRANSMIT );
+	SetGravity( UTIL_ScaleForGravity( 500 ) );	// use a lower gravity for grenades to make them easier to shoot
+	SetFriction( 0.8 );
+	SetSequence( 0 );
 
-	// We're self-illuminating, so we don't take or give shadows
-	AddEffects( EF_NOSHADOW|EF_NORECEIVESHADOW );
+	m_fSpawnTime = gpGlobals->curtime;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:  The grenade has a slight delay before it goes live.  That way the
+//			 person firing it can bounce it off a nearby wall.  However if it
+//			 hits another character it blows up immediately
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CGrenadeShrapnel::GrenadeShrapnelThink( void )
+{
+	SetNextThink( gpGlobals->curtime + 0.05f );
+
+	if (!m_bIsLive)
+	{
+		// Go live after a short delay
+		if (m_fSpawnTime + SHRAPNEL_NO_COLLIDE_TIME < gpGlobals->curtime)
+		{
+			m_bIsLive  = true;
+		}
+	}
+
+	if (m_bIsLive)
+	{
+		Detonate();
+	}
 }
 
 void CGrenadeShrapnel::Event_Killed( const CTakeDamageInfo &info )
 {
-	Detonate( );
+	Detonate();
+}
+
+void CGrenadeShrapnel::GrenadeShrapnelTouch( CBaseEntity *pOther )
+{
+	Assert( pOther );
+
+	// If I'm live go ahead and blow up
+	if (m_bIsLive)
+	{
+		Detonate();
+		return;
+	}
+	else
+	{
+		// If I'm not live, only blow up if I'm hitting an chacter that
+		// is not the owner of the weapon
+		CBaseCombatCharacter *pBCC = ToBaseCombatCharacter( pOther );
+		if (pBCC && GetThrower() != pBCC)
+		{
+			m_bIsLive = true;
+			Detonate();
+			return;
+		}
+	}
+
+	BaseClass::BounceTouch( pOther );
 }
 
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CGrenadeShrapnel::GrenadeShrapnelTouch( CBaseEntity *pOther )
-{
-	if ( pOther->IsSolidFlagSet(FSOLID_VOLUME_CONTENTS | FSOLID_TRIGGER) )
-	{
-		// Some NPCs are triggers that can take damage (like antlion grubs). We should hit them.
-		if ( ( pOther->m_takedamage == DAMAGE_NO ) || ( pOther->m_takedamage == DAMAGE_EVENTS_ONLY ) )
-			return;
-	}
-
-	// Don't hit other spit
-	if ( pOther->GetCollisionGroup() == HL2COLLISION_GROUP_SPIT )
-		return;
-
-	// We want to collide with water
-	const trace_t *pTrace = &CBaseEntity::GetTouchTrace();
-
-	// copy out some important things about this trace, because the first TakeDamage
-	// call below may cause another trace that overwrites the one global pTrace points
-	// at.
-	bool bHitWater = ( ( pTrace->contents & CONTENTS_WATER ) != 0 );
-	CBaseEntity *const pTraceEnt = pTrace->m_pEnt;
-	const Vector tracePlaneNormal = pTrace->plane.normal;
-
-	if ( bHitWater )
-	{
-		// Splash!
-		CEffectData data;
-		data.m_fFlags = 0;
-		data.m_vOrigin = pTrace->endpos;
-		data.m_vNormal = Vector( 0, 0, 1 );
-		data.m_flScale = 8.0f;
-
-		DispatchEffect( "watersplash", data );
-	}
-	else
-	{
-		// Make a splat decal
-		trace_t *pNewTrace = const_cast<trace_t*>( pTrace );
-		UTIL_DecalTrace( pNewTrace, "BeerSplash" );
-	}
-
-	// Part normal damage, part poison damage
-	float poisonratio = sk_antlion_worker_spit_grenade_poison_ratio.GetFloat();
-
-	// Take direct damage if hit
-	// NOTE: assume that pTrace is invalidated from this line forward!
-	if ( pTraceEnt )
-	{
-		pTraceEnt->TakeDamage( CTakeDamageInfo( this, GetThrower(), m_flDamage * (1.0f-poisonratio), DMG_ACID ) );
-		pTraceEnt->TakeDamage( CTakeDamageInfo( this, GetThrower(), m_flDamage * poisonratio, DMG_POISON ) );
-	}
-
-	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), m_DmgRadius * 2.0f, 0.5f, GetThrower() );
-
-	QAngle vecAngles;
-	VectorAngles( tracePlaneNormal, vecAngles );
-	
-	if ( pOther->IsPlayer() || bHitWater )
-	{
-		// Do a lighter-weight effect if we just hit a player
-		DispatchParticleEffect( "antlion_spit_player", GetAbsOrigin(), vecAngles );
-	}
-	else
-	{
-		DispatchParticleEffect( "antlion_spit", GetAbsOrigin(), vecAngles );
-	}
-
-	Detonate();
-}
-
 void CGrenadeShrapnel::Detonate(void)
 {
-	m_takedamage = DAMAGE_NO;
+	if (!m_bIsLive)
+	{
+		return;
+	}
+	m_bIsLive		= false;
+	m_takedamage	= DAMAGE_NO;	
 
-	EmitSound( "GrenadeSpit.Hit" );	
+	Vector vecForward = GetAbsVelocity();
+	VectorNormalize(vecForward);
+	trace_t		tr;
+	UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward, MASK_SHOT, 
+		this, COLLISION_GROUP_NONE, &tr);
+	UTIL_DecalTrace( &tr, "SmallScorch" );	//FIXME; Hook to unique/smaller decal 
+	UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 300, SHAKE_START );
 
-	// Throw out the shrapnel
-	//TODO;
+	EmitSound( "GrenadeShrapnel.Detonate" );
+	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), 100, 1.0 );	//BASEGRENADE_EXPLOSION_VOLUME
+
+	// Fire out a whole bunch of bullets through the front
+	FireBulletsInfo_t info;
+	info.m_pAttacker = GetOwnerEntity();
+	info.m_iShots = sk_shrapnel_bullet_amt.GetInt();
+	info.m_vecSrc = GetAbsOrigin();
+	info.m_vecDirShooting = vecForward;
+	info.m_flDistance = 1024;
+	info.m_iTracerFreq = 1;
+	CAmmoDef *pAmmoDef = GetAmmoDef();
+	info.m_iAmmoType = pAmmoDef->Index( "Buckshot" );
+	info.m_iDamage = m_flDamage;
+	info.m_vecSpread = SHRAPNEL_VECTOR_CONE;
+	info.m_nFlags = (FIRE_BULLETS_TEMPORARY_DANGER_SOUND);
+	FireBullets( info );
+
+	// Explosion effect just for the fire trails
+	CPASFilter filter( GetAbsOrigin() );
+	te->Explosion( filter, 0.0,
+		&GetAbsOrigin(), 
+		g_sModelIndexFireball,
+		3, 
+		15,
+		TE_EXPLFLAG_NOSOUND | TE_EXPLFLAG_NOFIREBALL | TE_EXPLFLAG_NOFIREBALLSMOKE,
+		0,
+		0 );
+	// Dont use explosion smoke, use the smaller smoke instead
+	UTIL_Smoke( GetAbsOrigin(), random->RandomInt( 10, 15 ), 10 );
 
 	UTIL_Remove( this );
 }
-
-void CGrenadeShrapnel::Think( void )
-{
-
-	// Set us up to think again shortly
-	SetNextThink( gpGlobals->curtime + 0.05f );
-}
-

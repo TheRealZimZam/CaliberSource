@@ -53,8 +53,8 @@ typedef enum
 	ACT_CLIMB_UP,
 	ACT_CLIMB_DOWN,
 	ACT_CLIMB_DISMOUNT,
-	ACT_SHIPLADDER_UP,
-	ACT_SHIPLADDER_DOWN,
+	ACT_LADDER_UP,
+	ACT_LADDER_DOWN,
 	ACT_STRAFE_LEFT,
 	ACT_STRAFE_RIGHT,
 	ACT_ROLL_LEFT,			// tuck and roll, left
@@ -73,9 +73,15 @@ typedef enum
 	ACT_SIGNAL_GROUP,
 	ACT_SIGNAL_TAKECOVER,
 	ACT_SIGNAL_HALT,
+
 	ACT_SIGNAL_FORWARD,
 	ACT_SIGNAL_LEFT,
 	ACT_SIGNAL_RIGHT,
+	ACT_SIGNAL_BACK,
+	ACT_GESTURE_SIGNAL_FORWARD,
+	ACT_GESTURE_SIGNAL_LEFT,
+	ACT_GESTURE_SIGNAL_RIGHT,
+	ACT_GESTURE_SIGNAL_BACK,
 
 	ACT_LOOKBACK_RIGHT,		// look back over shoulder without turning around.
 	ACT_LOOKBACK_LEFT,
@@ -101,7 +107,6 @@ typedef enum
 	ACT_IDLE_AGITATED,
 	ACT_IDLE_STEALTH,
 	ACT_IDLE_HURT,			// Hurt version of idle
-	ACT_IDLE_FEAR,
 	ACT_IDLE_PRONE,			// Not a real prone - used for knockback/knockdown
 
 	ACT_WALK_RELAXED,
@@ -138,6 +143,7 @@ typedef enum
 	ACT_SPECIAL_ATTACK1,	// very monster specific special attacks.
 	ACT_SPECIAL_ATTACK2,	
 	ACT_COMBAT_IDLE,		// FIXME: unused?  agitated idle.
+	ACT_IDLE_SCARED,
 	ACT_WALK_SCARED,
 	ACT_RUN_SCARED,
 	ACT_VICTORY_DANCE,		// killed a player, do a victory dance.
@@ -171,6 +177,8 @@ typedef enum
 	ACT_STEP_BACK,
 	ACT_STEP_FORE,
 
+	ACT_GESTURE_USE,
+	
 	ACT_GESTURE_RANGE_ATTACK1,
 	ACT_GESTURE_RANGE_ATTACK2,
 	ACT_GESTURE_MELEE_ATTACK1,
@@ -222,6 +230,7 @@ typedef enum
 	ACT_VM_DRAW,
 	ACT_VM_HOLSTER,
 	ACT_VM_IDLE,
+	ACT_VM_USE,
 	ACT_VM_FIDGET,
 	ACT_VM_JAM,
 	ACT_VM_PULLBACK,
@@ -259,8 +268,8 @@ typedef enum
 	ACT_VM_PICKUP,
 	ACT_VM_RELEASE,
 	
-	ACT_VM_ATTACH_SILENCER,
-	ACT_VM_DETACH_SILENCER,
+	ACT_VM_ATTACH,
+	ACT_VM_DETACH,
 
 //===========================
 // HL2 Specific Activities
@@ -310,16 +319,6 @@ typedef enum
 	ACT_SHOTGUN_RELOAD_FINISH,
 	ACT_SHOTGUN_PUMP,
 
-	// SMG2 special activities
-	/*
-	ACT_SMG2_IDLE2,
-	ACT_SMG2_FIRE2,
-	ACT_SMG2_DRAW2,
-	ACT_SMG2_RELOAD2,
-	ACT_SMG2_DRYFIRE2,
-	ACT_SMG2_TOAUTO,
-	ACT_SMG2_TOBURST,
-	*/
 	// Physcannon special activities
 	ACT_PHYSCANNON_UPGRADE,
 
@@ -1258,7 +1257,7 @@ typedef enum
 
 	ACT_DOD_PLANT_TNT,
 	ACT_DOD_DEFUSE_TNT,
-	*/
+
 // HL2MP
 	ACT_HL2MP_IDLE,
 	ACT_HL2MP_RUN,
@@ -1792,6 +1791,7 @@ typedef enum
 	ACT_ITEM2_VM_IDLE_TO_LOWERED,
 	ACT_ITEM2_VM_IDLE_LOWERED,
 	ACT_ITEM2_VM_LOWERED_TO_IDLE,
+	*/
 
 	// this is the end of the global activities, private per-monster activities start here.
 	LAST_SHARED_ACTIVITY,

@@ -33,6 +33,7 @@ public:
 	//
 	// It also modulates these based on events triggered by DoAnimationEvent.
 	virtual void Update( float eyeYaw, float eyePitch ) = 0;
+//!	virtual void DoAnimationEvent() = 0;
 
 	// This is called by the client when a new player enters the PVS to clear any events
 	// the dormant version of the entity may have been playing.

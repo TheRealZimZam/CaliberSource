@@ -26,7 +26,7 @@
 // (so he goes to his idle animation at full playback rate rather than his walk 
 // animation at low playback rate).
 #define MOVING_MINIMUM_SPEED 0.5f
-
+#define MAX_GROUND_SPEED 320
 
 #define MAIN_IDLE_SEQUENCE_LAYER 0	// For 8-way blended models, this layer blends an idle on top of the run/walk animation to simulate a 9-way blend.
 									// For 9-way blended models, we don't use this layer.
@@ -51,7 +51,6 @@ public:
 	bool m_bUseAimSequences;
 };
 
-
 // ------------------------------------------------------------------------------------------------ //
 // CBasePlayerAnimState declaration.
 // ------------------------------------------------------------------------------------------------ //
@@ -60,6 +59,7 @@ abstract_class CBasePlayerAnimState : virtual public IPlayerAnimState
 {
 public:
 	DECLARE_CLASS_NOBASE( CBasePlayerAnimState );
+	friend IPlayerAnimState* CreatePlayerAnimState( CBasePlayer *pPlayer );
 
 	enum
 	{
@@ -79,8 +79,10 @@ public:
 	// Update() maintains the the lower body animation (the player's m_nSequence)
 	// and the upper body overlay based on the player's velocity and look direction.
 	//
-	// It also modulates these based on events triggered by DoAnimationEvent.
+	// DoAnimationEvent() receives and triggers all of the incidental animations -
+	// (firing, reloading, etc.)
 	virtual void Update( float eyeYaw, float eyePitch );
+//!	virtual void DoAnimationEvent( PlayerAnimEvent_t event, int nData );
 
 	// This is called by the client when a new player enters the PVS to clear any events
 	// the dormant version of the entity may have been playing.
@@ -108,11 +110,11 @@ public:
 
 	// This is called to figure out what the main activity is. The mod-specific class 
 	// overrides this to handle events like jumping, firing, etc.
-	virtual Activity CalcMainActivity() = 0;
+	virtual Activity CalcMainActivity();
 
 	// This is called to calculate the aim layer sequence. It usually figures out the 
 	// animation prefixes and suffixes and calls CalcSequenceIndex().
-	virtual int CalcAimLayerSequence( float *flCycle, float *flAimSequenceWeight, bool bForceIdle ) = 0;
+	virtual int CalcAimLayerSequence( float *flCycle, float *flAimSequenceWeight, bool bForceIdle );
 
 	// This lets server-controlled idle sequences to play unchanged on the client
 	virtual bool ShouldChangeSequences( void ) const;
@@ -134,7 +136,7 @@ public:
 	// It is used to determine where to put the move_x/move_y pose parameters or to
 	// determine the animation playback rate, based on the player's movement speed.
 	// The return value from here is interpolated so the playback rate or pose params don't move sharply.
-	virtual float GetCurrentMaxGroundSpeed() = 0;
+	virtual float GetCurrentMaxGroundSpeed() { return MAX_GROUND_SPEED; }
 
 	// Display Con_NPrint output about the animation state. This is called if
 	// we're on the client and if cl_showanimstate holds the current entity's index.
@@ -149,7 +151,7 @@ public:
 
 	// Allow inheriting classes to translate their desired activity, while keeping all
 	// internal ACT comparisons using the base activity
-	virtual Activity TranslateActivity( Activity actDesired ) { return actDesired; }
+	virtual Activity TranslateActivity( Activity actDesired );
 
 	// Allow inheriting classes to override SelectWeightedSequence
 	virtual int SelectWeightedSequence( Activity activity );
@@ -198,6 +200,11 @@ protected:
 	float m_flEyeYaw;
 	float m_flEyePitch;
 
+	// Jumping.
+	bool	m_bJumping;
+	float	m_flJumpStartTime;	
+	bool	m_bFirstJumpFrame;
+
 	// The following variables are used for tweaking the yaw of the upper body when standing still and
 	//  making sure that it smoothly blends in and out once the player starts moving
 	// Direction feet were facing when we stopped moving
@@ -231,7 +238,6 @@ private:
 
 	void				SetOuterPoseParameter( int iParam, float flValue );
 
-
 	void				EstimateYaw();
 
 	void				ComputeMainSequence();
@@ -243,7 +249,6 @@ private:
 	float GetInterpolatedGroundSpeed();
 
 private:
-	
 	float m_flMaxGroundSpeed;
 
 	float m_flLastAnimationStateClearTime;
@@ -275,8 +280,9 @@ private:
 	CSequenceTransitioner	m_SequenceTransitioner;
 };
 
-extern float g_flLastBodyPitch, g_flLastBodyYaw, m_flLastMoveYaw;
+IPlayerAnimState* CreatePlayerAnimState( CBasePlayer *pPlayer );
 
+extern float g_flLastBodyPitch, g_flLastBodyYaw, m_flLastMoveYaw;
 
 inline Activity CBasePlayerAnimState::GetCurrentMainSequenceActivity() const
 {

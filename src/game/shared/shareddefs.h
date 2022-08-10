@@ -87,7 +87,11 @@ public:
 
 #define WATERJUMP_HEIGHT			8
 
-#define MAX_CLIMB_SPEED		200
+#if defined(HL2_DLL)
+	#define MAX_CLIMB_SPEED		170
+#else
+	#define MAX_CLIMB_SPEED		200
+#endif 
 
 #if defined(TF_DLL) || defined(TF_CLIENT_DLL)
 	#define TIME_TO_DUCK		0.2
@@ -279,7 +283,7 @@ enum
 #define HITGROUP_GEAR		10			// alerts NPC, but doesn't do damage or bleed (1/100th damage)
 
 //
-// Enumerations for setting player animation.
+// Enumerations for setting single-player animation.
 //
 enum PLAYER_ANIM
 {
@@ -342,7 +346,7 @@ enum PLAYER_ANIM
 #define DMG_BLAST			(1 << 6)	// explosive blast damage
 #define DMG_CLUB			(1 << 7)	// crowbar, punch, headbutt
 #define DMG_SHOCK			(1 << 8)	// electric shock
-#define DMG_SONIC			(1 << 9)	// sound pulse shockwave
+#define DMG_SONIC			(1 << 9)	// sound pulse shockwave/stunned
 #define DMG_ENERGYBEAM		(1 << 10)	// laser or other high energy beam 
 #define DMG_PREVENT_PHYSICS_FORCE		(1 << 11)	// Prevent a physics force 
 #define DMG_NEVERGIB		(1 << 12)	// with this bit OR'd in, no damage type will be able to gib victims upon death
@@ -588,10 +592,11 @@ class CBaseEntity;
 
 enum FireBulletsFlags_t
 {
-	FIRE_BULLETS_FIRST_SHOT_ACCURATE = 0x1,		// Pop the first shot with perfect accuracy
-	FIRE_BULLETS_DONT_HIT_UNDERWATER = 0x2,		// If the shot hits its target underwater, don't damage it
-	FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS = 0x4,	// If the shot hits water surface, still call DoImpactEffect
-	FIRE_BULLETS_TEMPORARY_DANGER_SOUND = 0x8,		// Danger sounds added from this impact can be stomped immediately if another is queued
+	FIRE_BULLETS_NO_IMPACTS = 0x1,					// call DoImpactEffect?
+	FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS = 0x2,	// If the shot hits water surface, still call DoImpactEffect
+	FIRE_BULLETS_FIRST_SHOT_ACCURATE = 0x4,		// Pop the first shot with perfect accuracy
+	FIRE_BULLETS_DONT_HIT_UNDERWATER = 0x8,		// If the shot hits its target underwater, don't damage it
+	FIRE_BULLETS_TEMPORARY_DANGER_SOUND = 0x16,		// Danger sounds added from this impact can be stomped immediately if another is queued
 };
 
 

@@ -415,9 +415,9 @@ void CBaseGrenade::BounceTouch( CBaseEntity *pOther )
 	if (GetFlags() & FL_ONGROUND)
 	{
 		// add a bit of static friction
-//		SetAbsVelocity( GetAbsVelocity() * 0.8 );
+		SetAbsVelocity( GetAbsVelocity() * 0.9 );
 
-		// SetSequence( random->RandomInt( 1, 1 ) ); // FIXME: missing tumble animations
+		SetSequence( random->RandomInt( 1, 1 ) ); // FIXME: missing tumble animations
 	}
 	else
 	{
@@ -445,7 +445,7 @@ void CBaseGrenade::SlideTouch( CBaseEntity *pOther )
 	if (GetFlags() & FL_ONGROUND)
 	{
 		// add a bit of static friction
-//		SetAbsVelocity( GetAbsVelocity() * 0.95 );  
+		SetAbsVelocity( GetAbsVelocity() * 0.95 );  
 
 		if (GetAbsVelocity().x != 0 || GetAbsVelocity().y != 0)
 		{
@@ -460,11 +460,8 @@ void CBaseGrenade::SlideTouch( CBaseEntity *pOther )
 
 void CBaseGrenade ::BounceSound( void )
 {
-	// Doesn't need to do anything anymore! Physics makes the sound.
-#if 0
 	const char *pszBounceSound = ( m_iszBounceSound == NULL_STRING ) ? "BaseGrenade.BounceSound" : STRING( m_iszBounceSound );
 	EmitSound( pszBounceSound );
-#endif
 }
 
 void CBaseGrenade ::TumbleThink( void )

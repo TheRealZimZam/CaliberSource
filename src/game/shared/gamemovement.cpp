@@ -1586,11 +1586,11 @@ void CGameMovement::Friction( void )
 		// threshold, bleed the threshold amount.
 		if( player->m_Local.m_bDucked )
 		{
-			control = (speed < sv_deceleration.GetFloat()) ? sv_deceleration.GetFloat() : speed;
+			control = (speed < sv_deceleration.GetFloat()) ? (sv_deceleration.GetFloat() * 1.25f) : speed;	//2.0f
 		}
 		else
 		{
-			control = (speed < sv_deceleration.GetFloat()) ? (sv_deceleration.GetFloat() * 0.75f) : speed;	//2.0f
+			control = (speed < sv_deceleration.GetFloat()) ? sv_deceleration.GetFloat() : speed;
 		}
 
 		// Add the amount to the drop amount.
@@ -1891,9 +1891,21 @@ void CGameMovement::WalkMove( void )
 		wishspeed = mv->m_flMaxSpeed;
 	}
 
+	//!!! TODO; This is a disgusting hack for demo, do something more elegant!
+#if defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
+	if ( !( player->m_Local.m_bDucked ) || ( player->GetFlags() & FL_DUCKING ) )
+	{
+		if ( mv->m_nButtons & IN_BACK )
+			wishspeed = wishspeed * sv_backspeed.GetFloat();
+
+		if ( mv->m_nButtons & IN_MOVELEFT | IN_MOVERIGHT )
+			wishspeed = wishspeed * sv_strafespeed.GetFloat();
+	}
+#endif
+
 	// Set pmove velocity
 	mv->m_vecVelocity[2] = 0;
-	Accelerate ( wishdir, wishspeed, sv_accelerate.GetFloat() );
+	Accelerate( wishdir, wishspeed, sv_accelerate.GetFloat() );
 	mv->m_vecVelocity[2] = 0;
 
 	// Add in any base velocity to the current velocity.
@@ -2154,7 +2166,7 @@ void CGameMovement::FullObserverMove( void )
 	}
 
 	// Set pmove velocity, give observer 50% acceration bonus
-	Accelerate ( wishdir, wishspeed, sv_specaccelerate.GetFloat() );
+	Accelerate( wishdir, wishspeed, sv_specaccelerate.GetFloat() );
 
 	float spd = VectorLength( mv->m_vecVelocity );
 	if (spd < 1.0f)
@@ -2229,7 +2241,7 @@ void CGameMovement::FullNoClipMove( float factor, float maxacceleration )
 	if ( maxacceleration > 0.0 )
 	{
 		// Set pmove velocity
-		Accelerate ( wishdir, wishspeed, maxacceleration );
+		Accelerate( wishdir, wishspeed, maxacceleration );
 
 		float spd = VectorLength( mv->m_vecVelocity );
 		if (spd < 1.0f)
@@ -2350,7 +2362,6 @@ bool CGameMovement::CheckJumpButton( void )
 	if ( player->m_Local.m_flDuckJumpTime > 0.0f )
 		return false;
 
-
 	// In the air now.
     SetGroundEntity( NULL );
 	
@@ -2358,11 +2369,41 @@ bool CGameMovement::CheckJumpButton( void )
 	
 	MoveHelper()->PlayerSetAnimation( PLAYER_JUMP );
 
+	// make the jump sound
+	CPASFilter filter( player->GetAbsOrigin() );
+	filter.UsePredictionRules();
+	player->EmitSound( filter, player->entindex(), "Player.Jump" );
+
 	float flGroundFactor = 1.0f;
 	if (player->m_pSurfaceData)
 	{
 		flGroundFactor = player->m_pSurfaceData->game.jumpFactor; 
 	}
+
+	/*
+	// old and busted
+
+	float flStamina = player->m_Shared.GetStamina();
+
+	//15.0 is the base height. the player will always jump this high
+	//regardless of stamina. Also the player will be able to jump max height
+	//until he is below 60 stamina. Then the height will decrease proportionately
+
+	float flJumpSpeed = 15.0;	//base jump height
+	
+	if( flStamina >= 60.0f )
+	{
+		flJumpSpeed += 30.0;
+	}
+	else
+	{
+		flJumpSpeed += (30.0 * ( flStamina / 60.0f ) );
+	}
+
+	//Remove stamina for a successful jump
+	player->m_Shared.SetStamina( flStamina - 40 );
+
+	*/
 
 	float flMul;
 	if ( g_bMovementOptimizations )
@@ -2384,7 +2425,7 @@ bool CGameMovement::CheckJumpButton( void )
 	// Acclerate upward
 	// If we are ducking...
 	float startz = mv->m_vecVelocity[2];
-	if ( (  player->m_Local.m_bDucking ) || (  player->GetFlags() & FL_DUCKING ) )
+	if ( ( player->m_Local.m_bDucking ) || ( player->GetFlags() & FL_DUCKING ) )
 	{
 		// d = 0.5 * g * t^2		- distance traveled with linear accel
 		// t = sqrt(2.0 * 45 / g)	- how long to fall 45 units
@@ -2479,7 +2520,7 @@ void CGameMovement::FullLadderMove()
 	{
 		mv->m_nOldButtons &= ~IN_JUMP;
 	}
-	
+
 	// Perform the move accounting for any base velocity.
 	VectorAdd (mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity);
 	TryPlayerMove();
@@ -2852,12 +2893,12 @@ bool CGameMovement::LadderMove( void )
 	float climbSpeed = ClimbSpeed();
 
 	float forwardSpeed = 0, rightSpeed = 0;
-	if ( mv->m_nButtons & IN_BACK )
-		forwardSpeed -= climbSpeed;
-	
 	if ( mv->m_nButtons & IN_FORWARD )
 		forwardSpeed += climbSpeed;
-	
+
+	if ( mv->m_nButtons & IN_BACK )
+		forwardSpeed -= climbSpeed * sv_backspeed.GetFloat();
+
 	if ( mv->m_nButtons & IN_MOVELEFT )
 		rightSpeed -= climbSpeed;
 	
@@ -4132,7 +4173,7 @@ void CGameMovement::HandleDuckingSpeedCrop( void )
 {
 	if ( !m_bSpeedCropped && ( player->GetFlags() & FL_DUCKING ) && ( player->GetGroundEntity() != NULL ) )
 	{
-		float frac = 0.33333333f;
+		float frac = 0.33333333f;	//33333333f
 		mv->m_flForwardMove	*= frac;
 		mv->m_flSideMove	*= frac;
 		mv->m_flUpMove		*= frac;
@@ -4624,7 +4665,7 @@ void CGameMovement::FullTossMove( void )
 		}
 
 		// Set pmove velocity
-		Accelerate ( wishdir, wishspeed, sv_accelerate.GetFloat() );
+		Accelerate( wishdir, wishspeed, sv_accelerate.GetFloat() );
 	}
 
 	if ( mv->m_vecVelocity[2] > 0 )

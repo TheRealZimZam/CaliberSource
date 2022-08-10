@@ -17,6 +17,7 @@
 #ifdef CLIENT_DLL
 	#include "c_baseplayer.h"
 	#include "engine/ivdebugoverlay.h"
+	#include "eventlist.h"
 
 	ConVar cl_showanimstate( "cl_showanimstate", "-1", FCVAR_CHEAT | FCVAR_DEVELOPMENTONLY, "Show the (client) animation state for the specified entity (-1 for none)." );
 	ConVar showanimstate_log( "cl_showanimstate_log", "0", FCVAR_CHEAT | FCVAR_DEVELOPMENTONLY, "1 to output cl_showanimstate to Msg(). 2 to store in AnimStateClient.log. 3 for both." );
@@ -26,17 +27,6 @@
 	ConVar showanimstate_log( "sv_showanimstate_log", "0", FCVAR_CHEAT | FCVAR_DEVELOPMENTONLY, "1 to output sv_showanimstate to Msg(). 2 to store in AnimStateServer.log. 3 for both." );
 #endif
 
-
-// Below this many degrees, slow down turning rate linearly
-#define FADE_TURN_DEGREES	45.0f
-
-// After this, need to start turning feet
-#define MAX_TORSO_ANGLE		70.0f
-
-// Below this amount, don't play a turning animation/perform IK
-#define MIN_TURN_ANGLE_REQUIRING_TURN_ANIMATION		15.0f
-
-
 ConVar mp_feetyawrate( 
 	"mp_feetyawrate", 
 	"720", 
@@ -45,15 +35,42 @@ ConVar mp_feetyawrate(
 
 ConVar mp_facefronttime( 
 	"mp_facefronttime", 
-	"3", 
+	"0", 
 	FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, 
 	"After this amount of time of standing in place but aiming to one side, go ahead and move feet to face upper body." );
 
 ConVar mp_ik( "mp_ik", "1", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, "Use IK on in-place turns." );
 
+
+// Below this many degrees, slow down turning rate linearly
+#define FADE_TURN_DEGREES	45.0f
+
+// After this, need to start turning feet
+#define MAX_TORSO_ANGLE		60.0f
+
+// Below this amount, don't play a turning animation/perform IK
+#define MIN_TURN_ANGLE_REQUIRING_TURN_ANIMATION		15.0f
+#define BODYYAW_RATE		mp_feetyawrate.GetFloat()
+
+// Speed to blend into next movement layer
+#define RUN_SPEED		160.0f
+#define SPRINT_SPEED	270.0f
+
 // Pose parameters stored for debugging.
 float g_flLastBodyPitch, g_flLastBodyYaw, m_flLastMoveYaw;
 
+IPlayerAnimState* CreatePlayerAnimState( CBasePlayer *pPlayer )
+{
+	CBasePlayerAnimState *pState = new CBasePlayerAnimState;
+
+	CModAnimConfig config;
+	config.m_flMaxBodyYawDegrees = 45;
+	config.m_LegAnimType = LEGANIM_8WAY;
+	config.m_bUseAimSequences = false;
+
+	pState->Init( pPlayer, config );
+	return pState;
+}
 
 // ------------------------------------------------------------------------------------------------ //
 // CBasePlayerAnimState implementation.
@@ -69,6 +86,10 @@ CBasePlayerAnimState::CBasePlayerAnimState()
 	m_flMaxGroundSpeed = 0.0f;
 	m_flStoredCycle = 0.0f;
 
+	m_bJumping = false;
+	m_flJumpStartTime = 0.0f;	
+	m_bFirstJumpFrame = false;
+
 	m_flGaitYaw = 0.0f;
 	m_flGoalFeetYaw = 0.0f;
 	m_flCurrentFeetYaw = 0.0f;
@@ -83,7 +104,6 @@ CBasePlayerAnimState::CBasePlayerAnimState()
 	m_eCurrentMainSequenceActivity = ACT_IDLE;
 	m_flLastAnimationStateClearTime = 0.0f;
 }
-
 
 CBasePlayerAnimState::~CBasePlayerAnimState()
 {
@@ -107,6 +127,7 @@ void CBasePlayerAnimState::Release()
 void CBasePlayerAnimState::ClearAnimationState()
 {
 	ClearAnimationLayers();
+	m_bJumping = false;
 	m_bCurrentFeetYawInitialized = false;
 	m_flLastAnimationStateClearTime = gpGlobals->curtime;
 }
@@ -122,8 +143,10 @@ void CBasePlayerAnimState::Update( float eyeYaw, float eyePitch )
 {
 	VPROF( "CBasePlayerAnimState::Update" );
 
-	// Clear animation overlays because we're about to completely reconstruct them.
-	ClearAnimationLayers();
+	// Get the studio header for the player.
+	CStudioHdr *pStudioHdr = GetOuter()->GetModelPtr();
+	if ( !pStudioHdr )
+		return;
 
 	// Some mods don't want to update the player's animation state if they're dead and ragdolled.
 	if ( !ShouldUpdateAnimState() )
@@ -131,35 +154,41 @@ void CBasePlayerAnimState::Update( float eyeYaw, float eyePitch )
 		ClearAnimationState();
 		return;
 	}
-	
-	
-	CStudioHdr *pStudioHdr = GetOuter()->GetModelPtr();
+
 	// Store these. All the calculations are based on them.
 	m_flEyeYaw = AngleNormalize( eyeYaw );
 	m_flEyePitch = AngleNormalize( eyePitch );
+	m_angRender[YAW] = m_flEyeYaw;
+	m_angRender[ROLL] = 0;
+	m_angRender[PITCH] = 0;
 
-	// Compute sequences for all the layers.
+	// Clear animation overlays because we're about to completely reconstruct them.
+	ClearAnimationLayers();
+
+	// Compute the player sequences.
 	ComputeSequences( pStudioHdr );
-	
-	
+
 	// Compute all the pose params.
-	ComputePoseParam_BodyPitch( pStudioHdr );	// Look up/down.
+	ComputePoseParam_BodyPitch( pStudioHdr );	// Torso elevation.
 	ComputePoseParam_BodyYaw();		// Torso rotation.
 	ComputePoseParam_MoveYaw( pStudioHdr );		// What direction his legs are running in.
 
-	
 	ComputePlaybackRate();
 
-
 #ifdef CLIENT_DLL
+	C_BasePlayer *targetPlayer = C_BasePlayer::GetLocalPlayer();
+
+	if ( targetPlayer->ShouldDrawLocalPlayer() )
+	{
+		targetPlayer->SetPlaybackRate( 1.0f );
+	}
+
 	if ( cl_showanimstate.GetInt() == m_pOuter->entindex() )
 	{
 		DebugShowAnimStateFull( 5 );
 	}
 	else if ( cl_showanimstate.GetInt() == -2 )
 	{
-		C_BasePlayer *targetPlayer = C_BasePlayer::GetLocalPlayer();
-
 		if( targetPlayer && ( targetPlayer->GetObserverMode() == OBS_MODE_IN_EYE || targetPlayer->GetObserverMode() == OBS_MODE_CHASE ) )
 		{
 			C_BaseEntity *target = targetPlayer->GetObserverTarget();
@@ -183,27 +212,27 @@ void CBasePlayerAnimState::Update( float eyeYaw, float eyePitch )
 #endif
 }
 
-
 bool CBasePlayerAnimState::ShouldUpdateAnimState()
 {
+	// Don't update anim state if we're not visible
+	if ( GetOuter()->IsEffectActive( EF_NODRAW ) )
+		return false;
+
 	// By default, don't update their animation state when they're dead because they're
 	// either a ragdoll or they're not drawn.
 	return GetOuter()->IsAlive();
 }
-
 
 bool CBasePlayerAnimState::ShouldChangeSequences( void ) const
 {
 	return true;
 }
 
-
 void CBasePlayerAnimState::SetOuterPoseParameter( int iParam, float flValue )
 {
 	// Make sure to set all the history values too, otherwise the server can overwrite them.
 	GetOuter()->SetPoseParameter( iParam, flValue );
 }
-
 
 void CBasePlayerAnimState::ClearAnimationLayers()
 {
@@ -221,7 +250,6 @@ void CBasePlayerAnimState::ClearAnimationLayers()
 	}
 }
 
-
 void CBasePlayerAnimState::RestartMainSequence()
 {
 	CBaseAnimatingOverlay *pPlayer = GetOuter();
@@ -229,7 +257,6 @@ void CBasePlayerAnimState::RestartMainSequence()
 	pPlayer->m_flAnimTime = gpGlobals->curtime;
 	pPlayer->SetCycle( 0 );
 }
-
 
 void CBasePlayerAnimState::ComputeSequences( CStudioHdr *pStudioHdr )
 {
@@ -242,6 +269,36 @@ void CBasePlayerAnimState::ComputeSequences( CStudioHdr *pStudioHdr )
 	{
 		ComputeAimSequence();		// Upper body, based on weapon type.
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+Activity CBasePlayerAnimState::CalcMainActivity()
+{
+	Activity idealActivity = ACT_IDLE;
+
+	float flSpeed = GetOuterXYSpeed();
+
+	if ( flSpeed > MOVING_MINIMUM_SPEED )
+	{
+		if( flSpeed >= SPRINT_SPEED )
+			idealActivity = ACT_SPRINT;
+		else if( flSpeed >= RUN_SPEED )
+			idealActivity = ACT_RUN;
+		else
+			idealActivity = ACT_WALK;
+	}
+
+//	ShowDebugInfo();
+
+	return idealActivity;
+}
+
+//-----------------------------------------------------------------------------
+int CBasePlayerAnimState::CalcAimLayerSequence( float *flCycle, float *flAimSequenceWeight, bool bForceIdle )
+{
+	return 0;
 }
 
 void CBasePlayerAnimState::ResetGroundSpeed( void )
@@ -282,17 +339,14 @@ void CBasePlayerAnimState::ComputeMainSequence()
 	// If we went from idle to walk, reset the interpolation history.
 	// Kind of hacky putting this here.. it might belong outside the base class.
 	if ( (oldActivity == ACT_CROUCHIDLE || oldActivity == ACT_IDLE) && 
-		 (idealActivity == ACT_WALK || idealActivity == ACT_RUN_CROUCH) )
+		 (idealActivity == ACT_WALK || idealActivity == ACT_WALK_CROUCH) )
 	{
 		ResetGroundSpeed();
 	}
 #endif
 }
 
-
-
-
-
+//-----------------------------------------------------------------------------
 void CBasePlayerAnimState::UpdateAimSequenceLayers(
 	float flCycle,
 	int iFirstLayer,
@@ -370,7 +424,6 @@ void CBasePlayerAnimState::UpdateAimSequenceLayers(
 	pDest0->m_flCycle = pDest1->m_flCycle = flCycle;
 }
 
-
 void CBasePlayerAnimState::OptimizeLayerWeights( int iFirstLayer, int nLayers )
 {
 	int i;
@@ -426,7 +479,7 @@ bool CBasePlayerAnimState::ShouldBlendAimSequenceToIdle()
 {
 	Activity act = GetCurrentMainSequenceActivity();
 
-	return (act == ACT_RUN || act == ACT_WALK || act == ACT_RUNTOIDLE || act == ACT_RUN_CROUCH);
+	return (act == ACT_RUN || act == ACT_WALK || act == ACT_RUN_CROUCH || act == ACT_WALK_CROUCH);
 }
 
 void CBasePlayerAnimState::ComputeAimSequence()
@@ -454,6 +507,56 @@ void CBasePlayerAnimState::ComputeAimSequence()
 	OptimizeLayerWeights( AIMSEQUENCE_LAYER, NUM_AIMSEQUENCE_LAYERS );
 }
 
+//-----------------------------------------------------------------------------
+Activity CBasePlayerAnimState::TranslateActivity( Activity actDesired )
+{
+	Activity idealActivity = actDesired;
+
+	if ( GetOuter()->GetFlags() & FL_DUCKING )
+	{
+		switch( idealActivity )
+		{
+		case ACT_IDLE:
+			idealActivity = ACT_CROUCHIDLE;
+			break;
+		case ACT_WALK:
+			idealActivity = ACT_WALK_CROUCH;
+			break;
+		case ACT_RUN:
+			idealActivity = ACT_RUN_CROUCH;
+			break;
+		}
+	}
+#if 0
+	else if ( GetOuter()->IsAiming() )
+	{
+		switch( idealActivity )
+		{
+		case ACT_IDLE:			idealActivity = ACT_IDLE_ANGRY; break;
+		case ACT_WALK:			idealActivity = ACT_WALK_AIM; break;
+		case ACT_RUN:			idealActivity = ACT_RUN_AIM; break;
+		case ACT_CROUCHIDLE:	idealActivity = ACT_RANGE_AIM_LOW; break;
+		case ACT_WALK_CROUCH:	idealActivity = ACT_WALK_CROUCH_AIM; break;
+		case ACT_RUN_CROUCH:	idealActivity = ACT_RUN_CROUCH_AIM; break;
+		default: break;
+		}
+	}
+#endif
+	else if ( GetOuter()->GetWaterLevel() > 1 || GetOuter()->GetFlags() & FL_FLY )
+	{
+		switch( idealActivity )
+		{
+		case ACT_IDLE:
+			idealActivity = ACT_HOVER;
+			break;
+		default:
+			idealActivity = ACT_SWIM;
+			break;
+		}
+	}
+
+	return idealActivity;
+}
 
 int CBasePlayerAnimState::CalcSequenceIndex( const char *pBaseName, ... )
 {
@@ -505,12 +608,12 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 	GetOuterAbsVelocity( vel );
 
 	float speed = vel.Length2D();
-	bool isMoving = ( speed > MOVING_MINIMUM_SPEED );
+	bool bMoving = ( speed > MOVING_MINIMUM_SPEED );
 
 	*bIsMoving = false;
-	float flReturnValue = 1;
+	float flReturnValue = 1.0f;
 
-	if ( isMoving && CanThePlayerMove() )
+	if ( bMoving && CanThePlayerMove() )
 	{
 		float flGroundSpeed = GetInterpolatedGroundSpeed();
 		if ( flGroundSpeed < 0.001f )
@@ -521,11 +624,11 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 		{
 			// Note this gets set back to 1.0 if sequence changes due to ResetSequenceInfo below
 			flReturnValue = speed / flGroundSpeed;
-			flReturnValue = clamp( flReturnValue, 0.01, 10 );	// don't go nuts here.
+			flReturnValue = clamp( flReturnValue, 0.5, 2 );	// don't go nuts here.
 		}
 		*bIsMoving = true;
 	}
-	
+
 	return flReturnValue;
 }
 
@@ -539,7 +642,7 @@ bool CBasePlayerAnimState::CanThePlayerMove()
 void CBasePlayerAnimState::ComputePlaybackRate()
 {
 	VPROF( "CBasePlayerAnimState::ComputePlaybackRate" );
-	if ( m_AnimConfig.m_LegAnimType != LEGANIM_9WAY && m_AnimConfig.m_LegAnimType != LEGANIM_8WAY )
+	if ( m_AnimConfig.m_LegAnimType != LEGANIM_9WAY )
 	{
 		// When using a 9-way blend, playback rate is always 1 and we just scale the pose params
 		// to speed up or slow down the animation.
@@ -693,7 +796,7 @@ void CBasePlayerAnimState::ComputePoseParam_MoveYaw( CStudioHdr *pStudioHdr )
 					m_iCurrent8WayCrouchIdleSequence = m_pOuter->SelectWeightedSequence( ACT_CROUCHIDLE );
 				}
 
-				if ( m_eCurrentMainSequenceActivity == ACT_CROUCHIDLE || m_eCurrentMainSequenceActivity == ACT_RUN_CROUCH )
+				if ( m_eCurrentMainSequenceActivity == ACT_CROUCHIDLE || m_eCurrentMainSequenceActivity == ACT_WALK_CROUCH )
 					pLayer->m_nSequence = m_iCurrent8WayCrouchIdleSequence;
 				else
 					pLayer->m_nSequence = m_iCurrent8WayIdleSequence;
@@ -716,7 +819,7 @@ void CBasePlayerAnimState::ComputePoseParam_BodyPitch( CStudioHdr *pStudioHdr )
 	VPROF( "CBasePlayerAnimState::ComputePoseParam_BodyPitch" );
 
 	// Get pitch from v_angle
-	float flPitch = m_flEyePitch;
+	float flPitch = GetOuter()->GetLocalAngles()[ PITCH ];	//m_flEyePitch
 	if ( flPitch > 180.0f )
 	{
 		flPitch -= 360.0f;
@@ -853,7 +956,7 @@ void CBasePlayerAnimState::ComputePoseParam_BodyYaw()
 
 	if ( m_flCurrentFeetYaw != m_flGoalFeetYaw )
 	{
-		ConvergeAngles( m_flGoalFeetYaw, mp_feetyawrate.GetFloat(), m_AnimConfig.m_flMaxBodyYawDegrees,
+		ConvergeAngles( m_flGoalFeetYaw, BODYYAW_RATE, m_AnimConfig.m_flMaxBodyYawDegrees,
 			 gpGlobals->frametime, m_flCurrentFeetYaw );
 
 		m_flLastTurnTime = gpGlobals->curtime;
@@ -861,10 +964,6 @@ void CBasePlayerAnimState::ComputePoseParam_BodyYaw()
 
 	float flCurrentTorsoYaw = AngleNormalize( m_flEyeYaw - m_flCurrentFeetYaw );
 
-	// Rotate entire body into position
-	m_angRender[YAW] = m_flCurrentFeetYaw;
-	m_angRender[PITCH] = m_angRender[ROLL] = 0;
-		
 	SetOuterBodyYaw( flCurrentTorsoYaw );
 	g_flLastBodyYaw = flCurrentTorsoYaw;
 }
@@ -916,6 +1015,7 @@ const QAngle& CBasePlayerAnimState::GetRenderAngles()
 }
 
 
+//-----------------------------------------------------------------------------
 void CBasePlayerAnimState::GetOuterAbsVelocity( Vector& vel ) const
 {
 #if defined( CLIENT_DLL )

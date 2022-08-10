@@ -531,6 +531,7 @@ public:
 	bool					m_bFiresUnderwater;		// True if this weapon can fire underwater
 	bool					m_bAltFiresUnderwater;	// True if this weapon can fire underwater
 	bool					m_bReloadsSingly;		// Tryuey if this weapon reloads 1 round at a time
+	bool					m_bReloadsFullClip;		// For clip weapons; reloading takes away the entire clip size
 	bool					m_bCanJam;				// True if this weapon can jam
 	float					m_fMinRange1;			// What's the closest this weapon can be used?
 	float					m_fMinRange2;			// What's the closest this weapon can be used?
@@ -543,7 +544,7 @@ public:
 	float					m_flUnlockTime;
 	EHANDLE					m_hLocker;				// Who locked this weapon.
 
-#if defined(CSTRIKE_DLL) && defined(CLIENT_DLL)
+#if defined(CSTRIKE_DLL) && defined(CLIENT_DLL) 
 	bool					m_bInReloadAnimation;
 #endif
 	

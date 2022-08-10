@@ -53,6 +53,7 @@ CBaseCombatWeapon::CBaseCombatWeapon()
 	m_fJamChance		= 0.01;
 
 	m_bReloadsSingly	= false;
+	m_bReloadsFullClip	= false;
 	m_bCanJam			= false;
 
 	// Defaults to zero
@@ -2066,9 +2067,21 @@ void CBaseCombatWeapon::FinishReload( void )
 		// If I use primary clips, reload primary
 		if ( UsesClipsForAmmo1() )
 		{
-			int primary	= min( GetMaxClip1() - m_iClip1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));	
+			int primary	= min( GetMaxClip1() - m_iClip1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));
+			int iRemoveValue = primary;
 			m_iClip1 += primary;
-			pOwner->RemoveAmmo( primary, m_iPrimaryAmmoType);
+			if ( m_bReloadsFullClip )
+			{
+				m_iClip1 = GetMaxClip1();
+				iRemoveValue = GetMaxClip1();
+				// If we have more ammo in the clip than the stock, then just use the stock value
+				if ( pOwner->GetAmmoCount( m_iPrimaryAmmoType ) <= GetMaxClip1() )
+				{
+					m_iClip1 = ( pOwner->GetAmmoCount( m_iPrimaryAmmoType ) );
+				}
+			}
+
+			pOwner->RemoveAmmo( iRemoveValue, m_iPrimaryAmmoType );
 		}
 
 		// If I use secondary clips, reload secondary
@@ -2340,7 +2353,9 @@ BEGIN_PREDICTION_DATA( CBaseCombatWeapon )
 	DEFINE_FIELD( m_fMinRange2, FIELD_FLOAT ),		
 	DEFINE_FIELD( m_fMaxRange1, FIELD_FLOAT ),		
 	DEFINE_FIELD( m_fMaxRange2, FIELD_FLOAT ),		
-	DEFINE_FIELD( m_bReloadsSingly, FIELD_BOOLEAN ),	
+	DEFINE_FIELD( m_bReloadsSingly, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bReloadsFullClip, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bCanJam, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bRemoveable, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_iPrimaryAmmoCount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iSecondaryAmmoCount, FIELD_INTEGER ),
@@ -2402,6 +2417,8 @@ BEGIN_DATADESC( CBaseCombatWeapon )
 	DEFINE_FIELD( m_fFireDuration, FIELD_FLOAT ),
 
 	DEFINE_FIELD( m_bReloadsSingly, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bReloadsFullClip, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bCanJam, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_iSubType, FIELD_INTEGER ),
  	DEFINE_FIELD( m_bRemoveable, FIELD_BOOLEAN ),
 

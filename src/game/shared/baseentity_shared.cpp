@@ -1643,6 +1643,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 	{
 		bool bHitWater = false;
 		bool bHitGlass = false;
+		bool bPenetration = false;
 
 		// Prediction is only usable on players
 		if ( IsPlayer() )
@@ -1836,7 +1837,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 					flCumulativeDamage += dmgInfo.GetDamage();
 				}
 
-				if ( bStartedInWater || !bHitWater || (info.m_nFlags & FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS) )
+				if ( !(info.m_nFlags & FIRE_BULLETS_NO_IMPACTS) && (bStartedInWater || !bHitWater || (info.m_nFlags & FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS)) )
 				{
 					if ( bDoServerEffects == true )
 					{
@@ -1873,18 +1874,20 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		{
 #ifdef GAME_DLL
 			surfacedata_t *psurf = physprops->GetSurfaceData( tr.surface.surfaceProps );
-			if ( ( psurf != NULL ) && ( psurf->game.material == CHAR_TEX_GLASS ) && ( tr.m_pEnt->ClassMatches( "func_breakable" ) ) )
+			if ( ( psurf != NULL ) && ( tr.m_pEnt->ClassMatches( "func_breakable" ) ) )	//( psurf->game.material == CHAR_TEX_GLASS || psurf->game.material == CHAR_TEX_GRATE )
 			{
 				// Query the func_breakable for whether it wants to allow for bullet penetration
 				if ( tr.m_pEnt->HasSpawnFlags( SF_BREAK_NO_BULLET_PENETRATION ) == false )
 				{
-					bHitGlass = true;
+					bPenetration = true;
+					if ( psurf->game.material == CHAR_TEX_GLASS )
+						bHitGlass = true;
 				}
 			}
 #endif
 		}
 
-		if ( ( info.m_iTracerFreq != 0 ) && ( tracerCount++ % info.m_iTracerFreq ) == 0 && ( bHitGlass == false ) )
+		if ( ( info.m_iTracerFreq != 0 ) && ( tracerCount++ % info.m_iTracerFreq ) == 0 && ( bPenetration == false ) )
 		{
 			if ( bDoServerEffects == true )
 			{
@@ -1937,9 +1940,9 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 
 		// See if we should pass through glass
 #ifdef GAME_DLL
-		if ( bHitGlass )
+		if ( bPenetration )
 		{
-			HandleShotImpactingGlass( info, tr, vecDir, &traceFilter );
+			HandleShotPenetrating( info, tr, vecDir, &traceFilter, bHitGlass );
 		}
 #endif
 
@@ -1978,7 +1981,6 @@ bool CBaseEntity::ShouldDrawUnderwaterBulletBubbles()
 	return false;
 #endif
 }
-
 
 //-----------------------------------------------------------------------------
 // Handle shot entering water

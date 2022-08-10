@@ -579,6 +579,7 @@ CSpriteTrail *CSpriteTrail::SpriteTrailCreate( const char *pSpriteName, const Ve
 	if ( animate )
 	{
 		pSprite->TurnOn();
+	//!	pSprite->m_flSpriteFramerate = random->RandomInt( 15, 20 );
 	}
 
 	return pSprite;

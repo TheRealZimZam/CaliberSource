@@ -514,7 +514,6 @@ void CGameRules::RadiusDamage( const CTakeDamageInfo &info, const Vector &vecSrc
 #if defined( GAME_DLL )
 		if ( info.GetAttacker() && info.GetAttacker()->IsPlayer() && ToBaseCombatCharacter( tr.m_pEnt ) )
 		{
-
 			// This is a total hack!!!
 			bool bIsPrimary = true;
 			CBasePlayer *player = ToBasePlayer( info.GetAttacker() );
@@ -818,8 +817,13 @@ void CGameRules::ClientSettingsChanged( CBasePlayer *pPlayer )
 	if ( pszFov )
 	{
 		int iFov = atoi(pszFov);
-		iFov = clamp( iFov, 75, 90 );
+		iFov = clamp( iFov, 75, 140 );
 		pPlayer->SetDefaultFOV( iFov );
+
+		// Disgusting hack for viewmodels
+		ConVarRef vmFov( "viewmodel_fov" );
+		int ivmFov = 34 + iFov / 4;	//54
+		vmFov.SetValue( ivmFov );
 	}
 }
 

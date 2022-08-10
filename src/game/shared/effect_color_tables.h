@@ -41,11 +41,11 @@ static colorentry_t commandercolors[] =
 
 static colorentry_t bloodcolors[] =
 {
-	{ BLOOD_COLOR_RED,		96,		0,		0	},	//72
-	{ BLOOD_COLOR_YELLOW,	195,	195,	0	},
-	{ BLOOD_COLOR_GREEN,	96,		195,	0	},
-	{ BLOOD_COLOR_BLUE,		0,		96,		195	},
-	{ BLOOD_COLOR_MECH,		20,		20,		20	},	//This almost never appears, sparks and smoke are mainly used instead
+	{ BLOOD_COLOR_RED,		96,		0,		0	},
+	{ BLOOD_COLOR_YELLOW,	155,	155,	0	},
+	{ BLOOD_COLOR_GREEN,	64,		155,	0	},
+	{ BLOOD_COLOR_BLUE,		32,		96,		155	},
+	{ BLOOD_COLOR_MECH,		20,		20,		20	},	//Leak some oil
 #ifdef HL2_EPISODIC
 	{ BLOOD_COLOR_ANTLION,	195,	195,	0	},
 	{ BLOOD_COLOR_ZOMBIE,	195,	195,	0	},

@@ -32,7 +32,6 @@ public:
 	virtual void	Spawn( void );
 	virtual void	Activate( void );
 	virtual void	Think( void );
-	virtual void	UpdateOnRemove( void );
 
 	virtual void	NPC_FinishedEnterVehicle( CAI_BaseNPC *pPassenger, bool bCompanion );
 	virtual void	NPC_FinishedExitVehicle( CAI_BaseNPC *pPassenger, bool bCompanion );
@@ -41,7 +40,6 @@ public:
 	virtual bool	NPC_CanExitVehicle( CAI_BaseNPC *pPassenger, bool bCompanion );
 	virtual void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	virtual void	Precache( void );
-	virtual void	EnterVehicle( CBaseCombatCharacter *pPassenger );
 	virtual void	ExitVehicle( int nRole );
 	virtual bool	AllowBlockedExit( CBaseCombatCharacter *pPassenger, int nRole );
 	
@@ -63,8 +61,8 @@ public:
 	DECLARE_DATADESC();
 
 protected:
-	virtual float			GetUprightTime( void ) { return 1.0f; }
-	virtual float			GetUprightStrength( void );
+	virtual float			GetUprightTime( void ) { return 0.0f; }
+	virtual float			GetUprightStrength( void ) { return 0.0f; }
 	virtual bool			ShouldPuntUseLaunchForces( PhysGunForce_t reason ) { return ( reason == PHYSGUN_FORCE_PUNTED ); }
 	virtual void			HandleWater( void );
 
@@ -96,10 +94,8 @@ private:
 	COutputEvent	m_OnHostileEnteredVehicle;	// Passenger has completed entering the vehicle
 	COutputEvent	m_OnHostileExitedVehicle;		// Passenger has completed exited the vehicle
 
-	CHandle< CParticleSystem >			m_hWheelDust[NUM_WHEEL_EFFECTS];
-	CHandle< CParticleSystem >			m_hWheelWater[NUM_WHEEL_EFFECTS];
-
-	float								m_flNextWaterSound;
+	float	m_flNextDust;
+	float	m_flNextWaterSound;
 
 	EHANDLE	m_hLinkControllerFront;
 	EHANDLE m_hLinkControllerRear;

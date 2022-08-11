@@ -21,8 +21,6 @@
 
 extern ConVar phys_upimpactforcescale;
 
-extern ConVar jalopy_blocked_exit_max_speed;
-
 #define JEEP_AMMOCRATE_HITGROUP		5
 #define	JEEP_AMMO_CRATE_CLOSE_DELAY	2.0f
 
@@ -41,12 +39,11 @@ BEGIN_DATADESC( CPropHL2Buggy )
 
 	DEFINE_FIELD( m_bEntranceLocked, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bExitLocked, FIELD_BOOLEAN ),
-	DEFINE_ARRAY( m_hWheelDust, FIELD_EHANDLE, NUM_WHEEL_EFFECTS ),
-	DEFINE_ARRAY( m_hWheelWater, FIELD_EHANDLE, NUM_WHEEL_EFFECTS ),
 	DEFINE_FIELD( m_bBlink, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_hLinkControllerFront, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hLinkControllerRear, FIELD_EHANDLE ),
 	// m_flNextAvoidBroadcastTime
+	DEFINE_FIELD( m_flNextDust, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextWaterSound, FIELD_TIME ),
 	
 	DEFINE_OUTPUT( m_OnCompanionEnteredVehicle, "OnCompanionEnteredVehicle" ),
@@ -76,49 +73,17 @@ m_flNextAvoidBroadcastTime( 0.0f )
 	m_bUnableToFire = false;
 }
 
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CPropHL2Buggy::UpdateOnRemove( void )
-{
-	BaseClass::UpdateOnRemove();
-
-	// Kill our wheel dust
-	for ( int i = 0; i < NUM_WHEEL_EFFECTS; i++ )
-	{
-		if ( m_hWheelDust[i] != NULL )
-		{
-			UTIL_Remove( m_hWheelDust[i] );
-		}
-
-		if ( m_hWheelWater[i] != NULL )
-		{
-			UTIL_Remove( m_hWheelWater[i] );
-		}
-	}
-}
-
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CPropHL2Buggy::Precache( void )
 {
-	PrecacheScriptSound( "Physics.WaterSplash" );
+	PrecacheScriptSound( "Water.WaterSplash" );
 
-	PrecacheParticleSystem( "WheelDust" );
-	PrecacheParticleSystem( "WheelSplash" );
+//	PrecacheParticleSystem( "WheelDust" );
+//	PrecacheParticleSystem( "WheelSplash" );	//CUT; Moving physics objects already create a splash
 
 	BaseClass::Precache();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : *pPlayer - 
-//-----------------------------------------------------------------------------
-void CPropHL2Buggy::EnterVehicle( CBaseCombatCharacter *pPassenger )
-{
-	BaseClass::EnterVehicle( pPassenger );
 }
 
 //-----------------------------------------------------------------------------
@@ -258,18 +223,6 @@ AngularImpulse CPropHL2Buggy::PhysGunLaunchAngularImpulse( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Get the upright strength based on what state we're in
-//-----------------------------------------------------------------------------
-float CPropHL2Buggy::GetUprightStrength( void ) 
-{ 
-	// Lesser if overturned
-	if ( IsOverturned() )
-		return 2.0f;
-	
-	return 0.0f; 
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: If the player uses the jeep while at the back, he gets ammo from the crate instead
 //-----------------------------------------------------------------------------
 void CPropHL2Buggy::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
@@ -278,7 +231,7 @@ void CPropHL2Buggy::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE
 	BaseClass::BaseClass::Use( pActivator, pCaller, useType, value );
 }
 
-#define	MIN_WHEEL_DUST_SPEED	5
+#define	MIN_WHEEL_DUST_SPEED	9
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -291,102 +244,48 @@ void CPropHL2Buggy::UpdateWheelDust( void )
 	bool bAllowDust = vehicleData->steering.dustCloud;
 	
 	// Car must be active
-	bool bCarOn = m_VehiclePhysics.IsOn();
+//!	bool bCarOn = m_VehiclePhysics.IsOn();
+//! Achtually no, if the player bails at mach5 we want dust to still generate
 
 	// Must be moving quickly enough or skidding along the ground
-	bool bCreateDust = ( bCarOn &&
+	bool bCreateDust = ( //!bCarOn &&
 						 bAllowDust && 
 					   ( m_VehiclePhysics.GetSpeed() >= MIN_WHEEL_DUST_SPEED || carState->skidSpeed > DEFAULT_SKID_THRESHOLD ) );
 
 	// Update our wheel dust
 	Vector	vecPos;
-	for ( int i = 0; i < NUM_WHEEL_EFFECTS; i++ )
+	for ( int iWheel = 0; iWheel < NUM_WHEEL_EFFECTS; iWheel++ )
 	{
-		m_pServerVehicle->GetWheelContactPoint( i, vecPos );
-		
-		// Make sure the effect is created
-		if ( m_hWheelDust[i] == NULL )
-		{
-			// Create the dust effect in place
-			m_hWheelDust[i] = (CParticleSystem *) CreateEntityByName( "info_particle_system" );
-			if ( m_hWheelDust[i] == NULL )
-				continue;
-
-			// Setup our basic parameters
-			m_hWheelDust[i]->KeyValue( "start_active", "0" );
-			m_hWheelDust[i]->KeyValue( "effect_name", "WheelDust" );
-			m_hWheelDust[i]->SetParent( this );
-			m_hWheelDust[i]->SetLocalOrigin( vec3_origin );
-			DispatchSpawn( m_hWheelDust[i] );
-			if ( gpGlobals->curtime > 0.5f )
-				m_hWheelDust[i]->Activate();
-		}
-
-		// Make sure the effect is created
-		if ( m_hWheelWater[i] == NULL )
-		{
-			// Create the dust effect in place
-			m_hWheelWater[i] = (CParticleSystem *) CreateEntityByName( "info_particle_system" );
-			if ( m_hWheelWater[i] == NULL )
-				continue;
-
-			// Setup our basic parameters
-			m_hWheelWater[i]->KeyValue( "start_active", "0" );
-			m_hWheelWater[i]->KeyValue( "effect_name", "WheelSplash" );
-			m_hWheelWater[i]->SetParent( this );
-			m_hWheelWater[i]->SetLocalOrigin( vec3_origin );
-			DispatchSpawn( m_hWheelWater[i] );
-			if ( gpGlobals->curtime > 0.5f )
-				m_hWheelWater[i]->Activate();
-		}
-
-		// Turn the dust on or off
+		m_pServerVehicle->GetWheelContactPoint( iWheel, vecPos );
 		if ( bCreateDust )
 		{
-			// Angle the dust out away from the wheels
-			Vector vecForward, vecRight, vecUp;
-			GetVectors( &vecForward, &vecRight, &vecUp );
-			
-			const vehicle_controlparams_t *vehicleControls = m_pServerVehicle->GetVehicleControlParams();
-			float flWheelDir = ( i & 1 ) ? 1.0f : -1.0f;
-			QAngle vecAngles;
-			vecForward += vecRight * flWheelDir;
-			vecForward += vecRight * (vehicleControls->steering*0.5f) * flWheelDir;
-			vecForward += vecUp;
-			VectorAngles( vecForward, vecAngles );
-
-			// NDebugOverlay::Axis( vecPos, vecAngles, 8.0f, true, 0.1f );
-
-			if ( m_WaterData.m_bWheelInWater[i] )
+			if ( m_WaterData.m_bWheelInWater[iWheel] )
 			{
-				m_hWheelDust[i]->StopParticleSystem();
-
 				// Set us up in the right position
-				m_hWheelWater[i]->StartParticleSystem();
-				m_hWheelWater[i]->SetAbsAngles( vecAngles );
-				m_hWheelWater[i]->SetAbsOrigin( vecPos + Vector( 0, 0, 8 ) );
+				UTIL_Bubbles( vecPos + Vector( -2, -2, -2 ), vecPos + Vector( 2, 2, 2 ), random->RandomInt( 4, 8 ) );
+
+				if ( m_WaterData.m_flNextRippleTime[iWheel] < gpGlobals->curtime )
+				{
+					// Stagger ripple times
+					m_WaterData.m_flNextRippleTime[iWheel] = gpGlobals->curtime + RandomFloat( 0.1, 0.3 );
+					CreateSplash( m_WaterData.m_vecWheelContactPoints[iWheel] );
+					CreateRipple( m_WaterData.m_vecWheelContactPoints[iWheel] );
+				}
 
 				if ( m_flNextWaterSound < gpGlobals->curtime )
 				{
 					m_flNextWaterSound = gpGlobals->curtime + random->RandomFloat( 0.25f, 1.0f );
-					EmitSound( "Physics.WaterSplash" );
+					EmitSound( "Water.WaterSplash" );
 				}
+				return;
 			}
 			else
 			{
-				m_hWheelWater[i]->StopParticleSystem();
+				float fldustscale = m_VehiclePhysics.GetSpeed() * random->RandomFloat( 0.1f, 0.25f );
+				fldustscale = clamp( fldustscale, 0.1f, 10.0f );
 
-				// Set us up in the right position
-				m_hWheelDust[i]->StartParticleSystem();
-				m_hWheelDust[i]->SetAbsAngles( vecAngles );
-				m_hWheelDust[i]->SetAbsOrigin( vecPos + Vector( 0, 0, 8 ) );
+				UTIL_Dust( vecPos, 0, fldustscale, fldustscale );
 			}
-		}
-		else
-		{
-			// Stop emitting
-			m_hWheelDust[i]->StopParticleSystem();
-			m_hWheelWater[i]->StopParticleSystem();
 		}
 	}
 }
@@ -434,9 +333,12 @@ void CPropHL2Buggy::Think( void )
 		m_throttleDisableTime = gpGlobals->curtime + 0.25f;		
 	}
 
-
 	// See if the wheel dust should be on or off
-	UpdateWheelDust();	
+	if ( m_flNextDust < gpGlobals->curtime )
+	{
+		UpdateWheelDust();
+		m_flNextDust = gpGlobals->curtime + 0.1f;	
+	}
 
 	CreateAvoidanceZone();
 }
@@ -498,106 +400,8 @@ static void SimpleCollisionResponse( Vector velocityIn, const Vector &normal, fl
 	*pVelocityOut = Vt - coefficientOfRestitution * Vn;
 }
 
-static void KillBlockingEnemyNPCs( CBasePlayer *pPlayer, CBaseEntity *pVehicleEntity, IPhysicsObject *pVehiclePhysics )
-{
-	Vector velocity;
-	pVehiclePhysics->GetVelocity( &velocity, NULL );
-	float vehicleMass = pVehiclePhysics->GetMass();
-
-	// loop through the contacts and look for enemy NPCs that we're pushing on
-	CUtlVector<CAI_BaseNPC *> npcList;
-	CUtlVector<Vector> forceList;
-	CUtlVector<Vector> contactList;
-	IPhysicsFrictionSnapshot *pSnapshot = pVehiclePhysics->CreateFrictionSnapshot();
-	while ( pSnapshot->IsValid() )
-	{
-		IPhysicsObject *pOther = pSnapshot->GetObject(1);
-		float otherMass = pOther->GetMass();
-		CBaseEntity *pOtherEntity = static_cast<CBaseEntity *>(pOther->GetGameData());
-		CAI_BaseNPC *pNPC = pOtherEntity ? pOtherEntity->MyNPCPointer() : NULL;
-		// Is this an enemy NPC with a small enough mass?
-		if ( pNPC && pPlayer->IRelationType(pNPC) != D_LI && ((otherMass*2.0f) < vehicleMass) )
-		{
-			// accumulate the stress force for this NPC in the lsit
-			float force = pSnapshot->GetNormalForce();
-			Vector normal;
-			pSnapshot->GetSurfaceNormal(normal);
-			normal *= force;
-			int index = npcList.Find(pNPC);
-			if ( index < 0 )
-			{
-				vphysicsupdateai_t *pUpdate = NULL;
-				if ( pNPC->VPhysicsGetObject() && pNPC->VPhysicsGetObject()->GetShadowController() && pNPC->GetMoveType() == MOVETYPE_STEP )
-				{
-					if ( pNPC->HasDataObjectType(VPHYSICSUPDATEAI) )
-					{
-						pUpdate = static_cast<vphysicsupdateai_t *>(pNPC->GetDataObject(VPHYSICSUPDATEAI));
-						// kill this guy if I've been pushing him for more than half a second and I'm 
-						// still pushing in his direction
-						if ( (gpGlobals->curtime - pUpdate->startUpdateTime) > 0.5f && DotProduct(velocity,normal) > 0)
-						{
-							index = npcList.AddToTail(pNPC);
-							forceList.AddToTail( normal );
-							Vector pos;
-							pSnapshot->GetContactPoint(pos);
-							contactList.AddToTail(pos);
-						}
-					}
-					else
-					{
-						pUpdate = static_cast<vphysicsupdateai_t *>(pNPC->CreateDataObject( VPHYSICSUPDATEAI ));
-						pUpdate->startUpdateTime = gpGlobals->curtime;
-					}
-					// update based on vphysics for the next second
-					// this allows the car to push the NPC
-					pUpdate->stopUpdateTime = gpGlobals->curtime + 1.0f;
-					float maxAngular;
-					pNPC->VPhysicsGetObject()->GetShadowController()->GetMaxSpeed( &pUpdate->savedShadowControllerMaxSpeed, &maxAngular );
-					pNPC->VPhysicsGetObject()->GetShadowController()->MaxSpeed( 1.0f, maxAngular );
-				}
-			}
-			else
-			{
-				forceList[index] += normal;
-			}
-		}
-		pSnapshot->NextFrictionData();
-	}
-	pVehiclePhysics->DestroyFrictionSnapshot( pSnapshot );
-	// now iterate the list and check each cumulative force against the threshold
-	if ( npcList.Count() )
-	{
-		for ( int i = npcList.Count(); --i >= 0; )
-		{
-			Vector damageForce;
-			npcList[i]->VPhysicsGetObject()->GetVelocity( &damageForce, NULL );
-			Vector vel;
-			pVehiclePhysics->GetVelocityAtPoint( contactList[i], &vel );
-			damageForce -= vel;
-			Vector normal = forceList[i];
-			VectorNormalize(normal);
-			SimpleCollisionResponse( damageForce, normal, 1.0, &damageForce );
-			damageForce += (normal * 300.0f);
-			damageForce *= npcList[i]->VPhysicsGetObject()->GetMass();
-			float len = damageForce.Length();
-			damageForce.z += len*phys_upimpactforcescale.GetFloat();
-			Vector vehicleForce = -damageForce;
-
-			CTakeDamageInfo dmgInfo( pVehicleEntity, pVehicleEntity, damageForce, contactList[i], 200.0f, DMG_CRUSH|DMG_VEHICLE );
-			npcList[i]->TakeDamage( dmgInfo );
-			pVehiclePhysics->ApplyForceOffset( vehicleForce, contactList[i] );
-			PhysCollisionSound( pVehicleEntity, npcList[i]->VPhysicsGetObject(), CHAN_BODY, pVehiclePhysics->GetMaterialIndex(), npcList[i]->VPhysicsGetObject()->GetMaterialIndex(), gpGlobals->frametime, 200.0f );
-		}
-	}
-}
-
 void CPropHL2Buggy::DriveVehicle( float flFrameTime, CUserCmd *ucmd, int iButtonsDown, int iButtonsReleased )
 {
-	/* The car headlight hurts perf, there's no timer to turn it off automatically,
-	   and we haven't built any gameplay around it.
-
-	   Furthermore, I don't think I've ever seen a playtester turn it on.
-	
 	if ( ucmd->impulse == 100 )
 	{
 		if (HeadlightIsOn())
@@ -608,19 +412,8 @@ void CPropHL2Buggy::DriveVehicle( float flFrameTime, CUserCmd *ucmd, int iButton
 		{
 			HeadlightTurnOn();
 		}
-	}*/
-	
-	if ( ucmd->forwardmove != 0.0f )
-	{
-		//Msg("Push V: %.2f, %.2f, %.2f\n", ucmd->forwardmove, carState->engineRPM, carState->speed );
-		CBasePlayer *pPlayer = ToBasePlayer(GetDriver());
-
-		if ( pPlayer && VPhysicsGetObject() )
-		{
-			KillBlockingEnemyNPCs( pPlayer, this, VPhysicsGetObject() );
-			SolveBlockingProps( this, VPhysicsGetObject() );
-		}
 	}
+
 	BaseClass::DriveVehicle(flFrameTime, ucmd, iButtonsDown, iButtonsReleased);
 }
 
@@ -760,12 +553,11 @@ void CPropHL2Buggy::InputDestroyLinkController( inputdata_t &data )
 	}
 }
 
-
 bool CPropHL2Buggy::AllowBlockedExit( CBaseCombatCharacter *pPassenger, int nRole )
 {
 	// Wait until we've settled down before we resort to blocked exits.
 	// This keeps us from doing blocked exits in mid-jump, which can cause mayhem like
 	// sticking the player through player clips or into geometry.
-	return GetSmoothedVelocity().IsLengthLessThan( jalopy_blocked_exit_max_speed.GetFloat() );
+	return GetSmoothedVelocity().IsLengthLessThan( 50 );
 }
 

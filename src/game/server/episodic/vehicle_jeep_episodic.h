@@ -1,7 +1,7 @@
 //====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
 //
-// Purpose: 
-//
+// Purpose: Episodic Jalopy
+// TODO; Change wheel particle fx to normal system
 //=============================================================================
 
 #ifndef VEHICLE_JEEP_EPISODIC_H
@@ -82,7 +82,6 @@ protected:
 	virtual float			GetUprightTime( void ) { return 1.0f; }
 	virtual float			GetUprightStrength( void );
 	virtual bool			ShouldPuntUseLaunchForces( PhysGunForce_t reason ) { return ( reason == PHYSGUN_FORCE_PUNTED ); }
-	virtual void			HandleWater( void );
 
 	virtual AngularImpulse	PhysGunLaunchAngularImpulse( void );
 	virtual Vector			PhysGunLaunchVelocity( const Vector &forward, float flMass );
@@ -124,13 +123,12 @@ private:
 	COutputEvent	m_OnHostileEnteredVehicle;	// Passenger has completed entering the vehicle
 	COutputEvent	m_OnHostileExitedVehicle;		// Passenger has completed exited the vehicle
 
-	CHandle< CParticleSystem >			m_hWheelDust[NUM_WHEEL_EFFECTS];
-	CHandle< CParticleSystem >			m_hWheelWater[NUM_WHEEL_EFFECTS];
 	CHandle< CVehicleCargoTrigger >		m_hCargoTrigger;
 	CHandle< CPhysicsProp >				m_hCargoProp;
 
 	CHandle< CSprite >					m_hHazardLights[NUM_HAZARD_LIGHTS];
-	float								m_flNextWaterSound;
+	float	m_flNextDust;
+	float	m_flNextWaterSound;
 
 	bool	m_bRadarEnabled;
 	bool	m_bRadarDetectsEnemies;

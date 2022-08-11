@@ -1,7 +1,7 @@
 //====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
 //
-//
-//
+// Purpose: Episodic Jalopy
+// TODO; Change wheel particle fx to normal system
 //=============================================================================
 
 #include "cbase.h"
@@ -323,8 +323,6 @@ BEGIN_DATADESC( CPropJeepEpisodic )
 	DEFINE_FIELD( m_hCargoProp, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hCargoTrigger, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bAddingCargo, FIELD_BOOLEAN ),
-	DEFINE_ARRAY( m_hWheelDust, FIELD_EHANDLE, NUM_WHEEL_EFFECTS ),
-	DEFINE_ARRAY( m_hWheelWater, FIELD_EHANDLE, NUM_WHEEL_EFFECTS ),
 	DEFINE_ARRAY( m_hHazardLights, FIELD_EHANDLE, NUM_HAZARD_LIGHTS ),
 	DEFINE_FIELD( m_flCargoStartTime, FIELD_TIME ),
 	DEFINE_FIELD( m_bBlink, FIELD_BOOLEAN ),
@@ -335,6 +333,7 @@ BEGIN_DATADESC( CPropJeepEpisodic )
 	DEFINE_FIELD( m_hLinkControllerRear, FIELD_EHANDLE ),
 	DEFINE_KEYFIELD( m_bBusterHopperVisible, FIELD_BOOLEAN, "CargoVisible" ),
 	// m_flNextAvoidBroadcastTime
+	DEFINE_FIELD( m_flNextDust, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextWaterSound, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextRadarUpdateTime, FIELD_TIME ),
 	DEFINE_FIELD( m_iNumRadarContacts, FIELD_INTEGER ),
@@ -400,6 +399,7 @@ void CPropJeepEpisodic::UpdateOnRemove( void )
 {
 	BaseClass::UpdateOnRemove();
 
+#if 0
 	// Kill our wheel dust
 	for ( int i = 0; i < NUM_WHEEL_EFFECTS; i++ )
 	{
@@ -413,6 +413,7 @@ void CPropJeepEpisodic::UpdateOnRemove( void )
 			UTIL_Remove( m_hWheelWater[i] );
 		}
 	}
+#endif
 
 	DestroyHazardLights();
 }
@@ -426,10 +427,10 @@ void CPropJeepEpisodic::Precache( void )
 	PrecacheMaterial( RADAR_PANEL_WRITEZ );
 	PrecacheModel( s_szHazardSprite );
 	PrecacheScriptSound( "JNK_Radar_Ping_Friendly" );
-	PrecacheScriptSound( "Physics.WaterSplash" );
+	PrecacheScriptSound( "Water.WaterSplash" );
 
-	PrecacheParticleSystem( "WheelDust" );
-	PrecacheParticleSystem( "WheelSplash" );
+//	PrecacheParticleSystem( "WheelDust" );
+//	PrecacheParticleSystem( "WheelSplash" );	//CUT; Moving physics objects already create a splash
 
 	BaseClass::Precache();
 }
@@ -637,6 +638,7 @@ bool CPropJeepEpisodic::PassengerInTransition( void )
 {
 	// FIXME: Big hack - we need a way to bridge this data better
 	// TODO: Get a list of passengers we can traverse instead
+//	CNPC_PlayerCompanion *Passenger = info.GetAttacker()->MyCombatCharacterPointer();
 	CNPC_Alyx *pAlyx = CNPC_Alyx::GetAlyx();
 	if ( pAlyx )
 	{
@@ -682,9 +684,9 @@ float CPropJeepEpisodic::GetUprightStrength( void )
 { 
 	// Lesser if overturned
 	if ( IsOverturned() )
-		return 2.0f;
+		return 0.5f;
 	
-	return 0.0f; 
+	return 1.0f; 
 }
 
 //-----------------------------------------------------------------------------
@@ -735,10 +737,11 @@ void CPropJeepEpisodic::UpdateWheelDust( void )
 	bool bAllowDust = vehicleData->steering.dustCloud;
 	
 	// Car must be active
-	bool bCarOn = m_VehiclePhysics.IsOn();
+//!	bool bCarOn = m_VehiclePhysics.IsOn();
+//! Achtually no, if the player bails at mach5 we want dust to still generate
 
 	// Must be moving quickly enough or skidding along the ground
-	bool bCreateDust = ( bCarOn &&
+	bool bCreateDust = ( //!bCarOn &&
 						 bAllowDust && 
 					   ( m_VehiclePhysics.GetSpeed() >= MIN_WHEEL_DUST_SPEED || carState->skidSpeed > DEFAULT_SKID_THRESHOLD ) );
 
@@ -747,90 +750,26 @@ void CPropJeepEpisodic::UpdateWheelDust( void )
 	for ( int i = 0; i < NUM_WHEEL_EFFECTS; i++ )
 	{
 		m_pServerVehicle->GetWheelContactPoint( i, vecPos );
-		
-		// Make sure the effect is created
-		if ( m_hWheelDust[i] == NULL )
-		{
-			// Create the dust effect in place
-			m_hWheelDust[i] = (CParticleSystem *) CreateEntityByName( "info_particle_system" );
-			if ( m_hWheelDust[i] == NULL )
-				continue;
 
-			// Setup our basic parameters
-			m_hWheelDust[i]->KeyValue( "start_active", "0" );
-			m_hWheelDust[i]->KeyValue( "effect_name", "WheelDust" );
-			m_hWheelDust[i]->SetParent( this );
-			m_hWheelDust[i]->SetLocalOrigin( vec3_origin );
-			DispatchSpawn( m_hWheelDust[i] );
-			if ( gpGlobals->curtime > 0.5f )
-				m_hWheelDust[i]->Activate();
+		if ( m_WaterData.m_bWheelInWater[i] )
+		{
+			// Set us up in the right position
+			UTIL_Bubbles( vecPos + Vector( -2, -2, -2 ), vecPos + Vector( 2, 2, 2 ), random->RandomInt( 4, 8 ) );	//PLACEHOLDER
+
+			if ( m_flNextWaterSound < gpGlobals->curtime )
+			{
+				m_flNextWaterSound = gpGlobals->curtime + random->RandomFloat( 0.25f, 1.0f );
+				EmitSound( "Water.WaterSplash" );
+			}
+			return;
 		}
 
-		// Make sure the effect is created
-		if ( m_hWheelWater[i] == NULL )
-		{
-			// Create the dust effect in place
-			m_hWheelWater[i] = (CParticleSystem *) CreateEntityByName( "info_particle_system" );
-			if ( m_hWheelWater[i] == NULL )
-				continue;
-
-			// Setup our basic parameters
-			m_hWheelWater[i]->KeyValue( "start_active", "0" );
-			m_hWheelWater[i]->KeyValue( "effect_name", "WheelSplash" );
-			m_hWheelWater[i]->SetParent( this );
-			m_hWheelWater[i]->SetLocalOrigin( vec3_origin );
-			DispatchSpawn( m_hWheelWater[i] );
-			if ( gpGlobals->curtime > 0.5f )
-				m_hWheelWater[i]->Activate();
-		}
-
-		// Turn the dust on or off
 		if ( bCreateDust )
 		{
-			// Angle the dust out away from the wheels
-			Vector vecForward, vecRight, vecUp;
-			GetVectors( &vecForward, &vecRight, &vecUp );
-			
-			const vehicle_controlparams_t *vehicleControls = m_pServerVehicle->GetVehicleControlParams();
-			float flWheelDir = ( i & 1 ) ? 1.0f : -1.0f;
-			QAngle vecAngles;
-			vecForward += vecRight * flWheelDir;
-			vecForward += vecRight * (vehicleControls->steering*0.5f) * flWheelDir;
-			vecForward += vecUp;
-			VectorAngles( vecForward, vecAngles );
+			float fldustscale = m_VehiclePhysics.GetSpeed() * random->RandomFloat( 0.1f, 0.25f );
+			fldustscale = clamp( fldustscale, 0.0f, 10.0f );
 
-			// NDebugOverlay::Axis( vecPos, vecAngles, 8.0f, true, 0.1f );
-
-			if ( m_WaterData.m_bWheelInWater[i] )
-			{
-				m_hWheelDust[i]->StopParticleSystem();
-
-				// Set us up in the right position
-				m_hWheelWater[i]->StartParticleSystem();
-				m_hWheelWater[i]->SetAbsAngles( vecAngles );
-				m_hWheelWater[i]->SetAbsOrigin( vecPos + Vector( 0, 0, 8 ) );
-
-				if ( m_flNextWaterSound < gpGlobals->curtime )
-				{
-					m_flNextWaterSound = gpGlobals->curtime + random->RandomFloat( 0.25f, 1.0f );
-					EmitSound( "Physics.WaterSplash" );
-				}
-			}
-			else
-			{
-				m_hWheelWater[i]->StopParticleSystem();
-
-				// Set us up in the right position
-				m_hWheelDust[i]->StartParticleSystem();
-				m_hWheelDust[i]->SetAbsAngles( vecAngles );
-				m_hWheelDust[i]->SetAbsOrigin( vecPos + Vector( 0, 0, 8 ) );
-			}
-		}
-		else
-		{
-			// Stop emitting
-			m_hWheelDust[i]->StopParticleSystem();
-			m_hWheelWater[i]->StopParticleSystem();
+			UTIL_Dust( vecPos, 0, fldustscale, fldustscale );
 		}
 	}
 }
@@ -1058,6 +997,8 @@ void CPropJeepEpisodic::Think( void )
 	BaseClass::Think();
 
 	// If our passenger is transitioning, then don't let the player drive off
+	// TODO; Grab any passenger, not just alyx!
+//	CNPC_PlayerCompanion *Passenger = info.GetAttacker()->MyCombatCharacterPointer();
 	CNPC_Alyx *pAlyx = CNPC_Alyx::GetAlyx();
 	if ( pAlyx && pAlyx->GetPassengerState() == PASSENGER_STATE_EXITING )
 	{
@@ -1068,7 +1009,11 @@ void CPropJeepEpisodic::Think( void )
 	UpdateCargoEntry();
 
 	// See if the wheel dust should be on or off
-	UpdateWheelDust();	
+	if ( m_flNextDust < gpGlobals->curtime )
+	{
+		UpdateWheelDust();
+		m_flNextDust = gpGlobals->curtime + 0.1f;	
+	}
 
 	// Update the radar, of course.
 	UpdateRadar();
@@ -1221,6 +1166,7 @@ static void SimpleCollisionResponse( Vector velocityIn, const Vector &normal, fl
 	*pVelocityOut = Vt - coefficientOfRestitution * Vn;
 }
 
+//TODO; I think this is broken, at least when gibs are on - it crashes the game
 static void KillBlockingEnemyNPCs( CBasePlayer *pPlayer, CBaseEntity *pVehicleEntity, IPhysicsObject *pVehiclePhysics )
 {
 	Vector velocity;
@@ -1535,25 +1481,6 @@ void CPropJeepEpisodic::HazardBlinkThink( void )
 	}
 
 	m_bBlink = !m_bBlink;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CPropJeepEpisodic::HandleWater( void )
-{
-	// Only check the wheels and engine in water if we have a driver (player).
-	if ( !GetDriver() )
-		return;
-
-	// Update our internal state
-	CheckWater();
-
-	// Save of data from last think.
-	for ( int iWheel = 0; iWheel < JEEP_WHEEL_COUNT; ++iWheel )
-	{
-		m_WaterData.m_bWheelWasInWater[iWheel] = m_WaterData.m_bWheelInWater[iWheel];
-	}
 }
 
 //-----------------------------------------------------------------------------

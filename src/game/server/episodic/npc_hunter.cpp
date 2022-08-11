@@ -3,6 +3,7 @@
 // Small, fast version of the strider. Goes where striders cannot, such
 // as into buildings. Best killed with physics objects and explosives.
 //
+// TODO; This is 100kb bigger than it needs to be
 //=============================================================================
 
 #include "cbase.h"
@@ -4246,15 +4247,17 @@ void CNPC_Hunter::HandleAnimEvent( animevent_t *pEvent )
 {
 	Vector footPosition;
 	QAngle angles;
-	
+
 	if ( pEvent->event == AE_HUNTER_FOOTSTEP_LEFT )
 	{
+		MakeAIFootstepSound( 240.0f );
 		LeftFootHit( pEvent->eventtime );
 		return;
 	}
 
 	if ( pEvent->event == AE_HUNTER_FOOTSTEP_RIGHT )
 	{
+		MakeAIFootstepSound( 240.0f );
 		RightFootHit( pEvent->eventtime );
 		return;
 	}
@@ -4262,26 +4265,6 @@ void CNPC_Hunter::HandleAnimEvent( animevent_t *pEvent )
 	if ( pEvent->event == AE_HUNTER_FOOTSTEP_BACK )
 	{
 		BackFootHit( pEvent->eventtime );
-		return;
-	}
-	
-	if ( pEvent->event == AE_HUNTER_START_EXPRESSION )
-	{
-		if ( pEvent->options && Q_strlen( pEvent->options ) )
-		{
-			//m_iszCurrentExpression = AllocPooledString( pEvent->options );
-			//SetExpression( pEvent->options );
-		}
-		return;
-	}
-
-	if ( pEvent->event == AE_HUNTER_END_EXPRESSION )
-	{
-		if ( pEvent->options && Q_strlen( pEvent->options ) )
-		{
-			//m_iszCurrentExpression = NULL_STRING;
-			//RemoveActorFromScriptedScenes( this, true, false, pEvent->options );
-		}
 		return;
 	}
 
@@ -4358,6 +4341,28 @@ void CNPC_Hunter::HandleAnimEvent( animevent_t *pEvent )
 
 		return;
 	}
+
+#if 0
+	if ( pEvent->event == AE_HUNTER_START_EXPRESSION )
+	{
+		if ( pEvent->options && Q_strlen( pEvent->options ) )
+		{
+			//m_iszCurrentExpression = AllocPooledString( pEvent->options );
+			//SetExpression( pEvent->options );
+		}
+		return;
+	}
+
+	if ( pEvent->event == AE_HUNTER_END_EXPRESSION )
+	{
+		if ( pEvent->options && Q_strlen( pEvent->options ) )
+		{
+			//m_iszCurrentExpression = NULL_STRING;
+			//RemoveActorFromScriptedScenes( this, true, false, pEvent->options );
+		}
+		return;
+	}
+#endif
 
 	BaseClass::HandleAnimEvent( pEvent );
 }
@@ -5282,7 +5287,7 @@ bool CNPC_Hunter::CanShootThrough( const trace_t &tr, const Vector &vecTarget )
 //-----------------------------------------------------------------------------
 int CNPC_Hunter::GetSoundInterests()
 {
-	return SOUND_WORLD | SOUND_COMBAT | SOUND_PLAYER | SOUND_DANGER | SOUND_PHYSICS_DANGER | SOUND_PLAYER_VEHICLE | SOUND_BULLET_IMPACT | SOUND_MOVE_AWAY;
+	return SOUND_WORLD | SOUND_COMBAT | SOUND_PLAYER | SOUND_DANGER | SOUND_PHYSICS_DANGER | SOUND_VEHICLE | SOUND_BULLET_IMPACT | SOUND_MOVE_AWAY;
 }
 
 //-----------------------------------------------------------------------------

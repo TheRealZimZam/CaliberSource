@@ -1,5 +1,6 @@
 # CaliberSource
 Caliber Source Sourcecode -- Half-Life 1 but with fancy lightbulbs.
+Currently very WIP - use at your own discretion!
 Latest build 8/10/22
 
 All original assets by Valve Software

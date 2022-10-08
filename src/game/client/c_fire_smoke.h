@@ -233,7 +233,7 @@ public:
 		m_vPos[2] += dscale * FLAME_SOURCE_HEIGHT;
 		m_flScale = scale;
 
-//		scale *= 0.75f;
+		scale *= 0.75f;
 
 		float flickerScale = GetFlickerScale();
 

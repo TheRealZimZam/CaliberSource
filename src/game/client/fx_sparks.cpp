@@ -12,6 +12,7 @@
 #include "FX_Sparks.h"
 #include "iefx.h"
 #include "c_te_effect_dispatch.h"
+#include "engine/IEngineSound.h"
 #include "tier0/vprof.h"
 #include "fx_quad.h"
 #include "fx.h"
@@ -721,13 +722,13 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 #define	RICOCHET_SPARK_MAXSPEED	768.0f
 #define	RICOCHET_SPARK_GRAVITY	300.0f
 
-//TODO; This needs a scale - 1 for bullets, 2 for shells, 3 for ludicrous shells
-void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal )
+//TODO; This needs optimization and a scale - 1 for bullets, 2 for shells, 3 for ludicrous shells
+void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal, int Scale )
 {
 	VPROF_BUDGET( "FX_RicochetSpark", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 
-//!	if ( !fx_drawmetalspark.GetBool() )
-//!		return;
+	if ( !fx_drawmetalspark.GetBool() )
+		return;
 
 	//
 	// Impact point fireball
@@ -801,6 +802,11 @@ void FX_RicochetSpark( const Vector &position, const Vector &direction, const Ve
 		Color32Init( pParticle->m_color, 212+ColorRandom, 196+ColorRandom, 164+ColorRandom, 192 );	//224, 192, 128, 192 w/dot
 	}
 #endif
+
+	//
+	//TODO; Send a new line out to a random point
+	//
+
 }
 
 //-----------------------------------------------------------------------------
@@ -1036,10 +1042,11 @@ void FX_EnergySplash( const Vector &pos, const Vector &normal, int nFlags )
 //			&normal - normal of the surface struck
 //-----------------------------------------------------------------------------
 #define	MICRO_EXPLOSION_MINSPEED	100.0f
-#define MICRO_EXPLOSION_MAXSPEED	150.0f
+#define MICRO_EXPLOSION_MAXSPEED	250.0f
+#define MICRO_EXPLOSION_SCALE		random->RandomInt( 10, 16 )
 #define MICRO_EXPLOSION_SPREAD		1.0f
-#define MICRO_EXPLOSION_GRAVITY		0.0f
-#define MICRO_EXPLOSION_DAMPEN		0.4f
+#define MICRO_EXPLOSION_GRAVITY		800.0f
+#define MICRO_EXPLOSION_DAMPEN		8.0f
 
 void FX_MicroExplosion( const Vector &position, const Vector &normal )
 {
@@ -1063,7 +1070,7 @@ void FX_MicroExplosion( const Vector &position, const Vector &normal )
 						MICRO_EXPLOSION_DAMPEN, 
 						bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
 
-	int	numSparks = random->RandomInt( 8, 16 );
+	int	numSparks = random->RandomInt( 3, 6 );
 	
 	if ( g_Material_Spark == NULL )
 	{
@@ -1072,7 +1079,7 @@ void FX_MicroExplosion( const Vector &position, const Vector &normal )
 
 	TrailParticle	*pParticle;
 	Vector	dir, vOfs;
-	float	length = 0.2f;
+	float	length = 0.1f;
 
 	//Fast lines
 	for ( int i = 0; i < numSparks; i++ )
@@ -1089,9 +1096,9 @@ void FX_MicroExplosion( const Vector &position, const Vector &normal )
 			dir[1] = normal[1] + random->RandomFloat( -MICRO_EXPLOSION_SPREAD*ramp, MICRO_EXPLOSION_SPREAD*ramp );
 			dir[2] = normal[2] + random->RandomFloat( -MICRO_EXPLOSION_SPREAD*ramp, MICRO_EXPLOSION_SPREAD*ramp );
 		
-			pParticle->m_flWidth		= random->RandomFloat( 5.0f, 10.0f );
+			pParticle->m_flWidth		= random->RandomFloat( 2.0f, 6.0f );
 			pParticle->m_flLength		= (length*((1.0f-ramp)*(1.0f-ramp)*0.5f));
-			pParticle->m_flDieTime		= 0.2f;
+			pParticle->m_flDieTime		= random->RandomFloat( 0.1f, 0.2f );
 			pParticle->m_vecVelocity	= dir * random->RandomFloat( MICRO_EXPLOSION_MINSPEED*(1.5f-ramp), MICRO_EXPLOSION_MAXSPEED*(1.5f-ramp) );
 
 			Color32Init( pParticle->m_color, 255, 255, 255, 255 );
@@ -1104,26 +1111,37 @@ void FX_MicroExplosion( const Vector &position, const Vector &normal )
 
 	CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "FX_MicroExplosion 2" );
 	pSimple->SetSortOrigin( offset );
-	
+
 	SimpleParticle *sParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), pSimple->GetPMaterial( "sprites/rico1" ), offset );
-		
+
 	if ( sParticle )
 	{
 		sParticle->m_flLifetime		= 0.0f;
-		sParticle->m_flDieTime		= 0.2f;
+		sParticle->m_flDieTime		= 0.1f;
 		
 		sParticle->m_vecVelocity.Init();
 
 		sParticle->m_uchColor[0]	= 255;
 		sParticle->m_uchColor[1]	= 255;
 		sParticle->m_uchColor[2]	= 255;
-		sParticle->m_uchStartAlpha	= random->RandomInt( 192, 224 );
+		sParticle->m_uchStartAlpha	= random->RandomInt( 224, 255 );
 		sParticle->m_uchEndAlpha	= 0;
-		sParticle->m_uchStartSize	= random->RandomInt( 20, 28 );
+		sParticle->m_uchStartSize	= MICRO_EXPLOSION_SCALE;
 		sParticle->m_uchEndSize		= sParticle->m_uchStartSize;
 		sParticle->m_flRoll			= random->RandomInt( 0, 360 );
 		sParticle->m_flRollDelta	= 0.0f;
 	}
+
+	// Play a sound
+#if 0
+	CLocalPlayerFilter filter;
+
+	EmitSound_t ep;
+	ep.m_pSoundName =  "MicroExplosionEffect.Sound";
+	ep.m_pOrigin = &offset;
+
+	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1141,7 +1159,7 @@ void FX_MicroExplosion( const Vector &position, const Vector &normal )
 #define	EXPLOSION_FLECK_DAMPEN			0.3f
 #define	EXPLOSION_FLECK_ANGULAR_SPRAY	0.8f
 
-void FX_Explosion( Vector& origin, Vector& normal, char materialType )
+void FX_Explosion( Vector& origin, Vector& normal, char materialType, int scale )
 {
 	VPROF_BUDGET( "FX_Explosion", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	Vector	offset = origin + ( normal * 2.0f );
@@ -1177,7 +1195,7 @@ void FX_Explosion( Vector& origin, Vector& normal, char materialType )
 	pSparkEmitter->SetSortOrigin( offset );
 
 	Vector	dir;
-	int		numSparks = random->RandomInt( 8,16 );
+	int		numSparks = random->RandomInt(8,12) * scale;
 
 	// Dump out sparks
 	int i;
@@ -1201,7 +1219,6 @@ void FX_Explosion( Vector& origin, Vector& normal, char materialType )
 
 		Color32Init( pParticle->m_color, 255, 255, 255, 255 );
 	}
-
 
 	// Chunks o'dirt
 	// Only create dirt chunks on concrete/world
@@ -1264,7 +1281,7 @@ void FX_Explosion( Vector& origin, Vector& normal, char materialType )
 		pSphereParticle->m_uchStartAlpha	= 150.0;
 		pSphereParticle->m_uchEndAlpha		= 64.0;
 		pSphereParticle->m_uchStartSize		= 0.0;
-		pSphereParticle->m_uchEndSize		= 255.0;
+		pSphereParticle->m_uchEndSize		= 200.0 * scale;
 		pSphereParticle->m_vecVelocity		= Vector(0,0,0);
 
 		float colorRamp = random->RandomFloat( 0.75f, 1.5f );
@@ -1288,8 +1305,8 @@ void FX_Explosion( Vector& origin, Vector& normal, char materialType )
 			pParticle->m_flDieTime		= 0.25f;
 			pParticle->m_uchStartAlpha	= 128.0;
 			pParticle->m_uchEndAlpha	= 64.0;
-			pParticle->m_uchStartSize	= 16.0;
-			pParticle->m_uchEndSize		= 64.0;
+			pParticle->m_uchStartSize	= 16.0 * scale;
+			pParticle->m_uchEndSize		= 48.0 * scale;
 
 			float flAngle = ((float)i * M_PI * 2) / numBalls;
 			float x = cos( flAngle );
@@ -1315,7 +1332,7 @@ void FX_Explosion( Vector& origin, Vector& normal, char materialType )
 		pParticle->m_flLifetime	= 0.0f;
 		pParticle->m_flDieTime	= random->RandomFloat( 2.0f, 3.0f );
 		pParticle->m_uchStartSize	= 64;
-		pParticle->m_uchEndSize		= 255;
+		pParticle->m_uchEndSize		= 200 * scale;
 		dir[0] = normal[0] + random->RandomFloat( -0.8f, 0.8f );
 		dir[1] = normal[1] + random->RandomFloat( -0.8f, 0.8f );
 		dir[2] = normal[2] + random->RandomFloat( -0.8f, 0.8f );
@@ -1330,6 +1347,17 @@ void FX_Explosion( Vector& origin, Vector& normal, char materialType )
 		pParticle->m_uchColor[1] = min( 1.0f, g*colorRamp )*255.0f;
 		pParticle->m_uchColor[2] = min( 1.0f, b*colorRamp )*255.0f;
 	}
+
+	// Play a sound
+#if 0
+	CLocalPlayerFilter filter;
+
+	EmitSound_t ep;
+	ep.m_pSoundName =  "BaseExplosionEffect.Sound";
+	ep.m_pOrigin = &offset;
+
+	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1347,12 +1375,11 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 	// 
 	// Smoke
 	//
-
 	CSmartPtr<CSimpleEmitter> pSmokeEmitter = CSimpleEmitter::Create( "FX_ConcussiveExplosion 1" );
 	pSmokeEmitter->SetSortOrigin( offset );
 
 	//Quick moving sprites
-	 for ( i = 0; i < 16; i++ )
+	 for ( i = 0; i < 12; i++ )
 	{
 		SimpleParticle *pParticle = (SimpleParticle *) pSmokeEmitter->AddParticle( sizeof(SimpleParticle), g_Mat_DustPuff[1], offset );
 
@@ -1360,7 +1387,7 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 			return;
 
 		pParticle->m_flLifetime		= 0.0f;
-		pParticle->m_flDieTime		= random->RandomFloat( 0.2f, 0.4f );
+		pParticle->m_flDieTime		= random->RandomFloat( 0.2f, 0.8f );
 		pParticle->m_uchStartSize	= random->RandomInt( 4, 8 );
 		pParticle->m_uchEndSize		= random->RandomInt( 32, 64 );
 		
@@ -1368,7 +1395,7 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 		dir[1] = random->RandomFloat( -1.0f, 1.0f );
 		dir[2] = random->RandomFloat( -1.0f, 1.0f );
 		
-		pParticle->m_vecVelocity	= dir * random->RandomFloat( 64.0f, 128.0f );
+		pParticle->m_vecVelocity	= dir * random->RandomFloat( 128.0f, 256.0f );
 		pParticle->m_uchStartAlpha	= random->RandomInt( 64, 128 );
 		pParticle->m_uchEndAlpha	= 0;
 		pParticle->m_flRoll			= random->RandomFloat( 180, 360 );
@@ -1413,17 +1440,15 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 	//	
 	// Quick sphere
 	//
-
 	CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "FX_ConcussiveExplosion 2" );
-
 	pSimple->SetSortOrigin( offset );
-	
+
+	// Quick bright flash
 	SimpleParticle *pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof(SimpleParticle), pSimple->GetPMaterial( "effects/blueflare1" ), offset );
-	
 	if ( pParticle )
 	{
 		pParticle->m_flLifetime	= 0.0f;
-		pParticle->m_flDieTime	= 0.1f;
+		pParticle->m_flDieTime	= 0.2f;
 		pParticle->m_vecVelocity.Init();
 		pParticle->m_flRoll			= random->RandomFloat( 180, 360 );
 		pParticle->m_flRollDelta	= random->RandomFloat( -1, 1 );
@@ -1431,47 +1456,46 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 		pParticle->m_uchColor[0] = pParticle->m_uchColor[1] = pParticle->m_uchColor[2] = 128;
 		
 		pParticle->m_uchStartAlpha	= 255;
-		pParticle->m_uchEndAlpha	= 0;
+		pParticle->m_uchEndAlpha	= 128;
 
-		pParticle->m_uchStartSize	= 16;
-		pParticle->m_uchEndSize		= 64;
+		pParticle->m_uchStartSize	= 64;
+		pParticle->m_uchEndSize		= 32;
 	}
 	
+	// Larger dimmer flash
 	pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof(SimpleParticle), pSimple->GetPMaterial( "effects/blueflare1" ), offset );
-	
 	if ( pParticle )
 	{
 		pParticle->m_flLifetime	= 0.0f;
-		pParticle->m_flDieTime	= 0.2f;
+		pParticle->m_flDieTime	= 0.5f;
 		pParticle->m_vecVelocity.Init();
 		pParticle->m_flRoll		= random->RandomFloat( 180, 360 );
 		pParticle->m_flRollDelta	= random->RandomFloat( -1, 1 );
 		pParticle->m_uchColor[0] = pParticle->m_uchColor[1] = pParticle->m_uchColor[2] = 32;
 		
-		pParticle->m_uchStartAlpha	= 64;
-		pParticle->m_uchEndAlpha	= 0;
+		pParticle->m_uchStartAlpha	= 128;
+		pParticle->m_uchEndAlpha	= 16;
 
-		pParticle->m_uchStartSize	= 64;
-		pParticle->m_uchEndSize		= 128;
+		pParticle->m_uchStartSize	= 128;
+		pParticle->m_uchEndSize		= 64;
 	}
 
 
 	//
 	// Dlight
 	//
-
 	dlight_t *dl= effects->CL_AllocDlight ( 0 );
 
 	dl->origin	= offset;
-	dl->color.r = dl->color.g = dl->color.b = 64;
-	dl->radius	= random->RandomFloat(128,256);
-	dl->die		= gpGlobals->curtime + 0.1;
+	dl->color.r = dl->color.g = 64;
+	dl->color.b = 128;
+	dl->radius	= random->RandomFloat(192,300);
+	dl->die		= gpGlobals->curtime + 0.2;
 
 
 	//
 	// Moving lines
 	//
-
 	TrailParticle	*pTrailParticle;
 	CSmartPtr<CTrailParticles> pSparkEmitter	= CTrailParticles::Create( "FX_ConcussiveExplosion 3" );
 	PMaterialHandle hMaterial;
@@ -1500,7 +1524,7 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 
 			pTrailParticle->m_flWidth		= random->RandomFloat( 1.0f, 2.0f );
 			pTrailParticle->m_flLength		= random->RandomFloat( 0.01f, 0.1f );
-			pTrailParticle->m_flDieTime		= random->RandomFloat( 0.1f, 0.2f );
+			pTrailParticle->m_flDieTime		= random->RandomFloat( 0.1f, 0.5f );
 			
 			pTrailParticle->m_vecVelocity	= dir * random->RandomFloat( 800, 1000 );
 
@@ -1545,7 +1569,7 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 			pTrailParticle->m_flWidth		= random->RandomFloat( 1.0f, 2.0f );
 			pTrailParticle->m_flLength		= random->RandomFloat( 0.01f, 0.1f );
 			pTrailParticle->m_flDieTime		= random->RandomFloat( 0.2f, 1.0f );
-			
+
 			pTrailParticle->m_vecVelocity	= dir * random->RandomFloat( 128, 512 );
 
 			float colorRamp = random->RandomFloat( 0.75f, 1.0f );
@@ -1553,7 +1577,6 @@ void FX_ConcussiveExplosion( Vector &origin, Vector &normal )
 		}
 	}
 }
-
 
 void FX_SparkFan( Vector &position, Vector &normal )
 {
@@ -1610,7 +1633,6 @@ void FX_SparkFan( Vector &position, Vector &normal )
 		Color32Init( pParticle->m_color, 255, 255, 255, 255 );
 	}
 }
-
 
 void ManhackSparkCallback( const CEffectData & data )
 {

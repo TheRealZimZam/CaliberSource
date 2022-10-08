@@ -31,7 +31,7 @@ public:
 
 	static	C_BaseExplosionEffect &Instance( void )	{	return m_instance;	}
 
-	virtual void	Create( const Vector &position, float force, float scale, int flags );
+	virtual void	Create( const Vector &position, float force, int model, float scale, int flags );
 
 protected:
 					C_BaseExplosionEffect( void );
@@ -39,6 +39,7 @@ protected:
 	virtual void	PlaySound( void );
 
 	virtual void	CreateCore( float scale );
+	virtual void	CreateSpriteCore( int sprite, float scale );
 	virtual void	CreateDebris( void );
 	virtual void	CreateMisc( void );
 	virtual void	CreateDynamicLight( float scale );

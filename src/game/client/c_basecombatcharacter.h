@@ -34,6 +34,8 @@ public:
 	// -----------------------
 	// Ammo
 	// -----------------------
+	virtual int			GiveAmmo( int iCount, int iAmmoIndex, bool bSuppressSound = false );
+	int					GiveAmmo( int iCount, const char *szName, bool bSuppressSound = false );
 	void				RemoveAmmo( int iCount, int iAmmoIndex );
 	void				RemoveAmmo( int iCount, const char *szName );
 	void				RemoveAllAmmo( );
@@ -54,6 +56,7 @@ public:
 	// This is a sort of hack back-door only used by physgun!
 	void SetAmmoCount( int iCount, int iAmmoIndex );
 
+	float				m_flNextAttack;
 	float				GetNextAttack() const { return m_flNextAttack; }
 	void				SetNextAttack( float flWait ) { m_flNextAttack = flWait; }
 
@@ -64,15 +67,8 @@ public:
 
 	virtual void DoMuzzleFlash();
 
-public:
-
-	float			m_flNextAttack;
-
-
 protected:
-
 	int			m_bloodColor;			// color of blood particless
-
 
 private:
 	CNetworkArray( int, m_iAmmo, MAX_AMMO_TYPES );

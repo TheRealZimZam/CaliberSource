@@ -7,12 +7,16 @@
 #include "cbase.h"
 #include "c_smoke_trail.h"
 #include "smoke_fog_overlay.h"
+#include "env_wind_shared.h"
 #include "engine/IEngineTrace.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 #define SF_EMISSIVE	0x00000001
+
+extern ConVar cl_winddir;
+extern ConVar cl_windspeed;
 
 // ------------------------------------------------------------------------- //
 // Definitions
@@ -353,16 +357,16 @@ void C_FuncSmokeVolume::Update( float fTimeDelta )
 		}
 	}
 
-	if( m_CurrentDensity == 0.0f )
-	{
+	if( m_CurrentDensity < 0.001f )
 		return;
-	}
-	
-	// This is used to randomize the direction it chooses to move a particle in.
 
 	int offsetLookup[3] = {-1,0,1};
+//	if (cl_winddir.GetFloat() > 0)
+//	{
+//		offsetLookup = {-1,cl_winddir.GetFloat(),1};
+//	}
 
-	float tradeDurationMax = m_ParticleSpacingDistance / ( m_MovementSpeed + 0.1f );
+	float tradeDurationMax = m_ParticleSpacingDistance / ( (m_MovementSpeed + cl_windspeed.GetFloat()) + 0.1f );
 	float tradeDurationMin = tradeDurationMax * 0.5f;
 
 	if ( IS_NAN( tradeDurationMax ) || IS_NAN( tradeDurationMin ) )

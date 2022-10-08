@@ -174,7 +174,7 @@ void FX_PlayerTracer( Vector& start, Vector& end )
 }
 
 //TODO; This should be able to take color-values
-void FX_BigPlayerTracer( Vector& start, Vector& end, unsigned char *pTracerColor )
+void FX_BigPlayerTracer( Vector& start, Vector& end, int iTracerColor )
 {
 	VPROF_BUDGET( "FX_BigPlayerTracer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	Vector	shotDir, dStart, dEnd;
@@ -197,6 +197,23 @@ void FX_BigPlayerTracer( Vector& start, Vector& end, unsigned char *pTracerColor
 	const char		*materialName;
 	materialName = "effects/tracer_middle";
 	float width = random->RandomFloat( 0.5f, 0.75f );
+
+#if 0
+	//TODO; Change the color
+	unsigned char tracercolor[3];
+	if ( !pTracerColor )
+	{
+		tracercolor[0] = 255;
+		tracercolor[1] = 255;
+		tracercolor[2] = 255;
+	}
+	else
+	{
+		tracercolor[0] = pTracerColor[0];
+		tracercolor[1] = pTracerColor[1];
+		tracercolor[2] = pTracerColor[2];
+	}
+#endif
 
 	t = new CFXStaticLine( "Tracer", dStart, dEnd, width, 0.01f, materialName, 0 );
 	assert( t );
@@ -249,7 +266,7 @@ void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType )
 	{
 	case TRACER_TYPE_DEFAULT:
 		{
-			pszSoundName = "Bullets.DefaultNearmiss";
+			pszSoundName = "Bullets.SmallNearmiss";
 			flWhizDist = 32;	//24
 
 			Ray_t bullet, listener;
@@ -267,12 +284,12 @@ void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType )
 		break;
 
 	case TRACER_TYPE_GUNSHIP:
-		pszSoundName = "Bullets.GunshipNearmiss";
+		pszSoundName = "Bullets.MediumNearmiss";
 		flWhizDist = 48;
 		break;
 
 	case TRACER_TYPE_STRIDER:
-		pszSoundName = "Bullets.StriderNearmiss";
+		pszSoundName = "Bullets.LargeNearmiss";
 		flWhizDist = 64;
 		break;
 
@@ -284,7 +301,7 @@ void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType )
 		break;
 
 	case TRACER_TYPE_SHOTGUN:
-		pszSoundName = "Bullets.ShotgunNearmiss";
+		pszSoundName = "Bullets.PelletNearmiss";
 		flWhizDist = 32;
 		break;
 
@@ -376,11 +393,26 @@ void FX_BigTracer( Vector& start, Vector& end, int velocity, bool makeWhiz, unsi
 	{
 		float length = max( 64, random->RandomFloat( 128.0f, 192.0f ) );
 		float life = ( dist + length ) / velocity;	//NOTENOTE: We want the tail to finish its run as well
-		float width = random->RandomFloat( 0.75f, 0.85f );
-		
+		float width = random->RandomFloat( 0.6f, 0.75f );
+
 		//Add it
 		const char		*materialName;
 		materialName = ( random->RandomInt( 0, 1 ) ) ? "effects/tracer_middle" : "effects/tracer_middle2";
+
+		//Change the color
+		unsigned char tracercolor[3];
+		if ( !pTracerColor )
+		{
+			tracercolor[0] = 255;
+			tracercolor[1] = 255;
+			tracercolor[2] = 255;
+		}
+		else
+		{
+			tracercolor[0] = pTracerColor[0];
+			tracercolor[1] = pTracerColor[1];
+			tracercolor[2] = pTracerColor[2];
+		}
 
 		FX_AddDiscreetLine( start, dir, velocity, length, dist, width, life, materialName );
 	}

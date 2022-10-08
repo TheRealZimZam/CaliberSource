@@ -13,6 +13,7 @@
 #include "engine/IEngineSound.h"
 #include "engine/IVDebugOverlay.h"
 #include "c_te_effect_dispatch.h"
+#include "Sprite.h"
 #include "fx.h"
 #include "fx_quad.h"
 #include "fx_line.h"
@@ -34,6 +35,7 @@ CLIENTEFFECT_MATERIAL( "effects/fire_embers2" )
 CLIENTEFFECT_MATERIAL( "effects/fire_embers3" )
 CLIENTEFFECT_MATERIAL( "particle/particle_smokegrenade" )
 //CLIENTEFFECT_MATERIAL( "sprites/shockwave" )
+CLIENTEFFECT_MATERIAL( "sprites/heatwave" )
 CLIENTEFFECT_MATERIAL( "effects/splash3" )
 CLIENTEFFECT_MATERIAL( "effects/splashwake1" )
 CLIENTEFFECT_REGISTER_END()
@@ -170,7 +172,7 @@ float C_BaseExplosionEffect::ScaleForceByDeviation( Vector &deviant, Vector &sou
 //			force - 
 // Output : virtual void
 //-----------------------------------------------------------------------------
-void C_BaseExplosionEffect::Create( const Vector &position, float force, float scale, int flags )
+void C_BaseExplosionEffect::Create( const Vector &position, float force, int model, float scale, int flags )
 {
 	m_vecOrigin = position;
 	m_fFlags	= flags;
@@ -188,7 +190,10 @@ void C_BaseExplosionEffect::Create( const Vector &position, float force, float s
 	//NOTENOTE; Env_explode clamps at 10 (if enabled), but nothing else does...
 	if ( scale != 0 )
 	{
-		CreateCore( scale );
+		if ( model != 0 )
+			CreateSpriteCore( model, scale );	//Old-style explosion, just send a sprite out
+		else
+			CreateCore( scale );	//Default explosion
 	}
 
 	CreateDebris();
@@ -544,6 +549,36 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 	}
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void C_BaseExplosionEffect::CreateSpriteCore( int sprite, float scale )
+{
+	//TODO
+/*
+	switch( sprite )
+	{
+		case 1:
+		// Zerog
+		break;
+
+		case 2:
+		// Flare
+		break;
+
+		case 3:
+		// Water
+		break;
+
+		default:
+			//Zerog
+			break;
+	}
+*/
+	CreateCore( scale );
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -698,7 +733,7 @@ void C_BaseExplosionEffect::CreateMisc( void )
 #ifndef _XBOX
 	int HeatwaveQuality = 8;
 #else
-	int HeatwaveQuality = 6;
+	int HeatwaveQuality = 4;
 #endif
 
 	for ( i = 0; i < HeatwaveQuality; i++ )
@@ -842,7 +877,7 @@ void C_BaseExplosionEffect::GetForceDirection( const Vector &origin, float magni
 //-----------------------------------------------------------------------------
 void ExplosionCallback( const CEffectData &data )
 {
-	BaseExplosionEffect().Create( data.m_vOrigin, data.m_flMagnitude, data.m_flScale, data.m_fFlags );
+	BaseExplosionEffect().Create( data.m_vOrigin, data.m_flMagnitude, 0, data.m_flScale, data.m_fFlags );
 }
 
 DECLARE_CLIENT_EFFECT( "Explosion", ExplosionCallback );
@@ -988,7 +1023,7 @@ void C_WaterExplosionEffect::Create( const Vector &position, float force, float 
 	// Get our lighting information
 	FX_GetSplashLighting( m_vecOrigin + Vector( 0, 0, 32 ), &m_vecColor, &m_flLuminosity );
 
-	BaseClass::Create( position, force, scale, flags );
+	BaseClass::Create( position, force, 0, scale, flags );
 }
 
 
@@ -1456,7 +1491,7 @@ void C_MegaBombExplosionEffect::CreateCore( void )
 //-----------------------------------------------------------------------------
 void HelicopterMegaBombCallback( const CEffectData &data )
 {
-	C_MegaBombExplosionEffect().Create( data.m_vOrigin, 1.0f, 1.0f, 0 );
+	C_MegaBombExplosionEffect().Create( data.m_vOrigin, 1.0f, 0, 1.0f, 0 );
 }
 
 DECLARE_CLIENT_EFFECT( "HelicopterMegaBomb", HelicopterMegaBombCallback );

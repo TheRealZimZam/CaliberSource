@@ -64,7 +64,7 @@ void C_TELargeFunnel::CreateFunnel( void )
 	float ratio = 0.25;
 	float invratio = 1 / ratio;
 
-	PMaterialHandle hMaterial = pSimple->GetPMaterial( "sprites/flare6" );
+	PMaterialHandle hMaterial = pSimple->GetPMaterial( "sprites/flare1" );
 
 	for ( i = -256 ; i <= 256 ; i += 24 )	//24 from 32.. little more dense
 	{

@@ -41,7 +41,7 @@ public:
 	virtual void OpenSelection( void );
 	virtual void HideSelection( void );
 
-	virtual void				CancelWeaponSelection( void );
+	virtual void				CancelWeaponSelection( bool bDoSound );
 
 	// Game specific overrides
 	virtual void CycleToNextWeapon( void ) = 0;
@@ -54,7 +54,10 @@ public:
 	virtual void				SetWeaponSelected( void );
 	virtual void				SelectWeapon( void );
 
-	virtual C_BaseCombatWeapon	*GetSelectedWeapon( void ) = 0;
+	virtual	C_BaseCombatWeapon	*GetSelectedWeapon( void )
+	{
+		return m_hSelectedWeapon;
+	}
 
 	virtual void OnWeaponPickup( C_BaseCombatWeapon *pWeapon );
 	virtual bool IsInSelectionMode();

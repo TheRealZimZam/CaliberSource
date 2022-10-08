@@ -848,8 +848,8 @@ void C_EntityFlame::CleanUpRagdollOnRemove( void )
 
 	m_hEntAttached->RemoveFlag( FL_ONFIRE );
 	m_hEntAttached->SetEffectEntity( NULL );
-	m_hEntAttached->StopSound( "General.BurningFlesh" );
-	m_hEntAttached->StopSound( "General.BurningObject" );
+	m_hEntAttached->StopSound( "Fire.BurningFlesh" );
+	m_hEntAttached->StopSound( "Fire.BurningObject" );
 
 	m_hEntAttached = NULL;
 }
@@ -1033,7 +1033,7 @@ void C_EntityFlame::ClientThink( void )
 					if ( m_hEntAttached )
 					{
 						CPASAttenuationFilter filter( m_hEntAttached );
-						m_hEntAttached->EmitSound( filter, m_hEntAttached->GetSoundSourceIndex(), "General.StopBurning" ); 
+						m_hEntAttached->EmitSound( filter, m_hEntAttached->GetSoundSourceIndex(), "Fire.StopBurning" ); 
 					}
 
 					CleanUpRagdollOnRemove();

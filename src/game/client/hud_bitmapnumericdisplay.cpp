@@ -191,7 +191,7 @@ void CHudBitmapNumericDisplay::PaintAmmoBar(void)
 	float ammoPerc = 1 - ((float)ammo / (float)pWeapon->GetMaxClip1());
 
 	gHUD.DrawIconProgressBar(digit_xpos, digit_ypos, width, height, ammoBar, ammoPerc, col, CHud::HUDPB_VERTICAL);
-#endif
+#endif	//MOVE TO HUD_AMMO
 }
 
 //-----------------------------------------------------------------------------

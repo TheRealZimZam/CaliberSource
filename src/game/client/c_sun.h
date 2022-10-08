@@ -63,8 +63,8 @@ public:
 	DECLARE_CLASS( C_Sun, C_BaseEntity );
 	DECLARE_CLIENTCLASS();
 
-					C_Sun();
-					~C_Sun();
+	C_Sun();
+	~C_Sun();
 
 	virtual void	OnDataChanged( DataUpdateType_t updateType );
 

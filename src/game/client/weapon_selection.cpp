@@ -140,7 +140,7 @@ void CBaseHudWeaponSelection::OnThink( void )
 	{
 		if ( IsInSelectionMode() )
 		{
-			CancelWeaponSelection();
+			CancelWeaponSelection( true );
 		}
 	}
 }
@@ -424,11 +424,12 @@ void CBaseHudWeaponSelection::SelectSlot( int iSlot )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Close the weapon selection
+// Purpose: Close the weapon selection manually
 //-----------------------------------------------------------------------------
 void CBaseHudWeaponSelection::UserCmd_Close(void)
 {
-	CancelWeaponSelection();
+	C_BasePlayer::GetLocalPlayer()->EmitSound( "Player.WeaponSelected" );
+	CancelWeaponSelection( false );
 }
 
 //-----------------------------------------------------------------------------
@@ -535,7 +536,7 @@ void CBaseHudWeaponSelection::SelectWeapon( void )
 		SetWeaponSelected();
 	
 		m_hSelectedWeapon = NULL;
-	
+
 		engine->ClientCmd( "cancelselect\n" );
 
 		// Play the "weapon selected" sound
@@ -546,7 +547,7 @@ void CBaseHudWeaponSelection::SelectWeapon( void )
 //-----------------------------------------------------------------------------
 // Purpose: Abort selecting a weapon
 //-----------------------------------------------------------------------------
-void CBaseHudWeaponSelection::CancelWeaponSelection( void )
+void CBaseHudWeaponSelection::CancelWeaponSelection( bool bDoSound )
 {
 	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
 	if ( !player )
@@ -562,7 +563,8 @@ void CBaseHudWeaponSelection::CancelWeaponSelection( void )
 		m_hSelectedWeapon = NULL;
 
 		// Play the "close weapon selection" sound
-		player->EmitSound( "Player.WeaponSelectionClose" );
+		if ( bDoSound )
+			player->EmitSound( "Player.WeaponSelectionClose" );
 	}
 	else
 	{

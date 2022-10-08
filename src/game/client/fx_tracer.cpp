@@ -139,7 +139,7 @@ void BigTracerCallback( const CEffectData &data )
 		VectorMA( data.m_vStart, 4, vright, foo );
 		foo[2] -= 0.5f;
 
-		FX_BigPlayerTracer( foo, (Vector&)data.m_vOrigin );
+		FX_BigPlayerTracer( foo, (Vector&)data.m_vOrigin, 0 );
 		return;
 	}
 	

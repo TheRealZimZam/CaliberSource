@@ -35,11 +35,20 @@ enum
 	FX_ENERGYSPLASH_DEFAULT_EXPLOSIVE = ~0,
 };
 
+enum TracerColour_t
+{
+	TRACER_DEFAULT,
+	TRACER_RED,
+	TRACER_BLUE,
+	TRACER_GREEN,
+	TRACER_ORANGE,
+};
+
 bool FX_GetAttachmentTransform( ClientEntityHandle_t hEntity, int attachmentIndex, matrix3x4_t &transform );
 bool FX_GetAttachmentTransform( ClientEntityHandle_t hEntity, int attachmentIndex, Vector *origin, QAngle *angles );
 
 void FX_RicochetSound( const Vector& pos );
-void FX_HMGRicochetSound( const Vector& pos );
+void FX_MGRicochetSound( const Vector& pos );
 
 void FX_AntlionImpact( const Vector &pos, trace_t *tr );
 void FX_DebrisFlecks( const Vector& origin, trace_t *trace, char materialType, int iScale, bool bNoFlecks = false );
@@ -50,7 +59,7 @@ void FX_StriderTracer( Vector& start, Vector& end, int velocity, bool makeWhiz =
 void FX_HunterTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
 void FX_ShotgunTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
 void FX_PlayerTracer( Vector& start, Vector& end );
-void FX_BigPlayerTracer( Vector& start, Vector& end, unsigned char *pTracerColor = NULL );
+void FX_BigPlayerTracer( Vector& start, Vector& end, int iTracerColor );
 void FX_PlayerShotgunTracer( Vector& start, Vector& end );
 void FX_BulletPass( Vector& start, Vector& end );
 void FX_MetalSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal, int iScale = 1 );

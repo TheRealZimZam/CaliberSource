@@ -27,9 +27,9 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-// TODO; This should be taken from env_wind
-ConVar	cl_winddir			( "cl_winddir", "0", FCVAR_CHEAT, "Set by env_wind - wind direction angle" );
-ConVar	cl_windspeed		( "cl_windspeed", "0", FCVAR_CHEAT, "Set by env_wind - base wind speed" );
+// Taken from env_wind
+extern ConVar cl_winddir;
+extern ConVar cl_windspeed;
 
 Vector g_vSplashColor( 0.5, 0.5, 0.5 );
 float g_flSplashScale = 0.15;

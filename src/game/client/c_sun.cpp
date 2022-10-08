@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright Â© 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -56,7 +56,6 @@ void C_Sun::OnDataChanged( DataUpdateType_t updateType )
 	// will change and that will cause the material to become more translucent  This would be incorrect
 	// for the sun, which should always be completely opaque at its core.  Here, we renormalize the
 	// components to make sure only hue is altered.
-
 	float maxComponent = max ( m_clrRender->r, max ( m_clrRender->g, m_clrRender->b ) );
 
 	Vector vOverlayColor;
@@ -136,6 +135,3 @@ void C_Sun::OnDataChanged( DataUpdateType_t updateType )
 		m_GlowOverlay.Deactivate();
 	}
 }
-
-
-

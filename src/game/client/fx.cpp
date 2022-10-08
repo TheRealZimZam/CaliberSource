@@ -112,12 +112,12 @@ void FX_RicochetSound( const Vector& pos )
  	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.Ricochet", &org );
 }
 
-void FX_HMGRicochetSound( const Vector& pos )
+void FX_MGRicochetSound( const Vector& pos )
 {
 	Vector org = pos;
 	CLocalPlayerFilter filter;
 	// FIXME; This is a looped sound
- 	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.HMGRicochet", &org );
+ 	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.MGRicochet", &org );
 }
 
 //-----------------------------------------------------------------------------

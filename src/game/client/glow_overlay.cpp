@@ -22,7 +22,7 @@
 
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectGlow )
 CLIENTEFFECT_MATERIAL( "sun/overlay" )
-CLIENTEFFECT_MATERIAL( "sprites/light_glow02_add_noz" )
+CLIENTEFFECT_MATERIAL( "sun/sun" )
 CLIENTEFFECT_MATERIAL( "effects/flare" )
 CLIENTEFFECT_REGISTER_END()
 
@@ -160,7 +160,7 @@ void CGlowOverlay::UpdateSkyGlowObstruction( float zFar, bool bCacheFullSceneSta
 	if ( PixelVisibility_IsAvailable() )
 	{
 		// Trace a ray at the object. 
-		Vector pos = CurrentViewOrigin() + m_vDirection * zFar * 0.999f;
+		Vector pos = CurrentViewOrigin() + m_vDirection * zFar * 0.99f;
 
 		// UNDONE: Can probably do only the pixelvis query in this case if you can figure out where
 		// to put it - or save the position of this trace
@@ -395,7 +395,7 @@ void CGlowOverlay::Draw( bool bCacheFullSceneState )
 		// Get our material (deferred default load)
 		if ( m_Sprites[iSprite].m_pMaterial == NULL )
 		{
-			m_Sprites[iSprite].m_pMaterial = materials->FindMaterial( "sprites/light_glow02_add_noz", TEXTURE_GROUP_CLIENT_EFFECTS );
+			m_Sprites[iSprite].m_pMaterial = materials->FindMaterial( "sun/sun", TEXTURE_GROUP_CLIENT_EFFECTS );
 		}
 
 		Assert( m_Sprites[iSprite].m_pMaterial );

@@ -955,18 +955,17 @@ void CC_Player_PhysSwap( void )
 			// If current weapon is a throwable, change it back
 			if ( pWeapon->GetSlot() == 5 )
 			{
-			//	PhysCannonForceDrop( pWeapon, NULL );
 				pPlayer->SelectLastItem();
 				DevMsg( "Switching to previous weapon.\n");
 			}
-			// If it isnt, change to slot 5
 			else
 			{
 				DevMsg( "Attempting to switch to highest-priority consumable.\n");
-			//!	CBaseCombatWeapon *pWeaponGrenade = Weapon_GetSlot( 5 );
-			//!	pPlayer->SelectItem( pWeaponGrenade->GetClassname() );
 
-				pPlayer->SelectItem( "weapon_frag" );	//!!TODO; TEMP
+				//!!TODO; TEMP
+				//if ( !pPlayer->Weapon_ShouldSelectItem( "weapon_frag" ) )
+					pPlayer->SelectItem( "weapon_molotov" );
+					pPlayer->SelectItem( "weapon_frag" );
 			}
 		}
 	}

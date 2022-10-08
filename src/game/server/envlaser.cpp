@@ -171,6 +171,20 @@ void CEnvLaser::InputToggle( inputdata_t &inputdata )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CEnvLaser::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	int active = IsOn();
+
+	if ( !ShouldToggle( useType, active ) )
+		return;
+	if ( active )
+		TurnOff();
+	else
+		TurnOn();
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 

@@ -87,20 +87,26 @@ void CSteamJet::Precache( void )
 	PrecacheMaterial( "sprites/heatwave" );
 }
 
- void CSteamJet::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
- {
-	if (!pActivator->IsPlayer())
+void CSteamJet::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	switch(useType)
 	{
-		if (useType == USE_ON)
-		{
+		case USE_TOGGLE:
+			m_bEmit = !m_bEmit;
+		break;
+
+		case USE_ON:
 			m_bEmit = true;
-		}
-		else if (useType == USE_OFF)
-		{
+		break;
+
+		case USE_OFF:
 			m_bEmit = false;
-		}
+		break;
+
+		default:
+		break;
 	}
- }
+}
 
 
 //-----------------------------------------------------------------------------
@@ -111,7 +117,6 @@ void CSteamJet::InputToggle(inputdata_t &data)
 	m_bEmit = !m_bEmit;
 }
 
-
 //-----------------------------------------------------------------------------
 // Purpose: Input handler for turning on the steam jet.
 //-----------------------------------------------------------------------------
@@ -119,7 +124,6 @@ void CSteamJet::InputTurnOn(inputdata_t &data)
 {
 	m_bEmit = true;
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Input handler for turning off the steam jet.

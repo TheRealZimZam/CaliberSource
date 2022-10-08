@@ -156,7 +156,7 @@ void CSun::Activate()
 
 	if ( m_strOverlayMaterial == NULL_STRING )
 	{
-		m_strOverlayMaterial = AllocPooledString( "sun/sun.vmt" );
+		m_strOverlayMaterial = AllocPooledString( "sun/overlay.vmt" );
 	}
 	else 
 	{

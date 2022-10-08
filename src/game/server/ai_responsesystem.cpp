@@ -2529,13 +2529,13 @@ void CResponseSystem::ParseRule( void )
 			continue;
 		}
 
-		if ( !Q_stricmp( token, "applyContextToWorld" ) )
+		if ( !Q_stricmp( token, "applycontextToWorld" ) )
 		{
 			newRule.m_bApplyContextToWorld = true;
 			continue;
 		}
 
-		if ( !Q_stricmp( token, "applyContext" ) )
+		if ( !Q_stricmp( token, "applycontext" ) )
 		{
 			ParseToken();
 			if ( newRule.GetContext() == NULL )

@@ -1123,8 +1123,8 @@ void CAI_MappedActivityBehavior_Temporary::UpdateTranslateActivityMap()
 		//----
 		{	AIP_STANDING,	ACT_COVER_LOW,			NULL, 				ACT_IDLE 					},
 		//----
-		{	AIP_PEEKING, 	ACT_IDLE, 				"weapon_smg1", 		ACT_RANGE_AIM_SMG1_LOW		},
-		{	AIP_PEEKING, 	ACT_COVER_LOW, 			"weapon_smg1", 		ACT_RANGE_AIM_SMG1_LOW		},
+		{	AIP_PEEKING, 	ACT_IDLE, 				"weapon_smg1", 		ACT_RANGE_AIM_RIFLE_LOW		},
+		{	AIP_PEEKING, 	ACT_COVER_LOW, 			"weapon_smg1", 		ACT_RANGE_AIM_RIFLE_LOW		},
 		{	AIP_PEEKING, 	ACT_IDLE,				"weapon_pistol",	ACT_RANGE_AIM_PISTOL_LOW	},
 		{	AIP_PEEKING, 	ACT_COVER_LOW,			"weapon_pistol",	ACT_RANGE_AIM_PISTOL_LOW	},
 		{	AIP_PEEKING,	ACT_IDLE,				"weapon_ar2",		ACT_RANGE_AIM_AR2_LOW		},

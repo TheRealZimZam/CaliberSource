@@ -76,6 +76,10 @@ int CBaseHLBludgeonWeapon::WeaponMeleeAttack1Condition( float flDot, float flDis
 	{
 		return COND_TOO_FAR_TO_ATTACK;
 	}
+	else if (flDist < m_fMinRange1)
+	{
+		return COND_TOO_CLOSE_TO_ATTACK;
+	}
 	else if (flDot < 0.7)
 	{
 		return COND_NOT_FACING_ATTACK;

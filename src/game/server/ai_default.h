@@ -57,7 +57,7 @@ enum
 	SCHED_FAIL_ESTABLISH_LINE_OF_FIRE,
 	SCHED_SHOOT_ENEMY_COVER,	// Mostly the same as range_attack1???
 	SCHED_COWER, // usually a last resort!
-	SCHED_KNOCKDOWN, // Knockdown from damage-different than a flinch
+	SCHED_STUNNED, // Knockdown from damage-different than a flinch
 	SCHED_MELEE_ATTACK1,
 	SCHED_MELEE_ATTACK2,
 	SCHED_RANGE_ATTACK1,
@@ -70,6 +70,7 @@ enum
 	SCHED_HIDE_AND_RELOAD,
 	SCHED_RELOAD,
 	SCHED_AMBUSH,	// Wait in the current position until enemy comes into view
+	SCHED_EVADE,	// Move/jump to the left or right, to dodge attacks
 	SCHED_DIE,
 	SCHED_DIE_RAGDOLL,
 	SCHED_WAIT_FOR_SCRIPT,

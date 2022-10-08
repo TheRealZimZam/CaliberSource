@@ -11,6 +11,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#define SF_FADE_IN				0x0001		// Fade in, not out
+#define SF_FADE_MODULATE		0x0002		// Modulate, don't blend
+#define SF_FADE_ONLYONE			0x0004
+
 class CEnvFade : public CLogicalEntity
 {
 private:
@@ -26,6 +30,7 @@ public:
 	DECLARE_CLASS( CEnvFade, CLogicalEntity );
 
 	virtual void Spawn( void );
+	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	inline float Duration( void ) { return m_Duration; }
 	inline float HoldTime( void ) { return m_HoldTime; }
@@ -108,6 +113,12 @@ void CEnvFade::InputFade( inputdata_t &inputdata )
 	m_OnBeginFade.FireOutput( inputdata.pActivator, this );
 }
 
+void CEnvFade::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	inputdata_t inputdata;
+	inputdata.pActivator = pActivator;
+	InputFade( inputdata );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Fetches the arguments from the command line for the fadein and fadeout

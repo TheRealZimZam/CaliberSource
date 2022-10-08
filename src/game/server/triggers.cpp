@@ -175,6 +175,21 @@ void CBaseTrigger::Spawn()
 	BaseClass::Spawn();
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Old map compatibility
+//-----------------------------------------------------------------------------
+bool CBaseTrigger::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if (FStrEq(szKeyName, "target"))
+	{
+		//This is the thing we send a basic "use" input to
+		m_target = AllocPooledString(szValue);
+	}
+	else
+		return BaseClass::KeyValue( szKeyName, szValue );
+
+	return true;
+}
 
 //------------------------------------------------------------------------------
 // Cleanup
@@ -265,7 +280,6 @@ void CBaseTrigger::TouchTest( void )
 	{
 		if ( m_hTouchingEntities.Count() !=0 )
 		{
-			
 			m_OnTouching.FireOutput( this, this );
 		}
 		else
@@ -273,6 +287,22 @@ void CBaseTrigger::TouchTest( void )
 			m_OnNotTouching.FireOutput( this, this );
 		}
 	}
+}
+
+//
+// ToggleUse - If this is the USE function for a trigger, its state will toggle every time it's fired
+//
+void CBaseTrigger::ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	if ( !ShouldToggle( useType, m_bDisabled ) )
+		return;
+
+	if (m_bDisabled)
+		Enable();
+	else
+		Disable();
+
+//	UTIL_SetOrigin( this, pev->origin );
 }
 
 //-----------------------------------------------------------------------------
@@ -640,6 +670,15 @@ void CTriggerHurt::Spawn( void )
 
 	SetNextThink( TICK_NEVER_THINK );
 	SetThink( NULL );
+//	if ( !FStringNull( pev->targetname ) )
+//	{
+		SetUse( &CBaseTrigger::ToggleUse );
+//	}
+//	else
+//	{
+//		SetUse( NULL );
+//	}
+
 	if (m_bitsDamageInflict & DMG_RADIATION)
 	{
 		SetThink ( &CTriggerHurt::RadiationThink );
@@ -870,7 +909,6 @@ void CTriggerMultiple::Spawn( void )
 	SetTouch( &CTriggerMultiple::MultiTouch );
 }
 
-
 //-----------------------------------------------------------------------------
 // Purpose: Touch function. Activates the trigger.
 // Input  : pOther - The thing that touched us.
@@ -893,7 +931,14 @@ void CTriggerMultiple::ActivateMultiTrigger(CBaseEntity *pActivator)
 	if (GetNextThink() > gpGlobals->curtime)
 		return;         // still waiting for reset time
 
+/*
+	if (FClassnameIs(this, "trigger_secret"))
+	{
+		gpGlobals->found_secrets++;
+	}
+*/
 	m_hActivator = pActivator;
+	SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 );
 
 	m_OnTrigger.FireOutput(m_hActivator, this);
 
@@ -2140,6 +2185,8 @@ void CTriggerPush::Spawn()
 
 	InitTrigger();
 
+	SetUse( &CBaseTrigger::ToggleUse );
+
 	if (m_flSpeed == 0)
 	{
 		m_flSpeed = 100;
@@ -3289,8 +3336,18 @@ void CTriggerCamera::Move()
 		// Have we moved enough to reach the target?
 		if ( m_moveDistance <= 0 )
 		{
+#if 1
 			variant_t emptyVariant;
 			m_pPath->AcceptInput( "InPass", this, this, emptyVariant, 0 );
+#else
+			// Fire the passtarget if there is one
+			if ( m_pPath->pev->message )
+			{
+				FireTargets( STRING(m_pPath->pev->message), this, this, USE_TOGGLE, 0 );
+				if ( FBitSet( m_pPath->pev->spawnflags, SF_CORNER_FIREONCE ) )
+					m_pPath->pev->message = 0;
+			}
+#endif
 			// Time to go to the next target
 			m_pPath = m_pPath->GetNextTarget();
 

@@ -900,6 +900,8 @@ public:
 	void				Sleep();
 	bool				WokeThisTick() const;
 
+	virtual	bool		AllowedToIgnite( void ) { return false; }
+
 	//---------------------------------
 
 	NPC_STATE			m_NPCState;				// npc's current state
@@ -1056,8 +1058,7 @@ public:
 	
 	void				SelectDeathPose( const CTakeDamageInfo &info );
 	virtual bool		ShouldPickADeathPose( void ) { return true; }
-
-	virtual	bool		AllowedToIgnite( void ) { return false; }
+	virtual	bool		IsFirstEncounter( void ) { return m_bFirstEncounter; }
 
 protected:
 	virtual float 		GetGoalRepathTolerance( CBaseEntity *pGoalEnt, GoalType_t type, const Vector &curGoal, const Vector &curTargetPos );
@@ -1076,6 +1077,7 @@ private:
 	EHANDLE				m_hEnemy;		// the entity that the npc is fighting.
 	float				m_flTimeEnemyAcquired; // The time at which the entity the NPC is fighting became the NPC's enemy.
 	EHANDLE				m_hTargetEnt;	// the entity that the npc is trying to reach
+	bool				m_bFirstEncounter;
 
 	CRandStopwatch		m_GiveUpOnDeadEnemyTimer;
 	CSimpleSimTimer		m_FailChooseEnemyTimer;
@@ -1085,6 +1087,7 @@ private:
 
 	CSimpleSimTimer		m_UpdateEnemyPosTimer;
 	static CSimpleSimTimer m_AnyUpdateEnemyPosTimer;
+
 
 public:
 	//-----------------------------------------------------
@@ -1633,7 +1636,7 @@ public:
 	//---------------------------------
 	//  Cover
 	
-	virtual bool		FindCoverPos( CBaseEntity *pEntity, Vector *pResult );
+	virtual bool		FindCoverPos( CBaseEntity *pEntity, Vector *pResult, bool bLateral = false );
 	virtual bool		FindCoverPosInRadius( CBaseEntity *pEntity, const Vector &goalPos, float coverRadius, Vector *pResult );
 	virtual bool		FindCoverPos( CSound *pSound, Vector *pResult );
 	virtual bool		IsValidCover ( const Vector &vecCoverLocation, CAI_Hint const *pHint );
@@ -1682,8 +1685,9 @@ public:
 
 	// these functions will survey conditions and set appropriate conditions bits for attack types.
 	virtual int			RangeAttack1Conditions( float flDot, float flDist );
-	virtual int			RangeAttack2Conditions( float flDot, float flDist );
 	virtual int			MeleeAttack1Conditions( float flDot, float flDist );
+
+	virtual int			RangeAttack2Conditions( float flDot, float flDist );
 	virtual int			MeleeAttack2Conditions( float flDot, float flDist );
 
 	virtual float		InnateRange1MinRange( void ) { return 0.0f; }
@@ -1767,12 +1771,11 @@ public:
 	virtual void		Event_Killed( const CTakeDamageInfo &info );
 
 	virtual Vector		GetShootEnemyDir( const Vector &shootOrigin, bool bNoisy = true );
-#ifdef HL2_DLL
 	virtual Vector		GetActualShootPosition( const Vector &shootOrigin );
 	virtual Vector		GetActualShootTrajectory( const Vector &shootOrigin );
 	virtual	Vector		GetAttackSpread( CBaseCombatWeapon *pWeapon, CBaseEntity *pTarget = NULL );
 	virtual	float		GetSpreadBias( CBaseCombatWeapon *pWeapon, CBaseEntity *pTarget );
-#endif //HL2_DLL
+
 	virtual void		CollectShotStats( const Vector &vecShootOrigin, const Vector &vecShootDir );
 	virtual Vector		BodyTarget( const Vector &posSrc, bool bNoisy = true );
 	virtual Vector		GetAutoAimCenter() { return BodyTarget(vec3_origin, false); }
@@ -1929,7 +1932,7 @@ private:
 private:
 	// Task implementation helpers
 	void StartTurn( float flDeltaYaw );
-	bool FindCoverFromEnemy( bool bNodesOnly = false, float flMinDistance = 0, float flMaxDistance = FLT_MAX );
+	bool FindCoverFromEnemy( bool bNodesOnly = false, bool bLateralOnly = false, float flMinDistance = 0, float flMaxDistance = FLT_MAX );
 	bool FindCoverFromBestSound( Vector *pCoverPos );
 	void StartScriptMoveToTargetTask( int task );
 	

@@ -45,7 +45,8 @@
 ConVar hl1_ref_db_distance( "hl1_ref_db_distance", "18.0" );
 #define	REFERENCE_dB_DISTANCE	hl1_ref_db_distance.GetFloat()
 #else
-#define REFERENCE_dB_DISTANCE	36.0
+ConVar ref_db_distance( "ref_db_distance", "36.0" );
+#define	REFERENCE_dB_DISTANCE	ref_db_distance.GetFloat()
 #endif//HL1_DLL
 
 static soundlevel_t ComputeSoundlevel( float radius, bool playEverywhere )
@@ -178,6 +179,7 @@ public:
 	void InputVolume( inputdata_t &inputdata );
 	void InputFadeIn( inputdata_t &inputdata );
 	void InputFadeOut( inputdata_t &inputdata );
+	void EXPORT ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	DECLARE_DATADESC();
 
@@ -263,6 +265,7 @@ void CAmbientGeneric::Spawn( void )
 
 	SetThink(&CAmbientGeneric::RampThink);
 	SetNextThink( TICK_NEVER_THINK );
+	SetUse( &CAmbientGeneric::ToggleUse );
 
 	m_fActive = false;
 
@@ -842,6 +845,21 @@ void CAmbientGeneric::InputPlaySound( inputdata_t &inputdata )
 	}
 }
 
+void CAmbientGeneric::ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+#if 0
+	if ( useType != USE_TOGGLE )
+	{
+		if ( (m_fActive && useType == USE_ON) || (!m_fActive && useType == USE_OFF) )
+			return;
+	}
+#endif
+	if ( !ShouldToggle( useType, m_fActive ) )
+		return;
+
+	// Toggle
+	ToggleSound();
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Input handler that stops playing the sound.
@@ -864,11 +882,19 @@ void CAmbientGeneric::SendSound( SoundFlags_t flags)
 		{
 			UTIL_EmitAmbientSound(pSoundSource->GetSoundSourceIndex(), pSoundSource->GetAbsOrigin(), szSoundFile, 
 						0, SNDLVL_NONE, flags, 0);
+			m_fActive = false;
 		}
 		else
 		{
 			UTIL_EmitAmbientSound(pSoundSource->GetSoundSourceIndex(), pSoundSource->GetAbsOrigin(), szSoundFile, 
 				(m_dpv.vol * 0.01), m_iSoundLevel, flags, m_dpv.pitch);
+
+			// Only mark active if this is a looping sound.
+			// If not looping, each trigger will cause the sound to play.
+			// If the sound is still playing from a previous trigger press, 
+			// it will be shut off and then restarted.
+			if ( m_fLooping )
+				m_fActive = true;
 		}
 	}	
 	else
@@ -878,6 +904,7 @@ void CAmbientGeneric::SendSound( SoundFlags_t flags)
 		{
 			UTIL_EmitAmbientSound(m_nSoundSourceEntIndex, GetAbsOrigin(), szSoundFile, 
 					0, SNDLVL_NONE, flags, 0);
+			m_fActive = false;
 		}
 	}
 }

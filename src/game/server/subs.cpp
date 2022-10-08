@@ -94,6 +94,30 @@ void CBaseEntity::SUB_DoNothing( void )
 {
 }
 
+/*
+==============================
+SUB_UseTargets
+
+If self.delay is set, a DelayedUse entity will be created that will actually
+do the SUB_UseTargets after that many seconds have passed.
+
+Removes all entities with a targetname that match self.killtarget,
+and removes them, so some events can remove other triggers.
+
+Search for (string)targetname in all entities that
+match (string)self.target and call their .use function (if they have one)
+
+==============================
+*/
+void CBaseEntity::SUB_UseTargets( CBaseEntity *pActivator, USE_TYPE useType, float value )
+{
+	// fire targets
+	if (m_target != NULL_STRING)
+	{
+		FireTargets( STRING(m_target), pActivator, this, useType, value );
+	}
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Finds all active entities with the given targetname and calls their
 //			'Use' function.

@@ -1020,6 +1020,7 @@ public:
 	void					SUB_CallUseToggle( void ) { this->Use( this, this, USE_TOGGLE, 0 ); }
 	void					SUB_PerformFadeOut( void );
 	virtual	bool			SUB_AllowedToFade( void );
+	void					SUB_UseTargets( CBaseEntity *pActivator, USE_TYPE useType, float value );
 
 	// change position, velocity, orientation instantly
 	// passing NULL means no change

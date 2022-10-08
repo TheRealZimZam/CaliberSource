@@ -2762,25 +2762,6 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 				// No, this weapon sux.
 				continue;
 			}
-/*
-#ifdef HL2_DLL
-			if( FClassnameIs( pWeapon, "weapon_pistol" ) )
-			{
-				// No, it's a pistol.
-				continue;
-			}
-			if( FClassnameIs( pWeapon, "weapon_flaregun" ) )
-			{
-				// No, it's a flaregun.
-				continue;
-			}
-			if( FClassnameIs( pWeapon, "weapon_brickbat" ) )
-			{
-				// No, it's a rock.
-				continue;
-			}
-#endif
-*/
 		}
 
 		float fCurDist = (pWeapon->GetLocalOrigin() - GetLocalOrigin()).Length();
@@ -2836,11 +2817,11 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			}
 
 			// choose the last range attack weapon you find or the first available other weapon
-			if ( ! (pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
-			{
-				continue;
-			}
-			else if (fCurDist > fBestDist ) 
+//			if ( ! (pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
+//			{
+//				continue;
+//			}
+			if (fCurDist > fBestDist ) 
 			{
 				continue;
 			}
@@ -2871,6 +2852,7 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 //			iMax - Max carrying capability of the player
 // Output : Amount of ammo actually given
 //-----------------------------------------------------------------------------
+#if 0
 int CBaseCombatCharacter::GiveAmmo( int iCount, int iAmmoIndex, bool bSuppressSound)
 {
 	if (iCount <= 0)
@@ -2911,7 +2893,7 @@ int CBaseCombatCharacter::GiveAmmo( int iCount, const char *szName, bool bSuppre
 	}
 	return GiveAmmo( iCount, iAmmoType, bSuppressSound );
 }
-
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose:

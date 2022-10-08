@@ -31,12 +31,9 @@ ConVar	ai_moveprobe_usetracelist( "ai_moveprobe_usetracelist", "0" );
 
 ConVar	ai_strong_optimizations_no_checkstand( "ai_strong_optimizations_no_checkstand", "0" );
 
-#ifdef DEBUG
+
 ConVar ai_old_check_stand_position( "ai_old_check_stand_position", "0" );
 #define UseOldCheckStandPosition() (ai_old_check_stand_position.GetBool())
-#else
-#define UseOldCheckStandPosition() (false)
-#endif
 
 //-----------------------------------------------------------------------------
 

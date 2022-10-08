@@ -23,6 +23,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar ai_stun_duration		( "ai_stun_duration","5");
+ConVar ai_stun_duration_max	( "ai_stun_duration_max","8");
 
 //-----------------------------------------------------------------------------
 // Purpose:  This is a generic function (to be implemented by sub-classes) to
@@ -115,11 +117,16 @@ void CAI_BaseHumanoid::BuildScheduleTestBits( )
 //------------------------------------------------------------------------------
 bool CAI_BaseHumanoid::ShouldMoveAndShoot( void )
 {
-	if( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_TOO_FAR_TO_ATTACK ) )
+	if ( IsOnFire() )
 		return false;
 
-	if( GetEnemy() && g_pGameRules->IsSkillLevel( SKILL_EASY ) && HasCondition( COND_BEHIND_ENEMY, false ) )
+	if( HasCondition( COND_TOO_FAR_TO_ATTACK ) )	//|| HasCondition( COND_NO_PRIMARY_AMMO )
 		return false;
+
+#ifdef HL2_DLL
+	if( GetEnemy() && g_pGameRules->IsSkillLevel( SKILL_EASY ) && HasCondition( COND_BEHIND_ENEMY ) )
+		return false;
+#endif
 
 	return BaseClass::ShouldMoveAndShoot();
 }
@@ -186,13 +193,12 @@ bool CAI_BaseHumanoid::OnMoveBlocked( AIMoveResult_t *pResult )
 //-----------------------------------------------------------------------------
 bool CAI_BaseHumanoid::ShouldPickADeathPose( void ) 
 {
+#ifdef HL1_DLL
+	return false;
+#endif
+
 	if ( IsCrouching() )
 		return false;
-
-/*
-	if ( IsMoving() )
-		return false;
-*/
 
 #ifdef HL2_DLL
 	// Allow unique death animations - deathposes are meant to overwrite the generic ones
@@ -200,9 +206,6 @@ bool CAI_BaseHumanoid::ShouldPickADeathPose( void )
 		return false;
 #endif
 
-#ifdef HL1_DLL
-	return false;
-#endif
 	return true;
 }
 
@@ -264,7 +267,23 @@ ConVar	sk_backstab_distance( "sk_backstab_distance", "144.0" );	// 16 feet -- or
 ConVar	sk_backstab_multiplier( "sk_backstab_multiplier", "5.0" );
 void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
+	CTakeDamageInfo newInfo = info;
 	bool bSneakAttacked = false;
+
+#ifdef HL2_DLL
+	// Airboat gun will impart major force if it's about to kill him....
+	if ( info.GetDamageType() & DMG_AIRBOAT )
+	{
+		if ( info.GetDamage() >= GetHealth() )
+		{
+			float flMagnitude = newInfo.GetDamageForce().Length();
+			if ( (flMagnitude != 0.0f) && (flMagnitude < 400.0f * 65.0f) )
+			{
+				newInfo.ScaleDamageForce( 400.0f * 65.0f / flMagnitude );
+			}
+		}
+	}
+#endif
 
 	// Always drop if its a melee attack, regardless of hitgroup
 	if( ptr->hitgroup == HITGROUP_HEAD || info.GetDamageType() & (DMG_SLASH|DMG_CLUB|DMG_SHOCK) )
@@ -297,14 +316,10 @@ void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 
 	if( bSneakAttacked )
 	{
-		CTakeDamageInfo newInfo = info;
-
 		newInfo.ScaleDamage( sk_backstab_multiplier.GetFloat() );
-		BaseClass::TraceAttack( newInfo, vecDir, ptr );
-		return;
 	}
 
-	BaseClass::TraceAttack( info, vecDir, ptr );
+	BaseClass::TraceAttack( newInfo, vecDir, ptr );
 }
 
 //-----------------------------------------------------------------------------

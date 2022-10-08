@@ -348,6 +348,9 @@ int CBaseButton::OnTakeDamage( const CTakeDamageInfo &info )
 		}
 
 		m_OnPressed.FireOutput(m_hActivator, this);
+		// Toggle buttons fire when they get back to their "home" position
+		if ( !HasSpawnFlags(SF_BUTTON_TOGGLE) )
+			SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 );
 		ButtonReturn();
 	}
 	else
@@ -636,6 +639,7 @@ void CBaseButton::ButtonTouch( CBaseEntity *pOther )
 		}
 
 		m_OnPressed.FireOutput(m_hActivator, this);
+		SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 );
 		ButtonReturn();
 	}
 	else
@@ -748,6 +752,7 @@ void CBaseButton::TriggerAndWait( void )
 	m_nState = 1;			// use alternate textures
 
 	m_OnIn.FireOutput(m_hActivator, this);
+	SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 );
 }
 
 
@@ -779,6 +784,32 @@ void CBaseButton::ButtonBackHome( void )
 	m_toggle_state = TS_AT_BOTTOM;
 
 	m_OnOut.FireOutput(m_hActivator, this);
+	if ( HasSpawnFlags(SF_BUTTON_TOGGLE) )
+	{
+		//EMIT_SOUND(ENT(pev), CHAN_VOICE, (char*)STRING(pev->noise), 1, ATTN_NORM);
+		SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 );
+	}
+
+#ifdef HL1_DLL
+	if (!FStringNull(m_target))
+	{
+		edict_t* pentTarget	= NULL;
+		for (;;)
+		{
+			pentTarget = FIND_ENTITY_BY_TARGETNAME(pentTarget, STRING(pev->target));
+
+			if (FNullEnt(pentTarget))
+				break;
+
+			if (!FClassnameIs(pentTarget, "multisource"))
+				continue;
+			CBaseEntity *pTarget = CBaseEntity::Instance( pentTarget );
+
+			if ( pTarget )
+				pTarget->Use( m_hActivator, this, USE_TOGGLE, 0 );
+		}
+	}
+#endif
 
 	//
 	// Re-instate touch method, movement cycle is complete.

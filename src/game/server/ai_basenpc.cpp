@@ -117,7 +117,7 @@ bool RagdollManager_SaveImportant( CAI_BaseNPC *pNPC );
 #define	MIN_PHYSICS_FLINCH_DAMAGE	5.0f
 
 #define	NPC_GRENADE_FEAR_DIST		200
-#define	MAX_GLASS_PENETRATION_DEPTH	16.0f
+#define	MAX_PENETRATION_DEPTH		16.0f
 
 #define FINDNAMEDENTITY_MAX_ENTITIES	32		// max number of entities to be considered for random entity selection in FindNamedEntity
 
@@ -538,7 +538,7 @@ void CAI_BaseNPC::CleanupOnDeath( CBaseEntity *pCulprit, bool bFireDeathOutput )
 		RemoveActorFromScriptedScenes( this, false /*all scenes*/ );
 	}
 	else
-		DevMsg( "Unexpected double-death-cleanup\n" );
+		DevMsg( "WARNING: Unexpected double-death-cleanup!\n" );
 }
 
 void CAI_BaseNPC::SelectDeathPose( const CTakeDamageInfo &info )
@@ -1206,19 +1206,6 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 		}
 	}
 
-	// Airboat gun will impart major force if it's about to kill him....
-	if ( info.GetDamageType() & DMG_AIRBOAT )
-	{
-		if ( subInfo.GetDamage() >= GetHealth() )
-		{
-			float flMagnitude = subInfo.GetDamageForce().Length();
-			if ( (flMagnitude != 0.0f) && (flMagnitude < 400.0f * 65.0f) )
-			{
-				subInfo.ScaleDamageForce( 400.0f * 65.0f / flMagnitude );
-			}
-		}
-	}
-
 	if( info.GetInflictor() )
 	{
 		subInfo.SetInflictor( info.GetInflictor() );
@@ -1497,7 +1484,7 @@ void CBaseEntity::HandleShotPenetrating( const FireBulletsInfo_t &info,
 	const trace_t &tr, const Vector &vecDir, ITraceFilter *pTraceFilter, bool bHitGlass )
 {
 	// Move through the glass until we're at the other side
-	Vector	testPos = tr.endpos + ( vecDir * MAX_GLASS_PENETRATION_DEPTH );
+	Vector	testPos = tr.endpos + ( vecDir * MAX_PENETRATION_DEPTH );
 
 	CEffectData	data;
 	data.m_vNormal = tr.plane.normal;
@@ -1530,11 +1517,11 @@ void CBaseEntity::HandleShotPenetrating( const FireBulletsInfo_t &info,
 	behindGlassInfo.m_iShots = 1;
 	behindGlassInfo.m_vecSrc = penetrationTrace.endpos;
 	behindGlassInfo.m_vecDirShooting = vecDir;
-	behindGlassInfo.m_vecSpread = vec3_origin;
+	behindGlassInfo.m_vecSpread = bHitGlass ? info.m_vecSpread : (info.m_vecSpread*1.5f);	//Add a bit of spread, if not glass
 	behindGlassInfo.m_flDistance = info.m_flDistance*( 1.0f - tr.fraction );
 	behindGlassInfo.m_iAmmoType = info.m_iAmmoType;
 	behindGlassInfo.m_iTracerFreq = info.m_iTracerFreq;
-	behindGlassInfo.m_iDamage = info.m_iDamage;
+	behindGlassInfo.m_iDamage = bHitGlass ? info.m_iDamage : (info.m_iDamage/2);	//Half the damage, if not glass
 	behindGlassInfo.m_pAttacker = info.m_pAttacker ? info.m_pAttacker : this;
 	behindGlassInfo.m_nFlags = info.m_nFlags;
 
@@ -2646,24 +2633,22 @@ void CAI_BaseNPC::SetAim( const Vector &aimDir )
 	if( GetEnemy() )
 	{
 		// clamp and dampen movement
-		newPitch = curPitch + 0.8 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 20 ), curPitch );
+		newPitch = curPitch + 0.7 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 30 ), curPitch );
 
 #if 0
 		float flRelativeYaw = UTIL_AngleDiff( angDir.y, GetAbsAngles().y );
 		newYaw = curYaw + UTIL_AngleDiff( flRelativeYaw, curYaw );
 #else
-		float flRelativeYaw = UTIL_AngleDiff( angDir.y, GetMotor()->GetIdealYaw() );
-		float flNewTargetYaw = UTIL_ApproachAngle( flRelativeYaw, curYaw, 20 );
-		newYaw = curYaw + 0.8 * UTIL_AngleDiff( flNewTargetYaw, curYaw );
+		newYaw = curYaw + 0.7 * UTIL_AngleDiff( UTIL_ApproachAngle( UTIL_AngleDiff( angDir.y, GetMotor()->GetIdealYaw()), curYaw, 30 ), curYaw );
 #endif
 	}
 	else
 	{
 		// Sweep your weapon more slowly if you're not fighting someone
-		newPitch = curPitch + 0.6 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 20 ), curPitch );
+		newPitch = curPitch + 0.5 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 20 ), curPitch );
 
 		float flRelativeYaw = UTIL_AngleDiff( angDir.y, GetAbsAngles().y );
-		newYaw = curYaw + 0.6 * UTIL_AngleDiff( flRelativeYaw, curYaw );
+		newYaw = curYaw + 0.5 * UTIL_AngleDiff( flRelativeYaw, curYaw );
 	}
 
 	newPitch = AngleNormalize( newPitch );
@@ -4102,6 +4087,9 @@ void CAI_BaseNPC::RemoveIgnoredConditions( void )
 //=========================================================
 int CAI_BaseNPC::RangeAttack1Conditions ( float flDot, float flDist )
 {
+	if ( gpGlobals->curtime < m_flNextAttack )
+		return COND_NONE;
+
 	if ( flDist < 64)
 	{
 		return COND_TOO_CLOSE_TO_ATTACK;
@@ -4123,6 +4111,9 @@ int CAI_BaseNPC::RangeAttack1Conditions ( float flDot, float flDist )
 //=========================================================
 int CAI_BaseNPC::RangeAttack2Conditions ( float flDot, float flDist )
 {
+	if ( gpGlobals->curtime < m_flNextAttack )
+		return COND_NONE;
+
 	if ( flDist < 64)
 	{
 		return COND_TOO_CLOSE_TO_ATTACK;
@@ -4144,6 +4135,9 @@ int CAI_BaseNPC::RangeAttack2Conditions ( float flDot, float flDist )
 //=========================================================
 int CAI_BaseNPC::MeleeAttack1Conditions ( float flDot, float flDist )
 {
+	if ( gpGlobals->curtime < m_flNextAttack )
+		return COND_NONE;
+
 	if ( flDist > 64)
 	{
 		return COND_TOO_FAR_TO_ATTACK;
@@ -4170,6 +4164,9 @@ int CAI_BaseNPC::MeleeAttack1Conditions ( float flDot, float flDist )
 //=========================================================
 int CAI_BaseNPC::MeleeAttack2Conditions ( float flDot, float flDist )
 {
+	if ( gpGlobals->curtime < m_flNextAttack )
+		return COND_NONE;
+
 	if ( flDist > 64)
 	{
 		return COND_TOO_FAR_TO_ATTACK;
@@ -5455,6 +5452,10 @@ bool CAI_BaseNPC::FCanCheckAttacks( void )
 //-----------------------------------------------------------------------------
 float CAI_BaseNPC::EnemyDistance( CBaseEntity *pEnemy )
 {
+	// If we got passed a null
+	if(pEnemy == NULL)
+		return 0;
+
 	Vector enemyDelta = pEnemy->WorldSpaceCenter() - WorldSpaceCenter();
 	
 	// NOTE: We ignore rotation for computing height.  Assume it isn't an effect
@@ -6883,6 +6884,7 @@ void CAI_BaseNPC::NPCInit ( void )
 	SetHintNode( NULL );
 
 	m_afMemory			= MEMORY_CLEAR;
+	m_bFirstEncounter	= true;
 
 	SetEnemy( NULL );
 
@@ -9615,7 +9617,6 @@ void CAI_BaseNPC::CollectShotStats( const Vector &vecShootOrigin, const Vector &
 	}
 }
 
-#ifdef HL2_DLL
 //-----------------------------------------------------------------------------
 // Purpose: Return the actual position the NPC wants to fire at when it's trying
 //			to hit it's current enemy.
@@ -9854,7 +9855,7 @@ Vector CAI_BaseNPC::GetActualShootTrajectory( const Vector &shootOrigin )
 
 	return shotDir;
 }
-#endif HL2_DLL
+
 
 //-----------------------------------------------------------------------------
 
@@ -9880,7 +9881,14 @@ Vector CAI_BaseNPC::BodyTarget( const Vector &posSrc, bool bNoisy )
 //-----------------------------------------------------------------------------
 
 bool CAI_BaseNPC::ShouldMoveAndShoot()
-{ 
+{
+	// If you arent moving dont move and shoot... duh
+	if ( !IsMoving() )
+		return false;
+
+	if ( GetState() == NPC_STATE_SCRIPT || IsInAScript() )
+		return false;
+	
 	return ( ( CapabilitiesGet() & bits_CAP_MOVE_SHOOT ) != 0 ); 
 }
 
@@ -10154,6 +10162,7 @@ void CAI_BaseNPC::SetEnemy( CBaseEntity *pEnemy, bool bSetCondNewEnemy )
 
 	m_hEnemy = pEnemy;
 	m_flTimeEnemyAcquired = gpGlobals->curtime;
+	m_bFirstEncounter = false;
 
 	m_LastShootAccuracy = -1;
 	m_TotalShots		= 0;
@@ -14102,7 +14111,7 @@ bool CAI_BaseNPC::IsCrouchedActivity( Activity activity )
 		case ACT_COVER_SMG1_LOW:
 		case ACT_RELOAD_PISTOL_LOW:
 		case ACT_RELOAD_SMG1_LOW:
-		case ACT_RANGE_AIM_SMG1_LOW:
+		case ACT_RANGE_AIM_RIFLE_LOW:
 		case ACT_RANGE_AIM_PISTOL_LOW:
 #endif
 		case ACT_RANGE_AIM_LOW:

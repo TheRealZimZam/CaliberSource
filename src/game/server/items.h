@@ -32,8 +32,8 @@
 #define SIZE_AMMO_PISTOL_LARGE		104
 #define SIZE_AMMO_SMG1				50
 #define SIZE_AMMO_SMG1_LARGE		200
-#define SIZE_AMMO_SMG2				60
-#define SIZE_AMMO_SMG2_LARGE		180
+#define SIZE_AMMO_SMG2				35
+#define SIZE_AMMO_SMG2_LARGE		140
 #define SIZE_AMMO_AR1				30
 #define SIZE_AMMO_AR1_LARGE			120
 #define SIZE_AMMO_AR2				25
@@ -47,7 +47,7 @@
 
 #define SIZE_AMMO_SNIPER			4	// Comes in a strip like a bolt rifle, but is loaded seperately
 // Both shotguns use the same ammo, so average out their magazine size (better solution L8R)
-#define SIZE_AMMO_BUCKSHOT			4
+#define SIZE_AMMO_BUCKSHOT			5
 #define SIZE_AMMO_BUCKSHOT_MAG		7
 #define SIZE_AMMO_BUCKSHOT_LARGE	16	//Bigger box based on smaller box, for sweeper use clips
 #define SIZE_AMMO_SLUG_MAG			7

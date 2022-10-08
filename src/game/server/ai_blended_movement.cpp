@@ -853,7 +853,7 @@ void CAI_BlendedMotor::BuildTurnScript( const AILocalMoveGoal_t &move  )
 	{
 		float deltaYaw = UTIL_AngleDiff( m_scriptTurn[i-1].flYaw, m_scriptTurn[i].flYaw );
 	
-		float maxYaw = YAWSPEED * m_scriptTurn[i-1].flTime;
+		float maxYaw = YAWSPEED * m_scriptTurn[i-1].flTime;	//YAWSPEED
 
 		if (fabs(deltaYaw) > maxYaw)
 		{
@@ -881,10 +881,10 @@ int CAI_BlendedMotor::BuildTurnScript( int i, int j )
 	float deltaYaw;
 
 	deltaYaw = fabs( UTIL_AngleDiff( interiorYaw, m_scriptTurn[i].flYaw ) );
-	float t1 = deltaYaw / YAWSPEED;
+	float t1 = deltaYaw / YAWSPEED;	//YAWSPEED
 
 	deltaYaw = fabs( UTIL_AngleDiff( m_scriptTurn[j].flYaw, interiorYaw ) );
-	float t2 = deltaYaw / YAWSPEED;
+	float t2 = deltaYaw / YAWSPEED;	//YAWSPEED
 
 	float totalTime = m_scriptTurn[j].flElapsedTime - m_scriptTurn[i].flElapsedTime;
 

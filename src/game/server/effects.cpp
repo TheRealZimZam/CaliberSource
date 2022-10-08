@@ -1408,10 +1408,15 @@ public:
 
 	void	Spawn( void );
 	void	Precache( void );
-	void	CanThink ( void );
-	void	CanTouch ( CBaseEntity *pOther );
+	void	CanThink( void );
+	void	CanTouch( CBaseEntity *pOther );
+	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	DECLARE_DATADESC();
+
+//private:
+//	float	m_flCanLife;
+
 };
 
 
@@ -1420,6 +1425,8 @@ BEGIN_DATADESC( CItemSoda )
 	// Function Pointers
 	DEFINE_FUNCTION( CanThink ),
 	DEFINE_FUNCTION( CanTouch ),
+	
+//	DEFINE_FIELD( m_flCanLife, FIELD_TIME ),
 
 END_DATADESC()
 
@@ -1430,6 +1437,7 @@ void CItemSoda::Precache ( void )
 	PrecacheModel( "models/can.mdl" );
 
 	PrecacheScriptSound( "ItemSoda.Bounce" );
+	PrecacheScriptSound( "Player.Drink" );
 }
 
 void CItemSoda::Spawn( void )
@@ -1439,34 +1447,44 @@ void CItemSoda::Spawn( void )
 	SetMoveType( MOVETYPE_FLYGRAVITY );
 
 	SetModel ( "models/can.mdl" );
-	UTIL_SetSize ( this, Vector ( 0, 0, 0 ), Vector ( 0, 0, 0 ) );
+	UTIL_SetSize( this, Vector ( 0, 0, 0 ), Vector ( 0, 0, 0 ) );
+
+//	m_flCanLife = 60.0f;	//Stay alive for this long
 
 	SetThink (&CItemSoda::CanThink);
 	SetNextThink( gpGlobals->curtime + 0.5f );
 }
 
-void CItemSoda::CanThink ( void )
+void CItemSoda::CanThink( void )
 {
 	EmitSound( "ItemSoda.Bounce" );
 
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_TRIGGER );
-	UTIL_SetSize ( this, Vector ( -8, -8, 0 ), Vector ( 8, 8, 8 ) );
+	UTIL_SetSize( this, Vector ( -8, -8, 0 ), Vector ( 8, 8, 8 ) );
 
-	SetThink ( NULL );
-	SetTouch ( &CItemSoda::CanTouch );
+	SetThink( NULL );
+	SetTouch( &CItemSoda::CanTouch );
+//	SetUse( &CItemSoda::CanUse );
 }
 
-void CItemSoda::CanTouch ( CBaseEntity *pOther )
+void CItemSoda::CanTouch( CBaseEntity *pOther )
 {
 	if ( !pOther->IsPlayer() )
-	{
 		return;
-	}
+
+	Use( pOther, NULL, USE_ON, 0 ); // only the first param is used
+}
+
+void CItemSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	if ( !pActivator->IsPlayer() )
+		return;
 
 	// spoit sound here
-
-	pOther->TakeHealth( 1, DMG_GENERIC );// a bit of health.
+	CPASAttenuationFilter filter( pActivator, "Player.Drink" );
+	EmitSound( filter, pActivator->entindex(), "Player.Eat" );
+	pActivator->TakeHealth( 1, DMG_GENERIC );// a bit of health.
 
 	if ( GetOwnerEntity() )
 	{

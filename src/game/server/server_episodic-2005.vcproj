@@ -1841,10 +1841,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\hl1_ents.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\common\hl2orange.spa.h"
 				>
 			</File>
@@ -3856,6 +3852,14 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\grenade_concussive.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\grenade_concussive.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\grenade_frag.cpp"
 					>
 				</File>
@@ -4268,11 +4272,11 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\npc_rollermine.cpp"
+					RelativePath=".\hl2\npc_roller.h"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\npc_rollermine.h"
+					RelativePath=".\hl2\npc_rollermine.cpp"
 					>
 				</File>
 				<File
@@ -4480,6 +4484,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\weapon_emp.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\weapon_flameprojector.cpp"
 					>
 				</File>
@@ -4497,6 +4505,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\weapon_flaregun.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_flashlight.cpp"
 					>
 				</File>
 				<File
@@ -4544,7 +4556,19 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_smg.cpp"
+					RelativePath=".\hl2\weapon_smg1.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_smg2.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_sniperrifle.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\weapon_sniperrifle.h"
 					>
 				</File>
 				<File
@@ -4651,19 +4675,11 @@
 						>
 					</File>
 					<File
-						RelativePath=".\hl2\weapon_cguard.cpp"
-						>
-					</File>
-					<File
 						RelativePath=".\episodic\weapon_hopwire.cpp"
 						>
 					</File>
 					<File
 						RelativePath=".\episodic\weapon_proto1.cpp"
-						>
-					</File>
-					<File
-						RelativePath=".\hl2\weapon_sniperrifle.cpp"
 						>
 					</File>
 				</Filter>

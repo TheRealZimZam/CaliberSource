@@ -47,6 +47,7 @@ public:
 	void Activate( void );
 	virtual void PostClientActive( void );
 	void InitTrigger( void );
+	bool KeyValue( const char *szKeyName, const char *szValue );
 
 	void Enable( void );
 	void Disable( void );
@@ -59,6 +60,7 @@ public:
 	virtual void InputDisable( inputdata_t &inputdata );
 	virtual void InputToggle( inputdata_t &inputdata );
 	virtual void InputTouchTest ( inputdata_t &inputdata );
+	virtual void ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	virtual void InputStartTouch( inputdata_t &inputdata );
 	virtual void InputEndTouch( inputdata_t &inputdata );
@@ -106,6 +108,7 @@ class CTriggerMultiple : public CBaseTrigger
 	DECLARE_CLASS( CTriggerMultiple, CBaseTrigger );
 public:
 	void Spawn( void );
+
 	void MultiTouch( CBaseEntity *pOther );
 	void MultiWaitOver( void );
 	void ActivateMultiTrigger(CBaseEntity *pActivator);

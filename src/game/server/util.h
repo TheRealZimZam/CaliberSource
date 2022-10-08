@@ -158,6 +158,10 @@ inline bool FNullEnt(const edict_t* pent)
 	return pent == NULL || ENTINDEX((edict_t*)pent) == 0; 
 }
 
+// Testing strings for nullity
+#define iStringNull 0
+inline bool FStringNull(int iString)			{ return iString == iStringNull; }
+
 // Dot products for view cone checking
 #define VIEW_FIELD_FULL		(float)-1.0 // +-180 degrees
 #define	VIEW_FIELD_WIDE		(float)-0.7 // +-135 degrees 0.1 // +-85 degrees, used for full FOV checks 

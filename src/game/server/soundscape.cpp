@@ -67,6 +67,7 @@ void CEnvSoundscapeProxy::Activate()
 // ----------------------------------------------------------------------------- //
 
 LINK_ENTITY_TO_CLASS( env_soundscape, CEnvSoundscape );
+LINK_ENTITY_TO_CLASS( env_sound, CEnvSoundscape );
 
 BEGIN_DATADESC( CEnvSoundscape )
 
@@ -176,7 +177,7 @@ void CEnvSoundscape::Enable( void )
 
 bool CEnvSoundscape::KeyValue( const char *szKeyName, const char *szValue )
 {
-	if (FStrEq(szKeyName, "soundscape"))
+	if (FStrEq(szKeyName, "soundscape") || FStrEq(szKeyName, "roomtype"))
 	{
 		m_soundscapeName = AllocPooledString( szValue );
 	}

@@ -799,14 +799,9 @@ void CBasePlayer::DeathSound( const CTakeDamageInfo &info )
 {
 	// Did we die from falling?
 	if ( m_bitsDamageType & DMG_FALL )
-	{
-		// They died in the fall. Play a splat sound.
-		EmitSound( "Player.FallGib" );
-	}
+		EmitSound( "Player.FallGib" );	// They died in the fall. Play a splat sound.
 	else
-	{
 		EmitSound( "Player.Death" );
-	}
 
 	// play one of the suit death alarms
 	if ( IsSuitEquipped() )
@@ -1860,7 +1855,7 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 	// This could stand to be redone. Why is playerAnim abstracted from activity? (sjb)
 	if (playerAnim == PLAYER_JUMP)
 	{
-		idealActivity = ACT_JUMP;	//ACT_HOP
+		idealActivity = ACT_JUMP;
 	}
 	else if (playerAnim == PLAYER_SUPERJUMP)
 	{
@@ -1903,11 +1898,7 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 			{
 				idealActivity = ACT_SWIM;
 			}
-			if ( m_iHealth < sk_player_critical_health.GetInt() )
-			{
-				idealActivity = ACT_WALK_HURT;
-			}
-			if ( speed > 160.0 )
+			else if ( speed > 160.0 )
 			{
 				// Jogging
 				idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_RUN_AIM ) : Weapon_TranslateActivity( ACT_RUN );
@@ -1916,6 +1907,10 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 					// Full sprint
 					idealActivity = Weapon_TranslateActivity( ACT_SPRINT );
 				}
+			}
+			else if ( m_iHealth < sk_player_critical_health.GetInt() )
+			{
+				idealActivity = ACT_WALK_HURT;
 			}
 		}
 	}
@@ -1944,7 +1939,6 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 		idealActivity = Weapon_TranslateActivity( ACT_RELOAD );
 		if ( IsDucked() )
 			idealActivity = Weapon_TranslateActivity( ACT_RELOAD_LOW );
-
 	}
 	else if (playerAnim == PLAYER_IN_VEHICLE)
 	{
@@ -2210,10 +2204,10 @@ void CBasePlayer::PlayerDeathThink(void)
 // if the player has been dead for one second longer than allowed by forcerespawn, 
 // forcerespawn isn't on. Send the player off to an intermission camera until they 
 // choose to respawn.
-	if ( g_pGameRules->IsMultiplayer() && ( gpGlobals->curtime > (m_flDeathTime + DEATH_ANIMATION_TIME) ) && !IsObserver() )
+	if ( gpGlobals->curtime > (m_flDeathTime + DEATH_ANIMATION_TIME) && !IsObserver() )	//g_pGameRules->IsMultiplayer()
 	{
 		// go to dead camera. 
-		StartObserverMode( m_iObserverLastMode );
+		StartDeathCam();	//StartObserverMode( m_iObserverLastMode )
 	}
 	
 // wait for any button down,  or mp_forcerespawn is set and the respawn time is up
@@ -2230,7 +2224,6 @@ void CBasePlayer::PlayerDeathThink(void)
 	SetNextThink( TICK_NEVER_THINK );
 }
 
-/*
 
 //=========================================================
 // StartDeathCam - find an intermission spot and send the
@@ -2238,14 +2231,15 @@ void CBasePlayer::PlayerDeathThink(void)
 //=========================================================
 void CBasePlayer::StartDeathCam( void )
 {
-	CBaseEntity *pSpot, *pNewSpot;
-	int iRand;
-
 	if ( GetViewOffset() == vec3_origin )
 	{
 		// don't accept subsequent attempts to StartDeathCam()
 		return;
 	}
+
+#if 0
+	CBaseEntity *pSpot, *pNewSpot;
+	int iRand;
 
 	pSpot = gEntList.FindEntityByClassname( NULL, "info_intermission");	
 
@@ -2270,20 +2264,13 @@ void CBasePlayer::StartDeathCam( void )
 		StartObserverMode( pSpot->GetAbsOrigin(), pSpot->GetAbsAngles() );
 	}
 	else
-	{
-		// no intermission spot. Push them up in the air, looking down at their corpse
-		trace_t tr;
+#endif
 
-		CreateCorpse();
-
-		UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + Vector( 0, 0, 128 ), 
-			MASK_PLAYERSOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
-		QAngle angles;
-		VectorAngles( GetAbsOrigin() - tr.endpos, angles );
-		StartObserverMode( tr.endpos, angles );
-		return;
-	}
-} */
+	// no intermission spot. Push them up in the air, looking down at their corpse
+	CreateCorpse();
+	StartObserverMode( OBS_MODE_DEATHCAM );
+	return;
+}
 
 void CBasePlayer::StopObserverMode()
 {
@@ -5918,13 +5905,16 @@ void CBasePlayer::ImpulseCommands( )
 	{
 	case 100:
         // temporary flashlight for level designers
-        if ( FlashlightIsOn() )
+		if ( IsSuitEquipped() )
 		{
-			FlashlightTurnOff();
-		}
-        else 
-		{
-			FlashlightTurnOn();
+			if ( FlashlightIsOn() )
+			{
+				FlashlightTurnOff();
+			}
+			else 
+			{
+				FlashlightTurnOn();
+			}
 		}
 		break;
 
@@ -5976,9 +5966,8 @@ void CBasePlayer::ImpulseCommands( )
 		{
 			// too early!
 			break;
-
 		}
-		
+
 		EntityMessageBegin( this );
 			WRITE_BYTE( PLAY_PLAYER_JINGLE );
 		MessageEnd();
@@ -6175,14 +6164,14 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveAmmo( 255,	"HMG");
 		GiveAmmo( 32,	"357" );
 		GiveAmmo( 255,	"Buckshot");
-		GiveAmmo( 5,	"SMG1_Grenade");
-		GiveAmmo( 5,	"RPG_Round");
+		GiveAmmo( 5,	"AR2Grenade");
+		GiveAmmo( 5,	"RPGRound");
 		GiveAmmo( 24,	"SniperRound");
 		GiveAmmo( 16,	"XBowBolt" );
 		GiveAmmo( 10,	"FlareRound" );
 		GiveAmmo( 255,	"Flamethrower");
 		GiveAmmo( 5,	"Grenade");
-		GiveAmmo( 5,	"StunGrenade");
+		GiveAmmo( 5,	"EMPGrenade");
 		GiveAmmo( 5,	"Slam");
 		GiveAmmo( 5,	"Molotov");
 		GiveAmmo( 5,	"Brickbat");
@@ -6194,12 +6183,12 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 //		GiveNamedItem( "weapon_alyxgun" );
 //		GiveNamedItem( "weapon_ar1" );
 		GiveNamedItem( "weapon_ar2" );
-		GiveNamedItem( "weapon_binoculars" );
+//		GiveNamedItem( "weapon_binoculars" );
 		GiveNamedItem( "weapon_brickbat" );
 		GiveNamedItem( "weapon_bugbait" );
 //		GiveNamedItem( "weapon_cguard" );
 		GiveNamedItem( "weapon_crossbow" );
-		GiveNamedItem( "weapon_crowbar" );
+//		GiveNamedItem( "weapon_crowbar" );
 		GiveNamedItem( "weapon_flameprojector" );
 		GiveNamedItem( "weapon_flamethrower" );
 		GiveNamedItem( "weapon_flaregun" );
@@ -6209,20 +6198,18 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_hmg1" );
 //		GiveNamedItem( "weapon_irifle" );
 		GiveNamedItem( "weapon_flash" );
-//		GiveNamedItem( "weapon_mitcl" );
 		GiveNamedItem( "weapon_molotov" );
 		GiveNamedItem( "weapon_physcannon" );
 //		GiveNamedItem( "weapon_physgun" );
 		GiveNamedItem( "weapon_pistol" );
 		GiveNamedItem( "weapon_rpg" );
-//		GiveNamedItem( "weapon_scrapgun" );
 		GiveNamedItem( "weapon_shotgun" );
 		GiveNamedItem( "weapon_slam" );
 		GiveNamedItem( "weapon_smg1" );
 		GiveNamedItem( "weapon_smg2" );
 		GiveNamedItem( "weapon_sniperrifle" );
 		GiveNamedItem( "weapon_stab" );
-		GiveNamedItem( "weapon_concussive" );
+		GiveNamedItem( "weapon_emp" );
 //		GiveNamedItem( "weapon_stunstick" );
 		GiveNamedItem( "weapon_supershotgun" );
 		GiveNamedItem( "weapon_swing" );

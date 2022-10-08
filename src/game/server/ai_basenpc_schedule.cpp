@@ -865,12 +865,15 @@ void CAI_BaseNPC::MaintainSchedule ( void )
 
 //=========================================================
 
-bool CAI_BaseNPC::FindCoverPos( CBaseEntity *pEntity, Vector *pResult )
+bool CAI_BaseNPC::FindCoverPos( CBaseEntity *pEntity, Vector *pResult, bool bLateral )
 {
 	AI_PROFILE_SCOPE(CAI_BaseNPC_FindCoverPos);
 
 	if ( !GetTacticalServices()->FindLateralCover( pEntity->EyePosition(), 0, pResult ) )
 	{
+		if ( bLateral )
+			return false;
+
 		if ( !GetTacticalServices()->FindCoverPos( pEntity->GetAbsOrigin(), pEntity->EyePosition(), 0, CoverRadius(), pResult ) ) 
 		{
 			return false;
@@ -976,7 +979,7 @@ void CAI_BaseNPC::SetHintNode( CAI_Hint *pHintNode )
 
 //-----------------------------------------------------------------------------
 
-bool CAI_BaseNPC::FindCoverFromEnemy( bool bNodesOnly, float flMinDistance, float flMaxDistance )
+bool CAI_BaseNPC::FindCoverFromEnemy( bool bNodesOnly, bool bLateralOnly, float flMinDistance, float flMaxDistance )
 {
 	CBaseEntity *pEntity = GetEnemy();
 
@@ -998,7 +1001,7 @@ bool CAI_BaseNPC::FindCoverFromEnemy( bool bNodesOnly, float flMinDistance, floa
 	}
 	else
 	{
-		if ( !FindCoverPos( pEntity, &coverPos ) )
+		if ( !FindCoverPos( pEntity, &coverPos, bLateralOnly ) )
 			return false;
 	}
 
@@ -1519,13 +1522,15 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 	case TASK_FIND_NEAR_NODE_COVER_FROM_ENEMY:
 	case TASK_FIND_FAR_NODE_COVER_FROM_ENEMY:
 	case TASK_FIND_NODE_COVER_FROM_ENEMY:
+	case TASK_FIND_LATERAL_COVER_FROM_ENEMY:
 	case TASK_FIND_COVER_FROM_ENEMY:
 		{
 			bool 	bNodeCover 		= ( task != TASK_FIND_COVER_FROM_ENEMY );
+			bool 	bLateral 		= ( task == TASK_FIND_LATERAL_COVER_FROM_ENEMY );
 			float 	flMinDistance 	= ( task == TASK_FIND_FAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : 0.0;
 			float 	flMaxDistance 	= ( task == TASK_FIND_NEAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : FLT_MAX;
 			
-			if ( FindCoverFromEnemy( bNodeCover, flMinDistance, flMaxDistance ) )
+			if ( FindCoverFromEnemy( bNodeCover, bLateral, flMinDistance, flMaxDistance ) )
 			{
 				if ( task == TASK_FIND_COVER_FROM_ENEMY )
 					m_flMoveWaitFinished = gpGlobals->curtime + pTask->flTaskData;
@@ -2670,17 +2675,19 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 			vec2RightSide = right.AsVector2D();
 			Vector2DNormalize(vec2RightSide);
 
-			if ( DotProduct2D ( vec2DirToPoint, vec2RightSide ) > 0 )
+			if ( SelectWeightedSequence( ACT_STRAFE_RIGHT ) != ACTIVITY_NOT_AVAILABLE )
 			{
-				// strafe right
-				GetNavigator()->SetMovementActivity(ACT_STRAFE_RIGHT);
+				if ( DotProduct2D ( vec2DirToPoint, vec2RightSide ) > 0 )
+					// strafe right
+					GetNavigator()->SetMovementActivity(ACT_STRAFE_RIGHT);
+				else
+					// strafe left
+					GetNavigator()->SetMovementActivity(ACT_STRAFE_LEFT);
 			}
 			else
 			{
-				// strafe left
-				GetNavigator()->SetMovementActivity(ACT_STRAFE_LEFT);
+				GetNavigator()->SetMovementActivity(ACT_RUN);
 			}
-			TaskComplete();
 			break;
 		}
 
@@ -3172,17 +3179,13 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 
 void CAI_BaseNPC::StartTaskOverlay()
 {
-	if ( IsCurTaskContinuousMove() )
-	{
+//	if ( IsCurTaskContinuousMove() )
+//	{
 		if ( ShouldMoveAndShoot() )
-		{
 			m_MoveAndShootOverlay.StartShootWhileMove();
-		}
 		else
-		{
 			m_MoveAndShootOverlay.NoShootWhileMove();
-		}
-	}
+//	}
 }
 
 
@@ -3875,6 +3878,19 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 		}
 		break;
 
+	case TASK_STRAFE_PATH:
+		{
+			// Always face the enemy
+			if (GetNavigator()->IsGoalActive())
+			{
+				Vector vecEnemyLKP = GetEnemyLKP();
+				AddFacingTarget( vecEnemyLKP, 1.0, 0.2 );
+			}
+
+			ChainRunTask( TASK_WAIT_FOR_MOVEMENT, pTask->flTaskData );
+		}
+		break;
+
 	case TASK_WAIT_FOR_MOVEMENT_STEP:
 	case TASK_WAIT_FOR_MOVEMENT:
 		{
@@ -4229,10 +4245,8 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 
 void CAI_BaseNPC::RunTaskOverlay()
 {
-	if ( IsCurTaskContinuousMove() )
-	{
+//	if ( IsCurTaskContinuousMove() )
 		m_MoveAndShootOverlay.RunShootWhileMove();
-	}
 }
 
 void CAI_BaseNPC::EndTaskOverlay()

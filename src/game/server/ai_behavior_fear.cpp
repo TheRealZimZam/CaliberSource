@@ -300,9 +300,8 @@ void CAI_FearBehavior::GatherConditions()
 				SpoilSafePlace();
 			}
 		}
-		else if( flEnemyDistSqr < FEAR_ENEMY_TOLERANCE_CLOSE_DIST_SQR && GetEnemy()->GetEnemy() == GetOuter() )	
+		else if( flEnemyDistSqr < FEAR_ENEMY_TOLERANCE_CLOSE_DIST_SQR )	//&& GetEnemy()->GetEnemy() == GetOuter()
 		{
-			// Only become scared of an enemy at this range if they're my enemy, too
 			SetCondition( COND_FEAR_ENEMY_CLOSE );
 			if( IsInASafePlace() )
 			{
@@ -310,6 +309,10 @@ void CAI_FearBehavior::GatherConditions()
 			}
 		}
 	}
+
+	// If im running away, the enemy is on my arse and i have a weapon, try to fight back!
+	if (HasCondition(COND_FEAR_ENEMY_TOO_CLOSE))
+		m_flDeferUntil = gpGlobals->curtime + random->RandomFloat( 2.0, 3.5 );
 
 	// Check for separation from the player
 	//	-The player is farther away than 60 feet
@@ -444,24 +447,26 @@ int CAI_FearBehavior::TranslateSchedule( int scheduleType )
 		if( HasCondition(COND_FEAR_ENEMY_CLOSE) || HasCondition(COND_ENEMY_TARGETTING_ME) )
 		{
 			// If I'm moving to a safe place AND have an enemy too close to me,
-			// make the move to safety while ignoring the condition.
+			// dont bother with the litesearch, just go straight to hauling ass.
 			// this stops an oscillation
-			// IS THIS CODE EVER EVEN BEING CALLED? (sjb)
+			// YES (sjb)
 			return SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY;
 		}
 		break;
 
+#if 0
 	case SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY:
-			// My enemy is pursuing me, fight back!
-			if( HasCondition(COND_FEAR_ENEMY_TOO_CLOSE) )
-			{
-				//Defer a little bit, incase you have to reload or something similar
-				m_flDeferUntil = gpGlobals->curtime + 2.0f;
-				if( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
-					return TranslateSchedule( SCHED_MELEE_ATTACK1 );
-				else if( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
-					return TranslateSchedule( SCHED_RANGE_ATTACK1 );
-			}
+		// My enemy is breathing on me, fight back!
+		if( HasCondition(COND_FEAR_ENEMY_TOO_CLOSE) )
+		{
+			//Defer a little bit, incase you have to reload or something similar
+			m_flDeferUntil = gpGlobals->curtime + random->RandomFloat( 1.5, 2.5 );
+			if( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
+				return TranslateSchedule( SCHED_MELEE_ATTACK1 );
+			else if( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+				return TranslateSchedule( SCHED_RANGE_ATTACK1 );
+		}
+#endif
 		break;
 	}
 
@@ -561,7 +566,7 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER( CAI_FearBehavior )
 	);
 
 	DEFINE_SCHEDULE
-		(
+	(
 		SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY,
 
 		"	Tasks"
@@ -575,12 +580,13 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER( CAI_FearBehavior )
 		"	Interrupts"
 		""
 		"		COND_HEAR_DANGER"
-		);
+		"		COND_FEAR_ENEMY_TOO_CLOSE"
+	);
 
 	//===============================================
 	//===============================================
 	DEFINE_SCHEDULE
-		(
+	(
 		SCHED_FEAR_STAY_IN_SAFE_PLACE,
 
 		"	Tasks"
@@ -597,7 +603,7 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER( CAI_FearBehavior )
 		"		COND_FEAR_ENEMY_CLOSE"
 		"		COND_FEAR_ENEMY_TOO_CLOSE"
 		"		COND_CAN_MELEE_ATTACK1"
-		);
+	);
 
 
 AI_END_CUSTOM_SCHEDULE_PROVIDER()

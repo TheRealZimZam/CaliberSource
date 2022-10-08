@@ -11,6 +11,7 @@
 #include "physics.h"
 #include "ndebugoverlay.h"
 #include "engine/IEngineSound.h"
+#include "ai_basenpc.h"
 #include "physics_npc_solver.h"
 
 #ifdef HL1_DLL
@@ -598,18 +599,6 @@ void CBaseDoor::DoorTouch( CBaseEntity *pOther )
 	if( m_ChainTarget != NULL_STRING )
 		ChainTouch( pOther );
 
-	// Ignore touches by anything but players.
-	if ( !pOther->IsPlayer() )
-	{
-#ifdef HL1_DLL
-		if( PassesBlockTouchFilter( pOther ) && m_toggle_state == TS_GOING_DOWN )
-		{
-			DoorGoUp();
-		}
-#endif
-		return;
-	}
-
 	// If door is not opened by touch, do nothing.
 	if ( !HasSpawnFlags(SF_DOOR_PTOUCH) )
 	{
@@ -620,9 +609,36 @@ void CBaseDoor::DoorTouch( CBaseEntity *pOther )
 		}
 #endif//HL1_DLL
 
-		return; 
+		return;
 	}
-	
+
+	// Something other than a player has touched
+	if ( !pOther->IsPlayer() )
+	{
+#ifdef HL1_DLL
+		if( PassesBlockTouchFilter( pOther ) && m_toggle_state == TS_GOING_DOWN )
+		{
+			DoorGoUp();
+		}
+#endif//HL1_DLL
+
+		// A npc has touched me
+		if ( pOther->IsNPC() )
+		{
+			if ( HasSpawnFlags(SF_DOOR_NONPCS) )
+				return;
+
+			// Dont let dumb npcs like bugs and animals open doors
+			CAI_BaseNPC	*pNPC = pOther->MyNPCPointer();
+			if ( !(pNPC->CapabilitiesGet() & bits_CAP_AUTO_DOORS) )
+				return;
+		}
+		else
+		{
+			return;
+		}
+	}
+
 	// If door has master, and it's not ready to trigger, 
 	// play 'locked' sound.
 	if (m_sMaster != NULL_STRING && !UTIL_IsMasterTriggered(m_sMaster, pOther))

@@ -154,18 +154,10 @@ bool CFuncWallToggle::IsOn( void )
 
 void CFuncWallToggle::InputToggle( inputdata_t &inputdata )
 {
-	int status = IsOn();
-
-	if ( ShouldToggle( USE_TOGGLE, status ) )
-	{
-		if ( status )
-			TurnOff();
-		else
-			TurnOn();
-	}
+	Use( inputdata.pActivator, inputdata.pActivator, USE_TOGGLE, 0 );
 }
 
-//Adrian - Is this function needed at all?
+//Adrian - this needed function at all is?
 void CFuncWallToggle::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	int status = IsOn();

@@ -63,6 +63,7 @@ public:
 
 			~CEnvShake( void );
 	virtual void	Spawn( void );
+	void			Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	virtual void	OnRestore( void );
 
 	inline	float	Amplitude( void ) { return m_Amplitude; }
@@ -108,7 +109,6 @@ BEGIN_DATADESC( CEnvShake )
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "Frequency", InputFrequency ),
 
 END_DATADESC()
-
 
 
 #define SF_SHAKE_EVERYONE	0x0001		// Don't check radius
@@ -272,6 +272,10 @@ void CEnvShake::InputStartShake( inputdata_t &inputdata )
 	}
 }
 
+void CEnvShake::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	ApplyShake( SHAKE_START );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Input handler that stops the screen shake.

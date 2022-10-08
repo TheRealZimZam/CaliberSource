@@ -107,6 +107,7 @@ public:
 	void Smoke ( void );
 	void SetCustomDamageType( int iType ) { m_iCustomDamageType = iType; }
 	bool KeyValue( const char *szKeyName, const char *szValue );
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	int DrawDebugTextOverlays(void);
 
@@ -311,7 +312,6 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 	te->Explosion( filter, 0.0,
 		&vecExplodeOrigin, 
 		( m_sFireballSprite < 1 ) ? g_sModelIndexFireball : m_sFireballSprite,
-//		!( m_spawnflags & SF_ENVEXPLOSION_NOFIREBALL ) ? ( m_spriteScale / 10.0 ) : 0.0,
 		!( m_spawnflags & SF_ENVEXPLOSION_NOFIREBALL ) ? m_spriteScale : 0.0,
 		15,
 		nFlags,
@@ -370,6 +370,11 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 
 }
 
+void CEnvExplosion::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	inputdata_t inputdata;
+	InputExplode( inputdata );
+}
 
 void CEnvExplosion::Smoke( void )
 {

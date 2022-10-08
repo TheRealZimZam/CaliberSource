@@ -35,9 +35,7 @@
 ConVar func_break_max_pieces( "func_break_max_pieces", "15", FCVAR_ARCHIVE | FCVAR_REPLICATED );
 ConVar func_break_reduction_factor( "func_break_reduction_factor", ".5" );
 
-#ifdef HL1_DLL
 extern void PlayerPickupObject( CBasePlayer *pPlayer, CBaseEntity *pObject );
-#endif
 
 extern Vector		g_vecAttackDir;
 
@@ -86,7 +84,7 @@ extern Vector		g_vecAttackDir;
 		"weapon_flaregun",			// 35
 		"weapon_slam",				// 36
 		"weapon_molotov",			// 37
-		"weapon_concussive",		// 38
+		"weapon_emp",		// 38
 		"weapon_frag",				// 39
 		"item_dynamic_resupply",	// 40
 	};
@@ -1198,20 +1196,14 @@ void CBreakable::Die( void )
 	{
 		for ( int i = 0; i < iCount; i++ )
 		{
-
-	#ifdef HL1_DLL
 			// Use the passed model instead of the propdata type
 			const char *modelName = STRING( m_iszModelName );
 			
 			// if the map specifies a model by name
 			if( strstr( modelName, ".mdl" ) != NULL )
-			{
 				iModelIndex = modelinfo->GetModelIndex( modelName );
-			}
-			else	// do the hl2 / normal way
-	#endif
-
-			iModelIndex = modelinfo->GetModelIndex( g_PropDataSystem.GetRandomChunkModel(  STRING( m_iszModelName ) ) );
+			else
+				iModelIndex = modelinfo->GetModelIndex( g_PropDataSystem.GetRandomChunkModel(  STRING( m_iszModelName ) ) );
 
 			// All objects except the first one in this run are marked as slaves...
 			int slaveFlag = 0;
@@ -1348,10 +1340,19 @@ public:
 
 	virtual void VPhysicsCollision( int index, gamevcollisionevent_t *pEvent );
 	unsigned int PhysicsSolidMaskForEntity( void ) const { return MASK_PLAYERSOLID; }
+#if 0
+private:
+	int			m_iMassOverride;
+#endif
 };
 
 LINK_ENTITY_TO_CLASS( func_pushable, CPushable );
 
+#if 0
+BEGIN_DATADESC( CPushable )
+	DEFINE_INPUT( m_iMassOverride, FIELD_INTEGER, "mass" ),
+END_DATADESC()
+#endif
 
 void CPushable::Spawn( void )
 {
@@ -1364,22 +1365,26 @@ void CPushable::Spawn( void )
 
 	CreateVPhysics();
 
-//#ifdef HL1_DLL
-	// Force HL1 Pushables to stay axially aligned.
+	// Force Pushables to stay axially aligned.
 	VPhysicsGetObject()->SetInertia( Vector( 1e30, 1e30, 1e30 ) );
-//#endif
 }
 
 bool CPushable::CreateVPhysics( void )
 {
 	VPhysicsInitNormal( SOLID_VPHYSICS, 0, false );
+
 #if 0
 	IPhysicsObject *pPhysObj = VPhysicsGetObject();
 	if ( pPhysObj )
 	{
-		pPhysObj->SetMass( 30 );
-//		Vector vecInertia = Vector(800, 800, 800);
-//		pPhysObj->SetInertia( vecInertia );
+		if ( m_iMassOverride )
+		{
+			pPhysObj->SetMass( m_iMassOverride );
+		}
+#ifdef HL1_DLL
+		Vector vecInertia = Vector(800, 800, 800);
+		pPhysObj->SetInertia( vecInertia );
+#endif
 	}
 #endif
 

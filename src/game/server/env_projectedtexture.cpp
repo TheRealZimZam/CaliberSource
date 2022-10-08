@@ -154,22 +154,6 @@ void UTIL_ColorStringToLinearFloatColor( Vector &color, const char *pString )
 	color.z = GammaToLinear( tmp[2] * ( 1.0f / 255.0f ) ) * tmp[3];
 }
 
-//bool CEnvProjectedTexture::KeyValue( const char *szKeyName, const char *szValue )
-//{
-//	if ( FStrEq( szKeyName, "lightcolor" ) )
-//	{
-//		Vector tmp;
-//		UTIL_ColorStringToLinearFloatColor( tmp, szValue );
-//		m_LinearFloatLightColor = tmp;
-//	}
-//	else
-//	{
-//		return BaseClass::KeyValue( szKeyName, szValue );
-//	}
-//
-//	return true;
-//}
-//
 bool CEnvProjectedTexture::KeyValue( const char *szKeyName, const char *szValue )
 {
 	if ( FStrEq( szKeyName, "lightcolor" ) )

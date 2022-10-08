@@ -228,13 +228,9 @@ void CAI_ScriptedSequence::Spawn( void )
 	}
 
 	if ( m_spawnflags & SF_SCRIPT_NOINTERRUPT )
-	{
 		m_interruptable = false;
-	}
 	else
-	{
 		m_interruptable = true;
-	}
 
 	m_sequenceStarted = false;
 	m_startTime = 0;
@@ -279,6 +275,15 @@ bool CAI_ScriptedSequence::FCanOverrideState( void )
 	return false;
 }
 
+
+//
+// CineStart
+//
+void CAI_ScriptedSequence::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	inputdata_t inputdata;
+	InputMoveToPosition( inputdata );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Fires a script event by number.

@@ -26,8 +26,8 @@ ConVar hud_ws_showemptyslots( "hud_ws_showemptyslots", "0", FCVAR_ARCHIVE, "Show
 ConVar hud_ws_oldstyle( "hud_ws_oldstyle", "0", FCVAR_ARCHIVE, "Use HL1-style hud" );
 
 //Shouldnt these be offloaded?
-#define SELECTION_TIMEOUT_THRESHOLD		0.5f	// Seconds
-#define SELECTION_FADEOUT_TIME			0.75f
+#define SELECTION_TIMEOUT_THRESHOLD		0.75f	// Seconds
+#define SELECTION_FADEOUT_TIME			0.5f
 
 #define FASTSWITCH_DISPLAY_TIMEOUT		1.5f
 #define FASTSWITCH_FADEOUT_TIME			1.5f
@@ -219,6 +219,8 @@ void CHudWeaponSelection::LevelInit()
 //-----------------------------------------------------------------------------
 void CHudWeaponSelection::OnThink( void )
 {
+	CBaseHudWeaponSelection::OnThink();
+
 	float flSelectionTimeout = SELECTION_TIMEOUT_THRESHOLD;
 	float flSelectionFadeoutTime = SELECTION_FADEOUT_TIME;
 	if ( hud_fastswitch.GetBool() )
@@ -239,7 +241,7 @@ void CHudWeaponSelection::OnThink( void )
 		else if ( gpGlobals->curtime - m_flSelectionTime > flSelectionTimeout + flSelectionFadeoutTime )
 		{
 			// finished fade, close
-			HideSelection();
+			CancelWeaponSelection( true );
 		}
 	}
 	else if (m_bFadingOut)
@@ -379,7 +381,7 @@ void CHudWeaponSelection::Paint()
 			}
 			else
 			{
-				width = icon_buckets[ i ]->Width() + 5;
+				width = icon_buckets[ i ]->Width();
 				if ( icon_selection )
 				{
 					// If we have a selection icon, use the size of that instead
@@ -486,8 +488,8 @@ void CHudWeaponSelection::ApplySchemeSettings(vgui::IScheme *pScheme)
 void CHudWeaponSelection::OpenSelection( void )
 {
 	Assert(!IsInSelectionMode());
-
 	CBaseHudWeaponSelection::OpenSelection();
+
 	g_pClientMode->GetViewportAnimationController()->StartAnimationSequence("OpenWeaponSelectionMenu");
 	m_iSelectedBoxPosition = 0;
 	m_iSelectedSlot = -1;
@@ -499,6 +501,7 @@ void CHudWeaponSelection::OpenSelection( void )
 void CHudWeaponSelection::HideSelection( void )
 {
 	CBaseHudWeaponSelection::HideSelection();
+
 	g_pClientMode->GetViewportAnimationController()->StartAnimationSequence("CloseWeaponSelectionMenu");
 	m_bFadingOut = false;
 }

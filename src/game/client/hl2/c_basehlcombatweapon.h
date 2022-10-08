@@ -47,4 +47,11 @@ public:
 	DECLARE_CLIENTCLASS();
 };
 
+class C_HLSniperRifle : public C_BaseHLCombatWeapon
+{
+public:
+	DECLARE_CLASS( C_HLSniperRifle, C_BaseHLCombatWeapon );
+	DECLARE_CLIENTCLASS();
+};
+
 #endif // C_BASEHLCOMBATWEAPON_H

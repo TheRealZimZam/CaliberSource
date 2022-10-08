@@ -133,21 +133,16 @@ void CHudAmmo::UpdatePlayerAmmo( C_BasePlayer *player )
 	SetPaintBackgroundEnabled(true);
 
 	// Get our icons for the ammo types
-	m_iconPrimaryAmmo = gWR.GetAmmoIconFromWeapon( wpn->GetPrimaryAmmoType() );
+	m_iconPrimaryAmmo = gWR.GetAmmoIconFromWeapon( wpn->GetActiveAmmoType() );
 
 	// get the ammo in our clip
 	int ammo1 = wpn->Clip1();
-	int ammo2;
+	int ammo2 = player->GetAmmoCount(wpn->GetActiveAmmoType());
 	if (ammo1 < 0)
 	{
 		// we don't use clip ammo, just use the total ammo count
-		ammo1 = player->GetAmmoCount(wpn->GetPrimaryAmmoType());
+		ammo1 = player->GetAmmoCount(wpn->GetActiveAmmoType());
 		ammo2 = 0;
-	}
-	else
-	{
-		// we use clip ammo, so the second ammo is the total ammo
-		ammo2 = player->GetAmmoCount(wpn->GetPrimaryAmmoType());
 	}
 
 	hudlcd->SetGlobalStat( "(ammo_primary)", VarArgs( "%d", ammo1 ) );
@@ -220,7 +215,7 @@ void CHudAmmo::UpdateVehicleAmmo( C_BasePlayer *player, IClientVehicle *pVehicle
 	}
 	else
 	{
-		// diferent weapon, change without triggering
+		// different weapon, change without triggering
 		SetAmmo(ammo1, false);
 		SetAmmo2(ammo2, false);
 
@@ -338,7 +333,7 @@ void CHudAmmo::Paint( void )
 	{
 		// Put above the reserve ammo spot
 		int x = text_xpos + ( digit2_xpos - m_iconPrimaryAmmo->Width() ) / 2;	//TODO; The number after this would be nice to softcode
-		int y = text_ypos - ( digit2_ypos + ( m_iconPrimaryAmmo->Height() / 2 ) - 8 );	//TODO; The number after this would be nice to softcode
+		int y = text_ypos - ( digit2_ypos + ( m_iconPrimaryAmmo->Height() / 2 ) );	//TODO; The number after this would be nice to softcode
 		
 		m_iconPrimaryAmmo->DrawSelf( x, y, GetFgColor() );
 	}
@@ -414,7 +409,7 @@ public:
 		{
 			// Put below the number
 			int x = text_xpos + ( digit_xpos - m_iconSecondaryAmmo->Width() ) / 2;
-			int y = text_ypos - ( digit_ypos + ( m_iconSecondaryAmmo->Height() / 2 ) - 8 );	//TODO; The number after this would be nice to softcode
+			int y = text_ypos - ( digit_ypos + ( m_iconSecondaryAmmo->Height() / 2 ) );	//TODO; The number after this would be nice to softcode
 			
 			m_iconSecondaryAmmo->DrawSelf( x, y, GetFgColor() );
 		}
@@ -452,9 +447,8 @@ protected:
 
 		if (player && wpn && wpn->UsesSecondaryAmmo())
 		{
-		//	SetHalfSize(true);
-			SetNumZeros(2);
-			SetAmmo(player->GetAmmoCount(wpn->GetSecondaryAmmoType()));
+			//SetNumZeros(2);
+			SetAmmo(player->GetAmmoCount( wpn->GetInactiveAmmoType() ));
 		}
 
 		if ( m_hCurrentActiveWeapon != wpn )
@@ -472,10 +466,10 @@ protected:
 			m_hCurrentActiveWeapon = wpn;
 			
 			// Get the icon we should be displaying
-			m_iconSecondaryAmmo = gWR.GetAmmoIconFromWeapon( m_hCurrentActiveWeapon->GetSecondaryAmmoType() );
+			m_iconSecondaryAmmo = gWR.GetAmmoIconFromWeapon( m_hCurrentActiveWeapon->GetInactiveAmmoType() );
 		}
 	}
-	
+
 private:
 	CHandle< C_BaseCombatWeapon > m_hCurrentActiveWeapon;
 	CHudTexture *m_iconSecondaryAmmo;

@@ -4472,7 +4472,7 @@
 		"delete itself after firing this output."
 ]
 
-@PointClass base(Targetname) iconsprite("editor/multi_manager.vmt") = multi_manager : "Legacy support. Use logic_relay instead. MultiTarget Manager" 
+@PointClass base(Targetname) iconsprite("editor/multi_manager.vmt") = multi_manager : "Legacy support. Use logic_relay instead. Multimanager" 
 [
 	spawnflags(Flags) = 
 	[
@@ -6056,6 +6056,23 @@
 	"Legacy support. Use func_brush instead." 
 [
 	_minlight(string) : "Minimum Light Level" : : "The minimum level of ambient light that hits this brush."
+]
+
+@SolidClass base(Targetname, Parentname, RenderFields, Global, Angles) = func_pendulum : "Swings back and forth" 
+[
+	speed(integer) : "Speed" : 100
+	distance(integer) : "Distance (deg)" : 90
+	damp(integer) : "Damping (0-1000)" : 0
+	dmg(integer) : "Damage inflicted when blocked" : 0
+	spawnflags(flags) =
+	[
+		1: "Start ON" : 0
+		8: "Passable" : 0
+		16: "Auto-return" : 0
+		64: "X Axis" : 0
+		128: "Y Axis" : 0
+	]
+	_minlight(integer) : "_minlight"
 ]
 
 @SolidClass base(Targetname, Parentname) = func_precipitation : 

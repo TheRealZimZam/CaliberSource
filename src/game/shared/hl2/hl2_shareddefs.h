@@ -43,6 +43,8 @@ enum
 #define DMG_SNIPER			(DMG_LASTGENERICFLAG<<1)	// This is sniper damage
 #define DMG_MISSILEDEFENSE	(DMG_LASTGENERICFLAG<<2)	// The only kind of damage missiles take. (special missile defense)
 
+// these are the damage types that are big enough to damage armored targets
+#define DMG_ARMOR		( DMG_BLAST | DMG_SONIC | DMG_AIRBOAT | DMG_ENERGYBEAM | DMG_SNIPER )
 
 
 #endif // HL2_SHAREDDEFS_H

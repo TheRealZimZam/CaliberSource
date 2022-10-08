@@ -37,7 +37,7 @@ public:
 
 	virtual bool	WeaponShouldBeLowered( void );
 
-			bool	CanLower();
+	virtual bool	CanLower();
 	virtual bool	Ready( void );
 	virtual bool	Lower( void );
 	virtual bool	Deploy( void );
@@ -52,8 +52,10 @@ public:
 	virtual void	AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles );
 	virtual	float	CalcViewmodelBob( void );
 
-	virtual Vector	CalculateBulletSpread( void );
-	virtual Vector	GetBulletSpread( WeaponProficiency_t proficiency );
+	virtual Vector	CalculateBulletSpread( WeaponProficiency_t proficiency );
+	virtual Vector	GetBulletSpread( WeaponProficiency_t proficiency );		// Calculated spread
+	virtual const Vector &GetBulletSpread( void );							// Base weapon spread
+
 	virtual float	GetSpreadBias( WeaponProficiency_t proficiency );
 
 	virtual const	WeaponProficiencyInfo_t *GetProficiencyValues();
@@ -65,10 +67,9 @@ public:
 	int				m_iSecondaryAttacks;	// # of secondary attacks performed with this weapon
 
 protected:
-
-	bool			m_bLowered;			// Whether the viewmodel is raised or lowered
-	float			m_flRaiseTime;		// If lowered, the time we should raise the viewmodel
-	float			m_flHolsterTime;	// When the weapon was holstered
+	bool			m_bLowered;				// Whether the viewmodel is raised or lowered
+	float			m_flRaiseTime;			// If lowered, the time we should raise the viewmodel
+	float			m_flHolsterTime;		// When the weapon was holstered
 };
 
 #endif // BASEHLCOMBATWEAPON_SHARED_H

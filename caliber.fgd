@@ -1,0 +1,240 @@
+//=============================================================================
+//
+// IAC Source FGD 
+//
+//=============================================================================
+
+@include "base.fgd"
+@include "halflife2.fgd"
+
+//-------------------------------------------------------------------------
+// NPCs
+// baseclass also defined here to reflect small changes that might conflict with base hl2
+//
+//-------------------------------------------------------------------------
+
+
+//=============================================================================
+// Brush Entities
+//=============================================================================
+
+
+
+//=============================================================================
+// Entities
+//=============================================================================
+
+//=============================================================================
+// NPC's
+//=============================================================================
+
+@NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_rebel : "Rebel"
+[
+]
+@NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_worker : "Factory Worker"
+[
+]
+@NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_mobster : "Mobster"
+[
+]
+@NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_hobo : "Hobo"
+[
+]
+
+@NPCClass base(TalkNPC, BaseNPC, PlayerCompanion) studio("models/Conscript.mdl") = npc_conscript : "Conscript"
+[
+	additionalequipment(choices) : "Weapons" : "weapon_ar2" =
+	[
+		"weapon_pistol" : "Pistol"
+		"weapon_smg1" : "SMG1"
+		"weapon_stunstick" : "Stun Stick"
+		"weapon_shotgun" : "Shotgun"
+		"weapon_ar2" : "AR2"
+		"0" : "Nothing"
+	]
+
+	NumGrenades(choices) : "Number of Grenades" : "5" =
+	[
+		"0" : "None"
+		"1" : "1"
+		"2" : "2"
+		"3" : "3"
+		"4" : "4"
+		"5" : "5"
+		"999999" : "Unlimited"
+	]
+	
+	ExpressionOverride(string) : "Facial expression override"
+	input SetExpressionOverride(string) : "Set facial expression override"
+
+	// Outputs
+	output OnPlayerUse(void) : "Fires when a player +USEs Conscript"
+]
+
+
+//-----------------------------------------------------------------------------
+// Enemies
+//-----------------------------------------------------------------------------
+@NPCClass base(BaseNPC,RappelNPC) studio("models/Police.mdl") = npc_police : "Police"
+[
+	additionalequipment(choices) : "Weapons" : "weapon_pistol" =
+	[
+		"weapon_pistol" : "Pistol"
+		"weapon_smg1"  : "SMG1"
+		"weapon_stunstick"  : "Stun Stick"
+		"weapon_shotgun"  : "Shotgun (WIP)"
+		"weapon_ar2"  : "AR2 (WIP)"
+		"0"  : "Nothing"
+	]
+
+	manhacks(Choices) : "Number of Manhacks" : 0 =
+	[
+		0 : "None"
+		1 : "1"
+		2 : "2"
+	]
+
+	weapondrawn(Choices) : "Pistol starts drawn" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+	
+	spawnflags(Flags) =
+	[
+		131072 : "Simple cops" : 0
+		262144 : "Rappel (UNCHECK THIS IF IT IS CHECKED!)" : 0
+		524288 : "Use Stun Grenades" : 0
+		1048576 : "No chatter" : 0
+		2097152 : "Arrest enemies" : 0
+		4194304 : "No far stitching" : 0
+		8388608 : "Prevent manhack toss" : 0
+		16777216: "Allowed to respond to thrown objects" : 0
+		33554432: "Mid-range attacks (halfway between normal + long-range)" : 0
+	]
+	  
+	// Inputs
+	input EnableManhackToss(void) : "Enables manhack toss (which had been disabled by the spawnflag)"
+	input SetPoliceGoal(string) : "Causes the NPC to police the area defined by an ai_goal_police"
+	input ActivateBaton(void) : "Set the baton to active"
+
+	// Outputs
+	output OnStunnedPlayer(void) : "Fires when the player is hit by a stunstick by this NPC."
+	output OnCupCopped(void) : "Fires if the player hits me with the cupcop can. ONLY use for x360 achievement."
+]
+
+@NPCClass base(BaseCombine) studio("models/Combine_Soldier.mdl") = npc_grunt : "AFT Soldier"
+[
+	input Assault(string) : "Start an assault. Parameter passed in should be the name of the rally point."
+
+	// Changing to squad-leader enables alt-fire
+	model(choices) : "Model" : "models/combine_soldier.mdl" : "Regular Soldier" = 
+	[
+	//TODO; Change model names when implemented
+		"models/combine_soldier.mdl" : "Regular Soldier"
+	//	"models/combine_soldier_shock.mdl" : "Shock Soldier"
+		"models/combine_soldier_prisonguard.mdl" : "Nova Prospekt Soldier"
+		"models/combine_super_soldier.mdl" : "Demo Soldier/Squad Leader"
+	]
+
+	tacticalvariant(choices) : "Tactical Variant" : "0" =
+	[
+		"0" : "Normal Tactics"
+		"1" : "Aggressive Tactics"	// Super-aggressive "rush the player in a neat line" dumb AI
+		"2" : "Aggressive Tactics until within 30ft, then normal"	// Same as above but only at longer range
+		"3" : "Defend Position"		// Don't pursue the target at all
+	]
+
+	usemarch(choices) : "Walk Easy" : "0" : "When true, will use a variety of more casual walking animations instead of the standard walk. For use in crowds." =
+	[
+		"0" : "No"
+		"1" : "Yes"
+	]
+]
+
+@NPCClass base(BaseCombine) studio("models/Combine_Soldier.mdl") = npc_elite : "AFT Elite"
+[
+	input Assault(string) : "Start an assault. Parameter passed in should be the name of the rally point."
+
+	model(choices) : "Model" : "models/combine_elite.mdl" : "Regular Elite" = 
+	[
+		"models/combine_elite.mdl" : "Regular Elite"
+		"models/combine_paratroop.mdl" : "Airborne Elite"
+	]
+
+	tacticalvariant(choices) : "Tactical Variant" : "0" =
+	[
+		"0" : "Normal Tactics"
+		"1" : "Aggressive Tactics"	// Default "rush the player in a neat line" dumb AI
+		"2" : "Aggressive Tactics until within 30ft, then normal"	// Same as above but only at longer range
+		"3" : "Defend Position"		// Don't pursue the target at all
+	]
+
+	usemarch(choices) : "Walk Easy" : "0" : "When true, will use a variety of more casual walking animations instead of the standard walk. For use in crowds. " =
+	[
+		"0" : "No"
+		"1" : "Yes"
+	]
+]
+
+//=============================================================================
+// Weapons
+//=============================================================================
+
+@PointClass base(Weapon) studio("models/weapons/w_hmg1.mdl") = weapon_hmg1 : "MMG" []
+@PointClass base(Weapon) studio("models/weapons/w_flamethrower.mdl") = weapon_flameprojector : "Flameprojector" []
+@PointClass base(Weapon) studio("models/weapons/w_flamethrower.mdl") = weapon_flamethrower : "Flamethrower" []
+
+@PointClass base(Weapon) studio("models/weapons/w_bat.mdl") = weapon_swing : "Swing weapon"
+[
+	model(choices) : "Model" : "models/weapons/w_bat.mdl" : "Default world model" = 
+	[
+		"models/weapons/w_bat.mdl" : "Bat"
+		"models/weapons/w_crowbar.mdl" : "Crowbar"
+		"models/weapons/w_hammer.mdl" : "Hammer"
+		"models/weapons/w_pipe.mdl" : "Pipe"
+	]
+
+	weapontype(choices) : "Weapon type" : "0" =
+	[
+		"0" : "Bat"
+		"1" : "Crowbar"
+		"2" : "Hammer"
+		"3" : "Pipe"
+	]
+]
+
+@PointClass base(Weapon) studio("models/weapons/w_knife.mdl") = weapon_stab : "Stab weapon"
+[
+	model(choices) : "Model" : "models/weapons/w_bottle.mdl" : "Default world model" = 
+	[
+		"models/weapons/w_bottle.mdl" : "Bottle"
+		"models/weapons/w_knife.mdl" : "Knife"
+		"models/weapons/w_rebar.mdl" : "Rebar"
+		"models/weapons/w_shank.mdl" : "Shank"
+	]
+	
+	weapontype(choices) : "Weapon type" : "0" =
+	[
+		"0" : "Bottle"
+		"1" : "Knife"
+		"2" : "Rebar"
+		"3" : "Shank"
+	]
+]
+
+@PointClass base(Targetname, Angles) studio("models/can.mdl") = item_sodacan :
+	"Sodacan that can be used"
+[
+]
+
+
+@PointClass base(Weapon) studio("models/weapons/w_smg2.mdl") = weapon_smg2 : "Carbine" []
+//@PointClass base(Weapon) studio("models/weapons/w_crossbow.mdl") = weapon_scrapgun : "Scrapgun" []
+@PointClass base(Weapon) studio("models/weapons/w_supershotgun.mdl") = weapon_supershotgun : "Auto-Shotgun" []
+@PointClass base(Weapon) studio("models/weapons/w_molotov.mdl") = weapon_molotov : "Molotov" []
+//@PointClass base(Weapon) studio("models/weapons/w_grenade.mdl") = weapon_smokegrenade : "Gas Grenade" []
+@PointClass base(Weapon) studio("models/weapons/w_concgrenade.mdl") = weapon_concgrenade : "Stun Grenade" []
+@PointClass base(Weapon) studio("models/weapons/w_rpg.mdl") = weapon_flash : "FLASH" []
+@PointClass base(Weapon) studio("models/weapons/w_crossbow.mdl") = weapon_flashlight : "Flashlight" []
+@PointClass base(Weapon) studio("models/weapons/w_45.mdl") = weapon_45 : "45-70" []

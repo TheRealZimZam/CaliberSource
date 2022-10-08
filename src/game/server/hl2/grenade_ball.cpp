@@ -47,6 +47,7 @@ LINK_ENTITY_TO_CLASS( grenade_ball, CGrenadeBall );
 BEGIN_DATADESC( CGrenadeBall )
 
 	DEFINE_FIELD( m_bPlaySound, FIELD_BOOLEAN ),
+	DEFINE_SOUNDPATCH( m_pHissSound ),
 
 	// Function pointers
 	//DEFINE_THINKFUNC( SpitThink ),
@@ -61,16 +62,14 @@ BEGIN_DATADESC( CGrenadeBall )
 
 END_DATADESC()
 
-CGrenadeBall::CGrenadeBall( void ) : m_bPlaySound( true ), m_pHissSound( NULL )
+CGrenadeBall::CGrenadeBall( void ) : m_bPlaySound( true )
 {
 }
 
 void CGrenadeBall::Precache( void )
 {
 	PrecacheModel("effects/fire_cloud2.vmt");// client side spittle.
-
 	PrecacheModel("sprites/greenglow1.vmt");// client side spittle.
-
 	PrecacheModel("sprites/bigspit.vmt");// client side spittle.
 
 	PrecacheModel("models/spitball_large.mdl"); 
@@ -405,13 +404,17 @@ void CGrenadeBall::Think( void )
 	{
 		if ( m_flSpitLifeTime <= gpGlobals->curtime )
 		{
-			Detonate();
+			UTIL_Remove( this );
+			return;
 		}
 		else if (m_bHitGround && m_flSpitGroundLifeTime <= gpGlobals->curtime)
 		{
 			Detonate();
 		}
 	}
+
+	// Set us up to think again shortly
+	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	InitHissSound();
 	if ( m_pHissSound == NULL )
@@ -444,9 +447,6 @@ void CGrenadeBall::Think( void )
 		// Set the pitch we've calculated
 		CSoundEnvelopeController::GetController().SoundChangePitch( m_pHissSound, iPitch, 0.1f );
 	}
-
-	// Set us up to think again shortly
-	SetNextThink( gpGlobals->curtime + 0.1f );
 }
 
 //=============================================================================

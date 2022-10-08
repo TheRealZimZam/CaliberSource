@@ -134,6 +134,7 @@ protected:
 
 	float	m_flNextNPCThink;
 	float	m_flIgnoreWorldCollisionTime;
+	float	m_flNextHopTime;		// Keeps us from hopping too often due to damage.
 
 	bool	m_bCommittedToJump;		// Whether we have 'locked in' to jump at our enemy.
 	bool	m_bCrawlFromCanister;
@@ -196,7 +197,6 @@ public:
 
 	void	PrescheduleThink( void );
 	void	RunTask( const Task_t *pTask );
-	void	StartTask( const Task_t *pTask );
 
 	int		SelectSchedule( void );
 	int		TranslateSchedule( int scheduleType );
@@ -289,7 +289,6 @@ private:
 
 	bool m_bPanicState;
 	float m_flPanicStopTime;
-	float m_flNextHopTime;		// Keeps us from hopping too often due to damage.
 };
 
 

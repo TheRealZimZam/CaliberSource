@@ -53,13 +53,12 @@ public:
 	void				SetSpitType( int nType, int nSize );
 	void				Detonate( void );
 	void				Think( void );
+	void				InitHissSound( void );
 
 	CHandle<SmokeTrail>	m_hSmokeTrail;
 	CHandle<CSprite>	m_pSquidSpitSprite;
 
 private:
-	void	InitHissSound( void );
-
 	float			m_flSpitLifeTime;		// If non-zero won't despawn
 	float			m_flSpitGroundLifeTime;	// How long to sizzle on the ground
 	float			m_flNextDamageTime;

@@ -101,11 +101,11 @@ enum
 {
 	SCHED_HEADCRAB_RANGE_ATTACK1 = LAST_SHARED_SCHEDULE,
 	SCHED_HEADCRAB_WAKE_ANGRY,
-	SCHED_HEADCRAB_WAKE_ANGRY_NO_DISPLAY,
 	SCHED_HEADCRAB_DROWN,
 	SCHED_HEADCRAB_FAIL_DROWN,
 	SCHED_HEADCRAB_AMBUSH,
 	SCHED_HEADCRAB_HOP_RANDOMLY, // get off something you're not supposed to be on.
+	SCHED_HEADCRAB_EVADE,
 	SCHED_HEADCRAB_BARNACLED,
 	SCHED_HEADCRAB_UNHIDE,
 	SCHED_HEADCRAB_HARASS_ENEMY,
@@ -186,7 +186,7 @@ int ACT_HEADCRAB_CEILING_LAND;
 // Skill settings.
 //-----------------------------------------------------------------------------
 ConVar	sk_headcrab_health( "sk_headcrab_health","0");
-ConVar	sk_headcrab_fast_health( "sk_headcrab_fast_health","0");
+ConVar	sk_cheadcrab_health( "sk_cheadcrab_health","0");
 ConVar	sk_headcrab_poison_health( "sk_headcrab_poison_health","0");
 ConVar	sk_headcrab_melee_dmg( "sk_headcrab_melee_dmg","0");
 ConVar	sk_headcrab_poison_npc_damage( "sk_headcrab_poison_npc_damage", "0" );
@@ -211,6 +211,7 @@ BEGIN_DATADESC( CBaseHeadcrab )
 
 	DEFINE_FIELD( m_bHangingFromCeiling, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flIlluminatedTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flNextHopTime, FIELD_TIME ),
 
 	DEFINE_INPUTFUNC( FIELD_VOID, "Burrow", InputBurrow ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "BurrowImmediate", InputBurrowImmediate ),
@@ -765,6 +766,25 @@ void CBaseHeadcrab::RunTask( const Task_t *pTask )
 			{
 				// Face the direction I've been forced to jump.
 				GetMotor()->SetIdealYawToTargetAndUpdate( GetAbsOrigin() + GetAbsVelocity() );
+			}
+			break;
+
+		case TASK_HEADCRAB_HOP_ASIDE:
+			if ( GetEnemy() )
+				GetMotor()->SetIdealYawAndUpdate( GetEnemy()->GetAbsOrigin() - GetAbsOrigin(), AI_KEEP_YAW_SPEED );
+
+			if( GetFlags() & FL_ONGROUND )
+			{
+				SetGravity(1.0);
+				SetMoveType( MOVETYPE_STEP );
+
+#if 0
+				if( GetEnemy() && ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length() > HEADCRAB_MAX_JUMP_DIST )
+				{
+					TaskFail( "");
+				}
+#endif
+				TaskComplete();
 			}
 			break;
 
@@ -1492,6 +1512,71 @@ void CBaseHeadcrab::StartTask( const Task_t *pTask )
 		}
 		break;
 
+	case TASK_HEADCRAB_HOP_ASIDE:
+		{
+			Vector vecDir, vecForward, vecRight;
+			bool fJumpIsLeft;
+			trace_t tr;
+
+			GetVectors( &vecForward, &vecRight, NULL );
+
+			fJumpIsLeft = false;
+			if( random->RandomInt( 0, 100 ) < 50 )
+			{
+				fJumpIsLeft = true;
+				vecRight.Negate();
+			}
+
+			vecDir = ( vecRight + ( vecForward * 2 ) );
+			VectorNormalize( vecDir );
+			vecDir *= 150.0;
+
+			// This could be a problem. Since I'm adjusting the headcrab's gravity for flight, this check actually
+			// checks farther ahead than the crab will actually jump. (sjb)
+			AI_TraceHull( GetAbsOrigin(), GetAbsOrigin() + vecDir,GetHullMins(), GetHullMaxs(), MASK_SHOT, this, GetCollisionGroup(), &tr );
+
+			//NDebugOverlay::Line( tr.startpos, tr.endpos, 0, 255, 0, false, 1.0 );
+
+			if( tr.fraction == 1.0 )
+			{
+				AIMoveTrace_t moveTrace;
+				GetMoveProbe()->MoveLimit( NAV_JUMP, GetAbsOrigin(), tr.endpos, MASK_NPCSOLID, GetEnemy(), &moveTrace );
+
+				// FIXME: Where should this happen?
+				Vector vecJumpVel = moveTrace.vJumpVelocity;
+
+				if( !IsMoveBlocked( moveTrace ) )
+				{
+					SetAbsVelocity( vecJumpVel );// + 0.5f * Vector(0,0,sv_gravity.GetFloat()) * flInterval;
+					SetGravity( UTIL_ScaleForGravity( 1600 ) );
+					SetGroundEntity( NULL );
+					SetNavType( NAV_JUMP );
+
+					if( fJumpIsLeft )
+					{
+						SetIdealActivity( (Activity)ACT_HEADCRAB_HOP_LEFT );
+						GetNavigator()->SetMovementActivity( (Activity) ACT_HEADCRAB_HOP_LEFT );
+					}
+					else
+					{
+						SetIdealActivity( (Activity)ACT_HEADCRAB_HOP_RIGHT );
+						GetNavigator()->SetMovementActivity( (Activity) ACT_HEADCRAB_HOP_RIGHT );
+					}
+				}
+				else
+				{
+					// Can't jump, just fall through.
+					TaskComplete();
+				}
+			}
+			else
+			{
+				// Can't jump, just fall through.
+				TaskComplete();
+			}
+		}
+		break;
+
 		case TASK_HEADCRAB_DROWN:
 		{
 			// Set the gravity really low here! Sink slowly
@@ -1699,6 +1784,7 @@ int CBaseHeadcrab::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 {
 	CTakeDamageInfo info = inputInfo;
 
+#if 0
 	//
 	// Don't take any acid damage.
 	//
@@ -1714,6 +1800,7 @@ int CBaseHeadcrab::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	{
 		info.SetDamage( m_iHealth );
 	}
+#endif
 
 	if( info.GetDamageType() & DMG_BLAST )
 	{
@@ -1801,20 +1888,24 @@ int CBaseHeadcrab::TranslateSchedule( int scheduleType )
 	{
 		case SCHED_FALL_TO_GROUND:
 			return SCHED_HEADCRAB_FALL_TO_GROUND;
+		break;
 
 		case SCHED_WAKE_ANGRY:
-		{
 			if ( HaveSequenceForActivity((Activity)ACT_HEADCRAB_THREAT_DISPLAY) )
 				return SCHED_HEADCRAB_WAKE_ANGRY;
-			else
-				return SCHED_HEADCRAB_WAKE_ANGRY_NO_DISPLAY;
-		}
-		
+		break;
+
 		case SCHED_RANGE_ATTACK1:
 			return SCHED_HEADCRAB_RANGE_ATTACK1;
+		break;
+
+		case SCHED_EVADE:
+			return SCHED_HEADCRAB_EVADE;
+		break;
 
 		case SCHED_FAIL_TAKE_COVER:
 			return SCHED_ALERT_FACE;
+		break;
 
 		case SCHED_CHASE_ENEMY_FAILED:
 			{
@@ -1940,6 +2031,14 @@ int CBaseHeadcrab::SelectSchedule( void )
 			else
 			{
 				return SCHED_PATROL_WALK;
+			}
+			break;
+		}
+		case NPC_STATE_COMBAT:
+		{
+			if (HasCondition( COND_HEAVY_DAMAGE ))
+			{
+				return SCHED_TAKE_COVER_FROM_ENEMY;
 			}
 			break;
 		}
@@ -2423,7 +2522,7 @@ void CHeadcrab::Spawn( void )
 
 	BaseClass::Spawn();
 
-	m_iHealth = sk_headcrab_health.GetFloat();
+	m_iHealth = sk_cheadcrab_health.GetFloat();
 	m_flBurrowTime = 0.0f;
 	m_bCrawlFromCanister = false;
 	m_bMidJump = false;
@@ -2514,7 +2613,7 @@ void CHeadcrab::BiteSound( void )
 	EmitSound( "NPC_HeadCrab.Bite" );
 }
 
-LINK_ENTITY_TO_CLASS( npc_headcrab, CHeadcrab );
+LINK_ENTITY_TO_CLASS( npc_cheadcrab, CHeadcrab );
 #ifndef HL1_DLL
 LINK_ENTITY_TO_CLASS( monster_headcrab, CHeadcrab );
 #endif
@@ -2528,7 +2627,6 @@ BEGIN_DATADESC( CFastHeadcrab )
 	DEFINE_FIELD( m_flRealGroundSpeed,	FIELD_FLOAT ),
 	DEFINE_FIELD( m_flSlowRunTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_flPauseTime,			FIELD_TIME ),
-	DEFINE_FIELD( m_vecJumpVel,			FIELD_VECTOR ),
 
 END_DATADESC()
 
@@ -2706,11 +2804,22 @@ int	CFastHeadcrab::SelectSchedule( void )
 		return SCHED_IDLE_STAND;
 	}
 
-	if ( HasCondition(COND_CAN_RANGE_ATTACK1) && IsHangingFromCeiling() == false )
+	if (!IsHangingFromCeiling())
 	{
-		if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
-			return SCHED_RANGE_ATTACK1;
-		ClearCondition(COND_CAN_RANGE_ATTACK1);
+		if ( HasCondition(COND_CAN_RANGE_ATTACK1) )
+		{
+			if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+				return SCHED_RANGE_ATTACK1;
+			ClearCondition(COND_CAN_RANGE_ATTACK1);
+		}
+		else if ( (HasCondition( COND_ENEMY_TARGETTING_ME ) || HasCondition( COND_LIGHT_DAMAGE )) && random->RandomInt( 0, 4 ) == 4 )
+		{
+			if ( gpGlobals->curtime >= m_flNextHopTime )
+			{
+				m_flNextHopTime = gpGlobals->curtime + random->RandomFloat( 2, 6 );
+				return SCHED_EVADE;
+			}
+		}
 	}
 
 	return BaseClass::SelectSchedule();
@@ -2752,7 +2861,6 @@ void CFastHeadcrab::RunTask( const Task_t *pTask )
 	{
 	case TASK_RANGE_ATTACK1:
 	case TASK_RANGE_ATTACK2:
-		
 		if ( GetEnemy() )
 			// Fast headcrab faces the target in flight.
 			GetMotor()->SetIdealYawAndUpdate( GetEnemy()->GetAbsOrigin() - GetAbsOrigin(), AI_KEEP_YAW_SPEED );
@@ -2761,108 +2869,9 @@ void CFastHeadcrab::RunTask( const Task_t *pTask )
 		BaseClass::RunTask( pTask );
 		break;
 
-	case TASK_HEADCRAB_HOP_ASIDE:
-		if ( GetEnemy() )
-			GetMotor()->SetIdealYawAndUpdate( GetEnemy()->GetAbsOrigin() - GetAbsOrigin(), AI_KEEP_YAW_SPEED );
-
-		if( GetFlags() & FL_ONGROUND )
-		{
-			SetGravity(1.0);
-			SetMoveType( MOVETYPE_STEP );
-
-			if( GetEnemy() && ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length() > HEADCRAB_MAX_JUMP_DIST )
-			{
-				TaskFail( "");
-			}
-
-			TaskComplete();
-		}
-		break;
-
 	default:
 		BaseClass::RunTask( pTask );
 		break;
-	}
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : pTask - 
-//-----------------------------------------------------------------------------
-void CFastHeadcrab::StartTask( const Task_t *pTask )
-{
-	switch ( pTask->iTask )
-	{
-	case TASK_HEADCRAB_HOP_ASIDE:
-		{
-			Vector vecDir, vecForward, vecRight;
-			bool fJumpIsLeft;
-			trace_t tr;
-
-			GetVectors( &vecForward, &vecRight, NULL );
-
-			fJumpIsLeft = false;
-			if( random->RandomInt( 0, 100 ) < 50 )
-			{
-				fJumpIsLeft = true;
-				vecRight.Negate();
-			}
-
-			vecDir = ( vecRight + ( vecForward * 2 ) );
-			VectorNormalize( vecDir );
-			vecDir *= 150.0;
-
-			// This could be a problem. Since I'm adjusting the headcrab's gravity for flight, this check actually
-			// checks farther ahead than the crab will actually jump. (sjb)
-			AI_TraceHull( GetAbsOrigin(), GetAbsOrigin() + vecDir,GetHullMins(), GetHullMaxs(), MASK_SHOT, this, GetCollisionGroup(), &tr );
-
-			//NDebugOverlay::Line( tr.startpos, tr.endpos, 0, 255, 0, false, 1.0 );
-
-			if( tr.fraction == 1.0 )
-			{
-				AIMoveTrace_t moveTrace;
-				GetMoveProbe()->MoveLimit( NAV_JUMP, GetAbsOrigin(), tr.endpos, MASK_NPCSOLID, GetEnemy(), &moveTrace );
-
-				// FIXME: Where should this happen?
-				m_vecJumpVel = moveTrace.vJumpVelocity;
-
-				if( !IsMoveBlocked( moveTrace ) )
-				{
-					SetAbsVelocity( m_vecJumpVel );// + 0.5f * Vector(0,0,sv_gravity.GetFloat()) * flInterval;
-					SetGravity( UTIL_ScaleForGravity( 1600 ) );
-					SetGroundEntity( NULL );
-					SetNavType( NAV_JUMP );
-
-					if( fJumpIsLeft )
-					{
-						SetIdealActivity( (Activity)ACT_HEADCRAB_HOP_LEFT );
-						GetNavigator()->SetMovementActivity( (Activity) ACT_HEADCRAB_HOP_LEFT );
-					}
-					else
-					{
-						SetIdealActivity( (Activity)ACT_HEADCRAB_HOP_RIGHT );
-						GetNavigator()->SetMovementActivity( (Activity) ACT_HEADCRAB_HOP_RIGHT );
-					}
-				}
-				else
-				{
-					// Can't jump, just fall through.
-					TaskComplete();
-				}
-			}
-			else
-			{
-				// Can't jump, just fall through.
-				TaskComplete();
-			}
-		}
-		break;
-
-	default:
-		{
-			BaseClass::StartTask( pTask );
-		}
 	}
 }
 
@@ -2954,29 +2963,33 @@ float CFastHeadcrab::MaxYawSpeed( void )
 	{
 		case ACT_IDLE:
 		{
-			return( 120 );
+			return( 90 );
 		}
 
 		case ACT_RUN:
 		case ACT_WALK:
 		{
-			return( 150 );
+			return( 60 );
 		}
 
 		case ACT_TURN_LEFT:
 		case ACT_TURN_RIGHT:
 		{
-			return( 120 );
+			return( 90 );
 		}
 
 		case ACT_RANGE_ATTACK1:
 		{
-			return( 120 );
+			const Task_t *pCurTask = GetTask();
+			if ( pCurTask && pCurTask->iTask == TASK_HEADCRAB_JUMP_FROM_CANISTER )
+				return 15;
+			
+			return 30;
 		}
 
 		default:
 		{
-			return( 90 );
+			return( 60 );
 		}
 	}
 }
@@ -3000,6 +3013,7 @@ bool CFastHeadcrab::QuerySeeEntity(CBaseEntity *pSightEnt, bool bOnlyHateOrFearI
 	return BaseClass::QuerySeeEntity(pSightEnt, bOnlyHateOrFearIfNPC);
 }
 
+LINK_ENTITY_TO_CLASS( npc_headcrab, CFastHeadcrab );
 LINK_ENTITY_TO_CLASS( npc_headcrab_fast, CFastHeadcrab );
 
 //-----------------------------------------------------------------------------
@@ -3011,7 +3025,6 @@ BEGIN_DATADESC( CBlackHeadcrab )
 
 	DEFINE_FIELD( m_bPanicState, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flPanicStopTime, FIELD_TIME ),
-	DEFINE_FIELD( m_flNextHopTime, FIELD_TIME ),
 
 	DEFINE_ENTITYFUNC( EjectTouch ),
 
@@ -3170,7 +3183,7 @@ int CBlackHeadcrab::TranslateSchedule( int scheduleType )
 			{
 				//DevMsg( "I'm sick of panicking\n" );
 				m_bPanicState = false;
-				return SCHED_CHASE_ENEMY;
+				return TranslateSchedule(SCHED_CHASE_ENEMY);
 			}
 
 			break;
@@ -3652,23 +3665,6 @@ AI_BEGIN_CUSTOM_NPC( npc_headcrab, CBaseHeadcrab )
 	)
 
 	//=========================================================
-	//
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_HEADCRAB_WAKE_ANGRY_NO_DISPLAY,
-
-		"	Tasks"
-		"		TASK_STOP_MOVING				0"
-		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE "
-		"		TASK_FACE_IDEAL					0"
-		"		TASK_SOUND_WAKE					0"
-		"		TASK_FACE_ENEMY					0"
-		""
-		"	Interrupts"
-	)
-
-	//=========================================================
 	// > SCHED_FAST_HEADCRAB_RANGE_ATTACK1
 	//=========================================================
 	DEFINE_SCHEDULE
@@ -3745,6 +3741,20 @@ AI_BEGIN_CUSTOM_NPC( npc_headcrab, CBaseHeadcrab )
 		"	Tasks"
 		"		TASK_STOP_MOVING			0"
 		"		TASK_HEADCRAB_HOP_OFF_NPC	0"
+
+		"	Interrupts"
+	)
+
+	//=========================================================
+	// Headcrab can see his enemy is locking on
+	//=========================================================
+	DEFINE_SCHEDULE
+	(
+		SCHED_HEADCRAB_EVADE,
+
+		"	Tasks"
+		"		TASK_STOP_MOVING			0"
+		"		TASK_HEADCRAB_HOP_ASIDE		0"
 
 		"	Interrupts"
 	)

@@ -46,6 +46,8 @@ acttable_t CWeaponStab::m_acttable[] =
 	{ ACT_MELEE_ATTACK1,	ACT_MELEE_ATTACK_STAB,	true },
 	{ ACT_IDLE,				ACT_IDLE_MELEE,			false },
 	{ ACT_IDLE_ANGRY,		ACT_IDLE_ANGRY_MELEE,	false },
+
+	{ ACT_GESTURE_MELEE_ATTACK1,	ACT_GESTURE_MELEE_ATTACK_STAB,	true },
 };
 
 IMPLEMENT_ACTTABLE(CWeaponStab);

@@ -84,6 +84,7 @@ BEGIN_DATADESC( CFuncTank )
 	DEFINE_FIELD( m_iLargeAmmoType, FIELD_INTEGER ),
 #endif // HL2_EPISODIC
 
+	DEFINE_KEYFIELD( m_soundUse,		FIELD_SOUNDNAME, "usesound" ),
 	DEFINE_KEYFIELD( m_soundStartRotate, FIELD_SOUNDNAME, "rotatestartsound" ),
 	DEFINE_KEYFIELD( m_soundStopRotate, FIELD_SOUNDNAME, "rotatestopsound" ),
 	DEFINE_KEYFIELD( m_soundLoopRotate, FIELD_SOUNDNAME, "rotatesound" ),
@@ -899,8 +900,12 @@ void CFuncTank::Precache( void )
 	if ( m_soundLoopRotate != NULL_STRING )
 		PrecacheScriptSound( STRING(m_soundLoopRotate) );
 
-	PrecacheScriptSound( "Func_Tank.BeginUse" );
-//	PrecacheScriptSound( "Func_Tank.Fire" );
+	if ( m_soundUse != NULL_STRING )
+		PrecacheScriptSound( STRING(m_soundUse) );
+
+//	PrecacheScriptSound( "FuncTank.BeginUse50cal" );
+//	PrecacheScriptSound( "FuncTank.BeginUseMinigun" );
+//	PrecacheScriptSound( "FuncTank.Fire" );
 	PrecacheScriptSound( "Weapon_Functank.Single" );
 
 	// Precache the combine cannon
@@ -1041,7 +1046,16 @@ bool CFuncTank::StartControl( CBaseCombatCharacter *pController )
 	// Set the controller's position to be the use position.
 	m_vecControllerUsePos = m_hController->GetLocalOrigin();
 
-	EmitSound( "Func_Tank.BeginUse" );
+	if ( m_soundUse != NULL_STRING )
+	{
+		CPASAttenuationFilter filter( this );
+
+		EmitSound_t ep;
+		ep.m_nChannel = CHAN_ITEM;
+		ep.m_pSoundName = (char*)STRING(m_soundUse);
+
+		EmitSound( filter, entindex(), ep );
+	}
 	
 	SetNextThink( gpGlobals->curtime + 0.1f );
 	
@@ -2214,9 +2228,13 @@ void CFuncTank::Fire( int bulletCount, const Vector &barrelEnd, const Vector &fo
 	{
 		if ( m_iszSpriteSmoke != NULL_STRING )
 		{
+			int SmokeAlpha = 255*(m_spriteScale);
+			if ( SmokeAlpha > 255 )
+				SmokeAlpha = 255;
+
 			CSprite *pSprite = CSprite::SpriteCreate( STRING(m_iszSpriteSmoke), barrelEnd, TRUE );
-			pSprite->AnimateAndDie( random->RandomFloat( 15.0, 20.0 ) );
-			pSprite->SetTransparency( kRenderTransAlpha, m_clrRender->r, m_clrRender->g, m_clrRender->b, 255, kRenderFxNone );
+			pSprite->AnimateAndDie( random->RandomFloat( 10.0, 20.0 ) );
+			pSprite->SetTransparency( kRenderTransAdd, 255, 255, 255, SmokeAlpha, kRenderFxNone );
 
 			Vector vecVelocity( 0, 0, random->RandomFloat(40, 80) ); 
 			pSprite->SetAbsVelocity( vecVelocity );
@@ -2230,7 +2248,7 @@ void CFuncTank::Fire( int bulletCount, const Vector &barrelEnd, const Vector &fo
 			pSprite->SetScale( m_spriteScale );
 		}
 
-//		EmitSound( "Func_Tank.Fire" );
+//		EmitSound( "FuncTank.Fire" );
 	}
 
 	if( pAttacker && pAttacker->IsPlayer() )
@@ -2722,7 +2740,7 @@ void CFuncTankRocket::Fire( int bulletCount, const Vector &barrelEnd, const Vect
 {
 	CMissile *pRocket = (CMissile *) CBaseEntity::Create( "rpg_missile", barrelEnd, GetAbsAngles(), this );
 	
-	pRocket->DumbFire();
+	pRocket->GuidingDisabled( true );
 	pRocket->SetNextThink( gpGlobals->curtime + 0.1f );
 	pRocket->SetAbsVelocity( forward * m_flRocketSpeed );
 	if ( GetController() && GetController()->IsPlayer() )

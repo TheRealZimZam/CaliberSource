@@ -1297,16 +1297,24 @@ void CProtoSniper::SniperSoundThink()
 	{
 		// Some maths here to get the distance
 		// Get bullet time to player
-		CBasePlayer *pPlayer = AI_GetSinglePlayer();
-		if ( pPlayer )
+		if ( g_pGameRules->IsMultiplayer() )
 		{
-			float SpeedofSound = 18000.0f;	// in hmmr units
-			float Dist = (pPlayer->GetAbsOrigin() - GetBulletOrigin() ).Length();
-			float Time = Dist / (SpeedofSound / snipersoundmultiplier.GetInt());	// Slow it down a bit so its more noticeable
-			m_flSoundDelay = Time;
+			m_flSoundDelay = 0;
 			m_fFired = false;
-			SetContextThink( &CProtoSniper::SniperSoundThink, gpGlobals->curtime + m_flSoundDelay, s_pSniperSoundThinkContext );
-			return;
+		}
+		else
+		{
+			CBasePlayer *pPlayer = AI_GetSinglePlayer();
+			if ( pPlayer )
+			{
+				float SpeedofSound = 18000.0f;	// in hmmr units
+				float Dist = (pPlayer->GetAbsOrigin() - GetBulletOrigin() ).Length();
+				float Time = Dist / (SpeedofSound / snipersoundmultiplier.GetInt());	// Slow it down a bit so its more noticeable
+				m_flSoundDelay = Time;
+				m_fFired = false;
+				SetContextThink( &CProtoSniper::SniperSoundThink, gpGlobals->curtime + m_flSoundDelay, s_pSniperSoundThinkContext );
+				return;
+			}
 		}
 	}
 

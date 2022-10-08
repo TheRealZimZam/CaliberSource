@@ -48,6 +48,7 @@
 #include "coordsize.h"
 #include "hl2_shareddefs.h"
 #include "te_effect_dispatch.h"
+#include "grenade_concussive.h"
 #include "beam_flags.h"
 #include "prop_combine_ball.h"
 #include "explode.h"
@@ -1894,6 +1895,7 @@ void CNPC_Strider::HandleAnimEvent( animevent_t *pEvent )
 		break;
 	case STRIDER_AE_CANNONHIT:
 		CreateConcussiveBlast( m_blastHit, m_blastNormal, this, 2.5 );
+		RadiusDamage( CTakeDamageInfo( this, this, 200, DMG_BLAST|DMG_DISSOLVE ), m_blastHit, 256, CLASS_NONE, NULL );
 		break;
 
 	case STRIDER_AE_SHOOTMINIGUN:

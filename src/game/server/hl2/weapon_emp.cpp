@@ -1,19 +1,15 @@
-//=========== (C) Copyright 2000 Valve, L.L.C. All rights reserved. ===========
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// The copyright to the contents herein is the property of Valve, L.L.C.
-// The contents may be used and/or copied only with the written permission of
-// Valve, L.L.C., or in accordance with the terms and conditions stipulated in
-// the agreement/contract under which the contents have been supplied.
+// Purpose: Concussive Grenade
 //
-// Purpose: This is the molotov weapon
-//
-//=============================================================================
+// TODO; Cooking
+//=============================================================================//
 
 #include "cbase.h"
 #include "basehlthrowable.h"
 #include "player.h"
 #include "gamerules.h"
-#include "grenade_molotov.h"
+#include "grenade_concussive.h"
 #include "npcevent.h"
 #include "engine/IEngineSound.h"
 #include "items.h"
@@ -24,22 +20,22 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#define CONCGRENADE_RADIUS	4.0f // inches
+
 //-----------------------------------------------------------------------------
-// Fire grenade
+// Fragmentation grenades
 //-----------------------------------------------------------------------------
-class CWeaponMolotov: public CHLThrowable
+class CWeaponEMP: public CHLThrowable
 {
 public:
-	DECLARE_CLASS( CWeaponMolotov, CHLThrowable );
+	DECLARE_CLASS( CWeaponEMP, CHLThrowable );
 
 	DECLARE_SERVERCLASS();
 
-	CWeaponMolotov();
+	CWeaponEMP();
 
 	void	Precache( void );
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
-
-	float	GetFuseTime( void ) { return 0; }
 
 	void	ThrowGrenade( CBaseCombatCharacter *pOwner );
 	void	RollGrenade( CBaseCombatCharacter *pOwner );
@@ -51,41 +47,44 @@ private:
 	DECLARE_DATADESC();
 };
 
-acttable_t	CWeaponMolotov::m_acttable[] = 
+acttable_t	CWeaponEMP::m_acttable[] = 
 {
 	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_THROW, true },
 };
 
-IMPLEMENT_ACTTABLE(CWeaponMolotov);
+IMPLEMENT_ACTTABLE(CWeaponEMP);
 
-IMPLEMENT_SERVERCLASS_ST(CWeaponMolotov, DT_WeaponMolotov)
+IMPLEMENT_SERVERCLASS_ST(CWeaponEMP, DT_WeaponEMP)
 END_SEND_TABLE()
 
-LINK_ENTITY_TO_CLASS( weapon_molotov, CWeaponMolotov );
-PRECACHE_WEAPON_REGISTER(weapon_molotov);
+LINK_ENTITY_TO_CLASS( weapon_emp, CWeaponEMP );
+PRECACHE_WEAPON_REGISTER(weapon_emp);
 
-BEGIN_DATADESC( CWeaponMolotov )
+BEGIN_DATADESC( CWeaponEMP )
 END_DATADESC()
 
-CWeaponMolotov::CWeaponMolotov( )
+CWeaponEMP::CWeaponEMP( )
 {
-}
-
-//------------------------------------------------------------------------------
-void CWeaponMolotov::Precache( void )
-{
-	BaseClass::Precache();
-
-	UTIL_PrecacheOther( "grenade_molotov" );
-
-	PrecacheScriptSound( "Weapon_Molotov.Throw" );
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-// Input  : *pOwner - 
 //-----------------------------------------------------------------------------
-void CWeaponMolotov::ThrowGrenade( CBaseCombatCharacter *pOwner )
+void CWeaponEMP::Precache( void )
+{
+	BaseClass::Precache();
+
+	UTIL_PrecacheOther( "grenade_concussive" );
+
+	PrecacheScriptSound( "WeaponFrag.Throw" );
+	PrecacheScriptSound( "WeaponFrag.Roll" );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : *pPlayer - 
+//-----------------------------------------------------------------------------
+void CWeaponEMP::ThrowGrenade( CBaseCombatCharacter *pOwner )
 {
 	Vector vecSrc		= pOwner->WorldSpaceCenter();
 	Vector vecFacing	= pOwner->BodyDirection3D( );
@@ -100,16 +99,17 @@ void CWeaponMolotov::ThrowGrenade( CBaseCombatCharacter *pOwner )
 		CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 		vecAiming = pPlayer->GetAutoaimVector( AUTOAIM_2DEGREES );
 		vecAiming.z += 0.10; // Raise up so passes through reticle
+		gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 	}
 
-	CGrenadeMolotov *pMolotov = (CGrenadeMolotov*)Create( "grenade_molotov", vecSrc, vec3_angle, GetOwner() );
-	pMolotov->SetAbsVelocity( vecAiming*740 );
+	CGrenadeConcussive *pConcussive = (CGrenadeConcussive*)Create( "grenade_concussive", vecSrc, vec3_angle, GetOwner() );
+	pConcussive->SetAbsVelocity( vecAiming*740 );
 	// Tumble through the air
 	QAngle angVel( random->RandomFloat ( -100, -500 ), random->RandomFloat ( -100, -500 ), random->RandomFloat ( -100, -500 ) ); 
-	pMolotov->SetLocalAngularVelocity( angVel );
+	pConcussive->SetLocalAngularVelocity( angVel );
 
-	pMolotov->SetThrower( GetOwner() );
-	pMolotov->SetOwnerEntity( ((CBaseEntity*)GetOwner()) );
+	pConcussive->SetThrower( GetOwner() );
+	pConcussive->SetOwnerEntity( ((CBaseEntity*)GetOwner()) );
 
 	m_bRedraw = true;
 
@@ -120,9 +120,9 @@ void CWeaponMolotov::ThrowGrenade( CBaseCombatCharacter *pOwner )
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-// Input  : *pOwner - 
+// Input  : *pPlayer - 
 //-----------------------------------------------------------------------------
-void CWeaponMolotov::LobGrenade( CBaseCombatCharacter *pOwner )
+void CWeaponEMP::LobGrenade( CBaseCombatCharacter *pOwner )
 {
 	Vector vecSrc		= pOwner->WorldSpaceCenter();
 	Vector vecFacing	= pOwner->BodyDirection3D( );
@@ -137,16 +137,17 @@ void CWeaponMolotov::LobGrenade( CBaseCombatCharacter *pOwner )
 		CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 		vecAiming = pPlayer->GetAutoaimVector( AUTOAIM_2DEGREES );
 		vecAiming.z += 0.20; // Raise up so passes through reticle
+		gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 	}
 
-	CGrenadeMolotov *pMolotov = (CGrenadeMolotov*)Create( "grenade_molotov", vecSrc, vec3_angle, GetOwner() );
-	pMolotov->SetAbsVelocity( vecAiming*360 );
+	CGrenadeConcussive *pConcussive = (CGrenadeConcussive*)Create( "grenade_concussive", vecSrc, vec3_angle, GetOwner() );
+	pConcussive->SetAbsVelocity( vecAiming*360 );
 	// Tumble through the air
 	QAngle angVel( random->RandomFloat ( -100, -500 ), random->RandomFloat ( -100, -500 ), random->RandomFloat ( -100, -500 ) ); 
-	pMolotov->SetLocalAngularVelocity( angVel );
+	pConcussive->SetLocalAngularVelocity( angVel );
 
-	pMolotov->SetThrower( GetOwner() );
-	pMolotov->SetOwnerEntity( ((CBaseEntity*)GetOwner()) );
+	pConcussive->SetThrower( GetOwner() );
+	pConcussive->SetOwnerEntity( ((CBaseEntity*)GetOwner()) );
 
 	m_bRedraw = true;
 
@@ -156,10 +157,11 @@ void CWeaponMolotov::LobGrenade( CBaseCombatCharacter *pOwner )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Molotov doesnt roll
-// Input  : *pOwner - 
+// Purpose: 
+// Input  : *pPlayer - 
 //-----------------------------------------------------------------------------
-void CWeaponMolotov::RollGrenade( CBaseCombatCharacter *pOwner )
+void CWeaponEMP::RollGrenade( CBaseCombatCharacter *pOwner )
 {
 	LobGrenade( pOwner );
 }
+

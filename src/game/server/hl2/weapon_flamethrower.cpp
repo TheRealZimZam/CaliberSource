@@ -210,6 +210,13 @@ bool CWeaponFlameThrower::CanHolster( void )
 	return BaseClass::CanHolster();
 }
 
+bool CWeaponFlameThrower::Holster( CBaseCombatWeapon *pSwitchingTo )
+{
+	m_bFiring = false;
+
+	return BaseClass::Holster( pSwitchingTo );
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Override if we're waiting to release a shot
 //-----------------------------------------------------------------------------

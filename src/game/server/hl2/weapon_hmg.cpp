@@ -34,16 +34,12 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector cone;
+		static Vector cone = VECTOR_CONE_8DEGREES;
+		if ( GetHSpread() != NULL )
+			cone = Vector( GetHSpread(), (GetHSpread() / 2) + (GetVSpread() / 2), GetVSpread() );
 
 		if( GetOwner() && GetOwner()->IsPlayer() && m_iFireMode == FIREMODE_3RNDBURST )
-		{
 			cone = VECTOR_CONE_4DEGREES;
-		}
-		else
-		{
-			cone = VECTOR_CONE_8DEGREES;
-		}
 
 		return cone;
 	}
@@ -63,7 +59,22 @@ public:
 	virtual float	GetMaxRestTime() { return 0.9; }
 
 	DECLARE_ACTTABLE();
+
+/*
+protected:
+	float			m_flHeat;
+	bool			m_bOverheating;
+*/
 };
+
+/*
+BEGIN_DATADESC( CWeaponHMG1 )
+
+	DEFINE_FIELD( m_flHeat,	FIELD_FLOAT ),
+	DEFINE_FIELD( m_bOverheating,	FIELD_BOOLEAN ),
+
+END_DATADESC()
+*/
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponHMG1, DT_Weaponhmg1)
 END_SEND_TABLE()
@@ -94,6 +105,8 @@ CWeaponHMG1::CWeaponHMG1( )
 {
 	m_fMinRange1		= 32;
 	m_fMaxRange1		= 2000;
+//	m_flHeat			= 0;
+//	m_bOverheating		= true;
 
 	if ( !sv_funmode.GetBool() )
 	{
@@ -145,7 +158,6 @@ void CWeaponHMG1::AddViewKick( void )
 {
 	#define	EASY_DAMPEN			0.5f
 	#define	MAX_VERTICAL_KICK	10.0f	//Degrees
-//	#define	SLIDE_LIMIT			1.0f	//Seconds
 	
 	//Get the view kick
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );

@@ -62,17 +62,12 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector cone;
-		cone = VECTOR_CONE_4DEGREES;
+		if ( GetHSpread() != NULL )
+			return BaseClass::GetBulletSpread();
 
+		static Vector cone = VECTOR_CONE_4DEGREES;
 		if ( GetOwner() && GetOwner()->IsNPC() )
 			cone = VECTOR_CONE_7DEGREES;
-
-		if ( GetHSpread() != NULL )
-		{
-			// We got a weaponscript cone, use that instead
-			cone = Vector( GetHSpread(), ((GetHSpread() / 2) + (GetVSpread() / 2)), GetVSpread() );
-		}
 
 		return cone;
 	}
@@ -80,10 +75,10 @@ public:
 	// Size of burst
 	virtual int		GetMinBurst()
 	{
-		if ( GetOwner() && GetOwner()->IsNPC() )
-			return 1;
-		else
+		if ( GetOwner() && GetOwner()->IsPlayer() )
 			return 4;
+		else
+			return 1;
 	}
 	virtual int		GetMaxBurst() { return GetMinBurst(); }
 
@@ -157,12 +152,12 @@ CWeaponPistol::CWeaponPistol( void )
 {
 //	m_flSoonestPrimaryAttack = gpGlobals->curtime;
 
-	m_fMinRange1		= 24;
+	m_fMinRange1		= 16;
 	m_fMaxRange1		= 1024;
 
 	//Burst range for ai
-//	m_fMinRange2		= 24;
-//	m_fMaxRange2		= 200;
+	m_fMinRange2		= 16;
+	m_fMaxRange2		= 200;
 
 	if ( !sv_funmode.GetBool() )
 	{
@@ -203,7 +198,7 @@ void CWeaponPistol::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCh
 			CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
 
 			WeaponSound( SINGLE_NPC );
-			pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
+			pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, pOperator->GetAttackSpread(this), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
 			pOperator->DoMuzzleFlash();
 
 			//Temp effect until model is done with CL_EVENT_EJECTBRASS1, like the smg
@@ -239,7 +234,7 @@ void CWeaponPistol::DryFire( void )
 //-----------------------------------------------------------------------------
 void CWeaponPistol::PrimaryAttack( void )
 {
-	PistolFire( GetBulletSpread(), GetFireRate(), false );
+	PistolFire( GetOwner()->GetAttackSpread( this ), GetFireRate(), false );
 }
 
 //-----------------------------------------------------------------------------
@@ -247,7 +242,7 @@ void CWeaponPistol::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 void CWeaponPistol::SecondaryAttack( void )
 {
-	PistolFire( (GetBulletSpread() * sk_pistol_burst_accuracy_scale.GetFloat()), 0.06f, true );
+	PistolFire( (GetOwner()->GetAttackSpread( this ) * sk_pistol_burst_accuracy_scale.GetFloat()), 0.06f, true );
 }
 
 //-----------------------------------------------------------------------------
@@ -278,7 +273,7 @@ void CWeaponPistol::PistolFire( Vector vSpread, float flCycleTime, bool bBurstFi
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, GetOwner() );
 
-	//TEMP/TODO; This needs improvement
+	//!!!TEMPTEMP; This needs a proper solution
 	if ( bBurstFire )
 	{
 		m_nNumShotsFired++;

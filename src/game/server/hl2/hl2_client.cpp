@@ -107,9 +107,9 @@ void ClientGamePrecache( void )
 
 	CBaseEntity::PrecacheScriptSound( "FX_AntlionImpact.ShellImpact" );
 	CBaseEntity::PrecacheScriptSound( "Missile.ShotDown" );
-	CBaseEntity::PrecacheScriptSound( "Bullets.DefaultNearmiss" );
-	CBaseEntity::PrecacheScriptSound( "Bullets.GunshipNearmiss" );
-	CBaseEntity::PrecacheScriptSound( "Bullets.StriderNearmiss" );
+	CBaseEntity::PrecacheScriptSound( "Bullets.SmallNearmiss" );
+	CBaseEntity::PrecacheScriptSound( "Bullets.MediumNearmiss" );
+	CBaseEntity::PrecacheScriptSound( "Bullets.LargeNearmiss" );
 	
 	CBaseEntity::PrecacheScriptSound( "Geiger.BeepHigh" );
 	CBaseEntity::PrecacheScriptSound( "Geiger.BeepLow" );

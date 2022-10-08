@@ -35,9 +35,9 @@
 extern short	g_sModelIndexFireball;			// (in combatweapon.cpp) holds the index for the smoke cloud
 
 // Moved to HL2_SharedGameRules because these are referenced by shared AmmoDef functions
-extern ConVar    sk_plr_dmg_smg1_grenade;
-extern ConVar    sk_npc_dmg_smg1_grenade;
-//extern ConVar    sk_max_smg1_grenade;
+extern ConVar    sk_plr_dmg_smg_grenade;
+extern ConVar    sk_npc_dmg_smg_grenade;
+//extern ConVar    sk_max_smg_grenade;
 
 ConVar		sk_ar2_grenade_bounce_velocity_to_preserve	( "sk_ar2_grenade_bounce_velocity_to_preserve","0.1");
 #define		AR2_GRENADE_BOUNCE_VELOCITY_TO_PRESERVE	sk_ar2_grenade_bounce_velocity_to_preserve.GetFloat()	//HL2 is 0.3, Quake is 0.8
@@ -109,11 +109,11 @@ void CGrenadeAR2::Spawn( void )
 
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
 	{
-		m_flDamage = sk_plr_dmg_smg1_grenade.GetFloat();
+		m_flDamage = sk_plr_dmg_smg_grenade.GetFloat();
 	}
 	else
 	{
-		m_flDamage = sk_npc_dmg_smg1_grenade.GetFloat();
+		m_flDamage = sk_npc_dmg_smg_grenade.GetFloat();
 	}
 
 	m_DmgRadius		= sk_ar2_grenade_radius.GetFloat();

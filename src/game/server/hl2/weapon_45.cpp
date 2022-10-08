@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		45-70 Mares leg
+// Purpose:		45-70
 //
 // TODO; 
 //=============================================================================//
@@ -8,6 +8,7 @@
 #include "cbase.h"
 #include "NPCEvent.h"
 #include "basehlcombatweapon.h"
+#include "weapon_sniperrifle.h"
 #include "basecombatcharacter.h"
 #include "AI_BaseNPC.h"
 #include "player.h"
@@ -23,27 +24,25 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	CONTENDER_REFIRE_TIME		0.6f
-#define	CONTENDER_ACCURACY_SHOT_PENALTY_TIME		0.75f	// Applied amount of time each shot adds to the time we must recover from. Should be a bit over firerate
+#define	CONTENDER_REFIRE_TIME		sk_45_refire_time.GetFloat()
+#define	CONTENDER_ACCURACY_SHOT_PENALTY_TIME		0.8f	// Applied amount of time each shot adds to the time we must recover from. Should be a bit over firerate
 #define	CONTENDER_ACCURACY_MAXIMUM_PENALTY_TIME	2.0f	// Maximum penalty to deal out
 
+ConVar	sk_45_refire_time( "sk_45_refire_time",	"0.4");
 extern ConVar sv_funmode;
 
 //-----------------------------------------------------------------------------
 // CWeapon45
 //-----------------------------------------------------------------------------
 
-class CWeapon45 : public CBaseHLCombatWeapon
+class CWeapon45 : public CHLSniperRifle
 {
-	DECLARE_DATADESC();
-
+	DECLARE_CLASS( CWeapon45, CHLSniperRifle );
 public:
-
-	DECLARE_CLASS( CWeapon45, CBaseHLCombatWeapon );
-
-	CWeapon45( void );
+	CWeapon45( );
 
 	DECLARE_SERVERCLASS();
+	DECLARE_DATADESC();
 
 	void	ItemPostFrame( void );
 	void	ItemPreFrame( void );
@@ -140,16 +139,14 @@ acttable_t	CWeapon45::m_acttable[] =
 	{ ACT_RELOAD_LOW,				ACT_RELOAD_PISTOL_LOW,				false },
 	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_PISTOL,			false },
 };
-
-
 IMPLEMENT_ACTTABLE( CWeapon45 );
 
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
-CWeapon45::CWeapon45( void )
+CWeapon45::CWeapon45( )
 {
-	m_flSoonestPrimaryAttack = gpGlobals->curtime;
+//	m_flSoonestPrimaryAttack = gpGlobals->curtime;
 	m_flAccuracyPenalty = 0.0f;
 
 	m_fMinRange1		= 16;
@@ -198,42 +195,28 @@ void CWeapon45::PrimaryAttack( void )
 {
 	// Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-
 	if ( !pPlayer )
 	{
 		return;
 	}
 
 	if ( ( gpGlobals->curtime - m_flLastAttackTime ) > 0.5f )
-	{
 		m_nNumShotsFired = 0;
-	}
 	else
-	{
 		m_nNumShotsFired++;
-	}
 
 	m_flLastAttackTime = gpGlobals->curtime;
 	m_flSoonestPrimaryAttack = gpGlobals->curtime + CONTENDER_REFIRE_TIME;
 
-	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 600, 0.2, GetOwner() );
-
-	//Disorient the player
-	pPlayer->ViewPunch( QAngle( -8, random->RandomFloat( -2, 2 ), 0 ) );
-
 	BaseClass::PrimaryAttack();
+
+	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
 
 	// Add an accuracy penalty which can move past our maximum penalty time if we're really spastic
 	m_flAccuracyPenalty += CONTENDER_ACCURACY_SHOT_PENALTY_TIME;
 
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
-
-	if ( !m_iClip1 && pPlayer->GetAmmoCount( m_iPrimaryAmmoType ) <= 0 )
-	{
-		// HEV suit - indicate out of ammo condition
-		pPlayer->SetSuitUpdate( "!HEV_AMO0", FALSE, 0 ); 
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -291,6 +274,8 @@ void CWeapon45::ItemBusyFrame( void )
 //-----------------------------------------------------------------------------
 void CWeapon45::ItemPostFrame( void )
 {
+	UpdatePenaltyTime();
+
 	BaseClass::ItemPostFrame();
 
 	if ( m_bInReload )
@@ -301,17 +286,22 @@ void CWeapon45::ItemPostFrame( void )
 	if ( pOwner == NULL )
 		return;
 
+	//Allow a refire as fast as the player can click
+	if ( ( ( pOwner->m_nButtons & IN_ATTACK ) == false ) && ( m_flSoonestPrimaryAttack < gpGlobals->curtime ) )
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime - 0.1f;
+	}
+	else if ( ( pOwner->m_nButtons & IN_ATTACK ) && ( m_flNextPrimaryAttack < gpGlobals->curtime ) && ( m_iClip1 <= 0 ) )
+	{
+		DryFire();
+	}
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 bool CWeapon45::Reload( void )
 {
-	bool fRet = DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
-	if ( fRet )
-	{
-		WeaponSound( RELOAD );
-		m_flAccuracyPenalty = 0.0f;
-	}
-	return fRet;
+	m_flAccuracyPenalty = 0.0f;
+
+	return BaseClass::Reload();
 }

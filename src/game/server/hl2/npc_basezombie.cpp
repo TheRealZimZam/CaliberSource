@@ -137,14 +137,12 @@ int CNPC_BaseZombie::ACT_ZOM_SWATRIGHTMID;
 int CNPC_BaseZombie::ACT_ZOM_SWATLEFTLOW;
 int CNPC_BaseZombie::ACT_ZOM_SWATRIGHTLOW;
 int CNPC_BaseZombie::ACT_ZOM_RELEASECRAB;
-//int CNPC_BaseZombie::ACT_ZOM_FALL;
 #endif
 int ACT_ZOM_SWATLEFTMID;
 int ACT_ZOM_SWATRIGHTMID;
 int ACT_ZOM_SWATLEFTLOW;
 int ACT_ZOM_SWATRIGHTLOW;
 int ACT_ZOM_RELEASECRAB;
-//int ACT_ZOM_FALL;
 
 ConVar	sk_zombie_dmg_one_slash( "sk_zombie_dmg_one_slash","0");
 ConVar	sk_zombie_dmg_both_slash( "sk_zombie_dmg_both_slash","0");
@@ -165,7 +163,7 @@ ConVar zombie_moanfreq( "zombie_moanfreq", "1" );
 ConVar zombie_decaymin( "zombie_decaymin", "0.1" );
 ConVar zombie_decaymax( "zombie_decaymax", "0.4" );
 
-ConVar zombie_ambushdist( "zombie_ambushdist", "16000" );
+ConVar zombie_ambushdist( "zombie_ambushdist", "8000" );
 
 //=========================================================
 // For a couple of reasons, we keep a running count of how
@@ -658,7 +656,7 @@ int CNPC_BaseZombie::MeleeAttack1Conditions ( float flDot, float flDist )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-#define ZOMBIE_BUCKSHOT_TRIPLE_DAMAGE_DIST	96.0f // Triple damage from buckshot at 8 feet (headshot only)
+#define ZOMBIE_BUCKSHOT_TRIPLE_DAMAGE_DIST 86.0f
 float CNPC_BaseZombie::GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info )
 {
 	switch( iHitGroup )
@@ -702,12 +700,15 @@ void CNPC_BaseZombie::TraceAttack( const CTakeDamageInfo &info, const Vector &ve
 		m_bHeadShot = true;
 	}
 
-	if( infoCopy.GetDamageType() & DMG_BUCKSHOT )
+	if ( hl2_episodic.GetBool() )
 	{
-		// Zombie gets across-the-board damage reduction for buckshot. This compensates for the recent changes which
-		// make the shotgun much more powerful, and returns the zombies to a level that has been playtested extensively.(sjb)
-		// This normalizes the buckshot damage to what it used to be on normal (5 dmg per pellet. Now it's 8 dmg per pellet). 
-		infoCopy.ScaleDamage( 0.675 );
+		if( infoCopy.GetDamageType() & DMG_BUCKSHOT )
+		{
+			// Zombie gets across-the-board damage reduction for buckshot. This compensates for the recent changes which
+			// make the shotgun much more powerful, and returns the zombies to a level that has been playtested extensively.(sjb)
+			// This normalizes the buckshot damage to what it used to be on normal (5 dmg per pellet. Now it's 8 dmg per pellet). 
+			infoCopy.ScaleDamage( 0.675 );
+		}
 	}
 
 	BaseClass::TraceAttack( infoCopy, vecDir, ptr );
@@ -725,13 +726,18 @@ bool CNPC_BaseZombie::ShouldBecomeTorso( const CTakeDamageInfo &info, float flDa
 		return false;
 
 	if ( m_fIsTorso )
-	{
-		// Already split.
 		return false;
-	}
 
 	// Not if we're in a dss
 	if ( IsRunningDynamicInteraction() )
+		return false;
+
+	// Never break apart a slouched zombie. This is because the most fun
+	// slouched zombies to kill are ones sleeping leaning against explosive
+	// barrels. If you break them in half in the blast, the force of being
+	// so close to the explosion makes the body pieces fly at ridiculous 
+	// velocities because the pieces weigh less than the whole.
+	if( IsSlumped() )
 		return false;
 
 	// Break in half IF:
@@ -771,13 +777,16 @@ bool CNPC_BaseZombie::ShouldBecomeTorso( const CTakeDamageInfo &info, float flDa
 //-----------------------------------------------------------------------------
 HeadcrabRelease_t CNPC_BaseZombie::ShouldReleaseHeadcrab( const CTakeDamageInfo &info, float flDamageThreshold )
 {
+	if ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) && m_iHealth < GIB_HEALTH_VALUE )
+		return RELEASE_RAGDOLL;
+
 	if ( m_iHealth <= m_flReleaseThreshold )
 	{
 		if ( info.GetDamageType() & DMG_REMOVENORAGDOLL )
 			return RELEASE_NO;
 
 		// If I was killed by an explosion or smacked off with a crowbar, send the crab flying.
-		if ( info.GetDamageType() & (DMG_BLAST|DMG_SNIPER|DMG_CLUB) )
+		if ( (info.GetDamageType() & (DMG_SNIPER|DMG_VEHICLE|DMG_CLUB)) )
 			return RELEASE_RAGDOLL;
 
 		// If I was shocked or plasma'd, vaporize.
@@ -789,16 +798,12 @@ HeadcrabRelease_t CNPC_BaseZombie::ShouldReleaseHeadcrab( const CTakeDamageInfo 
 			return RELEASE_RAGDOLL_SLICED_OFF;
 		}
 
-		// Finally, if I was killed by a bullet...
+		// Finally, if I was killed by a headshot...
 		if ( info.GetDamageType() & DMG_BULLET && m_bHeadShot )
 		{
 			// Go limp
 			if ( flDamageThreshold > 0.25 )
-			{
-				// Enough force to kill the crab.
-				return RELEASE_RAGDOLL;
-			}
-		//!	return RELEASE_IMMEDIATE;
+				return RELEASE_RAGDOLL;	// Enough force to kill the crab.
 		}
 
 		// Seize and release the crab
@@ -935,7 +940,7 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 			m_iHealth = ZOMBIE_RELEASE_HEALTH_MIN;
 			SetCondition( COND_ZOMBIE_RELEASECRAB );
 			return 0;
-
+			break;
 		}
 	}
 
@@ -977,6 +982,23 @@ void CNPC_BaseZombie::MakeAISpookySound( float volume, float duration )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CNPC_BaseZombie::PainSound( const CTakeDamageInfo &info )
+{
+	// We're constantly taking damage when we are on fire. Don't make all those noises!
+	if ( IsOnFire() )
+		return;
+
+	EmitSound( "Zombie.Pain" );
+}
+
+void CNPC_BaseZombie::DeathSound( const CTakeDamageInfo &info ) 
+{
+	EmitSound( "Zombie.Die" );
+}
+
+//-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 bool CNPC_BaseZombie::CanPlayMoanSound()
 {
@@ -1002,16 +1024,31 @@ bool CNPC_BaseZombie::CanPlayMoanSound()
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Play a random idle sound.
+//-----------------------------------------------------------------------------
+void CNPC_BaseZombie::IdleSound( void )
+{
+	if( IsSlumped() )
+		return;	// Sleeping zombies are quiet.
+
+	if( GetState() == NPC_STATE_IDLE && random->RandomFloat( 0, 1 ) == 0 )
+	{
+		// Moan more infrequently in IDLE state.
+		return;
+	}
+
+	EmitSound( "Zombie.Idle" );
+	MakeAISpookySound( 360.0f );
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Open a window and let a little bit of the looping moan sound
 //			come through.
 //-----------------------------------------------------------------------------
 void CNPC_BaseZombie::MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize )
 {
 	if( HasSpawnFlags( SF_NPC_GAG ) )
-	{
-		// Not yet!
-		return;
-	}
+		return;	// Not yet!
 
 	if( !m_pMoanSound )
 	{
@@ -1031,9 +1068,7 @@ void CNPC_BaseZombie::MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize )
 	envDefaultZombieMoanVolumeFast[ 1 ].durationMax = zombie_decaymax.GetFloat();
 
 	if( random->RandomInt( 1, 2 ) == 1 )
-	{
 		IdleSound();
-	}
 
 	float duration = ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pMoanSound, SOUNDCTRL_CHANGE_VOLUME, pEnvelope, iEnvelopeSize );
 
@@ -1066,6 +1101,28 @@ bool CNPC_BaseZombie::IsChopped( const CTakeDamageInfo &info )
 	return true;
 }
 
+#define ZOMBIE_SQUASH_MASS	300.0f  // Anything this heavy or heavier squashes a zombie good. (show special fx)
+bool CNPC_BaseZombie::IsSquashed( const CTakeDamageInfo &info )
+{
+	if( GetHealth() > 0 )
+	{
+		return false;
+	}
+
+	if( info.GetDamageType() & DMG_CRUSH )
+	{
+		IPhysicsObject *pCrusher = info.GetInflictor()->VPhysicsGetObject();
+		if( pCrusher && pCrusher->GetMass() >= ZOMBIE_SQUASH_MASS && info.GetInflictor()->WorldSpaceCenter().z > EyePosition().z )
+		{
+			// This heuristic detects when a zombie has been squashed from above by a heavy
+			// item. Done specifically so we can add gore effects to Ravenholm cartraps.
+			// The zombie must take physics damage from a 300+kg object that is centered above its eyes (comes from above)
+			return true;
+		}
+	}
+
+	return false;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Return true if this gibbing zombie should ignite its gibs
@@ -1238,6 +1295,7 @@ void CNPC_BaseZombie::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize
 
 	// FIXME: use overlays when they come online
 	//AddOverlay( ACT_ZOM_WALK_ON_FIRE, false );
+#if 0
 	if( !m_ActBusyBehavior.IsActive() )
 	{
 		Activity activity = GetActivity();
@@ -1263,6 +1321,7 @@ void CNPC_BaseZombie::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize
 			SetActivity( burningActivity );
 		}
 	}
+#endif
 }
 
 //---------------------------------------------------------
@@ -1416,6 +1475,16 @@ CBaseEntity *CNPC_BaseZombie::ClawAttack( float flDist, int iDamage, QAngle &qaV
 	return pHurt;
 }
 
+void CNPC_BaseZombie::AttackHitSound( void )
+{
+	EmitSound( "Zombie.AttackHit" );
+}
+
+void CNPC_BaseZombie::AttackMissSound( void )
+{
+	EmitSound( "Zombie.AttackMiss" );
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: The zombie is frustrated and pounding walls/doors. Make an appropriate noise
 // Input  : 
@@ -1448,6 +1517,14 @@ void CNPC_BaseZombie::PoundSound()
 	// Otherwise fall through to the default sound.
 	CPASAttenuationFilter filter( this,"NPC_BaseZombie.PoundDoor" );
 	EmitSound( filter, entindex(),"NPC_BaseZombie.PoundDoor" );
+}
+
+void CNPC_BaseZombie::AlertSound( void )
+{
+	EmitSound( "Zombie.Alert" );
+
+	// Don't let a moan sound cut off the alert sound.
+	m_flNextMoanSound += random->RandomFloat( 2.0, 4.0 );
 }
 
 //-----------------------------------------------------------------------------
@@ -1677,6 +1754,14 @@ void CNPC_BaseZombie::HandleAnimEvent( animevent_t *pEvent )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Play a random attack sound.
+//-----------------------------------------------------------------------------
+void CNPC_BaseZombie::AttackSound( void )
+{
+	EmitSound( "Zombie.Attack" );
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Spawn function for the base zombie.
 //
 // !!!IMPORTANT!!! YOUR DERIVED CLASS'S SPAWN() RESPONSIBILITIES:
@@ -1736,6 +1821,13 @@ void CNPC_BaseZombie::Precache( void )
 	PrecacheScriptSound( "NPC_BaseZombie.PoundDoor" );
 	PrecacheScriptSound( "NPC_BaseZombie.Swat" );
 	PrecacheScriptSound( "AI_BaseNPC.SwishSound" );
+	PrecacheScriptSound( "Zombie.AttackHit" );
+	PrecacheScriptSound( "Zombie.AttackMiss" );
+	PrecacheScriptSound( "Zombie.Pain" );
+	PrecacheScriptSound( "Zombie.Die" );
+	PrecacheScriptSound( "Zombie.Alert" );
+	PrecacheScriptSound( "Zombie.Idle" );
+	PrecacheScriptSound( "Zombie.Attack" );
 
 	PrecacheModel( GetLegsModel() );
 	PrecacheModel( GetTorsoModel() );
@@ -1821,6 +1913,11 @@ void CNPC_BaseZombie::BuildScheduleTestBits( void )
 	{
 		ClearCustomInterruptCondition( COND_LIGHT_DAMAGE );
 		ClearCustomInterruptCondition( COND_HEAVY_DAMAGE );
+	}
+
+	if( !m_fIsTorso && !IsCurSchedule( SCHED_FLINCH_PHYSICS ) && !m_ActBusyBehavior.IsActive() )
+	{
+		SetCustomInterruptCondition( COND_PHYSICS_DAMAGE );
 	}
 
 	BaseClass::BuildScheduleTestBits();
@@ -2295,7 +2392,7 @@ void CNPC_BaseZombie::Event_Killed( const CTakeDamageInfo &info )
 		VectorNormalize( vecDamageDir );
 
 		// Big blood splat
-		UTIL_BloodSpray( WorldSpaceCenter(), vecDamageDir, BLOOD_COLOR_YELLOW, 8, FX_BLOODSPRAY_CLOUD );
+		UTIL_BloodSpray( WorldSpaceCenter(), vecDamageDir, BloodColor(), 8, FX_BLOODSPRAY_CLOUD );
 	}
 
    	BaseClass::Event_Killed( info );
@@ -2404,6 +2501,9 @@ void CNPC_BaseZombie::ReleaseHeadcrab( const Vector &vecOrigin, const Vector &ve
 	{
 		vecSpot.z -= 16;
 	}
+
+	//Spray some blood as it leaves
+	UTIL_BloodSpray( vecSpot, 0, BloodColor(), 6, FX_BLOODSPRAY_CLOUD );
 
 	if( fRagdollCrab )
 	{
@@ -2614,35 +2714,37 @@ void CNPC_BaseZombie::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
 //-----------------------------------------------------------------------------
 // Purpose: Refines a base activity into something more specific to our internal state.
 //-----------------------------------------------------------------------------
-Activity CNPC_BaseZombie::NPC_TranslateActivity( Activity baseAct )
+Activity CNPC_BaseZombie::NPC_TranslateActivity( Activity BaseAct )
 {
-	if ( baseAct == ACT_WALK && IsCurSchedule( SCHED_COMBAT_PATROL, false) )
-		baseAct = ACT_RUN;
+	Activity NewActivity = BaseAct;
 
-	if ( IsOnFire() )
+	if ( BaseAct == ACT_WALK && IsCurSchedule(SCHED_COMBAT_PATROL, false) )
+		NewActivity = ACT_RUN;
+
+	if ( IsOnFire() && !m_ActBusyBehavior.IsActive() )
 	{
-		switch ( baseAct )
+		switch ( BaseAct )
 		{
-		//	case ACT_RUN_ON_FIRE:
-		//	{
-		//		return ( Activity )ACT_WALK_ON_FIRE;
-		//	}
+			case ACT_RUN_ON_FIRE:
+				NewActivity = ACT_RUN_ON_FIRE;
+			break;
 
 			case ACT_WALK:
-			{
 				// I'm on fire. Put ME out.
-				return ( Activity )ACT_WALK_ON_FIRE;
-			}
+				NewActivity = ACT_WALK_ON_FIRE;
+			break;
 
 			case ACT_IDLE:
-			{
 				// I'm on fire. Put ME out.
-				return ( Activity )ACT_IDLE_ON_FIRE;
-			}
+				NewActivity = ACT_IDLE_ON_FIRE;
+			break;
 		}
 	}
 
-	return BaseClass::NPC_TranslateActivity( baseAct );
+	if( HaveSequenceForActivity(NewActivity) )
+		BaseAct = NewActivity;
+
+	return BaseClass::NPC_TranslateActivity( BaseAct );
 }
 
 //-----------------------------------------------------------------------------
@@ -2745,7 +2847,6 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 	DECLARE_ACTIVITY( ACT_ZOM_SWATLEFTLOW )
 	DECLARE_ACTIVITY( ACT_ZOM_SWATRIGHTLOW )
 	DECLARE_ACTIVITY( ACT_ZOM_RELEASECRAB )
-//	DECLARE_ACTIVITY( ACT_ZOM_FALL )
 
 	DECLARE_CONDITION( COND_ZOMBIE_CAN_SWAT_ATTACK )
 	DECLARE_CONDITION( COND_ZOMBIE_RELEASECRAB )

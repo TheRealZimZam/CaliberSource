@@ -35,7 +35,7 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 	return pPlayer->GiveAmmo( flCount, iAmmoType, bSuppressSound );
 }
 
-// Already defined in baseclass
+// Already defined in baseclass because of item_dynamic_resupply
 #if 0
 // Ammo counts given by ammo items - Large variations are NEAR full-resupply
 // NOTENOTE: This should (almost) always be a multiplier of the magazine size for the weapon;
@@ -661,7 +661,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_RPG_ROUND, "RPG_Round"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_RPG_ROUND, "RPGRound"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.RPGRound_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.RPGRound_Touch" );
@@ -703,7 +703,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_GRENADE, "SMG1_Grenade"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_GRENADE, "AR2Grenade"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.AR2Round_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.AR2Round_Touch" );
@@ -840,6 +840,46 @@ LINK_ENTITY_TO_CLASS(item_ammo_buckshot, CItem_ClipBuckshot);
 
 
 // ========================================================================
+//	>> ClipFragshot
+// ========================================================================
+class CItem_ClipFragshot : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_ClipFragshot, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
+
+		PrecacheScriptSound( "Item.Magazine_Touch" );
+	}
+
+	void Spawn( void )
+	{ 
+		Precache( );
+		SetModel( "models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
+		BaseClass::Spawn( );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_BUCKSHOT_MAG, "Fragshot"))
+		{
+			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_fragshot, CItem_ClipFragshot);
+
+
+// ========================================================================
 //	>> CItem_AR2AltFireRound
 // Old AR2 Altfire
 // ========================================================================
@@ -915,8 +955,8 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_ammo_flamer, CItem_FlamerTank);
-
+LINK_ENTITY_TO_CLASS(item_ammo_flametank, CItem_FlamerTank);
+LINK_ENTITY_TO_CLASS(item_ammo_flame, CItem_FlamerTank);
 
 // ========================================================================
 //	>> CItem_LargeFlamerTank
@@ -1072,13 +1112,13 @@ const char *CItem_AmmoCrate::m_lpzAmmoNames[NUM_AMMO_CRATE_TYPES] =
 	"Pistol",		
 	"SMG1",			
 	"AR2",			
-	"RPG_Round",	
+	"RPGRound",	
 	"Buckshot",		
 	"Grenade",
 	"357",
 	"XBowBolt",
 	"AR2AltFire",
-	"SMG1_Grenade",
+	"AR2Grenade",
 };
 
 // Ammo amount given per +use

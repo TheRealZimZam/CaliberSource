@@ -53,6 +53,7 @@
 
 extern ConVar sk_healthkit;
 extern ConVar sk_healthvial;
+extern ConVar temp_demofixes;	//TEMPTEMP
 
 const int MAX_PLAYER_SQUAD = 4;
 
@@ -309,6 +310,7 @@ int ACT_CIT_HANDSUP;
 int	ACT_CIT_BLINDED;		// Blinded by scanner photo
 int ACT_CIT_SHOWARMBAND;
 int ACT_CIT_HEAL;			// Giving an item
+int ACT_CIT_HEALTOSS;		// Tossing an item
 int	ACT_CIT_STARTLED;		// Startled by sneaky scanner
 int	ACT_CIT_ANNOYED;		// Extremely pissed off
 
@@ -839,11 +841,11 @@ void CNPC_Citizen::SelectExpressionType()
 void CNPC_Citizen::FixupMattWeapon()
 {
 	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
-	if ( pWeapon && pWeapon->ClassMatches( "weapon_crowbar" ) && NameMatches( "matt" ) )
+	if ( pWeapon && pWeapon->ClassMatches( "weapon_crowbarold" ) && NameMatches( "matt" ) )
 	{
 		Weapon_Drop( pWeapon );
 		UTIL_Remove( pWeapon );
-		pWeapon = (CBaseCombatWeapon *)CREATE_UNSAVED_ENTITY( CMattsPipe, "weapon_crowbar" );
+		pWeapon = (CBaseCombatWeapon *)CREATE_UNSAVED_ENTITY( CMattsPipe, "weapon_crowbarold" );
 		pWeapon->SetName( AllocPooledString( "matt_weapon" ) );
 		DispatchSpawn( pWeapon );
 
@@ -923,6 +925,7 @@ Disposition_t CNPC_Citizen::IRelationType( CBaseEntity *pTarget )
 	{
 		if ( baseRelationship == D_HT && pTarget->Classify() != CLASS_NONE )
 		{
+			// Run away if im a coward and im hurt
 			if ( IsInjured() && m_bCanPanic )
 			{
 				return D_FR;
@@ -1637,13 +1640,16 @@ void CNPC_Citizen::StartTask( const Task_t *pTask )
 				break;
 			}
 
-			Speak( TLK_HEAL );
+			SpeakIfAllowed( TLK_HEAL );
 		}
 		else if ( IsAmmoResupplier() )
 		{
-			Speak( TLK_GIVEAMMO );
+			SpeakIfAllowed( TLK_GIVEAMMO );
 		}
-		SetIdealActivity( (Activity)ACT_CIT_HEAL );
+		if ( pTask->iTask == TASK_CIT_HEAL_TOSS )
+			SetIdealActivity( (Activity)ACT_CIT_HEALTOSS );
+		else
+			SetIdealActivity( (Activity)ACT_CIT_HEAL );
 		break;
 
 	case TASK_CIT_RPG_AUGER:
@@ -1813,7 +1819,7 @@ void CNPC_Citizen::RunTask( const Task_t *pTask )
 					if ( pPlayer && ( ( vecEnemyPos - pPlayer->GetAbsOrigin() ).LengthSqr() < RPG_SAFE_DISTANCE * RPG_SAFE_DISTANCE ) )
 					{
 						m_bRPGAvoidPlayer = true;
-						Speak( TLK_WATCHOUT );
+						SpeakIfAllowed( TLK_WATCHOUT );
 					}
 					else
 					{
@@ -1880,20 +1886,38 @@ Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 {
 	// !!!TEMPTEMP; This is all temporary fixes due to missing animations
 	// As soon as models are updated scrub this!
-#if 1
-	if ( activity == ACT_RUN_AIM_SHOTGUN )
-		return ACT_RUN_AIM_RIFLE;
-	if ( activity == ACT_WALK_AIM_SHOTGUN )
-		return ACT_WALK_AIM_RIFLE;
-	if ( activity == ACT_IDLE_ANGRY_SHOTGUN )
-		return ACT_IDLE_ANGRY_SMG1;
+	if ( temp_demofixes.GetBool() )
+	{
+		switch( activity )
+		{
+			case ACT_IDLE_ANGRY_SHOTGUN:
+				activity = ACT_IDLE_ANGRY_SMG1;
+			break;
+			case ACT_RUN_AIM_SHOTGUN:
+			case ACT_RUN_AIM_PISTOL:	//Ah fook me, thats terrible
+				activity = ACT_RUN_AIM_RIFLE;
+			break;
+			case ACT_WALK_AIM_SHOTGUN:
+			case ACT_WALK_AIM_PISTOL:	//No seasoning, no flavour, its fookin ice cold
+				activity = ACT_WALK_AIM_RIFLE;
+			break;
 
-	// Fear/panic behavior
-	if ( activity == ACT_IDLE_SCARED )
-		return ACT_COWER;
-	if ( activity == ACT_RUN_SCARED )
-		return ACT_RUN_PROTECTED;
-#endif
+			case ACT_MELEE_ATTACK_STAB:
+				activity = ACT_MELEE_ATTACK_SWING;
+			break;
+
+			case ACT_RELOAD_SHOTGUN_LOW:
+				activity = ACT_RELOAD_SMG1_LOW;
+			break;
+
+			case ACT_IDLE_SCARED:
+				activity = ACT_COWER;
+			break;
+			case ACT_RUN_SCARED:
+				activity = ACT_RUN_PROTECTED;
+			break;
+		}
+	}
 
 	return BaseClass::NPC_TranslateActivity( activity );
 }
@@ -2107,72 +2131,24 @@ void CNPC_Citizen::SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE
 }
 
 //-----------------------------------------------------------------------------
-// Purpose:
+// Purpose: Check if we want to throw something
 //-----------------------------------------------------------------------------
 /*
 int CNPC_Citizen::RangeAttack2Conditions( float flDot, float flDist )
 {
-	if ( m_iNumMolotovs < 1 )	// Out of bottles!
+	if ( m_iNumThrowables < 1 )	// Out of throwables!
 		return COND_NONE;
 
-	// -----------------------------------------------
-	// Not allowed to throw another grenade right now
-	// -----------------------------------------------
-	if ( gpGlobals->curtime < m_flNextMolotovCheck )
+	if (!GetEnemy())
 		return COND_NONE;
 
-	// -----------------------
-	// If moving, don't check
-	// -----------------------
-	if ( m_flGroundSpeed != 0 )
+	// If I can see the enemy and its not my nemesis, or im not annoyed/desperate, dont bother with non-scripted grenades
+	if ( !m_bAnnoyed || HasCondition(COND_SEE_ENEMY) && !HasCondition(COND_SEE_NEMESIS) )
 		return COND_NONE;
 
-	// --------------------------------------------------------------------------------
-	// Use a rough distance check
-	// --------------------------------------------------------------------------------
-	if( flDist > 640 || flDist < 96 )
-	{
-		// Too close or too far!
-		m_flNextMolotovCheck = gpGlobals->curtime + 1; // one full second.
-		return COND_NONE;
-	}
-	else if (flDot < 0.5)
-	{
-		return COND_NOT_FACING_ATTACK;
-	}
-
-	// ------------------------
-	// Enemy is not underwater
-	// ------------------------
-	if ( !( GetEnemy()->GetFlags() & FL_ONGROUND ) && GetEnemy()->GetWaterLevel() == 0 && GetEnemyLKP().z > (GetAbsOrigin().z + WorldAlignMaxs().z)  )
-	{
-		//!!!BUGBUG - we should make this check movetype and make sure it isn't FLY? Players who jump a lot are unlikely to be grenaded.
-		// don't throw grenades at anything that isn't on the ground or otherwise swimming!
-		m_flNextMolotovCheck = gpGlobals->curtime + 0.5; // half a second.
-		return COND_NONE;
-	}
-
-	// --------------------------------------------------------------------
-	// Are any allies near the impact area?
-	// --------------------------------------------------------------------
-	CBaseEntity *pTarget = NULL;
-	while ( ( pTarget = gEntList.FindEntityInSphere( pTarget, GetEnemyLKP(), 96 ) ) != NULL )
-	{
-		if ( this->IRelationType( pTarget ) == D_LI )
-		{
-			// crap, I might burn my own guy. Don't throw a bottle and don't check again for a while.
-			m_flNextMolotovCheck = gpGlobals->curtime + 1; // one full second.
-			return COND_WEAPON_BLOCKED_BY_FRIEND;
-		}
-	}
-
-	// --------------------------------------------------------------------------------
-	// Finally, trace a straightish line towards the enemy - if it hits, then toss it!
-	// --------------------------------------------------------------------------------
-	if ( !HasCondition( COND_SEE_ENEMY ) )
-		return COND_WEAPON_SIGHT_OCCLUDED;
-
-	return COND_CAN_RANGE_ATTACK2;
+	// So we do want to consider throwing or shooting something, pass the rest onto the weapon itself
+	BaseCombatWeapon *pWeapon = GetActiveWeapon();
+	return pWeapon()->WeaponRangeAttack1Condition(flDot, flDist);
 }
 */
 
@@ -2380,6 +2356,12 @@ int CNPC_Citizen::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		}
 #endif
 	}
+	else if( info.GetDamageType() & (DMG_SHOCK|DMG_SONIC|DMG_NERVEGAS|DMG_ACID) )
+	{
+		//Agh that burns!
+		if ( info.GetDamage() >= 5 )
+			SetCondition( COND_STUNNED );
+	}
 
 	CTakeDamageInfo newInfo = info;
 
@@ -2457,7 +2439,7 @@ bool CNPC_Citizen::IsPlayerAlly( CBasePlayer *pPlayer )
 {
 	if ( Classify() == CLASS_CITIZEN_REBEL && GlobalEntity_GetState("citizen_rebellion") == GLOBAL_ON )
 	{
-		// In the off case that we're classified passive, but precriminal isnt on
+		// In the off case that criminal cits are used in place of rebels, for some odd reason
 		return true;
 	}
 
@@ -4109,6 +4091,7 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 	DECLARE_ACTIVITY( ACT_CIT_BLINDED )
 	DECLARE_ACTIVITY( ACT_CIT_SHOWARMBAND )
 	DECLARE_ACTIVITY( ACT_CIT_HEAL )
+	DECLARE_ACTIVITY( ACT_CIT_HEALTOSS )
 	DECLARE_ACTIVITY( ACT_CIT_STARTLED )
 	DECLARE_ACTIVITY( ACT_CIT_ANNOYED )
 
@@ -4132,7 +4115,6 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_MOVE_TO_TARGET_RANGE			50"
 		"		TASK_STOP_MOVING					0"
 		"		TASK_FACE_IDEAL						0"
-//		"		TASK_SAY_HEAL						0"
 //		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
 		"		TASK_CIT_HEAL							0"
 //		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
@@ -4151,7 +4133,6 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 	"	Tasks"
 	"		TASK_STOP_MOVING					0"
 	"		TASK_FACE_IDEAL						0"
-//	"		TASK_SAY_HEAL						0"
 //	"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
 	"		TASK_CIT_HEAL_TOSS						0"
 //	"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"

@@ -95,15 +95,15 @@ static const char *s_pChunkModelName[CHOPPER_MAX_CHUNKS] =
 #define CHOPPER_BOMB_DROP_COUNT 4
 
 // Bullrush
-#define CHOPPER_BULLRUSH_MODE_DISTANCE g_helicopter_bullrush_distance.GetFloat()
-#define CHOPPER_BULLRUSH_ENEMY_BOMB_DISTANCE g_helicopter_bullrush_bomb_enemy_distance.GetFloat()
-#define CHOPPER_BULLRUSH_ENEMY_BOMB_TIME g_helicopter_bullrush_bomb_time.GetFloat()
-#define CHOPPER_BULLRUSH_ENEMY_BOMB_SPEED g_helicopter_bullrush_bomb_speed.GetFloat()
-#define CHOPPER_BULLRUSH_SHOOTING_VERTICAL_OFFSET g_helicopter_bullrush_shoot_height.GetFloat()
+#define CHOPPER_BULLRUSH_MODE_DISTANCE npc_helicopter_bullrush_distance.GetFloat()
+#define CHOPPER_BULLRUSH_ENEMY_BOMB_DISTANCE npc_helicopter_bullrush_bomb_enemy_distance.GetFloat()
+#define CHOPPER_BULLRUSH_ENEMY_BOMB_TIME npc_helicopter_bullrush_bomb_time.GetFloat()
+#define CHOPPER_BULLRUSH_ENEMY_BOMB_SPEED npc_helicopter_bullrush_bomb_speed.GetFloat()
+#define CHOPPER_BULLRUSH_SHOOTING_VERTICAL_OFFSET npc_helicopter_bullrush_shoot_height.GetFloat()
 
-#define CHOPPER_GUN_CHARGE_TIME		g_helicopter_chargetime.GetFloat()
-#define CHOPPER_GUN_IDLE_TIME		g_helicopter_idletime.GetFloat()
-#define CHOPPER_GUN_MAX_FIRING_DIST	g_helicopter_maxfiringdist.GetFloat()
+#define CHOPPER_GUN_CHARGE_TIME		sk_helicopter_chargetime.GetFloat()
+#define CHOPPER_GUN_IDLE_TIME		npc_helicopter_idletime.GetFloat()
+#define CHOPPER_GUN_MAX_FIRING_DIST	npc_helicopter_maxfiringdist.GetFloat()
 
 #define BULLRUSH_IDLE_PLAYER_FIRE_TIME 6.0f
 
@@ -142,20 +142,20 @@ ConVar sk_helicopter_num_bombs3("sk_helicopter_num_bombs3", "5");
 
 ConVar	sk_npc_dmg_helicopter_to_plr( "sk_npc_dmg_helicopter_to_plr","3", 0, "Damage helicopter shots deal to the player" );
 ConVar	sk_npc_dmg_helicopter( "sk_npc_dmg_helicopter","6", 0, "Damage helicopter shots deal to everything but the player" );
+ConVar	sk_helicopter_chargetime( "sk_helicopter_chargetime","1.2", 0, "How much time we have to wait (on average) between the time we start hearing the charging sound + the chopper fires" );
 
 ConVar	sk_helicopter_drone_speed( "sk_helicopter_drone_speed","450.0", 0, "How fast does the zapper drone move?" );
 
-ConVar	g_helicopter_chargetime( "g_helicopter_chargetime","2.0", 0, "How much time we have to wait (on average) between the time we start hearing the charging sound + the chopper fires" );
-ConVar	g_helicopter_bullrush_distance("g_helicopter_bullrush_distance", "5000");
-ConVar	g_helicopter_bullrush_bomb_enemy_distance("g_helicopter_bullrush_bomb_enemy_distance", "0");
-ConVar	g_helicopter_bullrush_bomb_time("g_helicopter_bullrush_bomb_time", "10");
-ConVar	g_helicopter_idletime( "g_helicopter_idletime","3.0", 0, "How much time we have to wait (on average) after we fire before we can charge up again" );
-ConVar	g_helicopter_maxfiringdist( "g_helicopter_maxfiringdist","2500.0", 0, "The maximum distance the player can be from the chopper before it stops firing" );
-ConVar	g_helicopter_bullrush_bomb_speed( "g_helicopter_bullrush_bomb_speed","850.0", 0, "The maximum distance the player can be from the chopper before it stops firing" );
-ConVar	g_helicopter_bullrush_shoot_height( "g_helicopter_bullrush_shoot_height","650.0", 0, "The maximum distance the player can be from the chopper before it stops firing" );
-ConVar	g_helicopter_bullrush_mega_bomb_health( "g_helicopter_bullrush_mega_bomb_health","0.25", 0, "Fraction of the health of the chopper before it mega-bombs" );
+ConVar	npc_helicopter_bullrush_distance("npc_helicopter_bullrush_distance", "5000");
+ConVar	npc_helicopter_bullrush_bomb_enemy_distance("npc_helicopter_bullrush_bomb_enemy_distance", "0");
+ConVar	npc_helicopter_bullrush_bomb_time("npc_helicopter_bullrush_bomb_time", "10");
+ConVar	npc_helicopter_idletime( "npc_helicopter_idletime","3.0", 0, "How much time we have to wait (on average) after we fire before we can charge up again" );
+ConVar	npc_helicopter_maxfiringdist( "npc_helicopter_maxfiringdist","2800.0", 0, "The maximum distance the player can be from the chopper before it stops firing" );
+ConVar	npc_helicopter_bullrush_bomb_speed( "npc_helicopter_bullrush_bomb_speed","850.0", 0, "The maximum distance the player can be from the chopper before it stops firing" );
+ConVar	npc_helicopter_bullrush_shoot_height( "npc_helicopter_bullrush_shoot_height","650.0", 0, "The maximum distance the player can be from the chopper before it stops firing" );
+ConVar	npc_helicopter_bullrush_mega_bomb_health( "npc_helicopter_bullrush_mega_bomb_health","0.25", 0, "Fraction of the health of the chopper before it mega-bombs" );
 
-ConVar	g_helicopter_bomb_danger_radius( "g_helicopter_bomb_danger_radius", "120" );
+ConVar	npc_helicopter_bomb_danger_radius( "npc_helicopter_bomb_danger_radius", "120" );
 
 Activity ACT_HELICOPTER_DROP_BOMB;
 Activity ACT_HELICOPTER_CRASHING;
@@ -757,7 +757,7 @@ private:
 	float		m_flGoalYawDmg;
 
 	// Sounds
-	CSoundPatch	*m_pGunFiringSound;
+	//CSoundPatch	*m_pGunFiringSound;
 
 	// Outputs
 	COutputInt	m_OnHealthChanged;
@@ -823,7 +823,7 @@ BEGIN_DATADESC( CNPC_AttackHelicopter )
 	DEFINE_FIELD( m_nShootingMode,		FIELD_INTEGER ),
 	DEFINE_FIELD( m_bDeadlyShooting,	FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bBombingSuppressed,	FIELD_BOOLEAN ),
-	DEFINE_SOUNDPATCH( m_pGunFiringSound ),
+	//DEFINE_SOUNDPATCH( m_pGunFiringSound ),
 	DEFINE_AUTO_ARRAY( m_hLights,		FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bIgnorePathVisibilityTests, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bShortBlink,		FIELD_BOOLEAN ),
@@ -906,13 +906,14 @@ CNPC_AttackHelicopter::~CNPC_AttackHelicopter(void)
 void CNPC_AttackHelicopter::StopLoopingSounds()
 {
 	BaseClass::StopLoopingSounds();
-
+/*
 	if ( m_pGunFiringSound )
 	{
 		CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
 		controller.SoundDestroy( m_pGunFiringSound );
 		m_pGunFiringSound = NULL;
 	}
+*/
 }
 
 //------------------------------------------------------------------------------
@@ -937,23 +938,20 @@ void CNPC_AttackHelicopter::Precache( void )
 {
 	BaseClass::Precache();
 
-	if ( !HasSpawnFlags(SF_HELICOPTER_ELECTRICAL_DRONE) )
-	{
-		PrecacheModel( CHOPPER_MODEL_NAME );
-	}
-	else
+	PrecacheModel( CHOPPER_MODEL_NAME );
+	if ( HasSpawnFlags(SF_HELICOPTER_ELECTRICAL_DRONE) )
 	{
 		PrecacheModel( CHOPPER_DRONE_NAME );
 	}
 
 	PrecacheModel( CHOPPER_RED_LIGHT_SPRITE );
-	//PrecacheModel( CHOPPER_MODEL_CORPSE_NAME );
 	
 	// If we're never going to engage in combat, we don't need to load these assets!
 	if ( m_bNonCombat == false )
 	{
 		UTIL_PrecacheOther( "grenade_helicopter" );
 		UTIL_PrecacheOther( "env_fire_trail" );
+		PrecacheModel( CHOPPER_MODEL_CORPSE_NAME );
 		Chopper_PrecacheChunks( this );
 		PrecacheModel("models/combine_soldier.mdl");
 	}
@@ -1077,7 +1075,7 @@ void CNPC_AttackHelicopter::Spawn( void )
 	{
 		m_flMaxSpeed = CHOPPER_MAX_SPEED;
 	}
-	m_flNextMegaBombHealth = m_iMaxHealth - m_iMaxHealth * g_helicopter_bullrush_mega_bomb_health.GetFloat();
+	m_flNextMegaBombHealth = m_iMaxHealth - m_iMaxHealth * npc_helicopter_bullrush_mega_bomb_health.GetFloat();
 
 	m_nGrenadeCount = CHOPPER_BOMB_DROP_COUNT;
 
@@ -1369,16 +1367,15 @@ void CNPC_AttackHelicopter::InitializeRotorSound( void )
 		}
 
 		m_pRotorBlast = controller.SoundCreate( filter, entindex(), "NPC_AttackHelicopter.RotorBlast" );
-		m_pGunFiringSound = controller.SoundCreate( filter, entindex(), "NPC_AttackHelicopter.FireGun" );
-		controller.Play( m_pGunFiringSound, 0.0, 100 );
+	//	m_pGunFiringSound = controller.SoundCreate( filter, entindex(), "NPC_AttackHelicopter.FireGun" );
+	//	controller.Play( m_pGunFiringSound, 0.0, 100 );
 	}
 	else
 	{
 		Assert(m_pRotorSound);
 		Assert(m_pRotorBlast);
-		Assert(m_pGunFiringSound);
+	//	Assert(m_pGunFiringSound);
 	}
-
 
 	BaseClass::InitializeRotorSound();
 }
@@ -1833,6 +1830,7 @@ void CNPC_AttackHelicopter::ShootAtPlayer( const Vector &vBasePos, const Vector 
 	VectorAngles( vGunDir, vGunAng );
 	
 	FireBullets( info );
+	EmitSound( "NPC_AttackHelicopter.FireGun" );
 
 	// Fire the rest of the bullets at objects around the player
 	CBaseEntity *ppNearbyTargets[16];
@@ -2478,6 +2476,7 @@ void CNPC_AttackHelicopter::ShootAtFacingDirection( const Vector &vBasePos, cons
 	FireBulletsInfo_t info( nShotCount, vBasePos, vGunDir, vecSpread, 8192, m_iAmmoType );
 	info.m_iTracerFreq = 1;
 	FireBullets( info );
+	EmitSound( "NPC_AttackHelicopter.FireGun" );
 }
 
 
@@ -2661,12 +2660,14 @@ void CNPC_AttackHelicopter::FireElectricityGun( )
 
 bool CNPC_AttackHelicopter::DoGunFiring( const Vector &vBasePos, const Vector &vGunDir, const Vector &vecFireAtPosition )
 {
+/*
 	CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
 	float flVolume = controller.SoundGetVolume( m_pGunFiringSound );
 	if ( flVolume != 1.0f )
 	{
 		controller.SoundChangeVolume( m_pGunFiringSound, 1.0, 0.01f );
 	}
+*/
 
 	if ( ( m_nAttackMode == ATTACK_MODE_BULLRUSH_VEHICLE ) && ( IsInSecondaryMode( BULLRUSH_MODE_SHOOT_GUN ) ) )
 	{
@@ -2705,7 +2706,7 @@ bool CNPC_AttackHelicopter::DoGunFiring( const Vector &vBasePos, const Vector &v
 	if ( m_nRemainingBursts > 0 )
 		return true;
 
-	controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.01f );
+	//controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.01f );
 	float flIdleTime = CHOPPER_GUN_IDLE_TIME;
 	float flVariance = flIdleTime * 0.1f;
 	m_flNextAttack = gpGlobals->curtime + m_flIdleTimeDelay + random->RandomFloat(flIdleTime - flVariance, flIdleTime + flVariance);
@@ -3142,14 +3143,14 @@ void CNPC_AttackHelicopter::BullrushBombs( )
 void CNPC_AttackHelicopter::InputGunOff( inputdata_t &inputdata )
 {
 	BaseClass::InputGunOff( inputdata );
-
+/*
 	if ( m_pGunFiringSound )
 	{
 		CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
 		controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.01f );
 	}
+*/
 }
-
 
 //------------------------------------------------------------------------------
 // Fire that gun baby!
@@ -3472,15 +3473,11 @@ void CNPC_AttackHelicopter::DropCorpse( int nDamage )
 //-----------------------------------------------------------------------------
 void CNPC_AttackHelicopter::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
-	// Take no damage from trace attacks unless it's blast damage. RadiusDamage() sometimes calls
-	// TraceAttack() as a means for delivering blast damage. Usually when the explosive penetrates
-	// the target. (RPG missiles do this sometimes).
-	if ( ( info.GetDamageType() & DMG_AIRBOAT ) || 
-		 ( info.GetInflictor()->Classify() == CLASS_MISSILE ) || 
-		 ( info.GetAttacker()->Classify() == CLASS_MISSILE ) )
-	{
-		BaseClass::BaseClass::TraceAttack( info, vecDir, ptr );
-	}
+	// Gotta check if its bullet here, a helicopter should never be clubbed but just in case...
+	if ( (info.GetDamageType() & DMG_BULLET) && random->RandomInt( 0, 3 ) == 3 )
+		g_pEffects->Ricochet( ptr->endpos, ptr->plane.normal);
+
+	BaseClass::TraceAttack( info, vecDir, ptr );
 }
 
 
@@ -3555,7 +3552,7 @@ int CNPC_AttackHelicopter::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		// Apply a force push that makes us look like we're reacting to the damage
 		Vector	damageDir = info.GetDamageForce();
 		VectorNormalize( damageDir );
-		ApplyAbsVelocityImpulse( damageDir * 500.0f );
+		ApplyAbsVelocityImpulse( damageDir * 300.0f );
 
 		// Knock the helicopter off of the level, too.
 		Vector vecRight, vecForce;
@@ -3718,8 +3715,8 @@ void CNPC_AttackHelicopter::Event_Killed( const CTakeDamageInfo &info )
 
 	m_lifeState			= LIFE_DYING;
 
-	CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
-	controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.1f );
+	//CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
+	//controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.1f );
 
 	if( GetCrashPoint() == NULL )
 	{
@@ -4388,8 +4385,8 @@ void CNPC_AttackHelicopter::SwitchToBullrushIdle( void )
 	m_flBullrushAdditionalHeight = 0.0f;
 	SetPauseState( PAUSE_NO_PAUSE );
 
-	CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
-	controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.1f );
+	//CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
+	//controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.1f );
 }
 
 
@@ -4415,8 +4412,8 @@ void CNPC_AttackHelicopter::ShutdownGunDuringBullrush( )
 	m_nRemainingBursts = 0;
 	SetPauseState( PAUSE_NO_PAUSE );
 
-	CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
-	controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.1f );
+	//CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
+	//controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.1f );
 }
 
 #define	HELICOPTER_MIN_IDLE_BOMBING_DIST	350.0f
@@ -4512,7 +4509,7 @@ void CNPC_AttackHelicopter::UpdateBullrushState( void )
 
 			if ( GetHealth() <= m_flNextMegaBombHealth )
 			{
-				m_flNextMegaBombHealth -= GetMaxHealth() * g_helicopter_bullrush_mega_bomb_health.GetFloat();
+				m_flNextMegaBombHealth -= GetMaxHealth() * npc_helicopter_bullrush_mega_bomb_health.GetFloat();
 				m_flNextBullrushBombTime = gpGlobals->curtime;
 				SetSecondaryMode( BULLRUSH_MODE_MEGA_BOMB );
 				EmitSound( "NPC_AttackHelicopter.MegabombAlert" );
@@ -5034,21 +5031,21 @@ void CGrenadeHelicopter::Spawn( void )
 	// use a lower gravity for grenades to make them easier to see
 	SetGravity( UTIL_ScaleForGravity( 400 ) );
 
+	// Allow player to blow this puppy up in the air
+	m_takedamage = DAMAGE_YES;
+
 #ifdef HL2_EPISODIC
 	m_bPickedUp = false;
 	m_flLifetime = BOMB_LIFETIME * 2.0;
-#endif // HL2_EPISODIC
 
+/*
 	if ( hl2_episodic.GetBool() )
 	{
 		// Disallow this, we'd rather deal with them as physobjects
 		m_takedamage = DAMAGE_NO;
 	}
-	else
-	{
-		// Allow player to blow this puppy up in the air
-		m_takedamage = DAMAGE_YES;
-	}
+*/
+#endif // HL2_EPISODIC
 
 	m_bActivated = false;
 	m_pWarnSound = NULL;
@@ -5216,7 +5213,7 @@ void CGrenadeHelicopter::WarningBlinkerThink()
 	}
 
 	// Frighten people
-	CSoundEnt::InsertSound ( SOUND_DANGER, WorldSpaceCenter(), g_helicopter_bomb_danger_radius.GetFloat(), 0.2f, this, SOUNDENT_CHANNEL_REPEATED_DANGER );
+	CSoundEnt::InsertSound ( SOUND_DANGER, WorldSpaceCenter(), npc_helicopter_bomb_danger_radius.GetFloat(), 0.2f, this, SOUNDENT_CHANNEL_REPEATED_DANGER );
 
 #ifdef HL2_EPISODIC
 	if( gpGlobals->curtime >= m_flBlinkFastTime )

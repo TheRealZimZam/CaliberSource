@@ -16,19 +16,14 @@
 #include "AI_BaseNPC.h"
 #include "player.h"
 #include "weapon_ar2.h"
-#include "grenade_ar2.h"
+//#include "grenade_ar2.h"
 #include "gamerules.h"
 #include "game.h"
 #include "in_buttons.h"
 #include "AI_Memory.h"
 #include "soundent.h"
 #include "hl2_player.h"
-#include "EntityFlame.h"
-#include "weapon_flaregun.h"
 #include "te_effect_dispatch.h"
-#include "prop_combine_ball.h"
-#include "beam_shared.h"
-#include "npc_combine.h"
 #include "rumble_shared.h"
 #include "gamestats.h"
 
@@ -47,14 +42,13 @@ ConVar sk_weapon_ar2_alt_fire_mass( "sk_weapon_ar2_alt_fire_mass", "150" );
 ConVar sk_weapon_ar2_ducking_bonus( "sk_weapon_ar2_ducking_bonus", "0.25");
 extern ConVar sv_funmode;
 
-#define AR2_ZOOM_RATE	0.5f	// Interval between zoom levels in seconds.
+#define AR2_ZOOM_RATE	0.3f	// Interval between zoom levels in seconds.
 
 //=========================================================
 //=========================================================
 
 BEGIN_DATADESC( CWeaponAR2 )
 
-	DEFINE_FIELD( m_flDelayedFire,	FIELD_TIME ),
 	DEFINE_FIELD( m_bShotDelayed,	FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bZoomed,	FIELD_BOOLEAN ),
 	//DEFINE_FIELD( m_nVentPose, FIELD_INTEGER ),
@@ -77,7 +71,7 @@ acttable_t	CWeaponAR2::m_acttable[] =
 	{ ACT_WALK,						ACT_WALK_RIFLE,					true },	// FIXME: hook to AR2 unique
 	{ ACT_WALK_AIM,					ACT_WALK_AIM_RIFLE,				true },	// FIXME: hook to AR2 unique
 	{ ACT_RUN,						ACT_RUN_RIFLE,					true },	// FIXME: hook to AR2 unique
-	{ ACT_RUN_AIM,					ACT_RUN_AIM_RIFLE,				true },	// FIXME: hook to AR2 unique
+	{ ACT_RUN_AIM,					ACT_RUN_AIM_AR2,				true },	// FIXME: hook to AR2 unique
 	{ ACT_SPRINT,					ACT_RUN_RIFLE_STIMULATED,		true },
 
 // Readiness activities (not aiming)
@@ -124,14 +118,17 @@ IMPLEMENT_ACTTABLE(CWeaponAR2);
 
 CWeaponAR2::CWeaponAR2( )
 {
+	// Non-Zoom range for AI
 	m_fMinRange1	= 48;
 	m_fMaxRange1	= 2048;
 
-	m_fMinRange2	= 256;
-	m_fMaxRange2	= 1024;
+	// Zoom range
+	m_fMinRange2	= 1024;
+	m_fMaxRange2	= 2048;
 
 	if ( !sv_funmode.GetBool() )
 	{
+		// Lose the entire clip when reloading
 		m_bReloadsFullClip	= true;
 	}
 
@@ -147,8 +144,8 @@ void CWeaponAR2::Precache( void )
 //	UTIL_PrecacheOther("grenade_ar2");
 	BaseClass::Precache();
 
-	UTIL_PrecacheOther( "prop_combine_ball" );
-	UTIL_PrecacheOther( "env_entity_dissolver" );
+//	UTIL_PrecacheOther( "prop_combine_ball" );
+//	UTIL_PrecacheOther( "env_entity_dissolver" );
 }
 
 //-----------------------------------------------------------------------------
@@ -159,10 +156,7 @@ void CWeaponAR2::Equip( CBaseCombatCharacter *pOwner )
 	if( pOwner->Classify() == CLASS_PLAYER_ALLY )
 	{
 		m_fMaxRange1 = 2560;
-	}
-	else
-	{
-		m_fMaxRange1 = 2048;
+		m_fMaxRange2 = 2560;
 	}
 
 	BaseClass::Equip( pOwner );
@@ -185,14 +179,6 @@ bool CWeaponAR2::Deploy( void )
 //-----------------------------------------------------------------------------
 void CWeaponAR2::ItemPostFrame( void )
 {
-#if 0
-	// See if we need to fire off our secondary round
-	if ( m_bShotDelayed && gpGlobals->curtime > m_flDelayedFire )
-	{
-		DelayedAttack();
-	}
-#endif
-
 	// Update our pose parameter for the vents
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 
@@ -219,7 +205,7 @@ void CWeaponAR2::ItemPostFrame( void )
 	}
 
 	//Don't kick the same when we're zoomed in
-	if ( m_bZoomed )
+	if ( IsWeaponZoomed() )
 	{
 		m_fFireDuration = 0.05f;
 	}
@@ -340,97 +326,6 @@ void CWeaponAR2::PrimaryAttack( void )
 void CWeaponAR2::SecondaryAttack( void )
 {
 	//NOTENOTE: The zooming is handled by the post/busy frames
-#if 0
-	if ( m_bShotDelayed )
-		return;
-
-	// Cannot fire underwater
-	if ( GetOwner() && GetOwner()->GetWaterLevel() == 3 )
-	{
-		DryFire();
-		return;
-	}
-
-	m_bShotDelayed = true;
-	m_flNextPrimaryAttack = m_flNextSecondaryAttack = m_flDelayedFire = gpGlobals->curtime + 0.5f;
-
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	if( pPlayer )
-	{
-		pPlayer->RumbleEffect(RUMBLE_AR2_ALT_FIRE, 0, RUMBLE_FLAG_RESTART );
-	}
-
-	SendWeaponAnim( ACT_VM_FIDGET );
-	WeaponSound( SPECIAL1 );
-
-	m_iSecondaryAttacks++;
-	gamestats->Event_WeaponFired( pPlayer, false, GetClassname() );
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CWeaponAR2::DelayedAttack( void )
-{
-	m_bShotDelayed = false;
-	
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
-	
-	if ( pOwner == NULL )
-		return;
-
-	// Deplete the clip completely
-	SendWeaponAnim( ACT_VM_SECONDARYATTACK );
-	m_flNextSecondaryAttack = pOwner->m_flNextAttack = gpGlobals->curtime + SequenceDuration();
-
-	// Register a muzzleflash for the AI
-	pOwner->DoMuzzleFlash();
-	pOwner->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
-	
-	WeaponSound( WPN_DOUBLE );
-
-	pOwner->RumbleEffect(RUMBLE_SHOTGUN_DOUBLE, 0, RUMBLE_FLAG_RESTART );
-
-	// Fire the bullets
-	Vector vecSrc	 = pOwner->Weapon_ShootPosition( );
-	Vector vecAiming = pOwner->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
-	Vector impactPoint = vecSrc + ( vecAiming * MAX_TRACE_LENGTH );
-
-	// Fire the bullets
-	Vector vecVelocity = vecAiming * 1000.0f;
-
-	// Fire the combine ball
-	CreateCombineBall(	vecSrc, 
-						vecVelocity, 
-						sk_weapon_ar2_alt_fire_radius.GetFloat(), 
-						sk_weapon_ar2_alt_fire_mass.GetFloat(),
-						sk_weapon_ar2_alt_fire_duration.GetFloat(),
-						pOwner );
-
-	// View effects
-	color32 white = {255, 255, 255, 64};
-	UTIL_ScreenFade( pOwner, white, 0.1, 0, FFADE_IN  );
-	
-	//Disorient the player
-	QAngle angles = pOwner->GetLocalAngles();
-
-	angles.x += random->RandomInt( -4, 4 );
-	angles.y += random->RandomInt( -4, 4 );
-	angles.z = 0;
-
-	pOwner->SnapEyeAngles( angles );
-	
-	pOwner->ViewPunch( QAngle( random->RandomInt( -8, -12 ), random->RandomInt( 1, 2 ), 0 ) );
-
-	// Decrease ammo
-	pOwner->RemoveAmmo( 1, m_iSecondaryAmmoType );
-
-	// Can shoot again immediately
-	m_flNextPrimaryAttack = gpGlobals->curtime + 0.5f;
-
-	// Can blow up after a short delay (so have time to release mouse button)
-	m_flNextSecondaryAttack = gpGlobals->curtime + 1.0f;
 }
 
 //-----------------------------------------------------------------------------
@@ -439,7 +334,7 @@ void CWeaponAR2::DelayedAttack( void )
 void CWeaponAR2::Zoom( void )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	
+
 	if ( pPlayer == NULL )
 		return;
 
@@ -450,7 +345,7 @@ void CWeaponAR2::Zoom( void )
 	{
 		// Zoom out to the default zoom level
 		WeaponSound(SPECIAL2);
-		pPlayer->SetFOV( this, 0, 0.1f );
+		pPlayer->SetFOV( this, 0, AR2_ZOOM_RATE );
 		m_bZoomed = false;
 		
 		// Darken corners of the screen
@@ -470,11 +365,9 @@ void CWeaponAR2::Zoom( void )
 			SendWeaponAnim( ACT_VM_FIDGET );
 
 			WeaponSound(SPECIAL1);
-			pPlayer->SetFOV( this, 35, 0.1f );
+			pPlayer->SetFOV( this, 35, AR2_ZOOM_RATE );
 			m_bZoomed = true;
 
-			// Change this to an overlay (cus its fugly)
-			// sprites/reticle1
 			UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT) );	
 		}
 	}
@@ -487,7 +380,7 @@ void CWeaponAR2::Zoom( void )
 float CWeaponAR2::GetMinRestTime()
 {
 	//Default is 0.3
-	return 0.5f;
+	return 0.6f;
 }
 
 //-----------------------------------------------------------------------------
@@ -497,39 +390,30 @@ float CWeaponAR2::GetMaxRestTime()
 	Class_T OwnerClass = GetOwner()->Classify();
 
 	if ( OwnerClass == CLASS_COMBINE )
-		 return 0.8f;
+		 return 1.0f;
 
-	return 1.0f;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Handle fire rate for both modes
-// Output : float
-//-----------------------------------------------------------------------------
-float CWeaponAR2::GetFireRate( void )
-{
-	if ( m_bZoomed )
-		return BaseClass::GetCycleTime() * 2.0;
-
-	return BaseClass::GetCycleTime();
+	return 1.1f;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Faster reload when crouched/stationary
+// TODO; This might need to go on the client
 //-----------------------------------------------------------------------------
+#if 0
 float CWeaponAR2::GetDefaultAnimSpeed( void )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	if ( GetOwner() && GetOwner()->IsPlayer() && m_bInReload )
 	{
-		if ( pPlayer->GetAbsVelocity().Length2D() > 120 )
-			return 1.0 - 0.25;
-		else if ( FBitSet( pPlayer->GetFlags(), FL_DUCKING ) )	//GetOwner()->GetFlags() & FL_DUCKING
+		if ( pPlayer->GetAbsVelocity().Length2D() > 180 )
+			return 0.75;
+		else if ( GetOwner()->GetFlags() & FL_DUCKING )
 			return 1.0 + sk_weapon_ar2_ducking_bonus.GetFloat();
 	}
 
-	return 1.0;
+	return BaseClass::GetDefaultAnimSpeed();
 }
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: Override if we're waiting to release a shot
@@ -541,11 +425,11 @@ bool CWeaponAR2::CanHolster( void )
 		return false;
 
 	// Zoomout
-	if ( m_bZoomed )
+	if ( IsWeaponZoomed() )
 	{
 		Zoom();
 	}
-	
+
 	return BaseClass::CanHolster();
 }
 
@@ -558,7 +442,7 @@ bool CWeaponAR2::Reload( void )
 		return false;
 
 	// Zoomout
-	if ( m_bZoomed )
+	if ( IsWeaponZoomed() )
 	{
 		Zoom();
 	}
@@ -576,7 +460,7 @@ bool CWeaponAR2::Reload( void )
 // Purpose: 
 // Input  : *pOperator - 
 //-----------------------------------------------------------------------------
-void CWeaponAR2::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles )
+void CWeaponAR2::FireNPCAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles )
 {
 	Vector vecShootOrigin, vecShootDir;
 
@@ -602,76 +486,8 @@ void CWeaponAR2::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUs
 	m_iClip1 = m_iClip1 - 1;
 
 	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(), SOUNDENT_VOLUME_MACHINEGUN, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
-
-	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 1 );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CWeaponAR2::FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles )
-{
-	WeaponSound( WPN_DOUBLE );
-
-	if ( !GetOwner() )
-		return;
-		
-	CAI_BaseNPC *pNPC = GetOwner()->MyNPCPointer();
-	if ( !pNPC )
-		return;
-	
-	// Fire!
-	Vector vecSrc;
-	Vector vecAiming;
-
-	if ( bUseWeaponAngles )
-	{
-		QAngle	angShootDir;
-		GetAttachment( LookupAttachment( "muzzle" ), vecSrc, angShootDir );
-		AngleVectors( angShootDir, &vecAiming );
-	}
-	else 
-	{
-		vecSrc = pNPC->Weapon_ShootPosition( );
-		
-		Vector vecTarget;
-
-		CNPC_Combine *pSoldier = dynamic_cast<CNPC_Combine *>( pNPC );
-		if ( pSoldier )
-		{
-			// In the distant misty past, elite soldiers tried to use bank shots.
-			// Therefore, we must ask them specifically what direction they are shooting.
-			vecTarget = pSoldier->GetAltFireTarget();
-		}
-		else
-		{
-			// All other users of the AR2 alt-fire shoot directly at their enemy.
-			if ( !pNPC->GetEnemy() )
-				return;
-				
-			vecTarget = pNPC->GetEnemy()->BodyTarget( vecSrc );
-		}
-
-		vecAiming = vecTarget - vecSrc;
-		VectorNormalize( vecAiming );
-	}
-
-	Vector impactPoint = vecSrc + ( vecAiming * MAX_TRACE_LENGTH );
-
-	float flAmmoRatio = 1.0f;
-	float flDuration = RemapValClamped( flAmmoRatio, 0.0f, 1.0f, 0.5f, sk_weapon_ar2_alt_fire_duration.GetFloat() );
-	float flRadius = RemapValClamped( flAmmoRatio, 0.0f, 1.0f, 4.0f, sk_weapon_ar2_alt_fire_radius.GetFloat() );
-
-	// Fire the bullets
-	Vector vecVelocity = vecAiming * 1000.0f;
-
-	// Fire the combine ball
-	CreateCombineBall(	vecSrc, 
-		vecVelocity, 
-		flRadius, 
-		sk_weapon_ar2_alt_fire_mass.GetFloat(),
-		flDuration,
-		pNPC );
+	int	TracerFreq = 1;
+	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, pOperator->GetAttackSpread(this), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, TracerFreq );
 }
 
 //-----------------------------------------------------------------------------
@@ -679,17 +495,10 @@ void CWeaponAR2::FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool b
 //-----------------------------------------------------------------------------
 void CWeaponAR2::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
 {
-	if ( bSecondary )
-	{
-		FireNPCSecondaryAttack( pOperator, true );
-	}
-	else
-	{
-		// Ensure we have enough rounds in the clip
-		m_iClip1++;
+	// Ensure we have enough rounds in the clip
+	m_iClip1++;
 
-		FireNPCPrimaryAttack( pOperator, true );
-	}
+	FireNPCAttack( pOperator, true );
 }
 
 //-----------------------------------------------------------------------------
@@ -702,16 +511,18 @@ void CWeaponAR2::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatChara
 	switch( pEvent->event )
 	{
 		case EVENT_WEAPON_AR2:
+		case EVENT_WEAPON_SMG1:
 			{
-				FireNPCPrimaryAttack( pOperator, false );
+				FireNPCAttack( pOperator, false );
 			}
 			break;
 
+#if 0
 		case EVENT_WEAPON_AR2_ALTFIRE:
 			{
-				FireNPCSecondaryAttack( pOperator, false );
+				Operator_ForceNPCFire( pOperator, true );
 			}
-			break;
+#endif
 
 		default:
 			CBaseCombatWeapon::Operator_HandleAnimEvent( pEvent, pOperator );

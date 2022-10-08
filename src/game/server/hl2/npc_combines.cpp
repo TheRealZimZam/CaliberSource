@@ -64,16 +64,15 @@ void CNPC_CombineS::Spawn( void )
 		SetHealth( sk_combine_guard_health.GetFloat() );
 		SetMaxHealth( sk_combine_guard_health.GetFloat() );
 		SetKickDamage( sk_combine_guard_kick.GetFloat() );
-	//	m_flFieldOfView			= 0.4;	//Narrower
+		m_flFieldOfView			= 0.4;	//Eyepatch = -%15 perception
 	}
 	else
 	{
 		SetHealth( sk_combine_s_health.GetFloat() );
 		SetMaxHealth( sk_combine_s_health.GetFloat() );
 		SetKickDamage( sk_combine_s_kick.GetFloat() );
-	//	m_flFieldOfView			= 0.3;	//Normal
+		m_flFieldOfView			= 0.3;	//Normal
 	}
-	m_flFieldOfView			= 0.3;	//*140
 
 	if ( !HasSpawnFlags( SF_NPC_START_EFFICIENT ) )
 	{

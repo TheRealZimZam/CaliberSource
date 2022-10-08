@@ -1,8 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: GREN-AYYYY-DUH
+// Purpose: GREN-AYYYY-DUH - Shared Throwable functions
 //
-// Purpose:	Shared Throwable functions
+// TODO; Cooking (ACT_VM_PULLPIN)
 //=============================================================================//
 
 #include "cbase.h"
@@ -42,9 +42,8 @@ BEGIN_DATADESC( CHLThrowable )
 
 	DEFINE_FIELD( m_bRedraw, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_AttackPaused, FIELD_INTEGER ),
-	DEFINE_FIELD( m_fDrawbackFinished, FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_flFuseTime, FIELD_FLOAT ),
-	DEFINE_FIELD( m_flCookTime, FIELD_TIME ),
+	DEFINE_FIELD( m_bDrawbackFinished, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_flCookedFuseTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextThrowCheck, FIELD_TIME ),
 	DEFINE_FIELD( m_vecTossVelocity, FIELD_VECTOR ),
 
@@ -55,9 +54,7 @@ CHLThrowable::CHLThrowable( )
 	m_vecTossVelocity.Init();
 
 	m_fMinRange1	= 100;
-	m_fMaxRange1	= 800;
-
-	m_flFuseTime = 0;
+	m_fMaxRange1	= 600;
 }
 
 //-----------------------------------------------------------------------------
@@ -66,8 +63,8 @@ CHLThrowable::CHLThrowable( )
 bool CHLThrowable::Deploy( void )
 {
 	m_bRedraw = false;
-	m_fDrawbackFinished = false;
-	m_flCookTime = gpGlobals->curtime;
+	m_bDrawbackFinished = false;
+	m_flCookedFuseTime = 0;
 	
 	return BaseClass::Deploy();
 }
@@ -79,8 +76,8 @@ bool CHLThrowable::Deploy( void )
 bool CHLThrowable::Holster( CBaseCombatWeapon *pSwitchingTo )
 {
 	m_bRedraw = false;
-	m_fDrawbackFinished = false;
-	m_flCookTime = gpGlobals->curtime;
+	m_bDrawbackFinished = false;
+	m_flCookedFuseTime = 0;
 
 	return BaseClass::Holster( pSwitchingTo );
 }
@@ -99,7 +96,8 @@ void CHLThrowable::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCha
 	switch( pEvent->event )
 	{
 		case EVENT_WEAPON_SEQUENCE_FINISHED:
-			m_fDrawbackFinished = true;
+			m_bDrawbackFinished = true;
+			m_flCookedFuseTime = GetFuseTime();	//Start counting
 			break;
 
 		case EVENT_WEAPON_THROW:
@@ -140,7 +138,7 @@ void CHLThrowable::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCha
 		m_flNextPrimaryAttack	= gpGlobals->curtime + RETHROW_DELAY;
 		m_flNextSecondaryAttack	= gpGlobals->curtime + RETHROW_DELAY;
 		m_flTimeWeaponIdle = FLT_MAX; //NOTE: This is set once the animation has finished up!
-		m_flCookTime = gpGlobals->curtime;
+		m_flCookedFuseTime = 0;
 	}
 }
 
@@ -172,7 +170,7 @@ int CHLThrowable::WeaponRangeAttack1Condition( float flDot, float flDist )
 	}
 
 	// If moving, can't throw.
-	if ( m_flGroundSpeed != 0 )
+	if ( m_flGroundSpeed > 1 )
 	{
 		m_flNextThrowCheck = gpGlobals->curtime + 0.5; // half second.
 		return COND_NONE;
@@ -205,13 +203,18 @@ int CHLThrowable::WeaponRangeAttack1Condition( float flDot, float flDist )
 
 		// Get Toss Vector
 		Vector			throwStart  = pNPC->Weapon_ShootPosition();
-		Vector			vecToss;
+
+		Vector			vecMins = -Vector(2,2,2);
+		Vector			vecMaxs = Vector(2,2,4);
+//		float			fGravity = sv_gravity.GetFloat(); 
+		Vector			vecToss = VecCheckToss( this, throwStart, vecTarget, -1, 1.0, true, &vecMins, &vecMaxs );
+#if 0
 		float			throwDist	= (throwStart - vecTarget).Length();
-		float			fGravity	= sv_gravity.GetFloat(); 
 		float			throwLimit	= pNPC->ThrowLimit(throwStart, vecTarget, fGravity, 35, WorldAlignMins(), WorldAlignMaxs(), pEnemy, &vecToss, &pTarget);
+#endif
 
 		// If I can make the throw (or most of the throw)
-		if (!throwLimit || (throwLimit != throwDist && throwLimit > 0.8*throwDist))
+		if (vecToss != vec3_origin)	//!throwLimit || (throwLimit != throwDist && throwLimit > 0.8*throwDist)
 		{
 			m_vecTossVelocity = vecToss;
 			m_flNextThrowCheck = gpGlobals->curtime + 0.33; // 1/3 second.
@@ -255,7 +258,7 @@ bool CHLThrowable::Reload( void )
 		m_flNextPrimaryAttack	= gpGlobals->curtime + SequenceDuration();
 		m_flNextSecondaryAttack	= gpGlobals->curtime + SequenceDuration();
 		m_flTimeWeaponIdle = gpGlobals->curtime + SequenceDuration();
-		m_flCookTime = gpGlobals->curtime;
+		m_flCookedFuseTime = 0;
 
 		//Mark this as done
 		m_bRedraw = false;
@@ -351,10 +354,8 @@ void CHLThrowable::DecrementAmmo( CBaseCombatCharacter *pOwner )
 //-----------------------------------------------------------------------------
 void CHLThrowable::ItemPostFrame( void )
 {
-	if( m_fDrawbackFinished )
+	if( m_bDrawbackFinished )
 	{
-		m_flCookTime = GetFuseTime();
-
 		CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 		if (pOwner)
 		{
@@ -364,7 +365,7 @@ void CHLThrowable::ItemPostFrame( void )
 				if( !(pOwner->m_nButtons & IN_ATTACK) )
 				{
 					SendWeaponAnim( ACT_VM_THROW );
-					m_fDrawbackFinished = false;
+					m_bDrawbackFinished = false;
 				}
 				break;
 
@@ -383,7 +384,7 @@ void CHLThrowable::ItemPostFrame( void )
 						SendWeaponAnim( ACT_VM_HAULBACK );
 					}
 
-					m_fDrawbackFinished = false;
+					m_bDrawbackFinished = false;
 				}
 				break;
 

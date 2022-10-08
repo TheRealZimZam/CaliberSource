@@ -145,16 +145,32 @@ public:
 	void Spawn( void )
 	{
 		Precache();
-		SetModel( "models/healthvial.mdl" );
+
+		if (m_bIsFood)
+		{
+			SetModel( "models/candybar.mdl" );
+			m_nSkin = random->RandomInt( 0, 5 );
+		}
+		else
+		{
+			SetModel( "models/healthvial.mdl" );
+		}
 
 		BaseClass::Spawn();
 	}
 
 	void Precache( void )
 	{
-		PrecacheModel("models/healthvial.mdl");
-
-		PrecacheScriptSound( "HealthVial.Touch" );
+		if (m_bIsFood)
+		{
+			PrecacheScriptSound( "Player.Eat" );
+			PrecacheModel("models/candybar.mdl");
+		}
+		else
+		{
+			PrecacheScriptSound( "HealthVial.Touch" );
+			PrecacheModel("models/healthvial.mdl");
+		}
 	}
 
 	bool MyTouch( CBasePlayer *pPlayer )
@@ -168,8 +184,16 @@ public:
 				WRITE_STRING( GetClassname() );
 			MessageEnd();
 
-			CPASAttenuationFilter filter( pPlayer, "HealthVial.Touch" );
-			EmitSound( filter, pPlayer->entindex(), "HealthVial.Touch" );
+			if (m_bIsFood)
+			{
+				CPASAttenuationFilter filter( pPlayer, "Player.Eat" );
+				EmitSound( filter, pPlayer->entindex(), "Player.Eat" );
+			}
+			else
+			{
+				CPASAttenuationFilter filter( pPlayer, "HealthVial.Touch" );
+				EmitSound( filter, pPlayer->entindex(), "HealthVial.Touch" );
+			}
 
 			if ( g_pGameRules->ItemShouldRespawn( this ) )
 			{
@@ -185,9 +209,20 @@ public:
 
 		return false;
 	}
+
+	bool		m_bIsFood;
+
+	DECLARE_DATADESC();
 };
 
 LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
+
+BEGIN_DATADESC( CHealthVial )
+
+	DEFINE_KEYFIELD( m_bIsFood, FIELD_BOOLEAN, "isfood" ),
+
+END_DATADESC()
+
 PRECACHE_REGISTER( item_healthvial );
 
 //-----------------------------------------------------------------------------

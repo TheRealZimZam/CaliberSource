@@ -18,7 +18,7 @@
 #include "beam_shared.h"
 
 class CWeaponRPG;
-class CWeaponLightRPG;
+class CWeaponFlash;
 class CLaserDot;
 class RocketTrail;
 
@@ -52,7 +52,7 @@ public:
 	void	AugerThink( void );
 	void	IgniteThink( void );
 	void	SeekThink( void );
-	void	DumbFire( void );
+	void	KillEngine( void );
 	void	SetGracePeriod( float flGracePeriod );
 
 	int		OnTakeDamage_Alive( const CTakeDamageInfo &info );
@@ -60,15 +60,18 @@ public:
 	
 	virtual float	GetDamage() { return m_flDamage; }
 	virtual void	SetDamage(float flDamage) { m_flDamage = flDamage; }
+	virtual void	SetEngineLifetime(float flLifetime) { m_flEngineLifetime = gpGlobals->curtime + flLifetime; }
+	virtual void	SetMaxLifetime(float flLifetime) { m_flMaxLifetime = gpGlobals->curtime + flLifetime; }
 
 	unsigned int PhysicsSolidMaskForEntity( void ) const;
 
 	CHandle<CWeaponRPG>		m_hOwner;
-	CHandle<CWeaponLightRPG>		m_lOwner;
+	CHandle<CWeaponFlash>		m_lOwner;
 	
 	static CMissile *Create( const Vector &vecOrigin, const QAngle &vecAngles, edict_t *pentOwner );
 
 	void CreateDangerSounds( bool bState ){ m_bCreateDangerSounds = bState; }
+	void GuidingDisabled( bool bState ){ m_bGuidingDisabled = bState; }
 
 	static void AddCustomDetonator( CBaseEntity *pEntity, float radius, float height = -1 );
 	static void RemoveCustomDetonator( CBaseEntity *pEntity );
@@ -76,7 +79,7 @@ public:
 protected:
 	virtual void DoExplosion();	
 	virtual void ComputeActualDotPosition( CLaserDot *pLaserDot, Vector *pActualDotPosition, float *pHomingSpeed );
-	virtual int AugerHealth() { return m_iMaxHealth - 20; }
+	virtual int AugerHealth() { return m_iMaxHealth - 15; }
 
 	// Creates the smoke trail
 	void CreateSmokeTrail( void );
@@ -87,7 +90,7 @@ protected:
 
 	CHandle<RocketTrail>	m_hRocketTrail;		// Smoke trail
 	CHandle<CSprite>		m_hRocketFlare;		// Flare at the tip
-	float					m_flAugerTime;		// Amount of time to auger before blowing up anyway
+//	float					m_flAugerTime;		// Amount of time to auger before blowing up anyway
 	float					m_flMarkDeadTime;
 	float					m_flDamage;
 
@@ -102,7 +105,10 @@ protected:
 
 private:
 	float					m_flGracePeriodEndsAt;
+	float					m_flEngineLifetime;
+	float					m_flMaxLifetime;
 	bool					m_bCreateDangerSounds;
+	bool					m_bGuidingDisabled;
 
 	DECLARE_DATADESC();
 };
@@ -159,7 +165,6 @@ private:
 
 	float	m_flReachedTargetTime;
 	float	m_flIgnitionTime;
-	bool	m_bGuidingDisabled;
 	float   m_flLastHomingSpeed;
 	EHANDLE m_hSpecificTarget;
 	string_t m_strHint;
@@ -238,7 +243,7 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector cone = VECTOR_CONE_3DEGREES;
+		static Vector cone = VECTOR_CONE_1DEGREES;
 		return cone;
 	}
 	
@@ -260,16 +265,16 @@ protected:
 };
 
 //-----------------------------------------------------------------------------
-// LIGHT-RPG
+// Dumbfire clip-fed rpg
 //-----------------------------------------------------------------------------
-class CWeaponLightRPG : public CBaseHLCombatWeapon
+class CWeaponFlash : public CBaseHLCombatWeapon
 {
 	DECLARE_DATADESC();
 public:
-	DECLARE_CLASS( CWeaponLightRPG, CBaseHLCombatWeapon );
+	DECLARE_CLASS( CWeaponFlash, CBaseHLCombatWeapon );
 
-	CWeaponLightRPG();
-	~CWeaponLightRPG();
+	CWeaponFlash();
+	~CWeaponFlash();
 
 	DECLARE_SERVERCLASS();
 
@@ -277,28 +282,18 @@ public:
 
 	void	PrimaryAttack( void );
 	virtual float GetFireRate( void ) { return 0.875f; };
-	void	ItemPostFrame( void );
 
-	bool	Deploy( void );
 	bool	Reload( void );
-	bool	WeaponShouldBeLowered( void );
-	bool	Lower( void );
-
-	virtual void Drop( const Vector &vecVelocity );
 
 	int		GetMinBurst() { return 4; }
 	int		GetMaxBurst() { return 4; }
-	float	GetMinRestTime() { return 4.0; }
-	float	GetMaxRestTime() { return 4.0; }
+	float	GetMinRestTime() { return 1.0; }
+	float	GetMaxRestTime() { return 1.5; }
 
 	bool	WeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions );
 	int		WeaponRangeAttack1Condition( float flDot, float flDist );
 
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-
-	void	NotifyRocketDied( void );
-
-	bool	HasAnyAmmo( void );
 
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
@@ -307,14 +302,12 @@ public:
 		static Vector cone = VECTOR_CONE_3DEGREES;
 		return cone;
 	}
-	
-	CBaseEntity *GetMissile( void ) { return m_hMissile; }
 
 	DECLARE_ACTTABLE();
-	
+
 protected:
-	bool				m_bInitialStateUpdate;
 	CHandle<CMissile>	m_hMissile;
+
 };
 
 #endif // WEAPON_RPG_H

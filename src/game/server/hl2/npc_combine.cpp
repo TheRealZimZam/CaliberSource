@@ -1,4 +1,4 @@
-//========= Copyright Â© 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Your classic malicious-military-marauders.
 // TODO's: Fix sentence prefix - the ifelite check works for now to get the demo out, but its gross and a better system would
@@ -6,7 +6,7 @@
 // The minimally invasive way I tried didnt work and I dont know how else to do it without a large re-write.
 // My idea is to have a think function interpret and store the finished sentence, and then play it when given the chance, 
 // rather than on a purely on-call basis as it is right now. I dont know about the perf costs of that, but
-// it shouldnt be too bad if its only updated every other think or something similar. - m.
+// it shouldnt be too bad if its only updated every other think or something similar. - wm.
 //
 // Auto-squadding, COND_COMBINE_DROP_GRENADE for tripmines, integrate with metrocops somehow??
 //
@@ -52,8 +52,9 @@
 #include "tier0/memdbgon.h"
 
 int g_fCombineQuestion;				// true if an idle grunt asked a question. Cleared when someone answers. YUCK old global from grunt code
-extern ConVar sk_npc_dmg_smg1_grenade;
+extern ConVar sk_npc_dmg_smg_grenade;
 extern ConVar sk_ar2_grenade_radius;
+extern ConVar temp_demofixes;	//TEMPTEMP
 
 #define COMBINE_SKIN_DEFAULT		0
 #define COMBINE_SKIN_SHOTGUNNER		1
@@ -163,7 +164,7 @@ DEFINE_FIELD( m_vecTossVelocity, FIELD_VECTOR ),
 DEFINE_FIELD( m_hForcedGrenadeTarget, FIELD_EHANDLE ),
 DEFINE_FIELD( m_lastGrenadeCondition, FIELD_INTEGER ),
 DEFINE_FIELD( m_bShouldPatrol, FIELD_BOOLEAN ),
-DEFINE_FIELD( m_bFirstEncounter, FIELD_BOOLEAN ),
+//DEFINE_FIELD( m_bFirstEncounter, FIELD_BOOLEAN ),
 DEFINE_FIELD( m_flNextPainSoundTime, FIELD_TIME ),
 DEFINE_FIELD( m_flNextAlertSoundTime, FIELD_TIME ),
 DEFINE_FIELD( m_flNextGrenadeCheck, FIELD_TIME ),
@@ -379,7 +380,7 @@ void CNPC_Combine::Spawn( void )
 
 	CapabilitiesAdd( bits_CAP_DUCK );				// In reloading and cover
 
-	m_bFirstEncounter	= true;// this is true when the grunt spawns, because he hasn't encountered an enemy yet.
+//	m_bFirstEncounter	= true;// this is true when the grunt spawns, because he hasn't encountered an enemy yet.
 
 	m_HackedGunPos = Vector ( 0, 0, 55 );
 
@@ -571,6 +572,9 @@ bool CNPC_Combine::ShouldMoveAndShoot()
 	if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 		return false;
 
+	if( HasCondition( COND_HEAR_DANGER ) )
+		return false;
+
 	// Only move-and-shoot when on the Assault
 	if( IsCurSchedule( SCHED_COMBINE_ASSAULT, false ) )
 		return true;
@@ -713,9 +717,6 @@ void CNPC_Combine::StartTaskChaseEnemyContinuously( const Task_t *pTask )
 		return;
 	}
 
-	// No shooting delay when in this mode
-	m_MoveAndShootOverlay.SetInitialDelay( 0.0 );
-
 	if (!GetNavigator()->IsGoalActive())
 	{
 		SetIdealActivity( GetStoppedActivity() );
@@ -783,9 +784,6 @@ void CNPC_Combine::RunTaskChaseEnemyContinuously( const Task_t *pTask )
 //=========================================================
 void CNPC_Combine::StartTask( const Task_t *pTask )
 {
-	// NOTE: This reset is required because we change it in TASK_COMBINE_CHASE_ENEMY_CONTINUOUSLY
-	m_MoveAndShootOverlay.SetInitialDelay( 0.75 );
-
 	switch ( pTask->iTask )
 	{
 	case TASK_COMBINE_SET_STANDING:
@@ -1540,6 +1538,19 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 	if ( HasCondition( COND_ON_FIRE ) )
 		return BaseClass::NPC_TranslateActivity( ACT_COMBINE_BUGBAIT );
 
+	if ( temp_demofixes.GetBool() )
+	{
+		switch( eNewActivity )
+		{
+			case ACT_RUN:
+				eNewActivity = ACT_RUN_RIFLE;
+			break;
+			case ACT_WALK:
+				eNewActivity = ACT_WALK_RIFLE;
+			break;
+		}
+	}
+
 	switch ( eNewActivity )
 	{
 		case ACT_RANGE_ATTACK2:
@@ -1560,6 +1571,7 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 			break;
 
 		case ACT_RUN:
+		case ACT_RUN_RIFLE:	//TEMPTEMP
 		case ACT_RUN_AIM:
 			if ( m_iHealth <= COMBINE_LIMP_HEALTH )
 			{
@@ -1574,8 +1586,9 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 		break;
 
 		case ACT_WALK:
+		case ACT_WALK_RIFLE:	//TEMPTEMP
 		case ACT_WALK_AIM:
-			if ( m_iHealth <= COMBINE_LIMP_HEALTH )
+			if ( m_iHealth <= COMBINE_LIMP_HEALTH && HaveSequenceForActivity( ACT_WALK_HURT ) )
 			{
 				// limp!
 				eNewActivity = ACT_WALK_HURT;
@@ -2204,6 +2217,7 @@ int CNPC_Combine::SelectScheduleAttack()
 					return SCHED_COMBINE_FOUND_ENEMY;
 				}
 			}
+
 			if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )	//GetShotRegulator()->IsInRestInterval()
 			{
 				// Give a quick burst then hide/move up
@@ -2216,6 +2230,7 @@ int CNPC_Combine::SelectScheduleAttack()
 			}
 			return SCHED_TAKE_COVER_FROM_ENEMY;
 		}
+		return SCHED_RANGE_ATTACK1;
 	}
 	else if ( HasCondition( COND_WEAPON_SIGHT_OCCLUDED ) )
 	{
@@ -2532,10 +2547,6 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 		return SCHED_COMBINE_COMBAT_FACE;
 		break;
 
-	case SCHED_ALERT_FACE:
-		return SCHED_COMBINE_ALERT_FACE;
-		break;
-
 	case SCHED_VICTORY_DANCE:
 		{
 			if ( m_pSquad )
@@ -2552,7 +2563,7 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 		{
 			if ( GetEnemy() != NULL && m_pSquad->IsLeader( this ) && CanDoSignal() ) //&& m_bFirstEncounter )
 			{
-				m_bFirstEncounter = false;// after first encounter, leader won't issue handsigns anymore when he has a new enemy
+			//	m_bFirstEncounter = false;// after first encounter, leader won't issue handsigns anymore when he has a new enemy
 				m_flNextSignalTime = gpGlobals->curtime + random->RandomFloat( 8, 15 );
 				return SCHED_COMBINE_SIGNAL_SUPPRESS;
 			}
@@ -2725,7 +2736,7 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 				pGrenade->SetAbsVelocity( m_vecTossVelocity );
 				pGrenade->SetLocalAngularVelocity( QAngle( random->RandomFloat( -100, -500 ), 0, 0 ) );
 				pGrenade->SetThrower( this );
-				pGrenade->SetDamage( sk_npc_dmg_smg1_grenade.GetFloat() );
+				pGrenade->SetDamage( sk_npc_dmg_smg_grenade.GetFloat() );
 				
 				m_lastGrenadeCondition = COND_NONE;
 				ClearCondition( COND_CAN_RANGE_ATTACK2 );
@@ -4156,23 +4167,6 @@ DEFINE_SCHEDULE
 //"		COND_HEAR_DANGER"
  )
 
- DEFINE_SCHEDULE
- (
- SCHED_COMBINE_ALERT_FACE,
-
- "	Tasks"
- "		TASK_STOP_MOVING			0"
- "		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
- "		TASK_FACE_IDEAL				0"
- "		TASK_WAIT					0.3"
-//"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_ALERT_SCAN"
- ""
- "	Interrupts"
- "		COND_NEW_ENEMY"
- "		COND_SEE_FEAR"
- "		COND_HEAVY_DAMAGE"
- "		COND_PROVOKED"
- )
 
  //=========================================================
  // SCHED_HIDE_AND_RELOAD

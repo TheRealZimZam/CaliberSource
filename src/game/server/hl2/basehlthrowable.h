@@ -48,9 +48,11 @@ public:
 	virtual bool	Reload( void );
 
 	bool	ShouldDisplayHUDHint() { return true; }
+	virtual bool IsArmed( void ) { return m_bDrawbackFinished == true; }
 
 	// Overwriten by baseclasses
-	virtual float	GetFuseTime( void ) { return m_flFuseTime; }
+	virtual float	GetFuseTime( void ) { return 0; }	//Base fuse time
+	virtual float	GetCookedFuseTime( void ) { return 0.1 + m_flCookedFuseTime; }	//Fuse time including cooking
 	virtual float	GetMinAttackDelay( void ) { return 6; }
 	virtual float	GetMaxAttackDelay( void ) { return 8; }
 
@@ -64,9 +66,8 @@ protected:
 
 	bool	m_bRedraw;				//Draw the weapon again after throwing a grenade
 	int		m_AttackPaused;
-	bool	m_fDrawbackFinished;
-	float	m_flFuseTime;
-	float	m_flCookTime;
+	bool	m_bDrawbackFinished;
+	float	m_flCookedFuseTime;
 	float	m_flNextThrowCheck;		// When to check throw ability next
 	
 	Vector				m_vecTossVelocity;

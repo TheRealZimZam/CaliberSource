@@ -119,7 +119,7 @@ public:
 	//---------------------------------
 	// Behavior
 	//---------------------------------
-	int				MeleeAttack1Conditions( float flDot, float flDist );
+	int				MeleeAttack2Conditions( float flDot, float flDist );
 	void 			GatherConditions();
 	virtual void	PredictPlayerPush();
 	void			BuildScheduleTestBits();
@@ -344,7 +344,6 @@ protected:
 		SCHED_PC_RANGE_ATTACK1,
 		SCHED_PC_SPOT_ENEMY,
 		SCHED_PC_COMBAT_FACE,
-		SCHED_PC_KNOCKDOWN,
 		SCHED_PC_INVESTIGATE_SOUND,
 		NEXT_SCHEDULE,
 
@@ -361,7 +360,6 @@ private:
 	
 	bool			m_bMovingAwayFromPlayer;
 	bool			m_bWeightPathsInCover;
-	bool			m_bFirstEncounter;	// only alert everyone else during the first encounter.
 //	float			m_flNextCrouchTime;
 	float			m_flNextEvadeTime;
 	float			m_flNextSoundTime;	// Should this be moved up a level??

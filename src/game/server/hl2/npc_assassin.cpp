@@ -13,6 +13,7 @@
 #include "ai_squadslot.h"
 #include "ai_route.h"
 #include "ai_interactions.h"
+#include "ai_hint.h"
 #include "ai_tacticalservices.h"
 #include "npc_assassin.h"
 #include "assassin_smoke.h"
@@ -31,7 +32,7 @@
 #include "tier0/memdbgon.h"
 
 ConVar	sk_assassin_health( "sk_assassin_health","80");
-ConVar	g_debug_assassin( "g_debug_assassin", "0" );
+//ConVar	g_debug_assassin( "g_debug_assassin", "0" );
 
 //=========================================================
 // Anim Events	
@@ -132,7 +133,7 @@ void CNPC_Assassin::Spawn( void )
 	SetBloodColor( BLOOD_COLOR_BLUE );
 	
 	m_iHealth			= sk_assassin_health.GetFloat();
-	m_flFieldOfView		= 0.1;	//*170
+	m_flFieldOfView		= 0.1;	//*170 - cant sneak up on ninjas
 	m_NPCState			= NPC_STATE_NONE;
 
 	CapabilitiesClear();
@@ -382,7 +383,6 @@ void CNPC_Assassin::HandleAnimEvent( animevent_t *pEvent )
 				}
 
 				EmitSound( "Zombie.AttackHit" );
-				//EmitSound( "Assassin.AttackHit" );
 			}
 		}
 		else
@@ -594,6 +594,10 @@ int CNPC_Assassin::SelectSchedule( void )
 			// Can shoot
 			if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
 				return SCHED_RANGE_ATTACK1;
+
+			// No ammo
+			if ( HasCondition( COND_NO_PRIMARY_AMMO ) )
+				return SCHED_RELOAD;
 
 			// Face our enemy
 			if ( HasCondition( COND_SEE_ENEMY ) )
@@ -867,7 +871,6 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 			{
 				EmitSound( "NPC_Assassin.Smoke" );
 				m_flNextSmokeTime = gpGlobals->curtime + 20.0f;
-				SetWait( 0.25 );
 				break;
 			}
 			else
@@ -892,6 +895,7 @@ void CNPC_Assassin::RunTask( const Task_t *pTask )
 	switch( pTask->iTask )
 	{
 	case TASK_ASSASSIN_EVADE:
+		EmitSound( "NPC_Assassin.Movement" );
 		AutoMovement();
 		if ( IsActivityFinished() )
 		{
@@ -988,7 +992,7 @@ void CNPC_Assassin::OnScheduleChange( void )
 		{
 			SetEyeState( ASSASSIN_EYE_SEEKING_TARGET );
 		}
-		else if ( m_NPCState == NPC_STATE_ALERT || (HasCondition( COND_HEAR_COMBAT ) || HasCondition( COND_SMELL )) )
+		else if ( m_NPCState == NPC_STATE_ALERT || (HasCondition( COND_HEAR_COMBAT ) || HasCondition( COND_HEAR_PLAYER )) )
 		{
 			SetEyeState( ASSASSIN_EYE_ACTIVE );
 		}
@@ -1141,14 +1145,14 @@ void CNPC_Assassin::BuildScheduleTestBits( void )
 //-----------------------------------------------------------------------------
 void CNPC_Assassin::Event_Killed( const CTakeDamageInfo &info )
 {
-	BaseClass::Event_Killed( info );
-
 	// Turn off the eye
 	SetEyeState( ASSASSIN_EYE_DEAD );
 	EmitSound( "NPC_Assassin.EyeDie" );
-	
+
 	// Turn off the pistols
 	SetBodygroup( 1, 0 );
+
+	BaseClass::Event_Killed( info );
 }
 
 //-----------------------------------------------------------------------------
@@ -1263,8 +1267,8 @@ AI_BEGIN_CUSTOM_NPC( npc_assassin, CNPC_Assassin )
 		"		TASK_SET_FAIL_SCHEDULE		SCHEDULE:SCHED_RUN_FROM_ENEMY"
 		"		TASK_STOP_MOVING			0"
 		"		TASK_FACE_ENEMY				0"
-		"		TASK_ASSASSIN_SMOKE			0"
 		"		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_ASSASSIN_SMOKE"
+		"		TASK_ASSASSIN_SMOKE			0"
 		"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_TAKE_COVER_FROM_ENEMY"
 		"	"
 		"	Interrupts"

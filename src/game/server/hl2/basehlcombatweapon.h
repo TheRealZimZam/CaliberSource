@@ -30,13 +30,14 @@ public:
 	// Default calls through to m_hOwner, but plasma weapons can override and shoot projectiles here.
 	virtual void	ItemPostFrame( void );
 	virtual void	FireBullets( const FireBulletsInfo_t &info );
-	virtual float	GetFireRate( void ) = 0;
+	virtual float	GetFireRate( void ) { return BaseClass::GetCycleTime(); }
 	virtual int		WeaponRangeAttack1Condition( float flDot, float flDist );
 	virtual bool	Deploy( void );
 
 	virtual const Vector &GetBulletSpread( void );
 
 	int				WeaponSoundRealtime( WeaponSound_t shoot_type );
+	Activity		GetPrimaryAttackActivity( void );
 
 	// utility function
 	static void DoMachineGunKick( CBasePlayer *pPlayer, float dampEasy, float maxVerticleKickAngle, float fireDurationTime, float slideLimitTime );

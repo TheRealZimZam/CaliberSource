@@ -295,7 +295,7 @@ void CNPC_Stalker::Spawn( void )
 //	m_bloodColor		= DONT_BLEED;
 	SetBloodColor( BLOOD_COLOR_BLUE );	//DONT_BLEED - Temp until decent flinch anims are added
 	m_iHealth			= sk_stalker_health.GetFloat();
-	m_flFieldOfView		= 0.3;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
+	m_flFieldOfView		= 0.8;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
 	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_MOVE_GROUND );
 	CapabilitiesAdd( bits_CAP_INNATE_MELEE_ATTACK1);

@@ -40,7 +40,7 @@ PRECACHE_WEAPON_REGISTER( weapon_crowbarold );
 acttable_t CWeaponCrowbarOld::m_acttable[] = 
 {
 	{ ACT_MELEE_ATTACK1,	ACT_MELEE_ATTACK_SWING, true },
-	{ ACT_IDLE,				ACT_IDLE_ANGRY_MELEE,	false },
+	{ ACT_IDLE,				ACT_IDLE_MELEE,			false },
 	{ ACT_IDLE_ANGRY,		ACT_IDLE_ANGRY_MELEE,	false },
 };
 
@@ -170,20 +170,27 @@ void CWeaponCrowbarOld::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseComba
 	// did I hit someone?
 	if ( pHurt )
 	{
-		// play sound
-		WeaponSound( MELEE_HIT );
-
 		// Fake a trace impact, so the effects work out like a player's crowbaw
 		trace_t traceHit;
 		UTIL_TraceLine( pOperator->Weapon_ShootPosition(), pHurt->GetAbsOrigin(), MASK_SHOT_HULL, pOperator, COLLISION_GROUP_NONE, &traceHit );
 		ImpactEffect( traceHit );
 	}
-	else
-	{
-		WeaponSound( MELEE_MISS );
-	}
+
+	ImpactSound( pHurt );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Play the impact sound
+// Input  : pHitEntity - entity that we hit
+// assumes pHitEntity is not null
+//-----------------------------------------------------------------------------
+void CWeaponCrowbarOld::ImpactSound( CBaseEntity *pHitEntity )
+{
+	if( pHitEntity->entindex() == 0 )
+		WeaponSound( MELEE_HIT_WORLD );
+	else 
+		WeaponSound( MELEE_HIT );
+}
 
 //-----------------------------------------------------------------------------
 // Animation event

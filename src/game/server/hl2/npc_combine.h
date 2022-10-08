@@ -51,8 +51,7 @@ public:
 	int				RangeAttack2Conditions( float flDot, float flDist ); // For innate grenade attack
 	int				MeleeAttack1Conditions( float flDot, float flDist ); // For kick/punch
 
-	virtual bool	CanAltFireEnemy();	// For weapon altfire
-	bool			CanLaunchGrenade( const Vector &vecTarget );
+	int				CanAltFireEnemy( float flDot, float flDist );	// For weapon altfire
 
 	bool			FVisible( CBaseEntity *pEntity, int traceMask = MASK_BLOCKLOS, CBaseEntity **ppBlocker = NULL );
 	virtual bool	IsCurTaskContinuousMove();
@@ -164,7 +163,7 @@ protected:
 	float			m_flNextSignalTime;			// Clock until a signal can be used
 	float			m_flNextAltFireTime;		// Elites only. Next time to begin considering alt-fire attack.
 
-	int				m_iNewEnemies;				// When this hits three, new enemy logic is deactivated until combat is over.
+	int				m_iNewEnemies;				// When this hits three, new enemy ai is deactivated until combat is over to prevent oscillation.
 	int				m_nShots;
 	float			m_flShotDelay;
 	float			m_flStopMoveShootTime;
@@ -182,14 +181,15 @@ private:
 		SCHED_COMBINE_COMBAT_FAIL,
 		SCHED_COMBINE_VICTORY_DANCE,
 		SCHED_COMBINE_COMBAT_FACE,
-		SCHED_COMBINE_ALERT_FACE,
+		SCHED_COMBINE_COVER_AND_RELOAD,
 		SCHED_COMBINE_HIDE_AND_RELOAD,
 		SCHED_COMBINE_SIGNAL_SUPPRESS,
 		SCHED_COMBINE_ASSAULT,
-		SCHED_COMBINE_GRENADE_ASSAULT,
+//		SCHED_COMBINE_GRENADE_ASSAULT,
 		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE,
-//		SCHED_COMBINE_FOUND_ENEMY,
+		SCHED_COMBINE_FOUND_ENEMY,
 		SCHED_COMBINE_PRESS_ATTACK,
+		SCHED_COMBINE_SIGNAL_PRESS_ATTACK,
 		SCHED_COMBINE_WAIT_IN_COVER,
 		SCHED_COMBINE_RANGE_ATTACK1,
 		SCHED_COMBINE_MELEE_ATTACK1,
@@ -206,8 +206,8 @@ private:
 		SCHED_COMBINE_BUGBAIT_DISTRACTION,
 		SCHED_COMBINE_CHARGE_TURRET,
 		SCHED_COMBINE_DROP_GRENADE,
+		SCHED_COMBINE_DEFUSE,
 		SCHED_COMBINE_CHARGE_PLAYER,
-		SCHED_COMBINE_SIGNAL_CHARGE_PLAYER,
 		SCHED_COMBINE_PATROL_ENEMY,
 		SCHED_COMBINE_BURNING_STAND,
 //		SCHED_COMBINE_EVADE,
@@ -215,7 +215,6 @@ private:
 //		SCHED_COMBINE_SMG1_ALTFIRE,
 		SCHED_COMBINE_FORCED_GRENADE_THROW,
 		SCHED_COMBINE_MOVE_TO_FORCED_GREN_LOS,
-		SCHED_COMBINE_MOVE_TO_MELEE,
 		NEXT_SCHEDULE,
 	};
 
@@ -246,7 +245,6 @@ private:
 	enum Combine_Conds
 	{
 		COND_COMBINE_NO_FIRE = BaseClass::NEXT_CONDITION,
-//		COND_COMBINE_DEAD_FRIEND,
 		COND_COMBINE_SHOULD_PATROL,
 		COND_COMBINE_HIT_BY_BUGBAIT,
 		COND_COMBINE_DROP_GRENADE,
@@ -290,11 +288,12 @@ private:
 */
 
 	int				m_nKickDamage;
+	int				m_voicePitch;
 	int				m_lastGrenadeCondition;
 	Vector			m_vecTossVelocity;
 	EHANDLE			m_hForcedGrenadeTarget;
 	bool			m_bShouldPatrol;
-	bool			m_bFirstEncounter;// only put on the handsign show in the squad's first encounter.
+//	bool			m_bFirstEncounter;// only put on the handsign show in the squad's first encounter.
 //	float			flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
 
 	CAI_Sentence< CNPC_Combine > m_Sentences;

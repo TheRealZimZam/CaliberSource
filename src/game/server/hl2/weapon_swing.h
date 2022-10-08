@@ -36,7 +36,7 @@ public:
 
 	CWeaponSwing();
 
-	float		GetRange( void )		{	return	SWING_RANGE;	}
+	float		GetRange( void )		{	return SWING_RANGE;	}
 	float		GetFireRate( void )		{	return BaseClass::GetCycleTime();	}	//SWING_REFIRE
 	int			GetDamageType( void )	{	return DMG_CLUB;	}
 

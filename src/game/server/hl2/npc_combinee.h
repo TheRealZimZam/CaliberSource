@@ -29,7 +29,7 @@ public:
 	// -----------------------------------------------------------------------------------
 	// -----------------------------------------------------------------------------------
 	void			DeathSound( const CTakeDamageInfo &info );
-//	void			PainSound( const CTakeDamageInfo &info );
+	void			PainSound( const CTakeDamageInfo &info );
 #if 0
 	void			IdleSound( void );
 	void			AlertSound( void );
@@ -42,7 +42,6 @@ public:
 	void			SpeakSentence( int sentType );
 #endif
 
-	virtual void	PrescheduleThink();
 	void			StartTask( const Task_t *pTask );
 
 	bool		m_fIsBlocking;

@@ -45,7 +45,15 @@ public:
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
 	float	GetFuseTime( void ) { return FRAGGRENADE_TIMER; }
-	
+	float	GetCookedFuseTime( void ) 
+	{
+		// Never ever go below the min time (tried to use clamp here, couldnt)
+		if ( m_flCookedFuseTime < FRAGGRENADE_TIMER_MIN )
+			m_flCookedFuseTime = FRAGGRENADE_TIMER_MIN;
+
+		return m_flCookedFuseTime; 
+	}
+
 	void	ThrowGrenade( CBaseCombatCharacter *pOwner );
 	void	RollGrenade( CBaseCombatCharacter *pOwner );
 	void	LobGrenade( CBaseCombatCharacter *pOwner );
@@ -110,8 +118,7 @@ void CWeaponFrag::ThrowGrenade( CBaseCombatCharacter *pOwner )
 	GetVectors( &vForward, NULL, &up );
 	vecThrow = vForward * 1000 + up * 20;
 
-	m_flFuseTime = FRAGGRENADE_TIMER_MIN + (m_flCookTime - FRAGGRENADE_TIMER_MIN);
-	Fraggrenade_Create( vecSrc, vec3_angle, vecThrow, AngularImpulse(600,random->RandomInt(-1200,1200),0), pOwner, m_flFuseTime, false );
+	Fraggrenade_Create( vecSrc, vec3_angle, vecThrow, AngularImpulse(600,random->RandomInt(-1200,1200),0), pOwner, GetCookedFuseTime(), false );
 
 	m_bRedraw = true;
 
@@ -144,8 +151,7 @@ void CWeaponFrag::LobGrenade( CBaseCombatCharacter *pOwner )
 	GetVectors( &vForward, NULL, &up );
 	vecThrow = vForward * 400 + up * 50;
 
-	m_flFuseTime = FRAGGRENADE_TIMER_MIN + (m_flCookTime - FRAGGRENADE_TIMER_MIN);
-	Fraggrenade_Create( vecSrc, vec3_angle, vecThrow, AngularImpulse(200,random->RandomInt(-600,600),0), pOwner, m_flFuseTime, false );
+	Fraggrenade_Create( vecSrc, vec3_angle, vecThrow, AngularImpulse(200,random->RandomInt(-600,600),0), pOwner, GetCookedFuseTime(), false );
 
 	WeaponSound( WPN_DOUBLE );
 
@@ -193,7 +199,7 @@ void CWeaponFrag::RollGrenade( CBaseCombatCharacter *pOwner )
 	QAngle orientation(0,pOwner->GetLocalAngles().y,-90);
 	// roll it
 	AngularImpulse rotSpeed(0,0,720);
-	Fraggrenade_Create( vecSrc, orientation, vecThrow, rotSpeed, pOwner, GetFuseTime(), false );
+	Fraggrenade_Create( vecSrc, orientation, vecThrow, rotSpeed, pOwner, GetCookedFuseTime(), false );
 
 	WeaponSound( SPECIAL1 );
 

@@ -24,7 +24,7 @@
 #include "npc_combines.h"
 #include "soundent.h"
 #include "mapentities.h"
-#include "npc_rollermine.h"
+#include "npc_roller.h"
 #include "scripted.h"
 #include "explode.h"
 #include "gib.h"

@@ -767,9 +767,9 @@ void CBaseHelicopter::FireWeapons()
 	// ALERT( at_console, "%.0f %.0f %.0f\n", gpGlobals->curtime, m_flLastSeen, m_flPrevSeen );
 	if (m_fHelicopterFlags & BITS_HELICOPTER_GUN_ON)
 	{
-		//if ( (m_flLastSeen + 1 > gpGlobals->curtime) && (m_flPrevSeen + 2 < gpGlobals->curtime) )
+		//!if ( (m_flLastSeen + 1 > gpGlobals->curtime) && (m_flPrevSeen + 2 < gpGlobals->curtime) )
 		{
-			if (FireGun( ))
+			if (FireGun())
 			{
 				// slow down if we're firing
 				if (m_flGoalSpeed > GetMaxSpeedFiring() )
@@ -1266,10 +1266,15 @@ void CBaseHelicopter::DrawDebugGeometryOverlays(void)
 //-----------------------------------------------------------------------------
 void CBaseHelicopter::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
+	//Msg( "%d %.0f\n", ptr->hitgroup, info.GetDamage() );
+
 	// Take no damage from trace attacks unless it's blast damage. RadiusDamage() sometimes calls
 	// TraceAttack() as a means for delivering blast damage. Usually when the explosive penetrates
 	// the target. (RPG missiles do this sometimes).
-	if( info.GetDamageType() & (DMG_BLAST|DMG_AIRBOAT) )
+	if (( info.GetDamageType() & (DMG_BLAST|DMG_SONIC|DMG_ENERGYBEAM|DMG_AIRBOAT)) || 
+		( info.GetInflictor()->Classify() == CLASS_MISSILE ) || 
+		( info.GetAttacker()->Classify() == CLASS_MISSILE ) ||
+		ptr->hitgroup == 1)
 	{
 		BaseClass::TraceAttack( info, vecDir, ptr );
 	}

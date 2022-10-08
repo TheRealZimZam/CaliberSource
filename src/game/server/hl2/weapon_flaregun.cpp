@@ -8,12 +8,15 @@
 #include "cbase.h"
 #include "player.h"
 #include "gamerules.h"
+#include "weapon_flaregun.h"
 #include "basehlcombatweapon.h"
 #include "decals.h"
 #include "soundenvelope.h"
+#include "in_buttons.h"
+#include "soundent.h"
+#include "vstdlib/random.h"
 #include "IEffects.h"
 #include "engine/IEngineSound.h"
-#include "weapon_flaregun.h"
 #include "gamestats.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -677,6 +680,8 @@ void CFlare::AddToActiveFlares( void )
 //-----------------------------------------------------------------------------
 // FLAREGUN
 //-----------------------------------------------------------------------------
+extern ConVar sk_plr_num_shotgun_pellets;
+extern ConVar sv_funmode;
 
 IMPLEMENT_SERVERCLASS_ST(CFlaregun, DT_Flaregun)
 END_SEND_TABLE()
@@ -685,8 +690,17 @@ LINK_ENTITY_TO_CLASS( weapon_flaregun, CFlaregun );
 PRECACHE_WEAPON_REGISTER( weapon_flaregun );
 
 //-----------------------------------------------------------------------------
-// Purpose: Precache
+// Purpose: Constructor
 //-----------------------------------------------------------------------------
+CFlaregun::CFlaregun( void )
+{
+	m_bReloadsSingly = false;
+	m_bUsingSecondaryAmmo = false;
+
+	m_fMinRange1		= 64.0;
+	m_fMaxRange1		= 1024;
+}
+
 void CFlaregun::Precache( void )
 {
 	BaseClass::Precache();
@@ -721,27 +735,55 @@ void CFlaregun::PrimaryAttack( void )
 	pOwner->SetAnimation( PLAYER_ATTACK1 );
 	pOwner->m_flNextAttack = gpGlobals->curtime + 1;
 	pOwner->SetAimTime( gpGlobals->curtime + SequenceDuration() );
+	pOwner->DoMuzzleFlash();
 
-	CFlare *pFlare = CFlare::Create( pOwner->Weapon_ShootPosition(), pOwner->EyeAngles(), pOwner, FLARE_DURATION );
+	if ( m_bUsingSecondaryAmmo )
+	{
+		Vector vecSrc	 = pOwner->Weapon_ShootPosition();
+		Vector vecAiming = pOwner->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
 
-	if ( pFlare == NULL )
-		return;
+		// Fire the bullets
+		int NumPellets = sk_plr_num_shotgun_pellets.GetInt();
+		pOwner->FireBullets( NumPellets, vecSrc, vecAiming, (VECTOR_CONE_12DEGREES), MAX_TRACE_LENGTH, m_iSecondaryAmmoType, 2, -1, -1, 0, NULL, false, false );
+		//pOwner->RemoveAmmo( 1, m_iSecondaryAmmoType );
 
-	Vector forward;
-	pOwner->EyeVectors( &forward );
+		pOwner->ViewPunch( QAngle( -(NumPellets/2), random->RandomFloat( -(5), (5) ), 0 ) );
+		if ( !sv_funmode.GetBool() && pOwner->GetHealth() > 2 )
+		{
+			pOwner->TakeDamage( CTakeDamageInfo( this, this, 1, DMG_CLUB ) );
+		}
 
-	pFlare->SetAbsVelocity( forward * 1500 );
+		WeaponSound( WPN_DOUBLE );
+		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );
+	}
+	else
+	{
+		CFlare *pFlare = CFlare::Create( pOwner->Weapon_ShootPosition(), pOwner->EyeAngles(), pOwner, FLARE_DURATION );
 
-	WeaponSound( SINGLE );
+		if ( pFlare == NULL )
+			return;
+
+		Vector forward;
+		pOwner->EyeVectors( &forward );
+
+		pFlare->SetAbsVelocity( forward * 1500 );
+
+		WeaponSound( SINGLE );
+	}
 
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pOwner, true, GetClassname() );
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Change to secondary ammo type
 //-----------------------------------------------------------------------------
-/*
+void CFlaregun::SwitchAmmoType( void )
+{
+	WeaponSound( SPECIAL1 );
+	BaseClass::SwitchAmmoType();
+}
+
 void CFlaregun::SecondaryAttack( void )
 {
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
@@ -749,31 +791,8 @@ void CFlaregun::SecondaryAttack( void )
 	if ( pOwner == NULL )
 		return;
 
-	if ( m_iClip1 <= 0 )
-	{
-		SendWeaponAnim( ACT_VM_DRYFIRE );
-		pOwner->m_flNextAttack = gpGlobals->curtime + SequenceDuration();
-		return;
-	}
-
-	m_iClip1 = m_iClip1 - 1;
-
-	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
 	pOwner->m_flNextAttack = gpGlobals->curtime + 1;
+	SwitchAmmoType();
 
-	CFlare *pFlare = CFlare::Create( pOwner->Weapon_ShootPosition(), pOwner->EyeAngles(), pOwner, FLARE_DURATION );
-
-	if ( pFlare == NULL )
-		return;
-
-	Vector forward;
-	pOwner->EyeVectors( &forward );
-
-	pFlare->SetAbsVelocity( forward * 500 );
-	pFlare->SetGravity(1.0f);
-	pFlare->SetFriction( 0.85f );
-	pFlare->SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
-
-	WeaponSound( SINGLE );
+	m_iSecondaryAttacks++;
 }
-*/

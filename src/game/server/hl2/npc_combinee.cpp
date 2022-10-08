@@ -65,7 +65,7 @@ void CNPC_CombineE::Spawn( void )
 	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
 	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 	// Sniper elites dont use grenades
-	if ( !FClassnameIs( this, "npc_atf_sniper" ))
+	if ( !FClassnameIs( this, "npc_sniper" ))
 	{
 		CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
 	}
@@ -76,10 +76,9 @@ void CNPC_CombineE::Spawn( void )
 		CapabilitiesAdd( bits_CAP_MOVE_JUMP );
 	}
 
-	m_flStopMoveShootTime = FLT_MAX; // Move and shoot defaults on.
-	m_MoveAndShootOverlay.SetInitialDelay( 0.75 ); // But with a bit of a delay.
-
 	BaseClass::Spawn();
+
+	m_MoveAndShootOverlay.SetInitialDelay( 0.25 );
 }
 
 
@@ -240,9 +239,6 @@ void CNPC_CombineE::SpeakSentence( int sentenceType )
 //-----------------------------------------------------------------------------
 void CNPC_CombineE::StartTask( const Task_t *pTask )
 {
-	// NOTE: This reset is required because we change it in TASK_COMBINE_CHASE_ENEMY_CONTINUOUSLY
-	m_MoveAndShootOverlay.SetInitialDelay( 0.75 );
-
 	switch ( pTask->iTask )
 	{
 	case TASK_ANNOUNCE_ATTACK:
@@ -378,7 +374,6 @@ void CNPC_CombineE::Event_Killed( const CTakeDamageInfo &info )
 	}
 
 	CBasePlayer *pPlayer = ToBasePlayer( info.GetAttacker() );
-
 	if ( pPlayer != NULL )
 	{
 		CHalfLife2 *pHL2GameRules = static_cast<CHalfLife2 *>(g_pGameRules);
@@ -440,51 +435,21 @@ bool CNPC_CombineE::IsHeavyDamage( const CTakeDamageInfo &info )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_CombineE::PrescheduleThink()
-{
-	BaseClass::PrescheduleThink();
-
-	if( gpGlobals->curtime >= m_flStopMoveShootTime )
-	{
-		// Time to stop move and shoot and start facing the way I'm running.
-		// This makes the combine look attentive when disengaging, but prevents
-		// them from always running around facing you.
-		//
-		// Only do this if it won't be immediately shut off again.
-		if( GetNavigator()->GetPathTimeToGoal() > 1.0f )
-		{
-			m_MoveAndShootOverlay.SuspendMoveAndShoot( 5.0f );
-			m_flStopMoveShootTime = FLT_MAX;
-		}
-	}
-
-	if( m_flGroundSpeed > 0 && GetState() == NPC_STATE_COMBAT && m_MoveAndShootOverlay.IsSuspended() )
-	{
-		// Return to move and shoot when near my goal so that I 'tuck into' the location facing my enemy.
-		if( GetNavigator()->GetPathTimeToGoal() <= 1.0f )
-		{
-			m_MoveAndShootOverlay.SuspendMoveAndShoot( 0 );
-		}
-	}
-
-}
-
-//-----------------------------------------------------------------------------
 // 
 //-----------------------------------------------------------------------------
 bool CNPC_CombineE::ShouldMoveAndShoot()
 {
+#if 0
 	m_flStopMoveShootTime = FLT_MAX;
+
+	// If you hear danger, focus on running for the first second or two
+	if( HasCondition( COND_HEAR_DANGER ) )
+		m_flStopMoveShootTime = gpGlobals->curtime + random->RandomFloat( 1.0f, 2.0f );
+#endif
 
 	// Dont move n' shoot when hurt
 	if ( m_iHealth <= COMBINE_ELITE_LIMP_HEALTH )
 		return false;
-
-	// If you hear danger, focus on running for the first second or two
-	if( HasCondition( COND_HEAR_DANGER, false ) )
-		m_flStopMoveShootTime = gpGlobals->curtime + random->RandomFloat( 1.0f, 2.0f );
 
 	return BaseClass::ShouldMoveAndShoot();
 }

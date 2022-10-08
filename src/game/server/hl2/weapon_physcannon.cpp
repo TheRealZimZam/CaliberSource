@@ -48,9 +48,12 @@ static const char *s_pWaitForUpgradeContext = "WaitForUpgrade";
 
 ConVar	g_debug_physcannon( "g_debug_physcannon", "0" );
 
+ConVar physcannon_maxmass( "physcannon_maxmass", "250" );
+ConVar player_throwforce( "player_throwforce", "1000" );
+
+#ifdef HL2_DLL
 ConVar physcannon_minforce( "physcannon_minforce", "700" );
 ConVar physcannon_maxforce( "physcannon_maxforce", "1500" );
-ConVar physcannon_maxmass( "physcannon_maxmass", "250" );
 ConVar physcannon_tracelength( "physcannon_tracelength", "250" );
 ConVar physcannon_mega_tracelength( "physcannon_mega_tracelength", "850" );
 ConVar physcannon_chargetime("physcannon_chargetime", "2" );
@@ -59,7 +62,6 @@ ConVar physcannon_mega_pullforce( "physcannon_mega_pullforce", "8000" );
 ConVar physcannon_cone( "physcannon_cone", "0.97" );
 ConVar physcannon_ball_cone( "physcannon_ball_cone", "0.997" );
 ConVar physcannon_punt_cone( "physcannon_punt_cone", "0.997" );
-ConVar player_throwforce( "player_throwforce", "1000" );
 ConVar physcannon_dmg_glass( "physcannon_dmg_glass", "15" );
 ConVar physcannon_right_turrets( "physcannon_right_turrets", "0" );
 
@@ -82,6 +84,7 @@ extern ConVar hl2_walkspeed;
 
 #define	MEGACANNON_MODEL "models/weapons/v_superphyscannon.mdl"
 #define	MEGACANNON_SKIN	1
+#endif
 
 // -------------------------------------------------------------------------
 //  Physcannon trace filter to handle special cases
@@ -1171,6 +1174,7 @@ void PlayerPickupObject( CBasePlayer *pPlayer, CBaseEntity *pObject )
 }
 
 //-----------------------------------------------------------------------------
+#ifdef HL2_DLL
 
 //-----------------------------------------------------------------------------
 // Physcannon
@@ -4467,6 +4471,8 @@ bool CWeaponPhysCannon::IsAccountableForObject( CBaseEntity *pObject )
 
 	return false;
 }
+
+#endif
 
 //-----------------------------------------------------------------------------
 // EXTERNAL API

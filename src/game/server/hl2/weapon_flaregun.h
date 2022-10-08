@@ -5,7 +5,6 @@
 //=============================================================================//
 
 #include "basehlcombatweapon.h"
-#include "soundenvelope.h"
 
 #ifndef WEAPON_FLAREGUN_H
 #define WEAPON_FLAREGUN_H
@@ -99,8 +98,11 @@ public:
 	DECLARE_SERVERCLASS();
 
 	void Precache( void );
+	void SwitchAmmoType( void );
 	void PrimaryAttack( void );
-//!	void SecondaryAttack( void );
+	void SecondaryAttack( void );
+	
+	CFlaregun(void);
 };
 
 #endif // WEAPON_FLAREGUN_H

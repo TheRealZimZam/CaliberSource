@@ -44,6 +44,7 @@ public:
 	void	StopFlameSound();
 	
 	bool	CanHolster( void );
+	bool	Holster( CBaseCombatWeapon *pSwitchingTo );
 	bool	Reload( void );
 
 	void	ItemPostFrame( void );

@@ -2151,10 +2151,10 @@ void CHL2_Player::FlashlightTurnOn( void )
 		if( !SuitPower_AddDevice( SuitDeviceFlashlight ) )
 			return;
 	}
-#ifdef HL2_DLL
-	if( !IsSuitEquipped() )
+#if 0
+	if( !IsSuitEquipped() && !Weapon_OwnsThisType( "weapon_flashlight" ) )
 		return;
-#endif
+#endif	//HL2_DLL
 
 	AddEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOn" );
@@ -2489,22 +2489,17 @@ int CHL2_Player::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 			EmitSound( "Player.DrownContinue" );
 		}
 	}
-
-	// Burnt
-	if ( info.GetDamageType() & DMG_BURN )
+	else if ( info.GetDamageType() & DMG_BURN )
 	{
+		// Burnt
 		EmitSound( "HL2Player.BurnPain" );
 	}
-
-	// Anything that would make a sound
-#if 0
-	if ( GetLastDamageTime() > 0 && info.GetDamageType() & (DMG_BULLET|DMG_CLUB|DMG_SLASH) )
+	else if (!(info.GetDamageType() & (DMG_FALL|DMG_SONIC)) && random->RandomInt( 0, 20 ) == 20)
 	{
 		EmitSound( "Player.Pain" );
 	}
-#endif
 
-	if( (info.GetDamageType() & DMG_SLASH) && hl2_episodic.GetBool() )
+	if( !(info.GetDamageType() & DMG_BULLET) && hl2_episodic.GetBool() )
 	{
 		if( m_afPhysicsFlags & PFLAG_USING )
 		{

@@ -34,7 +34,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define FASTZOMBIE_IDLE_PITCH			70
+#define FASTZOMBIE_IDLE_PITCH			75
 #define FASTZOMBIE_MIN_PITCH			85
 #define FASTZOMBIE_MAX_PITCH			130
 #define FASTZOMBIE_SOUND_UPDATE_FREQ	0.5
@@ -258,7 +258,6 @@ public:
 	void OnChangeActivity( Activity NewActivity );
 	void OnStateChange( NPC_STATE OldState, NPC_STATE NewState );
 	void Event_Killed( const CTakeDamageInfo &info );
-	bool ShouldBecomeTorso( const CTakeDamageInfo &info, float flDamageThreshold );
 
 	virtual Vector GetAutoAimCenter() { return WorldSpaceCenter() - Vector( 0, 0, 12.0f ); }
 
@@ -342,8 +341,9 @@ public:
 	DECLARE_DATADESC();
 };
 
+LINK_ENTITY_TO_CLASS( npc_zombie, CFastZombie );
+LINK_ENTITY_TO_CLASS( npc_zombie_torso, CFastZombie );
 LINK_ENTITY_TO_CLASS( npc_fastzombie, CFastZombie );
-LINK_ENTITY_TO_CLASS( npc_fastzombie_torso, CFastZombie );
 
 
 BEGIN_DATADESC( CFastZombie )
@@ -378,11 +378,6 @@ const char *CFastZombie::pMoanSounds[] =
 	"NPC_FastZombie.Moan1",
 };
 
-//-----------------------------------------------------------------------------
-// The model we use for our legs when we get blowed up.
-//-----------------------------------------------------------------------------
-static const char *s_pLegsModel = "models/gibs/fast_zombie_legs.mdl";
-
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -392,8 +387,8 @@ static const char *s_pLegsModel = "models/gibs/fast_zombie_legs.mdl";
 void CFastZombie::Precache( void )
 {
 	PrecacheModel("models/zombie/fast.mdl");
+	PrecacheModel("models/zombie/fast_torso.mdl");
 #ifdef HL2_EPISODIC
-	PrecacheModel("models/zombie/Fast_torso.mdl");
 	PrecacheScriptSound( "NPC_FastZombie.CarEnter1" );
 	PrecacheScriptSound( "NPC_FastZombie.CarEnter2" );
 	PrecacheScriptSound( "NPC_FastZombie.CarEnter3" );
@@ -402,13 +397,13 @@ void CFastZombie::Precache( void )
 #endif
 	PrecacheModel( "models/gibs/fast_zombie_torso.mdl" );
 	PrecacheModel( "models/gibs/fast_zombie_legs.mdl" );
+	PrecacheModel( "models/headcrab.mdl" );
 	
 	PrecacheScriptSound( "NPC_FastZombie.LeapAttack" );
 	PrecacheScriptSound( "NPC_FastZombie.FootstepRight" );
 	PrecacheScriptSound( "NPC_FastZombie.FootstepLeft" );
 	PrecacheScriptSound( "NPC_FastZombie.AttackHit" );
 	PrecacheScriptSound( "NPC_FastZombie.AttackMiss" );
-	PrecacheScriptSound( "NPC_FastZombie.LeapAttack" );
 	PrecacheScriptSound( "NPC_FastZombie.Attack" );
 	PrecacheScriptSound( "NPC_FastZombie.Idle" );
 	PrecacheScriptSound( "NPC_FastZombie.AlertFar" );
@@ -445,30 +440,24 @@ void CFastZombie::OnScheduleChange( void )
 //---------------------------------------------------------
 int CFastZombie::SelectSchedule ( void )
 {
-
-// ========================================================
 #ifdef HL2_EPISODIC
-
 	// Defer all decisions to the behavior if it's running
 	if ( m_PassengerBehavior.CanSelectSchedule() )
 	{
 		DeferSchedulingToBehavior( &m_PassengerBehavior );
 		return BaseClass::SelectSchedule();
 	}
-
 #endif //HL2_EPISODIC
-// ========================================================
 
+	// Death waits for no man. Or zombie. Or something.
 	if ( HasCondition( COND_ZOMBIE_RELEASECRAB ) )
-	{
-		// Death waits for no man. Or zombie. Or something.
 		return SCHED_ZOMBIE_RELEASECRAB;
-	}
 
 	if ( HasCondition( COND_FASTZOMBIE_CLIMB_TOUCH ) )
-	{
 		return SCHED_FASTZOMBIE_UNSTICK_JUMP;
-	}
+
+	if( HasCondition( COND_PHYSICS_DAMAGE ) && !m_ActBusyBehavior.IsActive() )
+		return SCHED_FLINCH_PHYSICS;
 
 	switch ( m_NPCState )
 	{
@@ -657,15 +646,11 @@ void CFastZombie::Spawn( void )
 
 	m_fIsTorso = m_fIsHeadless = false;
 
-	if( FClassnameIs( this, "npc_fastzombie" ) )
-	{
-		m_fIsTorso = false;
-	}
-	else
-	{
-		// This was placed as an npc_fastzombie_torso
+	// This was placed as an npc_zombie_torso
+	if( FClassnameIs( this, "npc_zombie_torso" ) )
 		m_fIsTorso = true;
-	}
+	else
+		m_fIsTorso = false;
 
 #ifdef HL2_EPISODIC
 	SetBloodColor( BLOOD_COLOR_ZOMBIE );
@@ -674,7 +659,7 @@ void CFastZombie::Spawn( void )
 #endif // HL2_EPISODIC
 
 	m_iHealth			= sk_fastzombie_health.GetFloat();
-	m_flFieldOfView		= 0.2;
+	m_flFieldOfView		= 0.6;
 
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_GROUND | bits_CAP_INNATE_RANGE_ATTACK1 /* | bits_CAP_INNATE_MELEE_ATTACK1 */);
@@ -710,7 +695,7 @@ void CFastZombie::PostNPCInit( void )
 //-----------------------------------------------------------------------------
 const char *CFastZombie::GetHeadcrabClassname( void )
 {
-	return "npc_headcrab_fast";
+	return "npc_headcrab";
 }
 
 const char *CFastZombie::GetHeadcrabModel( void )
@@ -787,7 +772,7 @@ void CFastZombie::SetZombieModel( void )
 //-----------------------------------------------------------------------------
 const char *CFastZombie::GetLegsModel( void )
 {
-	return s_pLegsModel;
+	return "models/gibs/fast_zombie_legs.mdl";
 }
 
 const char *CFastZombie::GetTorsoModel( void )
@@ -896,6 +881,9 @@ void CFastZombie::IdleSound( void )
 //-----------------------------------------------------------------------------
 void CFastZombie::PainSound( const CTakeDamageInfo &info )
 {
+	if ( IsOnFire() )
+		return;
+
 	if ( m_pLayer2 )
 		ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pLayer2, SOUNDCTRL_CHANGE_VOLUME, envFastZombieVolumePain, ARRAYSIZE(envFastZombieVolumePain) );
 	if ( m_pMoanSound )
@@ -914,27 +902,22 @@ void CFastZombie::DeathSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CFastZombie::AlertSound( void )
 {
-	CBaseEntity *pPlayer = AI_GetSinglePlayer();
+//!	CBaseEntity *pPlayer = AI_GetSinglePlayer();
 
-	if( pPlayer )
+	if( GetEnemy() )
 	{
 		// Measure how far the player is, and play the appropriate type of alert sound. 
 		// Doesn't matter if I'm getting mad at a different character, the player is the
 		// one that hears the sound.
 		float flDist;
 
-		flDist = ( GetAbsOrigin() - pPlayer->GetAbsOrigin() ).Length();
+		flDist = ( GetAbsOrigin() - GetEnemy()->GetAbsOrigin() ).Length();
 
 		if( flDist > 512 )
-		{
 			EmitSound( "NPC_FastZombie.AlertFar" );
-		}
 		else
-		{
 			EmitSound( "NPC_FastZombie.AlertNear" );
-		}
 	}
-
 }
 
 
@@ -1547,8 +1530,6 @@ void CFastZombie::BecomeTorso( const Vector &vecTorsoForce, const Vector &vecLeg
 	CapabilitiesRemove( bits_CAP_MOVE_JUMP );
 	CapabilitiesRemove( bits_CAP_MOVE_CLIMB );
 
-	ReleaseHeadcrab( EyePosition(), vecLegsForce * 0.5, true, true, true );
-
 	BaseClass::BecomeTorso( vecTorsoForce, vecLegsForce );
 }
 
@@ -1748,27 +1729,21 @@ void CFastZombie::EndAttackJump( void )
 //-----------------------------------------------------------------------------
 void CFastZombie::BuildScheduleTestBits( void )
 {
-	// FIXME: This is probably the desired call to make, but it opts into an untested base class path, we'll need to
-	//		  revisit this and figure out if we want that. -- jdw
-	// BaseClass::BuildScheduleTestBits();
-	//
+#ifdef HL2_EPISODIC
 	// For now, make sure our active behavior gets a chance to add its own bits
 	if ( GetRunningBehavior() )
 		GetRunningBehavior()->BridgeBuildScheduleTestBits(); 
 
-#ifdef HL2_EPISODIC
 	SetCustomInterruptCondition( COND_PROVOKED );
 #endif	// HL2_EPISODIC
 
 	// Any schedule that makes us climb should break if we touch player
 	if ( GetActivity() == ACT_CLIMB_UP || GetActivity() == ACT_CLIMB_DOWN || GetActivity() == ACT_CLIMB_DISMOUNT)
-	{
 		SetCustomInterruptCondition( COND_FASTZOMBIE_CLIMB_TOUCH );
-	}
 	else
-	{
 		ClearCustomInterruptCondition( COND_FASTZOMBIE_CLIMB_TOUCH );
-	}
+	
+	BaseClass::BuildScheduleTestBits();
 }
 
 //=========================================================
@@ -1792,6 +1767,8 @@ void CFastZombie::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
 			SetIdleSoundState();
 		}
 	}
+	
+	BaseClass::OnStateChange( OldState, NewState );
 }
 
 //-----------------------------------------------------------------------------
@@ -1805,6 +1782,7 @@ void CFastZombie::Event_Killed( const CTakeDamageInfo &info )
 	CTakeDamageInfo dInfo = info;
 
 #if 0
+	CTakeDamageInfo dInfo = info;
 
 	// Become a server-side ragdoll and create a constraint at the hand
 	if ( m_PassengerBehavior.GetPassengerState() == PASSENGER_STATE_INSIDE )
@@ -1837,28 +1815,7 @@ void CFastZombie::Event_Killed( const CTakeDamageInfo &info )
 	}
 #endif
 
-	BaseClass::Event_Killed( dInfo );
-}
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-bool CFastZombie::ShouldBecomeTorso( const CTakeDamageInfo &info, float flDamageThreshold )
-{
-	if( m_fIsTorso )
-	{
-		// Already split.
-		return false;
-	}
-
-	// Break in half IF:
-	// 
-	// Take half or more of max health in DMG_BLAST
-	if( (info.GetDamageType() & DMG_BLAST) && m_iHealth <= 0 )
-	{
-		return true;
-	}
-
-	return false;
+	BaseClass::Event_Killed( info );
 }
 
 //=============================================================================

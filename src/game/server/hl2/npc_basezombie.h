@@ -153,7 +153,7 @@ public:
 	virtual void BuildScheduleTestBits( void );
 
 	virtual int TranslateSchedule( int scheduleType );
-	virtual Activity NPC_TranslateActivity( Activity baseAct );
+	virtual Activity NPC_TranslateActivity( Activity BaseAct );
 
 	void StartTask( const Task_t *pTask );
 	void RunTask( const Task_t *pTask );
@@ -172,7 +172,7 @@ public:
 	bool ShouldIgnite( const CTakeDamageInfo &info );
 	bool ShouldIgniteZombieGib( void );
 	virtual bool IsChopped( const CTakeDamageInfo &info );
-	virtual bool IsSquashed( const CTakeDamageInfo &info ) { return false; }
+	virtual bool IsSquashed( const CTakeDamageInfo &info );
 	virtual void DieChopped( const CTakeDamageInfo &info );
 	virtual void Ignite( float flFlameLifetime, bool bNPCOnly = true, float flSize = 0.0f, bool bCalledByLevelDesigner = false );
 	void CopyRenderColorTo( CBaseEntity *pOther );
@@ -184,7 +184,7 @@ public:
 	void RemoveHead( void );
 	virtual void SetZombieModel( void ) { };
 	virtual void BecomeTorso( const Vector &vecTorsoForce, const Vector &vecLegsForce );
-	virtual bool CanBecomeLiveTorso() { return false; }
+	virtual bool CanBecomeLiveTorso() { return !m_fIsHeadless; }
 	virtual bool CNPC_BaseZombie::HeadcrabFits( CBaseAnimating *pCrab );
 	void ReleaseHeadcrab( const Vector &vecOrigin, const Vector &vecVelocity, bool fRemoveHead, bool fRagdollBody, bool fRagdollCrab = false );
 	void SetHeadcrabSpawnLocation( int iCrabAttachment, CBaseAnimating *pCrab );
@@ -206,12 +206,13 @@ public:
 
 	// Sounds & sound envelope
 	virtual bool ShouldPlayFootstepMoan( void );
-	virtual void PainSound( const CTakeDamageInfo &info ) = 0;
-	virtual void AlertSound( void ) = 0;
-	virtual void IdleSound( void ) = 0;
-	virtual void AttackSound( void ) = 0;
-	virtual void AttackHitSound( void ) = 0;
-	virtual void AttackMissSound( void ) = 0;
+	virtual void PainSound( const CTakeDamageInfo &info );
+	virtual void DeathSound( const CTakeDamageInfo &info );
+	virtual void AlertSound( void );
+	virtual void IdleSound( void );
+	virtual void AttackSound( void );
+	virtual void AttackHitSound( void );
+	virtual void AttackMissSound( void );
 	virtual void FootstepSound( bool fRightFoot ) = 0;
 	virtual void FootscuffSound( bool fRightFoot ) = 0;
 

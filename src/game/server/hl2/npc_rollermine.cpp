@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Rollermine - Robotic houndeye
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -20,7 +20,6 @@
 #include "vstdlib/random.h"
 #include "engine/IEngineSound.h"
 #include "decals.h"
-#include "antlion_dust.h"
 #include "ai_memory.h"
 #include "ai_squad.h"
 #include "ai_senses.h"
@@ -32,11 +31,14 @@
 #include "vehicle_base.h"
 #include "eventqueue.h"
 #include "te_effect_dispatch.h"
-#include "npc_rollermine.h"
+#include "IEffects.h"
+#include "npc_roller.h"
 #include "func_break.h"
 #include "soundenvelope.h"
 #include "mapentities.h"
+#ifdef HL2_EPISODIC
 #include "RagdollBoogie.h"
+#endif
 #include "physics_collisionevent.h"
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -44,6 +46,7 @@
 #define ROLLERMINE_MAX_TORQUE_FACTOR	5
 extern short g_sModelIndexWExplosion;
 
+ConVar	sk_rollermine_health( "sk_rollermine_health","0");
 ConVar	sk_rollermine_shock( "sk_rollermine_shock","0");
 ConVar	sk_rollermine_stun_delay("sk_rollermine_stun_delay", "1");
 ConVar	sk_rollermine_vehicle_intercept( "sk_rollermine_vehicle_intercept","1");
@@ -54,58 +57,8 @@ enum
 	ROLLER_SKIN_FRIENDLY,
 	ROLLER_SKIN_DETONATE,
 };
-//-----------------------------------------------------------------------------
-// CRollerController implementation
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-// Purpose: This class only implements the IMotionEvent-specific behavior
-//			It keeps track of the forces so they can be integrated
-//-----------------------------------------------------------------------------
-class CRollerController : public IMotionEvent
-{
-	DECLARE_SIMPLE_DATADESC();
 
-public:
-	IMotionEvent::simresult_e Simulate( IPhysicsMotionController *pController, IPhysicsObject *pObject, float deltaTime, Vector &linear, AngularImpulse &angular );
-
-	AngularImpulse	m_vecAngular;
-	Vector			m_vecLinear;
-
-	void Off( void ) { m_fIsStopped = true; }
-	void On( void ) { m_fIsStopped = false; }
-
-	bool IsOn( void ) { return !m_fIsStopped; }
-
-private:
-	bool	m_fIsStopped;
-};
-
-BEGIN_SIMPLE_DATADESC( CRollerController )
-
-	DEFINE_FIELD( m_vecAngular, FIELD_VECTOR ),
-	DEFINE_FIELD( m_vecLinear, FIELD_VECTOR ),
-	DEFINE_FIELD( m_fIsStopped, FIELD_BOOLEAN ),
-
-END_DATADESC()
-
-
-//-----------------------------------------------------------------------------
-IMotionEvent::simresult_e CRollerController::Simulate( IPhysicsMotionController *pController, IPhysicsObject *pObject, float deltaTime, Vector &linear, AngularImpulse &angular )
-{
-	if( m_fIsStopped )
-	{
-		return SIM_NOTHING;
-	}
-
-	linear = m_vecLinear;
-	angular = m_vecAngular;
-	
-	return IMotionEvent::SIM_LOCAL_ACCELERATION;
-}
-//-----------------------------------------------------------------------------
-
-
-#define ROLLERMINE_IDLE_SEE_DIST					2048
+#define ROLLERMINE_IDLE_SEE_DIST					768
 #define ROLLERMINE_NORMAL_SEE_DIST					2048
 #define ROLLERMINE_WAKEUP_DIST						256
 #define ROLLERMINE_SEE_VEHICLESONLY_BEYOND_IDLE		300		// See every other than vehicles upto this distance (i.e. old idle see dist)
@@ -116,14 +69,15 @@ IMotionEvent::simresult_e CRollerController::Simulate( IPhysicsMotionController 
 #define ROLLERMINE_MIN_ATTACK_DIST	1
 #define ROLLERMINE_MAX_ATTACK_DIST	4096
 
-#define	ROLLERMINE_OPEN_THRESHOLD	256
+#define	ROLLERMINE_OPEN_THRESHOLD	280
 
 #define ROLLERMINE_VEHICLE_OPEN_THRESHOLD	400
 #define ROLLERMINE_VEHICLE_HOP_THRESHOLD	300
 
 #define ROLLERMINE_HOP_DELAY				2			// Don't allow hops faster than this
 
-//#define ROLLERMINE_REQUIRED_TO_EXPLODE_VEHICLE		4
+#define ROLLERMINE_THROTTLE_REDUCTION		0.2
+#define ROLLERMINE_REQUIRED_TO_EXPLODE_VEHICLE		4
 
 #define ROLLERMINE_FEAR_DISTANCE			(300*300)
 
@@ -169,6 +123,28 @@ enum
 
 enum rollingsoundstate_t { ROLL_SOUND_NOT_READY = 0, ROLL_SOUND_OFF, ROLL_SOUND_CLOSED, ROLL_SOUND_OPEN };
 
+//-----------------------------------------------------------------------------
+IMotionEvent::simresult_e CRollerController::Simulate( IPhysicsMotionController *pController, IPhysicsObject *pObject, float deltaTime, Vector &linear, AngularImpulse &angular )
+{
+	if( m_fIsStopped )
+	{
+		return SIM_NOTHING;
+	}
+
+	linear = m_vecLinear;
+	angular = m_vecAngular;
+	
+	return IMotionEvent::SIM_LOCAL_ACCELERATION;
+}
+
+BEGIN_SIMPLE_DATADESC( CRollerController )
+
+	DEFINE_FIELD( m_vecAngular, FIELD_VECTOR ),
+	DEFINE_FIELD( m_vecLinear, FIELD_VECTOR ),
+	DEFINE_FIELD( m_fIsStopped, FIELD_BOOLEAN ),
+
+END_DATADESC()
+
 //=========================================================
 //=========================================================
 class CNPC_RollerMine : public CNPCBaseInteractive<CAI_BaseNPC>, public CDefaultPlayerPickupVPhysics
@@ -211,12 +187,21 @@ public:
 	bool	IsValidEnemy( CBaseEntity *pEnemy );
 	bool	IsPlayerVehicle( CBaseEntity *pEntity );
 	bool	IsShocking() { return gpGlobals->curtime < m_flShockTime ? true : false; }
+	void	UpdateEngineSound();
 	void	UpdateRollingSound();
 	void	UpdatePingSound();
+	void	StopEngineSound();
 	void	StopRollingSound();
 	void	StopPingSound();
 	float	RollingSpeed();
-	float	GetStunDelay();
+	float	GetStunDelay()
+	{
+		if( m_bHackedByAlyx )
+			return 0.1f;
+		else
+			return sk_rollermine_stun_delay.GetFloat();
+	}
+
 	void	EmbedOnGroundImpact();
 	void	UpdateEfficiency( bool bInPVS )	{ SetEfficiency( ( GetSleepState() != AISS_AWAKE ) ? AIE_DORMANT : AIE_NORMAL ); SetMoveEfficiency( AIME_NORMAL ); }
 	void	DrawDebugGeometryOverlays()
@@ -241,17 +226,25 @@ public:
 		return eye;
 	}
 
+//	void	Event_Killed( const CTakeDamageInfo &info );
 	int		OnTakeDamage( const CTakeDamageInfo &info );
 	void	TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 
+	int RollerPhysicsDamageMask( void )
+	{
+		return ( DMG_PHYSGUN | DMG_BULLET | DMG_BLAST | DMG_SONIC );
+	}
+
 	Class_T	Classify() 
-	{ 
+	{
 		if( !m_bTurnedOn )
 			return CLASS_NONE;
 
+/*
 		//About to blow up after being hacked so do damage to the player.
 		if ( m_bHackedByAlyx && ( m_flPowerDownDetonateTime > 0.0f && m_flPowerDownDetonateTime <= gpGlobals->curtime ) )
 			return CLASS_COMBINE;
+*/
 
 		return ( m_bHeld || m_bHackedByAlyx ) ? CLASS_HACKED_ROLLERMINE : CLASS_COMBINE; 
 	}
@@ -315,6 +308,7 @@ protected:
 	virtual	bool	HasBeenInteractedWith()	{ return m_bHackedByAlyx; }
 	virtual void	NotifyInteraction( CAI_BaseNPC *pUser );
 
+	CSoundPatch					*m_pEngineSound;
 	CSoundPatch					*m_pRollSound;
 	CSoundPatch					*m_pPingSound;
 
@@ -351,7 +345,7 @@ protected:
 
 	CNetworkVar( bool,	m_bPowerDown );
 	float	m_flPowerDownTime;
-	float	m_flPowerDownDetonateTime;
+//	float	m_flPowerDownDetonateTime;
 
 	static string_t gm_iszDropshipClassname;
 };
@@ -364,6 +358,7 @@ LINK_ENTITY_TO_CLASS( npc_rollermine, CNPC_RollerMine );
 //-----------------------------------------------------------------------------
 BEGIN_DATADESC( CNPC_RollerMine )
 
+	DEFINE_SOUNDPATCH( m_pEngineSound ),
 	DEFINE_SOUNDPATCH( m_pRollSound ),
 	DEFINE_SOUNDPATCH( m_pPingSound ),
 	DEFINE_EMBEDDED( m_RollerController ),
@@ -392,7 +387,7 @@ BEGIN_DATADESC( CNPC_RollerMine )
 
 	DEFINE_FIELD( m_bPowerDown,	FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flPowerDownTime,	FIELD_TIME ),
-	DEFINE_FIELD( m_flPowerDownDetonateTime,	FIELD_TIME ),
+//	DEFINE_FIELD( m_flPowerDownDetonateTime,	FIELD_TIME ),
 
 	DEFINE_PHYSPTR( m_pConstraint ),
 
@@ -498,22 +493,26 @@ void CNPC_RollerMine::Precache( void )
 	PrecacheModel( "sprites/rollermine_shock.vmt" );
 	PrecacheModel( "sprites/rollermine_shock_yellow.vmt" );
 
-	PrecacheScriptSound( "NPC_RollerMine.Taunt" );
+	PrecacheScriptSound( "NPC_RollerMine.Engine" );
 	PrecacheScriptSound( "NPC_RollerMine.OpenSpikes" );
-	PrecacheScriptSound( "NPC_RollerMine.Warn" );
-	PrecacheScriptSound( "NPC_RollerMine.Shock" );
-	PrecacheScriptSound( "NPC_RollerMine.ExplodeChirp" );
-	PrecacheScriptSound( "NPC_RollerMine.Chirp" );
-	PrecacheScriptSound( "NPC_RollerMine.ChirpRespond" );
-	PrecacheScriptSound( "NPC_RollerMine.ExplodeChirpRespond" );
-	PrecacheScriptSound( "NPC_RollerMine.JoltVehicle" );
-	PrecacheScriptSound( "NPC_RollerMine.Tossed" );
-	PrecacheScriptSound( "NPC_RollerMine.Hurt" );
-
+	PrecacheScriptSound( "NPC_RollerMine.CloseSpikes" );
 	PrecacheScriptSound( "NPC_RollerMine.Roll" );
 	PrecacheScriptSound( "NPC_RollerMine.RollWithSpikes" );
-	PrecacheScriptSound( "NPC_RollerMine.Ping" );
+	PrecacheScriptSound( "NPC_RollerMine.Shock" );
+	PrecacheScriptSound( "NPC_RollerMine.Powerup" );
+	PrecacheScriptSound( "NPC_RollerMine.ShutDown" );
+	PrecacheScriptSound( "NPC_RollerMine.Tossed" );
 	PrecacheScriptSound( "NPC_RollerMine.Held" );
+	PrecacheScriptSound( "NPC_RollerMine.Taunt" );
+	PrecacheScriptSound( "NPC_RollerMine.Ping" );
+	PrecacheScriptSound( "NPC_RollerMine.PreDetonate" );
+	PrecacheScriptSound( "NPC_RollerMine.Alert" );
+	PrecacheScriptSound( "NPC_RollerMine.Chirp" );
+	PrecacheScriptSound( "NPC_RollerMine.ChirpRespond" );
+	PrecacheScriptSound( "NPC_RollerMine.JoltVehicle" );
+	PrecacheScriptSound( "NPC_RollerMine.Warn" );
+	PrecacheScriptSound( "NPC_RollerMine.ExplodeChirp" );
+	PrecacheScriptSound( "NPC_RollerMine.ExplodeChirpRespond" );
 
 	PrecacheScriptSound( "NPC_RollerMine.Reprogram" );
 
@@ -547,6 +546,7 @@ void CNPC_RollerMine::Spawn( void )
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_SQUAD );
 
+	m_pEngineSound = NULL;
 	m_pRollSound = NULL;
 
 	m_bIsOpen = true;
@@ -556,7 +556,7 @@ void CNPC_RollerMine::Spawn( void )
 	
 	m_flFieldOfView		= -1.0f;
 	m_flForwardSpeed	= -1200;
-	m_bloodColor		= DONT_BLEED;
+	m_bloodColor		= BLOOD_COLOR_MECH;
 
 	SetHullType(HULL_SMALL_CENTERED);
 
@@ -573,7 +573,8 @@ void CNPC_RollerMine::Spawn( void )
 
 	NPCInit();
 
-	m_takedamage = DAMAGE_EVENTS_ONLY;
+	m_iHealth = (1 + sk_rollermine_health.GetFloat());
+//	m_takedamage = DAMAGE_EVENTS_ONLY;
 	SetDistLook( ROLLERMINE_IDLE_SEE_DIST );
 
 	if( m_bUniformSight )
@@ -596,13 +597,14 @@ void CNPC_RollerMine::Spawn( void )
 	m_flPreventUnstickUntil = 0;
 	m_flNextHop = 0;
 
-	m_flPowerDownDetonateTime = 0.0f;
+//	m_flPowerDownDetonateTime = 0.0f;
 	m_bPowerDown = false;
 	m_flPowerDownTime = 0.0f;
 
 	//Set their yaw speed to 0 so the motor doesn't rotate them.
 	GetMotor()->SetYawSpeed( 0.0f );
 	SetRollerSkin();
+	UpdateEngineSound();
 }
 
 //-----------------------------------------------------------------------------
@@ -664,6 +666,7 @@ void CNPC_RollerMine::WakeNeighbors()
 	if ( !m_wakeUp || !IsActive() )
 		return;
 	m_wakeUp = false;
+	EmitSound( "NPC_RollerMine.Alert" );
 
 	if ( m_pSquad )
 	{
@@ -851,6 +854,7 @@ void CNPC_RollerMine::RunAI()
 			}
 		}
 
+		UpdateEngineSound();
 		BaseClass::RunAI();
 	}
 }
@@ -1065,7 +1069,6 @@ void CNPC_RollerMine::StartTask( const Task_t *pTask )
 		break;
 
 	case TASK_ROLLERMINE_UNBURROW:
-		
 		{
 			AddSolidFlags( FSOLID_NOT_SOLID );
 			SetMoveType( MOVETYPE_NOCLIP );
@@ -1077,7 +1080,7 @@ void CNPC_RollerMine::StartTask( const Task_t *pTask )
 
 			if ( tr.fraction < 1.0f )
 			{
-				UTIL_CreateAntlionDust( tr.endpos + Vector(0,0,24), GetLocalAngles() );		
+				UTIL_Dust( tr.endpos + Vector(0,0,24), 0, 8, 8 );
 			}
 		}
 
@@ -1497,7 +1500,8 @@ void CNPC_RollerMine::RunTask( const Task_t *pTask )
 			{
 				m_iSoundEventFlags |= ROLLERMINE_SE_TAUNT; // Don't repeat.
 
-				EmitSound( "NPC_RollerMine.Taunt" );
+				if( random->RandomInt(0,5) == 5 )
+					EmitSound( "NPC_RollerMine.Taunt" );
 			}
 
 			// Jump earlier when chasing a vehicle
@@ -1619,33 +1623,27 @@ void CNPC_RollerMine::RunTask( const Task_t *pTask )
 		}
 		break;
 
+		// Turn off forever
 	case TASK_ROLLERMINE_POWERDOWN:
 		{
 			if ( m_flPowerDownTime <= gpGlobals->curtime )
 			{
 				m_flNextHop = gpGlobals->curtime;
-				m_flPowerDownTime = gpGlobals->curtime + RandomFloat( 0.3, 0.9 );
-				EmitSound( "NPC_RollerMine.Hurt" );
+				m_flPowerDownTime = gpGlobals->curtime;
+				EmitSound( "NPC_RollerMine.ShutDown" );
+				CSoundEnt::InsertSound( SOUND_WORLD, GetAbsOrigin(), 300, 0.1f, this );
 
-				CSoundEnt::InsertSound ( SOUND_DANGER, GetAbsOrigin(), 400, 0.5f, this );
-
-				if ( m_bIsOpen == false )
-				{
-					Open();
-				}
-				else
-				{
-					Close();
-				}
+				Close();
 			}
 
+/*
 			if ( m_flPowerDownDetonateTime <= gpGlobals->curtime )
 			{
 				SetThink( &CNPC_RollerMine::PreDetonate );
 				SetNextThink( gpGlobals->curtime + 0.5f );
 			}
-
-			// No TaskComplete() here, because the task will never complete. The rollermine will explode.
+*/
+			TaskComplete(); //The rollermine will explode smallerly.
 		}
 		break;	
 
@@ -1662,10 +1660,6 @@ void CNPC_RollerMine::RunTask( const Task_t *pTask )
 //-----------------------------------------------------------------------------
 void CNPC_RollerMine::Open( void )
 {
-	// Friendly rollers cannot open
-	if ( HasSpawnFlags( SF_ROLLERMINE_FRIENDLY ) )
-		return;
-
 	if ( m_bIsOpen == false )
 	{
 		SetModel( "models/roller_spikes.mdl" );
@@ -1680,13 +1674,9 @@ void CNPC_RollerMine::Open( void )
 		if ( !m_pConstraint )
 		{
 			if ( EnemyInVehicle() )
-			{
 				Hop( 256 );
-			}
-			else if ( !GetEnemy() || GetEnemy()->Classify() != CLASS_BULLSEYE )		// Don't hop when attacking bullseyes
-			{
+			else
 				Hop( 128 );
-			}
 		}
 	}
 }
@@ -1698,7 +1688,7 @@ void CNPC_RollerMine::Open( void )
 //-----------------------------------------------------------------------------
 void CNPC_RollerMine::SetRollerSkin( void )
 {
-	if ( m_bPowerDown == true )
+	if ( m_bPowerDown == true || m_iHealth <= 1)
 	{
 		m_nSkin = (int)ROLLER_SKIN_DETONATE;
 	}
@@ -1744,14 +1734,10 @@ void CNPC_RollerMine::Close( void )
 //-----------------------------------------------------------------------------
 void CNPC_RollerMine::SpikeTouch( CBaseEntity *pOther )
 {
-	/*
 	if ( pOther->IsSolidFlagSet(FSOLID_TRIGGER | FSOLID_VOLUME_CONTENTS) )
 		return;
 
 	if ( m_bHeld )
-		return;
-
-	if ( pOther->IsPlayer() )
 		return;
 
 	if ( pOther->m_takedamage != DAMAGE_YES )
@@ -1762,11 +1748,16 @@ void CNPC_RollerMine::SpikeTouch( CBaseEntity *pOther )
 	if ( pBreakable && pBreakable->GetMaterialType() == matGlass )
 		return;
 
+	// primed guys always blow up
+	if ( !m_bIsPrimed )
+	{
+		Disposition_t disp = IRelationType(pOther);
+		if ( ( pOther->m_iClassname == m_iClassname ) || (disp != D_HT && disp != D_FR) )
+			return;
+	}
+
 	Explode();
 	EmitSound( "NPC_RollerMine.Warn" );
-	*/
-
-	//FIXME: Either explode within certain rules, never explode, or just shock the hit victim
 }
 
 //-----------------------------------------------------------------------------
@@ -1822,7 +1813,7 @@ void CNPC_RollerMine::EmbedTouch( CBaseEntity *pOther )
 		UTIL_DecalTrace( &tr, "Rollermine.Crater" );
 
 		// Make some dust
-		UTIL_CreateAntlionDust( tr.endpos, GetLocalAngles() );
+		UTIL_Dust( tr.endpos, 0, 8, 8 );
 	}
 
 	// Don't try and embed again
@@ -2020,11 +2011,13 @@ void CNPC_RollerMine::ShockTouch( CBaseEntity *pOther )
 	Vector vecForce = ( -impulse * pPhysics->GetMass() * 10 );
 	CTakeDamageInfo	info( this, this, vecForce, out, sk_rollermine_shock.GetFloat(), DMG_SHOCK );
 
-	if( FClassnameIs( pOther, "npc_combine_s" ) )
+#ifdef HL2_EPISODIC
+	// Critical hit - make a boogie
+	if( pOther->IsNPC() )
 	{
-		if( pOther->GetHealth() <= (pOther->GetMaxHealth() / 2) ) 
+		if( pOther->GetHealth() <= (sk_rollermine_shock.GetFloat()/2) )
 		{
-			// Instant special death for a combine soldier who has less than half health.
+			// Special death for low-health kills
 			Vector vecDamageForce = pOther->WorldSpaceCenter() - WorldSpaceCenter();
 			VectorNormalize( vecDamageForce );
 
@@ -2041,12 +2034,8 @@ void CNPC_RollerMine::ShockTouch( CBaseEntity *pOther )
 			pOther->MyCombatCharacterPointer()->BecomeRagdollBoogie( this, vecDamageForce, 5.0f, SF_RAGDOLL_BOOGIE_ELECTRICAL );
 			return;
 		}
-		else
-		{
-			info.SetDamage( pOther->GetMaxHealth()/2 );
-		}
 	}
-
+#endif
 	pOther->TakeDamage( info );
 
 	// Knock players back a bit
@@ -2139,6 +2128,16 @@ void CNPC_RollerMine::StickToVehicle( CBaseEntity *pOther )
 	// Make sure we're spiky
 	Open();
 
+#if 0
+	// Reduce four wheeled vehicle's max speeds
+	CPropVehicleDriveable *pVehicle = dynamic_cast<CPropVehicleDriveable *>(pOther);
+	if ( pVehicle )
+	{
+		// Add a speed reduction to the vehicle.
+		pVehicle->GetPhysics()->AddThrottleReduction( ROLLERMINE_THROTTLE_REDUCTION );
+	}
+#endif
+
 	AnnounceArrivalToOthers( pOther );
 
 	// Also, jolt the vehicle sometime in the future
@@ -2204,22 +2203,22 @@ void CNPC_RollerMine::AnnounceArrivalToOthers( CBaseEntity *pOther )
 			g_EventQueue.AddEvent( aRollersOnVehicle[i], "RespondToExplodeChirp", RandomFloat(2,5), NULL, NULL );
 		}
 	}
-	else 
+	else
 	{
 	*/
-	// If there's other rollers on the vehicle, talk to them
-	if ( iRollers > 1 )
-	{
-		// Chirp to the others
-		EmitSound( "NPC_RollerMine.Chirp" );
-
-		// Tell the others to respond (skip first slot, because that's me)
-		for ( int i = 1; i < iRollers; i++ )
+		// If there's other rollers on the vehicle, talk to them
+		if ( iRollers > 1 )
 		{
-			variant_t emptyVariant;
-			g_EventQueue.AddEvent( aRollersOnVehicle[i], "RespondToChirp", RandomFloat(2,3), NULL, NULL );
+			// Chirp to the others
+			EmitSound( "NPC_RollerMine.Chirp" );
+
+			// Tell the others to respond (skip first slot, because that's me)
+			for ( int i = 1; i < iRollers; i++ )
+			{
+				variant_t emptyVariant;
+				g_EventQueue.AddEvent( aRollersOnVehicle[i], "RespondToChirp", RandomFloat(2,3), NULL, NULL );
+			}
 		}
-	}
 //	}
 }
 
@@ -2288,7 +2287,7 @@ void CNPC_RollerMine::InputJoltVehicle( inputdata_t &inputdata )
 	pVehiclePhysics->ApplyForceOffset( vecForce, GetAbsOrigin() );
 
 	// Play sounds & effects
-	EmitSound( "NPC_RollerMine.JoltVehicle" );
+	EmitSound( "NPC_RollerMine.Shock" );
 
 	// UNDONE: Good Zap effects
 	/*
@@ -2348,7 +2347,7 @@ void CNPC_RollerMine::InputPowerdown( inputdata_t &inputdata )
 {
 	m_bPowerDown = true;
 	m_flPowerDownTime = gpGlobals->curtime + RandomFloat( 0.1, 0.5 );
-	m_flPowerDownDetonateTime = m_flPowerDownTime + RandomFloat( 1.5, 4.0 );
+//	m_flPowerDownDetonateTime = m_flPowerDownTime + RandomFloat( 1.5, 4.0 );
 
 	ClearSchedule( "Received power down input" );
 }
@@ -2360,6 +2359,16 @@ void CNPC_RollerMine::UnstickFromVehicle( void )
 {
 	if ( m_pConstraint )
 	{
+#if 0
+		// Get the vehicle we're stuck to, and if it's a four wheeled vehicle, remove our speed reduction
+		CBaseEntity *pEntity = GetVehicleStuckTo();
+		CPropVehicleDriveable *pVehicle = dynamic_cast<CPropVehicleDriveable *>(pEntity);
+		if ( pVehicle )
+		{
+			// Remove our speed reduction to the vehicle.
+			pVehicle->GetPhysics()->RemoveThrottleReduction( ROLLERMINE_THROTTLE_REDUCTION );
+		}
+#endif
 		physenv->DestroyConstraint( m_pConstraint );
 		m_pConstraint = NULL;
 	}
@@ -2421,7 +2430,7 @@ void CNPC_RollerMine::OnPhysGunDrop( CBasePlayer *pPhysGunUser, PhysGunDrop_t Re
 	{
 		if ( m_bIsOpen )
 		{
-			//m_bIsPrimed = true;
+			m_bIsPrimed = true;
 			SetTouch( &CNPC_RollerMine::SpikeTouch );
 			// enable world/prop touch too
 			VPhysicsGetObject()->SetCallbackFlags( VPhysicsGetObject()->GetCallbackFlags() | CALLBACK_GLOBAL_TOUCH|CALLBACK_GLOBAL_TOUCH_STATIC );
@@ -2439,37 +2448,44 @@ void CNPC_RollerMine::OnPhysGunDrop( CBasePlayer *pPhysGunUser, PhysGunDrop_t Re
 //-----------------------------------------------------------------------------
 int CNPC_RollerMine::OnTakeDamage( const CTakeDamageInfo &info )
 {
-	if ( !(info.GetDamageType() & DMG_BURN) )
+	// We dont want to "die" until we've exploded
+	if ( m_iHealth <= 1 )
+		return 0;
+
+	if ( info.GetDamageType() & (DMG_BLAST|DMG_PLASMA) )
+	{
+		// dazed
+		m_RollerController.m_vecAngular.Init();
+		m_flActiveTime = gpGlobals->curtime + GetStunDelay();
+		Hop( 300 );
+	}
+	else
 	{
 		if ( GetMoveType() == MOVETYPE_VPHYSICS )
 		{
 			AngularImpulse	angVel;
-			angVel.Random( -400.0f, 400.0f );
+			angVel.Random( -250.0f, 250.0f );
 			VPhysicsGetObject()->AddVelocity( NULL, &angVel );
 			m_RollerController.m_vecAngular *= 0.8f;
 
 			VPhysicsTakeDamage( info );
 		}
+
+		CTakeDamageInfo newInfo = info;
+		if ( info.GetDamageType() & (DMG_BULLET|DMG_SLASH|DMG_CLUB) )
+		{
+			newInfo.ScaleDamage( 0.5 );
+		}
+		else if ( info.GetDamageType() & (DMG_SONIC|DMG_ENERGYBEAM) )
+		{
+			newInfo.ScaleDamage( 1.5 );
+		}
+
 		SetCondition( COND_LIGHT_DAMAGE );
+		return BaseClass::OnTakeDamage( newInfo );
 	}
 
-	if ( info.GetDamageType() & (DMG_BURN|DMG_BLAST) )
-	{
-		if ( info.GetAttacker() && info.GetAttacker()->m_iClassname != m_iClassname )
-		{
-			SetThink( &CNPC_RollerMine::PreDetonate );
-			SetNextThink( gpGlobals->curtime + random->RandomFloat( 0.1f, 0.5f ) );
-		}
-		else
-		{
-			// dazed
-			m_RollerController.m_vecAngular.Init();
-			m_flActiveTime = gpGlobals->curtime + GetStunDelay();
-			Hop( 300 );
-		}
-	}
-
-	return 0;
+	return BaseClass::OnTakeDamage( info );
 }
 
 //-----------------------------------------------------------------------------
@@ -2498,13 +2514,15 @@ void CNPC_RollerMine::Hop( float height )
 //-----------------------------------------------------------------------------
 void CNPC_RollerMine::PreDetonate( void )
 {
+	SetRollerSkin();
+	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), 400, 0.5f, this );
 	Hop( 300 );
 
 	SetTouch( NULL );
 	SetThink( &CNPC_RollerMine::Explode );
-	SetNextThink( gpGlobals->curtime + 0.5f );
+	SetNextThink( gpGlobals->curtime + 0.4f );
 
-	EmitSound( "NPC_RollerMine.Hurt" );
+	EmitSound( "NPC_RollerMine.PreDetonate" );
 }
 
 //-----------------------------------------------------------------------------
@@ -2517,8 +2535,8 @@ void CNPC_RollerMine::Explode( void )
 	//FIXME: Hack to make thrown mines more deadly and fun
 	float expDamage = m_bIsPrimed ? 100 : 25;
 
-	//If we've been hacked and we're blowing up cause we've been shut down then do moderate damage.
-	if ( m_bPowerDown == true )
+	//If we're exploding while off then do moderate damage.
+	if ( m_bPowerDown )
 	{
 		expDamage = 50;
 	}
@@ -2539,18 +2557,18 @@ void CNPC_RollerMine::Explode( void )
 	}
 
 	CTakeDamageInfo	info( this, this, 1, DMG_GENERIC );
-	Event_Killed( info );
+	BaseClass::Event_Killed( info );
 
 	// Remove myself a frame from now to avoid doing it in the middle of running AI
 	SetThink( &CNPC_RollerMine::SUB_Remove );
 	SetNextThink( gpGlobals->curtime );
 }
 
-const float MAX_ROLLING_SPEED = 720;
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+const float MAX_ROLLING_SPEED = 720;
 float CNPC_RollerMine::RollingSpeed()
 {
 	IPhysicsObject *pPhysics = VPhysicsGetObject();
@@ -2558,26 +2576,12 @@ float CNPC_RollerMine::RollingSpeed()
 	{
 		AngularImpulse angVel;
 		pPhysics->GetVelocity( NULL, &angVel );
-		float rollingSpeed = angVel.Length() - 90;
+		float rollingSpeed = angVel.Length() - 45;
 		rollingSpeed = clamp( rollingSpeed, 1, MAX_ROLLING_SPEED );
 		rollingSpeed *= (1/MAX_ROLLING_SPEED);
 		return rollingSpeed;
 	}
 	return 0;
-}
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-float CNPC_RollerMine::GetStunDelay()
-{
-	if( m_bHackedByAlyx )
-	{
-		return 0.1f;
-	}
-	else
-	{
-		return sk_rollermine_stun_delay.GetFloat();
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2606,10 +2610,43 @@ void CNPC_RollerMine::PrescheduleThink()
 			return;
 		}
 	}
+	else if ( m_iHealth <= 1 )
+	{
+		SetThink( &CNPC_RollerMine::PreDetonate );
+		SetNextThink( gpGlobals->curtime + 0.1f );
+	}
 
 	UpdateRollingSound();
 	UpdatePingSound();
 	BaseClass::PrescheduleThink();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CNPC_RollerMine::UpdateEngineSound()
+{
+	CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
+	CSoundParameters params;
+	CBaseEntity::GetParametersForSound( "NPC_RollerMine.Engine", params, NULL );
+
+	CPASAttenuationFilter filter( this );
+	m_pEngineSound = controller.SoundCreate( filter, entindex(), params.channel, params.soundname, params.soundlevel );
+	controller.Play( m_pEngineSound, params.volume, params.pitch );
+	if ( m_pEngineSound )
+	{
+		controller.SoundChangeVolume( m_pEngineSound, params.volume * RollingSpeed(), 0.1 );
+	}
+}
+
+void CNPC_RollerMine::StopEngineSound()
+{
+	if ( m_pEngineSound )
+	{
+		CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
+		controller.SoundDestroy( m_pEngineSound );
+		m_pEngineSound = NULL;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2626,7 +2663,6 @@ void CNPC_RollerMine::UpdateRollingSound()
 	{
 		soundState = m_bIsOpen ? ROLL_SOUND_OPEN : ROLL_SOUND_CLOSED;
 	}
-
 
 	CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
 	CSoundParameters params;
@@ -2669,7 +2705,6 @@ void CNPC_RollerMine::UpdateRollingSound()
 	}
 }
 
-
 void CNPC_RollerMine::StopRollingSound()
 {
 	CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
@@ -2679,21 +2714,10 @@ void CNPC_RollerMine::StopRollingSound()
 
 void CNPC_RollerMine::UpdatePingSound()
 {
-	float pingSpeed = 0;
-	if ( m_bIsOpen && !IsShocking() && !m_bHeld )
+	//TODO; Only one mine in the squad
+	CBaseEntity *pEnemy = GetEnemy();
+	if ( pEnemy && EnemyDistance( pEnemy ) > ROLLERMINE_OPEN_THRESHOLD )
 	{
-		CBaseEntity *pEnemy = GetEnemy();
-		if ( pEnemy )
-		{
-			pingSpeed = EnemyDistance( pEnemy );
-			pingSpeed = clamp( pingSpeed, 1, ROLLERMINE_OPEN_THRESHOLD );
-			pingSpeed *= (1.0f/ROLLERMINE_OPEN_THRESHOLD);
-		}
-	}
-
-	if ( pingSpeed > 0 )
-	{
-		pingSpeed = 1-pingSpeed;
 		CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
 		CSoundParameters params;
 		CBaseEntity::GetParametersForSound( "NPC_RollerMine.Ping", params, NULL );
@@ -2701,13 +2725,13 @@ void CNPC_RollerMine::UpdatePingSound()
 		{
 			CPASAttenuationFilter filter( this );
 			m_pPingSound = controller.SoundCreate( filter, entindex(), params.channel, params.soundname, params.soundlevel );
-			controller.Play( m_pPingSound, params.volume, 101 );
+			controller.Play( m_pPingSound, params.volume, 100 );
 		}
 
-		controller.SoundChangePitch( m_pPingSound, params.pitchlow + (params.pitchhigh - params.pitchlow) * pingSpeed, 0.1 );
-		controller.SoundChangeVolume( m_pPingSound, params.volume, 0.1 );
-		//DevMsg("PING: %.1f\n", pingSpeed );
+		float pingSpeed = params.pitchlow + (EnemyDistance( pEnemy )/4);	//Pitch increases as it gets closer
+		pingSpeed = clamp( pingSpeed, params.pitchlow, params.pitchhigh );
 
+		controller.SoundChangePitch( m_pPingSound, pingSpeed, 0.1 );
 	}
 	else
 	{
@@ -2728,6 +2752,7 @@ void CNPC_RollerMine::StopPingSound()
 //-----------------------------------------------------------------------------
 void CNPC_RollerMine::StopLoopingSounds( void )
 {
+	StopEngineSound();
 	StopRollingSound();
 	StopPingSound();
 	BaseClass::StopLoopingSounds();
@@ -2816,19 +2841,17 @@ float CNPC_RollerMine::VehicleHeading( CBaseEntity *pVehicle )
 //-----------------------------------------------------------------------------
 void CNPC_RollerMine::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
-	if ( info.GetDamageType() & (DMG_BULLET | DMG_CLUB) )
+	if ( info.GetDamageType() & (DMG_BULLET) )
 	{
-		CTakeDamageInfo newInfo( info );
+		// Communicate this is doing nothing
+		g_pEffects->Ricochet(ptr->endpos, ptr->plane.normal);
 
 		// If we're stuck to the car, increase it even more
+		CTakeDamageInfo newInfo( info );
 		if ( GetVehicleStuckTo() )
-		{
-			newInfo.SetDamageForce( info.GetDamageForce() * 40 );
-		}
-		else
-		{
 			newInfo.SetDamageForce( info.GetDamageForce() * 20 );
-		}
+		else
+			newInfo.SetDamageForce( info.GetDamageForce() * 10 );
 
 		BaseClass::TraceAttack( newInfo, vecDir, ptr );
 		return;

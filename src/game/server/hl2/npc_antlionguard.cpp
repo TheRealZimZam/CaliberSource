@@ -19,7 +19,6 @@
 #include "ai_pathfinder.h"
 #include "ai_navigator.h"
 #include "ai_senses.h"
-#include "npc_rollermine.h"
 #include "ai_blended_movement.h"
 #include "physics_prop_ragdoll.h"
 #include "iservervehicle.h"
@@ -1498,13 +1497,8 @@ void CNPC_AntlionGuard::Shove( void )
 			
 			if ( pVictim )
 			{
-				if ( NPC_Rollermine_IsRollermine( pVictim ) )
-				{
-					Pickup_OnPhysGunDrop( pVictim, NULL, LAUNCHED_BY_CANNON );
-				}
-
 				// FIXME: This causes NPCs that are not physically motivated to hop into the air strangely -- jdw
-				// pVictim->ApplyAbsVelocityImpulse( BodyDirection2D() * 400 + Vector( 0, 0, 250 ) );
+				pVictim->ApplyAbsVelocityImpulse( BodyDirection2D() * 400 + Vector( 0, 0, 250 ) );
 			}
 
 			m_hShoveTarget = NULL;
@@ -1797,11 +1791,6 @@ void CNPC_AntlionGuard::HandleAnimEvent( animevent_t *pEvent )
 
 				vecShoveVel *= flTargetDist * 3 * physObj->GetMass();	//FIXME: Scale by skill
 				vecShoveVel[2] += physObj->GetMass() * 350.0f;
-			}
-
-			if ( NPC_Rollermine_IsRollermine( m_hPhysicsTarget ) )
-			{
-				Pickup_OnPhysGunDrop( m_hPhysicsTarget, NULL, LAUNCHED_BY_CANNON );
 			}
 
 			//Send it flying

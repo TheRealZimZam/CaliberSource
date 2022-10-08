@@ -260,20 +260,9 @@ void CPropCombineBall::Precache( void )
 
 	PrecacheScriptSound( "NPC_CombineBall.Launch" );
 	PrecacheScriptSound( "NPC_CombineBall.KillImpact" );
-
-	if ( hl2_episodic.GetBool() )
-	{
-		PrecacheScriptSound( "NPC_CombineBall_Episodic.Explosion" );
-		PrecacheScriptSound( "NPC_CombineBall_Episodic.WhizFlyby" );
-		PrecacheScriptSound( "NPC_CombineBall_Episodic.Impact" );
-	}
-	else
-	{
-		PrecacheScriptSound( "NPC_CombineBall.Explosion" );
-		PrecacheScriptSound( "NPC_CombineBall.WhizFlyby" );
-		PrecacheScriptSound( "NPC_CombineBall.Impact" );
-	}
-
+	PrecacheScriptSound( "NPC_CombineBall.Explosion" );
+	PrecacheScriptSound( "NPC_CombineBall.WhizFlyby" );
+	PrecacheScriptSound( "NPC_CombineBall.Impact" );
 	PrecacheScriptSound( "NPC_CombineBall.HoldingInPhysCannon" );
 }
 
@@ -742,14 +731,7 @@ void CPropCombineBall::WhizSoundThink()
 
 						EmitSound_t ep;
 						ep.m_nChannel = CHAN_STATIC;
-						if ( hl2_episodic.GetBool() )
-						{
-							ep.m_pSoundName = "NPC_CombineBall_Episodic.WhizFlyby";
-						}
-						else
-						{
-							ep.m_pSoundName = "NPC_CombineBall.WhizFlyby";
-						}
+						ep.m_pSoundName = "NPC_CombineBall.WhizFlyby";
 						ep.m_flVolume = 1.0f;
 						ep.m_SoundLevel = SNDLVL_NORM;
 
@@ -779,14 +761,7 @@ void CPropCombineBall::WhizSoundThink()
 
 					EmitSound_t ep;
 					ep.m_nChannel = CHAN_STATIC;
-					if ( hl2_episodic.GetBool() )
-					{
-						ep.m_pSoundName = "NPC_CombineBall_Episodic.WhizFlyby";
-					}
-					else
-					{
-						ep.m_pSoundName = "NPC_CombineBall.WhizFlyby";
-					}
+					ep.m_pSoundName = "NPC_CombineBall.WhizFlyby";
 					ep.m_flVolume = 1.0f;
 					ep.m_SoundLevel = SNDLVL_NORM;
 
@@ -860,16 +835,7 @@ void CPropCombineBall::OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup
 		
 		EmitSound_t ep;
 		ep.m_nChannel = CHAN_STATIC;
-
-		if( hl2_episodic.GetBool() )
-		{
-			ep.m_pSoundName = "NPC_CombineBall_Episodic.HoldingInPhysCannon";
-		}
-		else
-		{
-			ep.m_pSoundName = "NPC_CombineBall.HoldingInPhysCannon";
-		}
-
+		ep.m_pSoundName = "NPC_CombineBall.HoldingInPhysCannon";
 		ep.m_flVolume = 1.0f;
 		ep.m_SoundLevel = SNDLVL_NORM;
 
@@ -1077,14 +1043,7 @@ void CPropCombineBall::DoExplosion( )
 
 	if ( OutOfBounces() == false )
 	{
-		if ( hl2_episodic.GetBool() )
-		{
-			EmitSound( "NPC_CombineBall_Episodic.Explosion" );
-		}
-		else
-		{
-			EmitSound( "NPC_CombineBall.Explosion" );
-		}
+		EmitSound( "NPC_CombineBall.Explosion" );
 
 		UTIL_ScreenShake( GetAbsOrigin(), 20.0f, 150.0, 1.0, 1250.0f, SHAKE_START );
 
@@ -1377,14 +1336,7 @@ void CPropCombineBall::DoImpactEffect( const Vector &preVelocity, int index, gam
 		DispatchEffect( "cball_bounce", data );
 	}
 
-	if ( hl2_episodic.GetBool() )
-	{
-		EmitSound( "NPC_CombineBall_Episodic.Impact" );
-	}
-	else
-	{
-		EmitSound( "NPC_CombineBall.Impact" );
-	}
+	EmitSound( "NPC_CombineBall.Impact" );
 }
 
 //-----------------------------------------------------------------------------

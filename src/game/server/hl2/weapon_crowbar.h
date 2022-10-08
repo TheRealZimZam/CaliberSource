@@ -49,6 +49,7 @@ public:
 private:
 	// Animation event handlers
 	void HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+	void ImpactSound( CBaseEntity *pHitEntity );
 };
 
 #endif // WEAPON_CROWBAR_H

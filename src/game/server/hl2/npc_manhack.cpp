@@ -284,7 +284,7 @@ void CNPC_Manhack::PrescheduleThink( void )
 		// Stuck in water!
 
 		// Reduce engine power so that the manhack lifts out of the water slowly.
-		m_fEnginePowerScale = 0.75;
+		m_fEnginePowerScale = 0.2;
 	}
 
 	// ----------------------------------------
@@ -327,7 +327,7 @@ void CNPC_Manhack::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDi
 {
 	g_vecAttackDir = vecDir;
 
-	if ( info.GetDamageType() & DMG_BULLET)
+	if ( info.GetDamageType() & DMG_BULLET && random->RandomInt(0, 3) == 3)
 	{
 		g_pEffects->Ricochet(ptr->endpos,ptr->plane.normal);
 	}
@@ -335,7 +335,7 @@ void CNPC_Manhack::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDi
 	if ( info.GetDamageType() & DMG_CLUB )
 	{
 		// Clubbed!
-//		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(10, 15), 10);
+		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(10, 15), 10);
 		g_pEffects->Sparks( ptr->endpos, 1, 1, &ptr->plane.normal );
 	}
 
@@ -379,6 +379,11 @@ void CNPC_Manhack::Event_Killed( const CTakeDamageInfo &info )
 		sparkPos.y += random->RandomFloat(-12,12);
 		sparkPos.z += random->RandomFloat(-12,12);
 		g_pEffects->Sparks( sparkPos, 2 );
+	}
+	// Smoke
+	if (GetWaterLevel() == 0)
+	{
+		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(10, 15), 10);
 	}
 
 	// Light
@@ -1451,10 +1456,6 @@ bool CNPC_Manhack::IsHeldByPhyscannon( )
 //-----------------------------------------------------------------------------
 void CNPC_Manhack::Slice( CBaseEntity *pHitEntity, float flInterval, trace_t &tr )
 {
-	// Don't hurt the player if I'm in water
-	if( GetWaterLevel() > 0 && pHitEntity->IsPlayer() )
-		return;
-
 	// Can't slice players holding it with the phys cannon
 	if ( IsHeldByPhyscannon() )
 	{
@@ -1462,17 +1463,19 @@ void CNPC_Manhack::Slice( CBaseEntity *pHitEntity, float flInterval, trace_t &tr
 			return;
 	}
 
+#if 0
+	// Don't hurt the player if I'm in water
+	if( GetWaterLevel() > 0 && pHitEntity->IsPlayer() )
+		return;
+#endif
+
 	if ( pHitEntity->m_takedamage == DAMAGE_NO )
 		return;
 
 	// Damage must be scaled by flInterval so framerate independent
 	float flDamage = sk_manhack_melee_dmg.GetFloat() * flInterval;
 
-	if ( pHitEntity->IsPlayer() )
-	{
-		flDamage *= 2.0f;
-	}
-	
+#if 0
 	// Held manhacks do more damage
 	if ( IsHeldByPhyscannon() )
 	{
@@ -1489,12 +1492,13 @@ void CNPC_Manhack::Slice( CBaseEntity *pHitEntity, float flInterval, trace_t &tr
 	else if ( dynamic_cast<CBaseProp*>(pHitEntity) || dynamic_cast<CBreakable*>(pHitEntity) )
 	{
 		// If we hit a prop, we want it to break immediately
-		flDamage = pHitEntity->GetHealth();
+		flDamage *= 6.0f;
 	}
 	else if ( pHitEntity->IsNPC() && IRelationType( pHitEntity ) == D_HT  && FClassnameIs( pHitEntity, "npc_combine_s" ) ) 
 	{
-		flDamage *= 6.0f;
+		flDamage *= 3.0f;
 	}
+#endif
 
 	if (flDamage < 1.0f)
 	{
@@ -1916,7 +1920,21 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 				SetEyeState( MANHACK_EYE_STATE_CHARGE );
 			}
 		}
-		
+
+		// steve, what does this code do?
+		/*
+		if( m_translatedActivity == ACT_MANHACK_UNPACK && !m_fAnimate )
+		{
+			// See if I should continue unpacking!!
+			if( ( flDist / m_vCurrentVelocity.Length() ) <= 1.8 )
+			{
+				// Alright! Let the unpacking continue!!
+				Msg("FINISHING UP!");
+				m_fAnimate = true;
+			}
+		}
+		*/
+
 		if ( gpGlobals->curtime > m_flBurstDuration )
 		{
 			ShowHostile( false );

@@ -21,7 +21,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar	sk_zombie_health( "sk_zombie_health","0");
+ConVar	sk_czombie_health( "sk_czombie_health","0");
 
 envelopePoint_t envZombieMoanVolumeFast[] =
 {
@@ -76,13 +76,13 @@ envelopePoint_t envZombieMoanIgnited[] =
 //=============================================================================
 //=============================================================================
 
-class CZombie : public CAI_BlendingHost<CNPC_BaseZombie>
+class CClassicZombie : public CAI_BlendingHost<CNPC_BaseZombie>
 {
 	DECLARE_DATADESC();
-	DECLARE_CLASS( CZombie, CAI_BlendingHost<CNPC_BaseZombie> );
+	DECLARE_CLASS( CClassicZombie, CAI_BlendingHost<CNPC_BaseZombie> );
 
 public:
-	CZombie()
+	CClassicZombie()
 	 : m_DurationDoorBash( 2, 6),
 	   m_NextTimeToStartDoorBash( 3.0 )
 	{
@@ -93,8 +93,6 @@ public:
 
 	void SetZombieModel( void );
 	void MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize );
-	bool ShouldBecomeTorso( const CTakeDamageInfo &info, float flDamageThreshold );
-	bool CanBecomeLiveTorso() { return !m_fIsHeadless; }
 
 	void GatherConditions( void );
 
@@ -128,19 +126,10 @@ public:
 	void Extinguish();
 	int OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo );
 	bool IsHeavyDamage( const CTakeDamageInfo &info );
-	bool IsSquashed( const CTakeDamageInfo &info );
-	void BuildScheduleTestBits( void );
 
 	void PrescheduleThink( void );
 	int SelectSchedule( void );
 
-	void PainSound( const CTakeDamageInfo &info );
-	void DeathSound( const CTakeDamageInfo &info );
-	void AlertSound( void );
-	void IdleSound( void );
-	void AttackSound( void );
-	void AttackHitSound( void );
-	void AttackMissSound( void );
 	void FootstepSound( bool fRightFoot );
 	void FootscuffSound( bool fRightFoot );
 
@@ -163,15 +152,15 @@ private:
 	Vector				 m_vPositionCharged;
 };
 
-LINK_ENTITY_TO_CLASS( npc_zombie, CZombie );
-LINK_ENTITY_TO_CLASS( npc_zombie_torso, CZombie );
+LINK_ENTITY_TO_CLASS( npc_czombie, CClassicZombie );
+LINK_ENTITY_TO_CLASS( npc_czombie_torso, CClassicZombie );
 #ifndef HL1_DLL
-LINK_ENTITY_TO_CLASS( monster_zombie, CZombie );
+LINK_ENTITY_TO_CLASS( monster_zombie, CClassicZombie );
 #endif
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-const char *CZombie::pMoanSounds[] =
+const char *CClassicZombie::pMoanSounds[] =
 {
 	 "NPC_BaseZombie.Moan1",
 	 "NPC_BaseZombie.Moan2",
@@ -216,7 +205,7 @@ enum
 int ACT_ZOMBIE_TANTRUM;
 int ACT_ZOMBIE_WALLPOUND;
 
-BEGIN_DATADESC( CZombie )
+BEGIN_DATADESC( CClassicZombie )
 
 	DEFINE_FIELD( m_hBlockingDoor, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_flDoorBashYaw, FIELD_FLOAT ),
@@ -230,26 +219,21 @@ END_DATADESC()
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CZombie::Precache( void )
+void CClassicZombie::Precache( void )
 {
 	BaseClass::Precache();
 
 	PrecacheModel( "models/zombie/classic.mdl" );
 	PrecacheModel( "models/zombie/classic_torso.mdl" );
 	PrecacheModel( "models/zombie/classic_legs.mdl" );
+	PrecacheModel( "models/headcrabclassic.mdl" );
 
 	PrecacheScriptSound( "Zombie.FootstepRight" );
 	PrecacheScriptSound( "Zombie.FootstepLeft" );
-	PrecacheScriptSound( "Zombie.FootstepLeft" );
 	PrecacheScriptSound( "Zombie.ScuffRight" );
 	PrecacheScriptSound( "Zombie.ScuffLeft" );
-	PrecacheScriptSound( "Zombie.AttackHit" );
-	PrecacheScriptSound( "Zombie.AttackMiss" );
-	PrecacheScriptSound( "Zombie.Pain" );
-	PrecacheScriptSound( "Zombie.Die" );
 	PrecacheScriptSound( "Zombie.Alert" );
 	PrecacheScriptSound( "Zombie.Idle" );
-	PrecacheScriptSound( "Zombie.Attack" );
 
 	PrecacheScriptSound( "NPC_BaseZombie.Moan1" );
 	PrecacheScriptSound( "NPC_BaseZombie.Moan2" );
@@ -259,12 +243,12 @@ void CZombie::Precache( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-void CZombie::Spawn( void )
+void CClassicZombie::Spawn( void )
 {
 	Precache();
 
 	// This was placed as an npc_zombie_torso
-	if( FClassnameIs( this, "npc_zombie_torso" ) )
+	if( FClassnameIs( this, "npc_czombie_torso" ) )
 		m_fIsTorso = true;
 	else
 		m_fIsTorso = false;
@@ -277,8 +261,8 @@ void CZombie::Spawn( void )
 	SetBloodColor( BLOOD_COLOR_GREEN );
 #endif // HL2_EPISODIC
 
-	m_iHealth			= sk_zombie_health.GetFloat();
-	m_flFieldOfView		= 0.2;
+	m_iHealth			= sk_czombie_health.GetFloat();
+	m_flFieldOfView		= 0.8;
 
 	CapabilitiesClear();
 
@@ -291,7 +275,7 @@ void CZombie::Spawn( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-void CZombie::PrescheduleThink( void )
+void CClassicZombie::PrescheduleThink( void )
 {
   	if( gpGlobals->curtime > m_flNextMoanSound )
   	{
@@ -313,7 +297,7 @@ void CZombie::PrescheduleThink( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-int CZombie::SelectSchedule( void )
+int CClassicZombie::SelectSchedule( void )
 {
 	if( HasCondition( COND_PHYSICS_DAMAGE ) && !m_ActBusyBehavior.IsActive() )
 	{
@@ -326,11 +310,11 @@ int CZombie::SelectSchedule( void )
 //-----------------------------------------------------------------------------
 // Purpose: Sound of a footstep
 //-----------------------------------------------------------------------------
-void CZombie::FootstepSound( bool fRightFoot )
+void CClassicZombie::FootstepSound( bool fRightFoot )
 {
 	if( fRightFoot )
 	{
-		EmitSound(  "Zombie.FootstepRight" );
+		EmitSound( "Zombie.FootstepRight" );
 	}
 	else
 	{
@@ -341,7 +325,7 @@ void CZombie::FootstepSound( bool fRightFoot )
 //-----------------------------------------------------------------------------
 // Purpose: Sound of a foot sliding/scraping
 //-----------------------------------------------------------------------------
-void CZombie::FootscuffSound( bool fRightFoot )
+void CClassicZombie::FootscuffSound( bool fRightFoot )
 {
 	if( fRightFoot )
 	{
@@ -354,102 +338,24 @@ void CZombie::FootscuffSound( bool fRightFoot )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Play a random attack hit sound
-//-----------------------------------------------------------------------------
-void CZombie::AttackHitSound( void )
-{
-	EmitSound( "Zombie.AttackHit" );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Play a random attack miss sound
-//-----------------------------------------------------------------------------
-void CZombie::AttackMissSound( void )
-{
-	// Play a random attack miss sound
-	EmitSound( "Zombie.AttackMiss" );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CZombie::PainSound( const CTakeDamageInfo &info )
-{
-	// We're constantly taking damage when we are on fire. Don't make all those noises!
-	if ( IsOnFire() )
-	{
-		return;
-	}
-
-	EmitSound( "Zombie.Pain" );
-}
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-void CZombie::DeathSound( const CTakeDamageInfo &info ) 
-{
-	EmitSound( "Zombie.Die" );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CZombie::AlertSound( void )
-{
-	EmitSound( "Zombie.Alert" );
-
-	// Don't let a moan sound cut off the alert sound.
-	m_flNextMoanSound += random->RandomFloat( 2.0, 4.0 );
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: Returns a moan sound for this class of zombie.
 //-----------------------------------------------------------------------------
-const char *CZombie::GetMoanSound( int nSound )
+const char *CClassicZombie::GetMoanSound( int nSound )
 {
 	return pMoanSounds[ nSound % ARRAYSIZE( pMoanSounds ) ];
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Play a random idle sound.
-//-----------------------------------------------------------------------------
-void CZombie::IdleSound( void )
-{
-	if( GetState() == NPC_STATE_IDLE && random->RandomFloat( 0, 1 ) == 0 )
-	{
-		// Moan infrequently in IDLE state.
-		return;
-	}
-
-	if( IsSlumped() )
-	{
-		// Sleeping zombies are quiet.
-		return;
-	}
-
-	EmitSound( "Zombie.Idle" );
-	MakeAISpookySound( 360.0f );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Play a random attack sound.
-//-----------------------------------------------------------------------------
-void CZombie::AttackSound( void )
-{
-	EmitSound( "Zombie.Attack" );
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: Returns the classname (ie "npc_headcrab") to spawn when our headcrab bails.
 //-----------------------------------------------------------------------------
-const char *CZombie::GetHeadcrabClassname( void )
+const char *CClassicZombie::GetHeadcrabClassname( void )
 {
-	return "npc_headcrab";
+	return "npc_cheadcrab";
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-const char *CZombie::GetHeadcrabModel( void )
+const char *CClassicZombie::GetHeadcrabModel( void )
 {
 	return "models/headcrabclassic.mdl";
 }
@@ -457,14 +363,14 @@ const char *CZombie::GetHeadcrabModel( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-const char *CZombie::GetLegsModel( void )
+const char *CClassicZombie::GetLegsModel( void )
 {
 	return "models/zombie/classic_legs.mdl";
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-const char *CZombie::GetTorsoModel( void )
+const char *CClassicZombie::GetTorsoModel( void )
 {
 	return "models/zombie/classic_torso.mdl";
 }
@@ -472,7 +378,7 @@ const char *CZombie::GetTorsoModel( void )
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-void CZombie::SetZombieModel( void )
+void CClassicZombie::SetZombieModel( void )
 {
 	Hull_t lastHull = GetHullType();
 
@@ -508,7 +414,7 @@ void CZombie::SetZombieModel( void )
 //---------------------------------------------------------
 // Classic zombie only uses moan sound if on fire.
 //---------------------------------------------------------
-void CZombie::MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize )
+void CClassicZombie::MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize )
 {
 	if( IsOnFire() )
 	{
@@ -518,24 +424,7 @@ void CZombie::MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize )
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-bool CZombie::ShouldBecomeTorso( const CTakeDamageInfo &info, float flDamageThreshold )
-{
-	if( IsSlumped() ) 
-	{
-		// Never break apart a slouched zombie. This is because the most fun
-		// slouched zombies to kill are ones sleeping leaning against explosive
-		// barrels. If you break them in half in the blast, the force of being
-		// so close to the explosion makes the body pieces fly at ridiculous 
-		// velocities because the pieces weigh less than the whole.
-		return false;
-	}
-
-	return BaseClass::ShouldBecomeTorso( info, flDamageThreshold );
-}
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-void CZombie::GatherConditions( void )
+void CClassicZombie::GatherConditions( void )
 {
 	BaseClass::GatherConditions();
 
@@ -580,7 +469,7 @@ void CZombie::GatherConditions( void )
 //---------------------------------------------------------
 //---------------------------------------------------------
 
-int CZombie::SelectFailSchedule( int failedSchedule, int failedTask, AI_TaskFailureCode_t taskFailCode )
+int CClassicZombie::SelectFailSchedule( int failedSchedule, int failedTask, AI_TaskFailureCode_t taskFailCode )
 {
 	if ( HasCondition( COND_BLOCKED_BY_DOOR ) && m_hBlockingDoor != NULL )
 	{
@@ -610,7 +499,7 @@ int CZombie::SelectFailSchedule( int failedSchedule, int failedTask, AI_TaskFail
 //---------------------------------------------------------
 //---------------------------------------------------------
 
-int CZombie::TranslateSchedule( int scheduleType )
+int CClassicZombie::TranslateSchedule( int scheduleType )
 {
 	if ( scheduleType == SCHED_COMBAT_FACE && IsUnreachable( GetEnemy() ) )
 		return SCHED_TAKE_COVER_FROM_ENEMY;
@@ -623,7 +512,7 @@ int CZombie::TranslateSchedule( int scheduleType )
 
 //---------------------------------------------------------
 
-Activity CZombie::NPC_TranslateActivity( Activity newActivity )
+Activity CClassicZombie::NPC_TranslateActivity( Activity newActivity )
 {
 	newActivity = BaseClass::NPC_TranslateActivity( newActivity );
 
@@ -638,7 +527,7 @@ Activity CZombie::NPC_TranslateActivity( Activity newActivity )
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-void CZombie::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
+void CClassicZombie::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
 {
 	BaseClass::OnStateChange( OldState, NewState );
 }
@@ -646,13 +535,13 @@ void CZombie::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
 //---------------------------------------------------------
 //---------------------------------------------------------
 
-void CZombie::StartTask( const Task_t *pTask )
+void CClassicZombie::StartTask( const Task_t *pTask )
 {
 	switch( pTask->iTask )
 	{
 	case TASK_ZOMBIE_EXPRESS_ANGER:
 		{
-			if ( random->RandomInt( 1, 4 ) == 2 )
+			if ( random->RandomInt( 0, 2 ) == 2 )
 			{
 				SetIdealActivity( (Activity)ACT_ZOMBIE_TANTRUM );
 			}
@@ -705,7 +594,7 @@ void CZombie::StartTask( const Task_t *pTask )
 //---------------------------------------------------------
 //---------------------------------------------------------
 
-void CZombie::RunTask( const Task_t *pTask )
+void CClassicZombie::RunTask( const Task_t *pTask )
 {
 	switch( pTask->iTask )
 	{
@@ -747,7 +636,7 @@ void CZombie::RunTask( const Task_t *pTask )
 //---------------------------------------------------------
 //---------------------------------------------------------
 
-bool CZombie::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal, CBaseDoor *pDoor, 
+bool CClassicZombie::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal, CBaseDoor *pDoor, 
 							  float distClear, AIMoveResult_t *pResult )
 {
 	if ( BaseClass::OnObstructingDoor( pMoveGoal, pDoor, distClear, pResult ) )
@@ -766,7 +655,7 @@ bool CZombie::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal, CBaseDoor *pDoor,
 //---------------------------------------------------------
 //---------------------------------------------------------
 
-Activity CZombie::SelectDoorBash()
+Activity CClassicZombie::SelectDoorBash()
 {
 	if ( random->RandomInt( 1, 3 ) == 1 )
 		return ACT_MELEE_ATTACK1;
@@ -777,7 +666,7 @@ Activity CZombie::SelectDoorBash()
 // Zombies should scream continuously while burning, so long
 // as they are alive... but NOT IN GERMANY!
 //---------------------------------------------------------
-void CZombie::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bool bCalledByLevelDesigner )
+void CClassicZombie::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bool bCalledByLevelDesigner )
 {
  	if( !IsOnFire() && IsAlive() )
 	{
@@ -801,7 +690,7 @@ void CZombie::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bool b
 //---------------------------------------------------------
 // If a zombie stops burning and hasn't died, quiet him down
 //---------------------------------------------------------
-void CZombie::Extinguish()
+void CClassicZombie::Extinguish()
 {
 	if( m_pMoanSound )
 	{
@@ -815,7 +704,7 @@ void CZombie::Extinguish()
 
 //---------------------------------------------------------
 //---------------------------------------------------------
-int CZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
+int CClassicZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 {
 #ifndef HL2_EPISODIC
 	if ( inputInfo.GetDamageType() & DMG_BUCKSHOT )
@@ -836,7 +725,7 @@ int CZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-bool CZombie::IsHeavyDamage( const CTakeDamageInfo &info )
+bool CClassicZombie::IsHeavyDamage( const CTakeDamageInfo &info )
 {
 #ifdef HL2_EPISODIC
 	if ( info.GetDamageType() & DMG_BUCKSHOT )
@@ -865,48 +754,10 @@ bool CZombie::IsHeavyDamage( const CTakeDamageInfo &info )
 
 	return BaseClass::IsHeavyDamage(info);
 }
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-#define ZOMBIE_SQUASH_MASS	300.0f  // Anything this heavy or heavier squashes a zombie good. (show special fx)
-bool CZombie::IsSquashed( const CTakeDamageInfo &info )
-{
-	if( GetHealth() > 0 )
-	{
-		return false;
-	}
-
-	if( info.GetDamageType() & DMG_CRUSH )
-	{
-		IPhysicsObject *pCrusher = info.GetInflictor()->VPhysicsGetObject();
-		if( pCrusher && pCrusher->GetMass() >= ZOMBIE_SQUASH_MASS && info.GetInflictor()->WorldSpaceCenter().z > EyePosition().z )
-		{
-			// This heuristic detects when a zombie has been squashed from above by a heavy
-			// item. Done specifically so we can add gore effects to Ravenholm cartraps.
-			// The zombie must take physics damage from a 300+kg object that is centered above its eyes (comes from above)
-			return true;
-		}
-	}
-
-	return false;
-}
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-void CZombie::BuildScheduleTestBits( void )
-{
-	BaseClass::BuildScheduleTestBits();
-
-	if( !m_fIsTorso && !IsCurSchedule( SCHED_FLINCH_PHYSICS ) && !m_ActBusyBehavior.IsActive() )
-	{
-		SetCustomInterruptCondition( COND_PHYSICS_DAMAGE );
-	}
-}
-
 	
 //=============================================================================
 
-AI_BEGIN_CUSTOM_NPC( npc_zombie, CZombie )
+AI_BEGIN_CUSTOM_NPC( npc_zombie, CClassicZombie )
 
 	DECLARE_CONDITION( COND_BLOCKED_BY_DOOR )
 	DECLARE_CONDITION( COND_DOOR_OPENED )

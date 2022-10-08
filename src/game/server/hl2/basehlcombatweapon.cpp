@@ -17,16 +17,6 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#if 0
-ConVar sk_realistic_spread( "sk_realistic_spread", "0");
-ConVar sk_spread_moving_modifier( "sk_spread_moving_modifier", "1.1", FCVAR_REPLICATED );	// Moving/walking
-ConVar sk_spread_movingfast_modifier( "sk_spread_movingfast_modifier", "1.25", FCVAR_REPLICATED );	// Moving/jogging/sprinting
-ConVar sk_spread_flying_modifier( "sk_spread_flying_modifier", "1.4", FCVAR_REPLICATED );	// Jumping/flying/swimming
-ConVar sk_spread_crouch_modifier( "sk_spread_crouch_modifier", "0.8", FCVAR_REPLICATED );	// Crouching
-
-extern ConVar hl2_runspeed;
-#endif
-
 IMPLEMENT_SERVERCLASS_ST( CHLMachineGun, DT_HLMachineGun )
 END_SEND_TABLE()
 
@@ -44,24 +34,11 @@ CHLMachineGun::CHLMachineGun( void )
 {
 }
 
-//-----------------------------------------------------------------------------
 const Vector &CHLMachineGun::GetBulletSpread( void )
 {
-#if 0
-	static Vector cone = VECTOR_CONE_5DEGREES;
-
+	static Vector cone = VECTOR_CONE_3DEGREES;
 	if ( GetHSpread() != NULL )
-	{
-		cone = CalculateBulletSpread();
-	}
-#endif
-	static Vector cone = VECTOR_CONE_5DEGREES;
-
-	if ( GetHSpread() != NULL )
-	{
-		// We got a weaponscript cone, use that instead
 		cone = Vector( GetHSpread(), ((GetHSpread() / 2) + (GetVSpread() / 2)), GetVSpread() );
-	}
 
 	return cone;
 }
@@ -80,7 +57,10 @@ void CHLMachineGun::PrimaryAttack( void )
 	
 	// Abort here to handle burst and auto fire modes
 	if ( (UsesClipsForAmmo1() && m_iClip1 == 0) || ( !UsesClipsForAmmo1() && !pPlayer->GetAmmoCount(m_iPrimaryAmmoType) ) )
+	{
+		DryFire();
 		return;
+	}
 
 	m_nShotsFired++;
 
@@ -272,7 +252,23 @@ int CHLMachineGun::WeaponSoundRealtime( WeaponSound_t shoot_type )
 	return numBullets;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Output : Activity
+//-----------------------------------------------------------------------------
+Activity CHLMachineGun::GetPrimaryAttackActivity( void )
+{
+	if ( m_nShotsFired > 2 )
+		return ACT_VM_RECOIL1;
 
+	if ( m_nShotsFired > 4 )
+		return ACT_VM_RECOIL2;
+
+	if ( m_nShotsFired > 6 )
+		return ACT_VM_RECOIL3;
+
+	return ACT_VM_PRIMARYATTACK;
+}
 
 
 //-----------------------------------------------------------------------------
@@ -335,7 +331,7 @@ float CHLSelectFireMachineGun::GetFireRate( void )
 		break;
 
 	default:
-		return 0.1f;
+		return BaseClass::GetFireRate();
 		break;
 	}
 }

@@ -13,7 +13,7 @@
 #include "ai_hull.h"
 #include "beam_shared.h"
 #include "ai_baseactor.h"
-#include "npc_rollermine.h"
+#include "npc_roller.h"
 #include "saverestore_utlvector.h"
 #include "physics_bone_follower.h"
 #include "Sprite.h"

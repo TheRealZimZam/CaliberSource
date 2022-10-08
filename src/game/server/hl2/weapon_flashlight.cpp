@@ -4,7 +4,7 @@
 //
 //			Primary attack: turn on/off light
 //			Secondary attack: quick smack
-// TODO's:  Actually code the clientside light
+// TODO's:  Actually code a clientside light
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -43,6 +43,9 @@ public:
 	void	ItemPostFrame( void );
 	void	PrimaryAttack( void );
 	void	SecondaryAttack( void );
+	
+	bool	CanHolster( void );
+
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
@@ -64,9 +67,7 @@ PRECACHE_WEAPON_REGISTER( weapon_flashlight );
 
 BEGIN_DATADESC( CWeaponFlashlight )
 
-	DEFINE_FIELD( m_flSoonestPrimaryAttack, FIELD_TIME ),
-	DEFINE_FIELD( m_flNextSecondaryAttack, FIELD_TIME ),
-	DEFINE_FIELD( m_nNumShotsFired,			FIELD_INTEGER ),
+	DEFINE_FIELD( m_bLightOn, FIELD_BOOLEAN ),
 
 END_DATADESC()
 
@@ -123,20 +124,7 @@ void CWeaponFlashlight::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseComb
 	{
 		case EVENT_WEAPON_PISTOL_FIRE:
 		{
-			Vector vecShootOrigin, vecShootDir;
-			vecShootOrigin = pOperator->Weapon_ShootPosition();
 
-			CAI_BaseNPC *npc = pOperator->MyNPCPointer();
-			ASSERT( npc != NULL );
-
-			vecShootDir = npc->GetActualShootTrajectory( vecShootOrigin );
-
-			CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
-
-			WeaponSound( SINGLE_NPC );
-			pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, VECTOR_CONE_PRECALCULATED, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2 );
-			pOperator->DoMuzzleFlash();
-			m_iClip1 = m_iClip1 - 1;
 		}
 		break;
 		default:
@@ -156,31 +144,26 @@ void CWeaponFlashlight::PrimaryAttack( void )
 		return;
 
 	WeaponSound( SINGLE );
-	pPlayer->DoMuzzleFlash();
 
 	// player "shoot" animation
 	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 	pPlayer->SetAimTime( 3.0f );
 
-	Vector	vecSrc	 = pPlayer->Weapon_ShootPosition( );
-	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
-
 	if ( m_bLightOn )
 	{
-
-		// The light is off
-		m_bLightOn = false;
+		pPlayer->FlashlightTurnOff();
+		m_bLightOn = false;	// The light is off
 	}
 	else
 	{
-
-		// The light is on
-		m_bLightOn = true;
+		pPlayer->FlashlightTurnOn();
+		m_bLightOn = true;	// The light is on
 	}
 
 	m_iPrimaryAttacks++;
-	m_flNextPrimaryAttack = gpGlobals->curtime + 0.1;
+	m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
+	m_flNextSecondaryAttack = gpGlobals->curtime + 0.2;
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 }
 
@@ -201,9 +184,33 @@ void CWeaponFlashlight::ItemPostFrame( void )
 	
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 	if ( pOwner == NULL )
+	{
+		if ( m_bLightOn )
+			m_bLightOn = false;	//Turn the light off
+
 		return;
+	}
 
+	if ( pOwner->m_afButtonPressed & IN_ATTACK )
+	{
+		PrimaryAttack();
+	}
+}
 
+//-----------------------------------------------------------------------------
+bool CWeaponFlashlight::CanHolster( void )
+{
+	// Turn the light off
+	if ( m_bLightOn )
+	{
+		CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+		if ( pPlayer )
+			pPlayer->FlashlightTurnOff();
+
+		m_bLightOn = false;
+	}
+
+	return BaseClass::CanHolster();
 }
 
 //-----------------------------------------------------------------------------

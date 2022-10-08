@@ -147,6 +147,7 @@ public:
 	virtual Vector HeadTarget( const Vector &posSrc );
 	bool ShouldBecomeTorso( const CTakeDamageInfo &info, float flDamageThreshold );
 	virtual bool IsChopped( const CTakeDamageInfo &info )	{ return false; }
+	bool CanBecomeLiveTorso() { return false; }
 
 	//
 	// CAI_BaseNPC implementation.
@@ -294,7 +295,7 @@ void CNPC_PoisonZombie::Spawn( void )
 #endif // HL2_EPISODIC
 
 	m_iHealth = sk_zombie_poison_health.GetFloat();
-	m_flFieldOfView = 0.2;
+	m_flFieldOfView = 0.8;
 
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_INNATE_MELEE_ATTACK1 | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_RANGE_ATTACK2 );

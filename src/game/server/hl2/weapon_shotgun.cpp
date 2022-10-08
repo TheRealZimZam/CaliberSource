@@ -53,20 +53,17 @@ public:
 
 	virtual const Vector& GetBulletSpread( void )
 	{
-		static Vector AllyCone = VECTOR_CONE_4DEGREES;
-		static Vector cone = VECTOR_CONE_SHOTGUN;
-
-		if ( GetHSpread() != NULL )
-		{
-			// We got a cone, use that instead
-			cone = Vector( GetHSpread(), (GetHSpread() / 2) + (GetVSpread() / 2), GetVSpread() );
-		}
+		static Vector AllyCone = VECTOR_CONE_5DEGREES;
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
 			// Story allies fire shots more akin to slugs. Leave room-clearing for the player.
 			return AllyCone;
 		}
 
+		if ( GetHSpread() != NULL )
+			return BaseClass::GetBulletSpread();
+
+		static Vector cone = VECTOR_CONE_SHOTGUN;
 		return cone;
 	}
 
@@ -219,7 +216,7 @@ void CWeaponShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool
 	}
 
 	int	TracerFreq = random->RandomInt( 2, 3 );
-	pOperator->FireBullets( sk_npc_num_shotgun_pellets.GetInt(), vecShootOrigin, vecShootDir, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, TracerFreq );
+	pOperator->FireBullets( sk_npc_num_shotgun_pellets.GetInt(), vecShootOrigin, vecShootDir, GetBulletSpread(), MAX_TRACE_LENGTH, GetPrimaryAmmoType(), TracerFreq );
 }
 
 //-----------------------------------------------------------------------------
@@ -245,7 +242,7 @@ void CWeaponShotgun::FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bo
 	}
 
 	int NumPellets = sk_npc_num_shotgun_pellets.GetInt() * 2;
-	pOperator->FireBullets( NumPellets, vecShootOrigin, vecShootDir, (VECTOR_CONE_SHOTGUN * 1.25), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 1 );
+	pOperator->FireBullets( NumPellets, vecShootOrigin, vecShootDir, (VECTOR_CONE_SHOTGUN * 1.25), MAX_TRACE_LENGTH, GetPrimaryAmmoType(), 1 );
 }
 
 //-----------------------------------------------------------------------------
@@ -338,7 +335,7 @@ bool CWeaponShotgun::StartReload( void )
 	if ( pOwner == NULL )
 		return false;
 
-	if (pOwner->GetAmmoCount(m_iPrimaryAmmoType) <= 0)
+	if (pOwner->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
 		return false;
 
 	if (m_iClip1 >= GetMaxClip1())
@@ -354,7 +351,7 @@ bool CWeaponShotgun::StartReload( void )
 		m_bNeedPump = true;
 	}
 
-	int j = min(1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));
+	int j = min(1, pOwner->GetAmmoCount(GetPrimaryAmmoType()));
 
 	if (j <= 0)
 		return false;
@@ -389,13 +386,13 @@ bool CWeaponShotgun::Reload( void )
 	if ( pOwner == NULL )
 		return false;
 
-	if (pOwner->GetAmmoCount(m_iPrimaryAmmoType) <= 0)
+	if (pOwner->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
 		return false;
 
 	if (m_iClip1 >= GetMaxClip1())
 		return false;
 
-	int j = min(1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));
+	int j = min(1, pOwner->GetAmmoCount(GetPrimaryAmmoType()));
 
 	if (j <= 0)
 		return false;
@@ -453,12 +450,12 @@ void CWeaponShotgun::FillClip( void )
 		return;
 
 	// Add them to the clip
-	if ( pOwner->GetAmmoCount( m_iPrimaryAmmoType ) > 0 )
+	if ( pOwner->GetAmmoCount( GetPrimaryAmmoType() ) > 0 )
 	{
 		if ( Clip1() < GetMaxClip1() )
 		{
 			m_iClip1++;
-			pOwner->RemoveAmmo( 1, m_iPrimaryAmmoType );
+			pOwner->RemoveAmmo( 1, GetPrimaryAmmoType() );
 		}
 	}
 }
@@ -521,6 +518,7 @@ void CWeaponShotgun::PrimaryAttack( void )
 	WeaponSound(SINGLE);
 
 	pPlayer->DoMuzzleFlash();
+	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 1.0 );
 
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
 
@@ -534,17 +532,16 @@ void CWeaponShotgun::PrimaryAttack( void )
 
 	Vector	vecSrc		= pPlayer->Weapon_ShootPosition( );
 	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
+	Vector recoilForce = pPlayer->BodyDirection2D() * -( sk_plr_num_shotgun_pellets.GetInt() * 3.0f );
+	pPlayer->ApplyAbsVelocityImpulse( recoilForce );
 
-	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 1.0 );
-	
 	// Fire the bullets, and force the first shot to be perfectly accuracy
-	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, true, true );
-
+	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, GetPrimaryAmmoType(), 2, -1, -1, 0, NULL, true, true );
 	pPlayer->ViewPunch( QAngle( -SHOTGUN_KICKBACK, random->RandomFloat( -SHOTGUN_KICKBACK, SHOTGUN_KICKBACK ), 0 ) );
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
 
-	if (!m_iClip1 && pPlayer->GetAmmoCount(m_iPrimaryAmmoType) <= 0)
+	if (!m_iClip1 && pPlayer->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
 	{
 		// HEV suit - indicate out of ammo condition
 		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
@@ -599,7 +596,7 @@ void CWeaponShotgun::SecondaryAttack( void )
 
 	// Fire the bullets
 	int NumPellets = sk_plr_num_shotgun_pellets.GetInt() * 2;
-	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, (VECTOR_CONE_SHOTGUN * 1.25), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, false, false );
+	pPlayer->FireBullets( NumPellets, vecSrc, vecAiming, (VECTOR_CONE_SHOTGUN * 1.25), MAX_TRACE_LENGTH, GetPrimaryAmmoType(), 2, -1, -1, 0, NULL, false, false );
 
 	pPlayer->ViewPunch( QAngle( -(NumPellets/2), random->RandomFloat( -(SHOTGUN_KICKBACK + 1), (SHOTGUN_KICKBACK + 1) ), 0 ) );
 
@@ -617,7 +614,7 @@ void CWeaponShotgun::SecondaryAttack( void )
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );
 
-	if (!m_iClip1 && pPlayer->GetAmmoCount(m_iPrimaryAmmoType) <= 0)
+	if (!m_iClip1 && pPlayer->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
 	{
 		// HEV suit - indicate out of ammo condition
 		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
@@ -663,7 +660,7 @@ void CWeaponShotgun::ItemPostFrame( void )
 		else if (m_flNextPrimaryAttack <= gpGlobals->curtime)
 		{
 			// If out of ammo end reload
-			if (pOwner->GetAmmoCount(m_iPrimaryAmmoType) <=0)
+			if (pOwner->GetAmmoCount(GetPrimaryAmmoType()) <=0)
 			{
 				FinishReload();
 				return;
@@ -706,7 +703,7 @@ void CWeaponShotgun::ItemPostFrame( void )
 			{
 				PrimaryAttack();
 			}
-			else if (!pOwner->GetAmmoCount(m_iPrimaryAmmoType))
+			else if (!pOwner->GetAmmoCount(GetPrimaryAmmoType()))
 			{
 				DryFire();
 			}
@@ -736,9 +733,9 @@ void CWeaponShotgun::ItemPostFrame( void )
 	else if ( (m_bDelayedFire1 || pOwner->m_nButtons & IN_ATTACK) && m_flNextPrimaryAttack <= gpGlobals->curtime)
 	{
 		m_bDelayedFire1 = false;
-		if ( (m_iClip1 <= 0 && UsesClipsForAmmo1()) || ( !UsesClipsForAmmo1() && !pOwner->GetAmmoCount(m_iPrimaryAmmoType) ) )
+		if ( (m_iClip1 <= 0 && UsesClipsForAmmo1()) || ( !UsesClipsForAmmo1() && !pOwner->GetAmmoCount(GetPrimaryAmmoType()) ) )
 		{
-			if (!pOwner->GetAmmoCount(m_iPrimaryAmmoType))
+			if (!pOwner->GetAmmoCount(GetPrimaryAmmoType()))
 			{
 				DryFire();
 			}

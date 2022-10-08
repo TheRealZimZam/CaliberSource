@@ -2038,7 +2038,7 @@ void CNPC_CScanner::AttackGas(void)
 
 		QAngle angles;
 		VectorAngles(m_vGasDirection, angles );
-		angles.y += 90;
+		//!angles.y += 90;
 
 		pJet->SetLocalAngles( angles );
 

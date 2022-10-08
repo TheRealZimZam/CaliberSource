@@ -3083,7 +3083,7 @@ bool CNPC_Alyx::IsCrouchedActivity( Activity activity )
 	case ACT_RANGE_ATTACK_SHOTGUN_LOW:
 	case ACT_RANGE_ATTACK_PISTOL_LOW:
 	case ACT_RANGE_AIM_LOW:
-	case ACT_RANGE_AIM_SMG1_LOW:
+	case ACT_RANGE_AIM_RIFLE_LOW:
 	case ACT_RANGE_AIM_PISTOL_LOW:
 	case ACT_RANGE_AIM_AR2_LOW:
 		return true;

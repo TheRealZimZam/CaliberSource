@@ -29,21 +29,40 @@ public:
 	void	ItemPostFrame( void );
 	void	Precache( void );
 	virtual void Equip( CBaseCombatCharacter *pOwner );
+	bool	IsWeaponZoomed() { return m_bZoomed; }
 
 	void	PrimaryAttack( void );
 	void	SecondaryAttack( void );
-	void	DelayedAttack( void );
 
 	const char *GetTracerType( void ) { return "AR2Tracer"; }
 
 	void	AddViewKick( void );
 
-	int		GetMinBurst( void ) { return 2; }	//TODO; Smaller burst from npcs when firing long range
-	int		GetMaxBurst( void ) { return 5; }	//TODO; Smaller burst from npcs when firing long range
+	int		GetMinBurst( void )
+	{
+		if( IsWeaponZoomed() )
+			return 2;
+
+		return 4;
+	}
+	int		GetMaxBurst( void )
+	{
+		if( IsWeaponZoomed() )
+			return 3;
+
+		return 5;
+	}
+
 	virtual float	GetMinRestTime();
 	virtual float	GetMaxRestTime();
-	float	GetFireRate( void );
-	float	GetDefaultAnimSpeed( void );
+	float	GetFireRate( void )
+	{
+		if ( IsWeaponZoomed() )
+			return BaseClass::GetCycleTime() * 2.0;
+
+		return BaseClass::GetCycleTime();
+	}
+//	float	GetDefaultAnimSpeed( void );
 
 	bool	CanHolster( void );
 	bool	Reload( void );
@@ -57,10 +76,13 @@ public:
 	virtual const Vector& GetBulletSpread( void )
 	{
 		static Vector cone;
-
-		if( GetOwner() && GetOwner()->IsPlayer() && m_bZoomed )
+		if( GetOwner() && IsWeaponZoomed() )
 		{
-			cone = VECTOR_CONE_1DEGREES;
+			if ( GetOwner()->IsPlayer() )
+				cone = VECTOR_CONE_1DEGREES;
+			else
+				cone = VECTOR_CONE_2DEGREES;
+
 			return cone;
 		}
 
@@ -69,15 +91,14 @@ public:
 
 	const WeaponProficiencyInfo_t *GetProficiencyValues();
 
-	void	FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
-	void	FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
+	void	FireNPCAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
+//	void	FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles );
 	void	Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
 	DECLARE_ACTTABLE();
 
 protected:
-	float			m_flDelayedFire;
 	bool			m_bShotDelayed;
 
 	void			Zoom( void );

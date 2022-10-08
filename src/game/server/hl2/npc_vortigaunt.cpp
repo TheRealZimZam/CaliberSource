@@ -1243,7 +1243,7 @@ void CNPC_Vortigaunt::Spawn()
 	m_bloodColor		= BLOOD_COLOR_GREEN;
 	m_iHealth			= sk_vortigaunt_health.GetFloat();
 	SetViewOffset( Vector ( 0, 0, 64 ) );// position of the eyes relative to monster's origin.
-	m_flFieldOfView		= VIEW_FIELD_WIDE; // NOTE: we need a wide field of view so npc will notice player and say hello
+	m_flFieldOfView		= 0.2;	//Humungous eye is good at seeing
 	m_NPCState			= NPC_STATE_NONE;
 
 	GetExpresser()->SetVoicePitch( random->RandomInt( 85, 110 ) );

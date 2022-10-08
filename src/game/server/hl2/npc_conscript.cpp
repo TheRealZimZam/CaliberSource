@@ -164,7 +164,7 @@ WeaponProficiency_t CNPC_Conscript::CalcWeaponProficiency( CBaseCombatWeapon *pW
 	}
 	else if( FClassnameIs( pWeapon, "weapon_smg1" ) )
 	{
-		return WEAPON_PROFICIENCY_GOOD;
+		return WEAPON_PROFICIENCY_VERY_GOOD;
 	}
 
 	return BaseClass::CalcWeaponProficiency( pWeapon );

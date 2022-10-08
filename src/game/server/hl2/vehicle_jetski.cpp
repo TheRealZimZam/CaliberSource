@@ -384,12 +384,6 @@ float CPropJetski::CalculateDrag( CUserCmd *ucmd )
 			flDrag += JETSKI_DRAG_LEAN_ADD;
 		}
 	}
-
-#define JETSKI_DRAG_NO_THRUST_IN_WATER		10.0f
-#define JETSKI_DRAG_NO_THRUST_ON_WATER		30.0f
-#define JETSKI_DRAG_LEAN_ADD				10.0f
-#define JETSKI_DRAG_IN_REVERSE				10.0f
-#define JETSKI_DRAG_IN_THRUST				5.0f
 #endif
 
 	// Debug

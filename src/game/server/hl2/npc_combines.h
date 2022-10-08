@@ -32,6 +32,7 @@ public:
 	// -----------------------------------------------------------------------------------
 	// -----------------------------------------------------------------------------------
 	void		DeathSound( const CTakeDamageInfo &info );
+	void		PainSound( const CTakeDamageInfo &info );
 	int			SelectSchedule( void );
 	void		HandleAnimEvent( animevent_t *pEvent );
 	void		OnChangeActivity( Activity eNewActivity );

@@ -105,9 +105,8 @@ void CGrenadeBugBait::Spawn( void )
 
 	m_takedamage = DAMAGE_NO;
 
-	m_pSporeTrail = NULL;
+//	m_pSporeTrail = NULL;
 
-	/*
 	m_pSporeTrail = SporeTrail::CreateSporeTrail();
 	
 	m_pSporeTrail->m_bEmit				= true;
@@ -118,7 +117,6 @@ void CGrenadeBugBait::Spawn( void )
 	m_pSporeTrail->m_flSpawnRadius		= 8.0f;
 
 	m_pSporeTrail->m_vecEndColor		= Vector( 0, 0, 0 );
-	*/
 }
 
 //-----------------------------------------------------------------------------

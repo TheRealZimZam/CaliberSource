@@ -30,8 +30,7 @@ public:
 	{
 		PrecacheModel ("models/items/battery.mdl");
 
-		PrecacheScriptSound( "ItemBattery.Touch" );
-
+		PrecacheScriptSound( "Battery.Touch" );
 	}
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
@@ -59,7 +58,7 @@ public:
 	{
 		PrecacheModel ("models/items/battery_aaa.mdl");
 
-		PrecacheScriptSound( "ItemBattery.Touch" );
+		PrecacheScriptSound( "Battery.Touch" );
 
 	}
 	bool MyTouch( CBasePlayer *pPlayer )

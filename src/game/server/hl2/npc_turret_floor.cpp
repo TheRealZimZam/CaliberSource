@@ -257,7 +257,7 @@ void CNPC_FloorTurret::Precache( void )
 	PrecacheScriptSound( "NPC_FloorTurret.DryFire");
 	PrecacheScriptSound( "NPC_FloorTurret.Destruct" );
 
-#ifdef HL2_EPISODIC
+#if 0
 	PrecacheParticleSystem( "explosion_turret_break" );
 #endif // HL2_EPISODIC
 	
@@ -2031,7 +2031,7 @@ void CNPC_FloorTurret::BreakThink( void )
 	Vector vecOrigin = WorldSpaceCenter() + ( vecUp * 12.0f );
 
 	// Our effect
-#ifdef HL2_EPISODIC
+#if 0
 	DispatchParticleEffect( "explosion_turret_break", vecOrigin, GetAbsAngles() );
 #endif // HL2_EPISODIC
 

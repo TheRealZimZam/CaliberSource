@@ -631,7 +631,7 @@ void CBasePlayer::PlayStepSound( Vector &vecOrigin, surfacedata_t *psurface, flo
 	}
 
 // TODO:  See note above, should this be hooked up?
-//	PlantFootprint( psurface );
+//!	PlantFootprint( psurface );
 
 	CRecipientFilter filter;
 	filter.AddRecipientsByPAS( vecOrigin );
@@ -721,58 +721,6 @@ void CBasePlayer::SetStepSoundTime( stepsoundtimes_t iStepSoundTime, bool bWalki
 	}
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: Check for wetstuff
-//-----------------------------------------------------------------------------
-#define WET_TIME			    5.f	// how many seconds till we're completely wet/dry
-#define DRY_TIME			   20.f	// how many seconds till we're completely wet/dry
-
-#if 0
-void CBasePlayer::UpdateWetness()
-{
-	// BRJ 1/7/01
-	// Check for whether we're in a rainy area....
-	// Do this by tracing a line straight down with a size guaranteed to
-	// be larger than the map
-	// Update wetness based on whether we're in rain or not...
-
-	trace_t tr;
-	UTIL_TraceLine( pev->origin, pev->origin + Vector(0, 0, -COORD_EXTENT * 1.74), 
-					MASK_SOLID_BRUSHONLY, edict(), COLLISION_GROUP_NONE, &tr);
-	if (tr.surface.flags & SURF_WET)
-	{
-		if (! (pev->flags & FL_INRAIN) )
-		{
-			// Transition...
-			// Figure out how wet we are now (we were drying off...)
-			float wetness = (m_WetTime - gpGlobals->time) / DRY_TIME;
-			if (wetness < 0.0f)
-				wetness = 0.0f;
-
-			// Here, wet time represents the time at which we get totally wet
-			m_WetTime = gpGlobals->time + (1.0 - wetness) * WET_TIME; 
-
-			pev->flags |= FL_INRAIN;
-		}
-	}
-	else
-	{
-		if ((pev->flags & FL_INRAIN) != 0)
-		{
-			// Transition...
-			// Figure out how wet we are now (we were getting more wet...)
-			float wetness = 1.0f + (gpGlobals->time - m_WetTime) / WET_TIME;
-			if (wetness > 1.0f)
-				wetness = 1.0f;
-
-			// Here, wet time represents the time at which we get totally dry
-			m_WetTime = gpGlobals->time + wetness * DRY_TIME; 
-
-			pev->flags &= ~FL_INRAIN;
-		}
-	}
-}
-#endif
 
 //-----------------------------------------------------------------------------
 Vector CBasePlayer::Weapon_ShootPosition( )

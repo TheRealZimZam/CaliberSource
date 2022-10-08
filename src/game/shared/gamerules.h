@@ -138,6 +138,8 @@ public:
 
 // Ammo Definitions
 	//CAmmoDef* GetAmmoDef();
+	virtual bool CanHaveAmmo( CBaseCombatCharacter *pPlayer, int iAmmoIndex ); // can this player take more of this ammo?
+	virtual bool CanHaveAmmo( CBaseCombatCharacter *pPlayer, const char *szName );
 
 	virtual bool SwitchToNextBestWeapon( CBaseCombatCharacter *pPlayer, CBaseCombatWeapon *pCurrentWeapon ); // Switch to the next best weapon
 	virtual CBaseCombatWeapon *GetNextBestWeapon( CBaseCombatCharacter *pPlayer, CBaseCombatWeapon *pCurrentWeapon ); // I can't use this weapon anymore, get me the next best one.
@@ -298,8 +300,8 @@ public:
 	virtual QAngle VecItemRespawnAngles( CItem *pItem ) = 0;// what angles should this item use when respawing?
 
 // Ammo retrieval
-	virtual bool CanHaveAmmo( CBaseCombatCharacter *pPlayer, int iAmmoIndex ); // can this player take more of this ammo?
-	virtual bool CanHaveAmmo( CBaseCombatCharacter *pPlayer, const char *szName );
+//	virtual bool CanHaveAmmo( CBaseCombatCharacter *pPlayer, int iAmmoIndex ); // can this player take more of this ammo?
+//	virtual bool CanHaveAmmo( CBaseCombatCharacter *pPlayer, const char *szName );
 	virtual void PlayerGotAmmo( CBaseCombatCharacter *pPlayer, char *szName, int iCount ) = 0;// called each time a player picks up some ammo in the world
 	virtual float GetAmmoQuantityScale( int iAmmoIndex ) { return 1.0f; }
 

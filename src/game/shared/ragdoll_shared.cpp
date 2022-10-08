@@ -1144,7 +1144,7 @@ C_EntityFlame *FireEffect( C_BaseAnimating *pTarget, C_BaseEntity *pServerFire, 
 
 		//Play a sound
 		CPASAttenuationFilter filter( pTarget );
-		pTarget->EmitSound( filter, pTarget->GetSoundSourceIndex(), "General.BurningFlesh" );
+		pTarget->EmitSound( filter, pTarget->GetSoundSourceIndex(), "Fire.BurningFlesh" );
 
 		for ( int i = 0; i < NUM_HITBOX_FIRES; i++ )
 		{

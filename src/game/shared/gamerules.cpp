@@ -142,6 +142,7 @@ CGameRules::CGameRules() : CAutoGameSystemPerFrame( "CGameRules" )
 	ClearMultiDamage();
 }
 
+#if 0
 //-----------------------------------------------------------------------------
 // Purpose: Return true if the specified player can carry any more of the ammo type
 //-----------------------------------------------------------------------------
@@ -167,6 +168,7 @@ bool CGameRules::CanHaveAmmo( CBaseCombatCharacter *pPlayer, const char *szName 
 {
 	return CanHaveAmmo( pPlayer, GetAmmoDef()->Index(szName) );
 }
+#endif
 
 //=========================================================
 //=========================================================
@@ -629,6 +631,32 @@ bool CGameRules::SwitchToNextBestWeapon( CBaseCombatCharacter *pPlayer, CBaseCom
 CBaseCombatWeapon *CGameRules::GetNextBestWeapon( CBaseCombatCharacter *pPlayer, CBaseCombatWeapon *pCurrentWeapon )
 {
 	return NULL;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Return true if the specified player can carry any more of the ammo type
+//-----------------------------------------------------------------------------
+bool CGameRules::CanHaveAmmo( CBaseCombatCharacter *pPlayer, int iAmmoIndex )
+{
+	if ( iAmmoIndex > -1 )
+	{
+		// Get the max carrying capacity for this ammo
+		int iMaxCarry = GetAmmoDef()->MaxCarry( iAmmoIndex );
+
+		// Does the player have room for more of this type of ammo?
+		if ( pPlayer->GetAmmoCount( iAmmoIndex ) < iMaxCarry )
+			return true;
+	}
+
+	return false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Return true if the specified player can carry any more of the ammo type
+//-----------------------------------------------------------------------------
+bool CGameRules::CanHaveAmmo( CBaseCombatCharacter *pPlayer, const char *szName )
+{
+	return CanHaveAmmo( pPlayer, GetAmmoDef()->Index(szName) );
 }
 
 bool CGameRules::ShouldCollide( int collisionGroup0, int collisionGroup1 )

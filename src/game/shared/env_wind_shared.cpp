@@ -74,6 +74,9 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar cl_winddir( "cl_winddir", "0", FCVAR_CHEAT | FCVAR_REPLICATED, "Set by env_wind - wind direction angle" );
+ConVar cl_windspeed( "cl_windspeed", "0", FCVAR_CHEAT | FCVAR_REPLICATED, "Set by env_wind - base wind speed" );
+
 //-----------------------------------------------------------------------------
 // globals
 //-----------------------------------------------------------------------------

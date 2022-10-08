@@ -7,6 +7,7 @@
 
 #include "cbase.h"
 #include "ammodef.h"
+#include "gamerules.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -102,6 +103,54 @@ bool CBaseCombatCharacter::Weapon_CanSwitchTo( CBaseCombatWeapon *pWeapon )
 CBaseCombatWeapon *CBaseCombatCharacter::GetActiveWeapon() const
 {
 	return m_hActiveWeapon;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Give the player some ammo.
+// Input  : iCount - Amount of ammo to give.
+//			iAmmoIndex - Index of the ammo into the AmmoInfoArray
+//			iMax - Max carrying capability of the player
+// Output : Amount of ammo actually given
+//-----------------------------------------------------------------------------
+int CBaseCombatCharacter::GiveAmmo( int iCount, int iAmmoIndex, bool bSuppressSound)
+{
+	if (iCount <= 0)
+		return 0;
+
+	if ( !g_pGameRules->CanHaveAmmo( this, iAmmoIndex ) )
+	{
+		// game rules say I can't have any more of this ammo type.
+		return 0;
+	}
+
+	if ( iAmmoIndex < 0 || iAmmoIndex >= MAX_AMMO_SLOTS )
+		return 0;
+
+	int iMax = GetAmmoDef()->MaxCarry(iAmmoIndex);
+	int iAdd = min( iCount, iMax - m_iAmmo[iAmmoIndex] );
+	if ( iAdd < 1 )
+		return 0;
+
+	// Ammo pickup sound
+	if ( !bSuppressSound )
+	{
+		EmitSound( "BaseCombatCharacter.AmmoPickup" );
+	}
+
+	m_iAmmo.Set( iAmmoIndex, m_iAmmo[iAmmoIndex] + iAdd );
+
+	return iAdd;
+}
+
+int CBaseCombatCharacter::GiveAmmo( int iCount, const char *szName, bool bSuppressSound )
+{
+	int iAmmoType = GetAmmoDef()->Index(szName);
+	if (iAmmoType == -1)
+	{
+		Msg("ERROR: Attempting to give unknown ammo type (%s)\n",szName);
+		return 0;
+	}
+	return GiveAmmo( iCount, iAmmoType, bSuppressSound );
 }
 
 //-----------------------------------------------------------------------------

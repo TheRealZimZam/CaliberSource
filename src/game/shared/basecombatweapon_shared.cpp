@@ -52,9 +52,10 @@ CBaseCombatWeapon::CBaseCombatWeapon()
 	m_fMaxRange2		= 1024;
 	m_fJamChance		= 0.01;
 
-	m_bReloadsSingly	= false;
-	m_bReloadsFullClip	= false;
-	m_bCanJam			= false;
+	m_bUsingSecondaryAmmo	= false;
+	m_bReloadsSingly		= false;
+	m_bReloadsFullClip		= false;
+	m_bCanJam				= false;
 
 	// Defaults to zero
 	m_nViewModelIndex	= 0;
@@ -111,6 +112,8 @@ void CBaseCombatWeapon::Activate( void )
 #endif
 
 }
+
+//-----------------------------------------------------------------------------
 void CBaseCombatWeapon::GiveDefaultAmmo( void )
 {
 	// If I use clips, set my clips to the default
@@ -132,6 +135,23 @@ void CBaseCombatWeapon::GiveDefaultAmmo( void )
 		SetSecondaryAmmoCount( GetDefaultClip2() );
 		m_iClip2 = WEAPON_NOCLIP;
 	}
+}
+
+void CBaseCombatWeapon::SwitchAmmoType( void )
+{
+	CBaseCombatCharacter *pOwner = GetOwner();
+	Assert( pOwner );
+
+	// Take the current ammo out of the gun and add it back into the pool
+	if ( UsesClipsForAmmo1() )
+	{
+		pOwner->GiveAmmo( m_iClip1, GetActiveAmmoType(), true );
+		m_iClip1 = 0;
+	}
+
+	// Now force a reload after switching ammo types
+	m_bUsingSecondaryAmmo = !m_bUsingSecondaryAmmo;
+
 }
 
 //-----------------------------------------------------------------------------
@@ -599,6 +619,25 @@ bool CBaseCombatWeapon::HasAmmo( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Get the active ammo type
+//-----------------------------------------------------------------------------
+int CBaseCombatWeapon::GetActiveAmmoType( void )
+{
+	if (m_bUsingSecondaryAmmo)
+		return GetSecondaryAmmoType();
+
+	return GetPrimaryAmmoType();
+}
+
+int CBaseCombatWeapon::GetInactiveAmmoType( void )
+{
+	if (m_bUsingSecondaryAmmo)
+		return GetPrimaryAmmoType();
+
+	return GetSecondaryAmmoType();
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Return true if this weapon should be seen, and hence be selectable, in the weapon selection
 //-----------------------------------------------------------------------------
 bool CBaseCombatWeapon::VisibleInWeaponSelection( void )
@@ -784,6 +823,7 @@ void CBaseCombatWeapon::MakeTracer( const Vector &vecTracerSrc, const trace_t &t
 
 	case TRACER_RAIL:
 	case TRACER_BEAM:
+		//UTIL_ParticleTracer( pszTracerName, vNewSrc, tr.endpos, iEntIndex, iAttachment, false );
 		break;
 
 	case TRACER_LINE_AND_WHIZ:
@@ -995,10 +1035,11 @@ void CBaseCombatWeapon::Equip( CBaseCombatCharacter *pOwner )
 void CBaseCombatWeapon::SetActivity( Activity act, float duration ) 
 { 
 	//Adrian: Oh man...
-#if !defined( CLIENT_DLL ) && (defined( HL2MP ) || defined( PORTAL ) || defined( SDK_DLL ) )
-	SetModel( GetWorldModel() );
+#if !defined( CLIENT_DLL )
+	if ( GetOwner()->IsPlayer() )
+		SetModel( GetWorldModel() );
 #endif
-	
+
 	int sequence = SelectWeightedSequence( act ); 
 	
 	// FORCE IDLE on sequences we don't have (which should be many)
@@ -1006,8 +1047,9 @@ void CBaseCombatWeapon::SetActivity( Activity act, float duration )
 		sequence = SelectWeightedSequence( ACT_VM_IDLE );
 
 	//Adrian: Oh man again...
-#if !defined( CLIENT_DLL ) && (defined( HL2MP ) || defined( PORTAL ) || defined( SDK_DLL ) )
-	SetModel( GetViewModel() );
+#if !defined( CLIENT_DLL )
+	if ( GetOwner()->IsPlayer() )
+		SetModel( GetViewModel() );
 #endif
 
 	if ( sequence != ACTIVITY_NOT_AVAILABLE )
@@ -1206,7 +1248,7 @@ bool CBaseCombatWeapon::HasPrimaryAmmo( void )
 	}
 
 	// Otherwise, I have ammo if I have some in my ammo counts
-	CBaseCombatCharacter		*pOwner = GetOwner();
+	CBaseCombatCharacter *pOwner = GetOwner();
 	if ( pOwner )
 	{
 		if ( pOwner->GetAmmoCount( m_iPrimaryAmmoType ) > 0 ) 
@@ -1236,10 +1278,16 @@ bool CBaseCombatWeapon::HasSecondaryAmmo( void )
 	}
 
 	// Otherwise, I have ammo if I have some in my ammo counts
-	CBaseCombatCharacter		*pOwner = GetOwner();
+	CBaseCombatCharacter *pOwner = GetOwner();
 	if ( pOwner )
 	{
 		if ( pOwner->GetAmmoCount( m_iSecondaryAmmoType ) > 0 ) 
+			return true;
+	}
+	else
+	{
+		// No owner, so return how much secondary ammo I have along with me.
+		if( GetSecondaryAmmoCount() > 0 )
 			return true;
 	}
 
@@ -1896,7 +1944,7 @@ bool CBaseCombatWeapon::DefaultReload( int iClipSize1, int iClipSize2, int iActi
 		return false;
 
 	// If I don't have any spare ammo, I can't reload
-	if ( pOwner->GetAmmoCount(m_iPrimaryAmmoType) <= 0 )
+	if ( pOwner->GetAmmoCount(GetActiveAmmoType()) <= 0 )
 		return false;
 
 	bool bReload = false;
@@ -1905,7 +1953,7 @@ bool CBaseCombatWeapon::DefaultReload( int iClipSize1, int iClipSize2, int iActi
 	if ( UsesClipsForAmmo1() )
 	{
 		// need to reload primary clip?
-		int primary	= min(iClipSize1 - m_iClip1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));
+		int primary	= min(iClipSize1 - m_iClip1, pOwner->GetAmmoCount(GetActiveAmmoType()));
 		if ( primary != 0 )
 		{
 			bReload = true;
@@ -1925,10 +1973,10 @@ bool CBaseCombatWeapon::DefaultReload( int iClipSize1, int iClipSize2, int iActi
 	if ( !bReload )
 		return false;
 
-#ifdef CLIENT_DLL
+//#ifdef CLIENT_DLL
 	// Play reload
 	WeaponSound( RELOAD );
-#endif
+//#endif
 	SendWeaponAnim( iActivity );
 
 	// Play the player's reload animation
@@ -2018,7 +2066,7 @@ void CBaseCombatWeapon::CheckReload( void )
 			}
 
 			// If out of ammo end reload
-			if (pOwner->GetAmmoCount(m_iPrimaryAmmoType) <=0)
+			if (pOwner->GetAmmoCount(GetActiveAmmoType()) <=0)
 			{
 				FinishReload();
 				return;
@@ -2028,7 +2076,7 @@ void CBaseCombatWeapon::CheckReload( void )
 			{
 				// Add them to the clip
 				m_iClip1 += 1;
-				pOwner->RemoveAmmo( 1, m_iPrimaryAmmoType );
+				pOwner->RemoveAmmo( 1, GetActiveAmmoType() );
 
 				Reload();
 				return;
@@ -2067,7 +2115,7 @@ void CBaseCombatWeapon::FinishReload( void )
 		// If I use primary clips, reload primary
 		if ( UsesClipsForAmmo1() )
 		{
-			int primary	= min( GetMaxClip1() - m_iClip1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));
+			int primary	= min( GetMaxClip1() - m_iClip1, pOwner->GetAmmoCount(GetActiveAmmoType()));
 			int iRemoveValue = primary;
 			m_iClip1 += primary;
 			if ( m_bReloadsFullClip )
@@ -2075,13 +2123,13 @@ void CBaseCombatWeapon::FinishReload( void )
 				m_iClip1 = GetMaxClip1();
 				iRemoveValue = GetMaxClip1();
 				// If we have more ammo in the clip than the stock, then just use the stock value
-				if ( pOwner->GetAmmoCount( m_iPrimaryAmmoType ) <= GetMaxClip1() )
+				if ( pOwner->GetAmmoCount( GetActiveAmmoType() ) <= GetMaxClip1() )
 				{
-					m_iClip1 = ( pOwner->GetAmmoCount( m_iPrimaryAmmoType ) );
+					m_iClip1 = ( pOwner->GetAmmoCount( GetActiveAmmoType() ) );
 				}
 			}
 
-			pOwner->RemoveAmmo( iRemoveValue, m_iPrimaryAmmoType );
+			pOwner->RemoveAmmo( iRemoveValue, GetActiveAmmoType() );
 		}
 
 		// If I use secondary clips, reload secondary
@@ -2104,9 +2152,9 @@ void CBaseCombatWeapon::FinishReload( void )
 //-----------------------------------------------------------------------------
 void CBaseCombatWeapon::AbortReload( void )
 {
-#ifdef CLIENT_DLL
+//#ifdef CLIENT_DLL
 	StopWeaponSound( RELOAD ); 
-#endif
+//#endif
 	m_bInReload = false;
 }
 
@@ -2396,6 +2444,7 @@ BEGIN_DATADESC( CBaseCombatWeapon )
 	DEFINE_FIELD( m_iSecondaryAmmoType, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iClip1, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iClip2, FIELD_INTEGER ),
+	DEFINE_FIELD( m_bUsingSecondaryAmmo, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bFiresUnderwater, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bAltFiresUnderwater, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fMinRange1, FIELD_FLOAT ),

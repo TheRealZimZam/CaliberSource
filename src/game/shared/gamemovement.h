@@ -179,7 +179,8 @@ protected:
 	// Sets refWaterLevel and refWaterType appropriately.
 	// If in water, applies current to baseVelocity, and returns true.
 	virtual bool			CheckWater( void );
-	
+	virtual bool			IsWet( void );
+
 	// Determine if player is in water, on ground, etc.
 	virtual void CategorizePosition( void );
 
@@ -212,6 +213,7 @@ protected:
 	float			SplineFraction( float value, float scale );
 
 	void			CategorizeGroundSurface( trace_t &pm );
+	void			PlantFootprint( surfacedata_t *psurface );
 
 	bool			InWater( void );
 
@@ -254,6 +256,7 @@ protected:
 	Vector			m_vecProximityMaxs;
 
 	float			m_fFrameTime;
+	float			m_WetTime;
 
 //private:
 	bool			m_bSpeedCropped;

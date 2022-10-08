@@ -1936,7 +1936,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			}
 		}
 
-		//TODO: We could expand this to a more general solution for various material penetration types (wood, thin metal, etc)
+		//DONE: We could expand this to a more general solution for various material penetration types (wood, thin metal, etc)
 
 		// See if we should pass through glass
 #ifdef GAME_DLL

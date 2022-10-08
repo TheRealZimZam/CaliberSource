@@ -364,7 +364,7 @@ enum PLAYER_ANIM
 
 #define DMG_PHYSGUN			(1<<23)		// Hit by manipulator. Usually doesn't do any damage.
 #define DMG_PLASMA			(1<<24)		// Shot by Cremator
-#define DMG_AIRBOAT			(1<<25)		// Hit by the airboat's gun
+#define DMG_AIRBOAT			(1<<25)		// Hit by the airboat's cannon
 
 #define DMG_DISSOLVE		(1<<26)		// Dissolving!
 #define DMG_BLAST_SURFACE	(1<<27)		// A blast on the surface of water that cannot harm things underwater
@@ -385,14 +385,13 @@ enum PLAYER_ANIM
 #define DMG_TIMEBASED		(DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE)	// mask for time-based damage
 
 // these are the damage types that are allowed to gib corpses
-#define DMG_GIB_CORPSE		( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_SONIC | DMG_CLUB )
+#define DMG_GIB_CORPSE		( DMG_CRUSH | DMG_FALL | DMG_BLAST | DMG_ENERGYBEAM | DMG_CLUB )
 
 // these are the damage types that have client hud art
 #define DMG_SHOWNHUD		(DMG_POISON | DMG_ACID | DMG_SLOWFREEZE | DMG_DROWN | DMG_BURN | DMG_SLOWBURN | DMG_NERVEGAS | DMG_RADIATION | DMG_SHOCK)
 
 // these are the damage types that don't have to supply a physics force & position
 #define DMG_NO_PHYSICS_FORCE	(DMG_FALL | DMG_BURN | DMG_PLASMA | DMG_DROWN | DMG_TIMEBASED | DMG_CRUSH | DMG_PHYSGUN)
-
 
 // settings for m_takedamage
 #define	DAMAGE_NO				0

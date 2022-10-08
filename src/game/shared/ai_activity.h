@@ -227,11 +227,11 @@ typedef enum
 
 	// viewmodel (weapon) activities
 	// FIXME: move these to the specific viewmodels, no need to make global
-	ACT_VM_DRAW,
-	ACT_VM_HOLSTER,
+	ACT_VM_DRAW,				// Taking weapon out
+	ACT_VM_HOLSTER,				// Putting weapon away
 	ACT_VM_IDLE,
-	ACT_VM_USE,
-	ACT_VM_FIDGET,
+	ACT_VM_USE,					// Using a world object (slapping a button, grabbing something, etc.)
+	ACT_VM_FIDGET,				// Misc. functions (ar2 scopein, flamethrower ignite, etc.)
 	ACT_VM_JAM,
 	ACT_VM_PULLBACK,
 	ACT_VM_PULLBACK_HIGH,
@@ -347,7 +347,7 @@ typedef enum
 	ACT_MELEE_ATTACK_STAB,
 	
 	ACT_RANGE_AIM_LOW,
-	ACT_RANGE_AIM_SMG1_LOW,
+	ACT_RANGE_AIM_RIFLE_LOW,
 	ACT_RANGE_AIM_PISTOL_LOW,
 	ACT_RANGE_AIM_AR2_LOW,
 //!	ACT_RANGE_AIM_HMG_LOW,
@@ -422,8 +422,8 @@ typedef enum
 	ACT_POLICE_HARASS2,
 
 	// Manned guns
-	ACT_IDLE_MANNEDGUN,
-	ACT_IDLE_MANNEDGUN_LARGE,
+	ACT_IDLE_MANNEDGUN,			//50cal
+	ACT_IDLE_MANNEDGUN_LARGE,	//minigun
 	
 	// Melee weapon
 	ACT_IDLE_MELEE,

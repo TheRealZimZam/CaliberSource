@@ -198,6 +198,7 @@ public:
 	bool					UsesPrimaryAmmo( void );					// returns true if the weapon actually uses primary ammo
 	bool					UsesSecondaryAmmo( void );					// returns true if the weapon actually uses secondary ammo
 	void					GiveDefaultAmmo( void );
+	void					SwitchAmmoType( void );
 	
 	virtual bool			CanHolster( void ) { return TRUE; };		// returns true if the weapon can be holstered
 	virtual bool			DefaultDeploy( char *szViewModel, char *szWeaponModel, int iActivity, char *szAnimExt );
@@ -331,6 +332,9 @@ public:
 
 	virtual int				GetPrimaryAmmoType( void )  const { return m_iPrimaryAmmoType; }
 	virtual int				GetSecondaryAmmoType( void )  const { return m_iSecondaryAmmoType; }
+	virtual int				GetActiveAmmoType( void );
+	virtual int				GetInactiveAmmoType( void );
+	
 	int						Clip1() const { return m_iClip1; }
 	int						Clip2() const { return m_iClip2; }
 
@@ -528,6 +532,7 @@ public:
 	CNetworkVar( int, m_iSecondaryAmmoType );	// "secondary" ammo index into the ammo info array
 	CNetworkVar( int, m_iClip1 );				// number of shots left in the primary weapon clip, -1 it not used
 	CNetworkVar( int, m_iClip2 );				// number of shots left in the secondary weapon clip, -1 it not used
+	bool					m_bUsingSecondaryAmmo;	// Whether the alternate ammo type is being used for primary attack
 	bool					m_bFiresUnderwater;		// True if this weapon can fire underwater
 	bool					m_bAltFiresUnderwater;	// True if this weapon can fire underwater
 	bool					m_bReloadsSingly;		// Tryuey if this weapon reloads 1 round at a time

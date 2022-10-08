@@ -791,20 +791,13 @@ CBaseHandle CGameMovement::TestPlayerPosition( const Vector& pos, int collisionG
 }
 
 
-#if 0
-// FIXME FIXME:  Does this need to be hooked up?
-bool CGameMovement::IsWet() const
-{
-	return ((pev->flags & FL_INRAIN) != 0) || (m_WetTime >= gpGlobals->time);
-}
-
 //-----------------------------------------------------------------------------
 // Plants player footprint decals
 //-----------------------------------------------------------------------------
-
 #define PLAYER_HALFWIDTH 12
 void CGameMovement::PlantFootprint( surfacedata_t *psurface )
 {
+#if 0
 	// Can't plant footprints on fake materials (ladders, wading)
 	if ( psurface->gameMaterial != 'X' )
 	{
@@ -825,6 +818,14 @@ void CGameMovement::PlantFootprint( surfacedata_t *psurface )
 			{
 			case 'D':
 				footprintDecal = DECAL_FOOTPRINT_DIRT;
+				break;
+
+			case 'K':
+				footprintDecal = DECAL_FOOTPRINT_SNOW;
+				break;
+
+			case 'N':
+				footprintDecal = DECAL_FOOTPRINT_SAND;
 				break;
 			}
 #endif
@@ -858,9 +859,61 @@ void CGameMovement::PlantFootprint( surfacedata_t *psurface )
 
 	// Switch feet for next time
 	m_IsFootprintOnLeft = !m_IsFootprintOnLeft;
+#endif
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Check for wetstuff
+//-----------------------------------------------------------------------------
+#define WET_TIME			    5.0f	// how many seconds till we're completely wet/dry
+#define DRY_TIME			   20.0f	// how many seconds till we're completely wet/dry
+
+#if 0
+void CBasePlayer::UpdateWetness()
+{
+	// BRJ 1/7/01
+	// Check for whether we're in a rainy area....
+	// Do this by tracing a line straight down with a size guaranteed to
+	// be larger than the map
+	// Update wetness based on whether we're in rain or not...
+
+	trace_t tr;
+	UTIL_TraceLine( pev->origin, pev->origin + Vector(0, 0, -COORD_EXTENT * 1.74), 
+					MASK_SOLID_BRUSHONLY, edict(), COLLISION_GROUP_NONE, &tr);
+	if (tr.surface.flags & SURF_WET)
+	{
+		if (! (pev->flags & FL_INRAIN) )
+		{
+			// Transition...
+			// Figure out how wet we are now (we were drying off...)
+			float wetness = (m_WetTime - gpGlobals->time) / DRY_TIME;
+			if (wetness < 0.0f)
+				wetness = 0.0f;
+
+			// Here, wet time represents the time at which we get totally wet
+			m_WetTime = gpGlobals->time + (1.0 - wetness) * WET_TIME; 
+
+			pev->flags |= FL_INRAIN;
+		}
+	}
+	else
+	{
+		if ((pev->flags & FL_INRAIN) != 0)
+		{
+			// Transition...
+			// Figure out how wet we are now (we were getting more wet...)
+			float wetness = 1.0f + (gpGlobals->time - m_WetTime) / WET_TIME;
+			if (wetness > 1.0f)
+				wetness = 1.0f;
+
+			// Here, wet time represents the time at which we get totally dry
+			m_WetTime = gpGlobals->time + wetness * DRY_TIME; 
+
+			pev->flags &= ~FL_INRAIN;
+		}
+	}
 }
 #endif
-
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -3559,6 +3612,12 @@ bool CGameMovement::CheckWater( void )
 	return ( player->GetWaterLevel() > WL_Feet );
 }
 
+bool CGameMovement::IsWet( void )
+{
+	return ((player->GetFlags() & FL_INRAIN) != 0) || (m_WetTime >= gpGlobals->frametime);
+}
+
+//-----------------------------------------------------------------------------
 void CGameMovement::SetGroundEntity( trace_t *pm )
 {
 	CBaseEntity *newGround = pm ? pm->m_pEnt : NULL;

@@ -100,15 +100,11 @@ bool CAI_BaseNPC::IsValidCover( const Vector &vecCoverLocation, CAI_Hint const *
 		}
 	}
 
-#if 0
-	// If I'm in a squad don't pick cover node if other squad member
-	// is already nearby
-	if (m_pSquad)
+	// If I'm in a squad try not to gagglefuck
+	if (InSquad())
 	{
-		return m_pSquad->IsValidCover( vecCoverLocation, pHint );
+		return GetSquad()->IsValidCover( vecCoverLocation );
 	}
-#endif 
-	// UNDONE: Do we really need this test?
 
 	// ----------------------------------------------------------------
 	// Make sure my hull can fit at this node before accepting it. 
@@ -222,7 +218,7 @@ void CAI_BaseNPC::RemoveFromSquad()
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::CheckSquad()
 {
-	if( !IsInSquad() )
+	if( !InSquad() )
 		return;
 
 	if( !GetSquad()->IsLeader(this) )

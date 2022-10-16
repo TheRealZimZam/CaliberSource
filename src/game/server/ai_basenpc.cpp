@@ -4814,7 +4814,7 @@ void CAI_BaseNPC::RunAI( void )
 
 	if( ai_debug_squads.GetBool() )
 	{
-		if( IsInSquad() && GetSquad() && !CAI_Squad::IsSilentMember(this ) && ( GetSquad()->IsLeader( this ) || GetSquad()->NumMembers() == 1 ) )
+		if( InSquad() && GetSquad() && !CAI_Squad::IsSilentMember(this ) && ( GetSquad()->IsLeader( this ) || GetSquad()->NumMembers() == 1 ) )
 		{
 			AISquadIter_t iter;
 			CAI_Squad *pSquad = GetSquad();
@@ -4837,7 +4837,7 @@ void CAI_BaseNPC::RunAI( void )
 		}
 	}
 
-	if( ai_debug_loners.GetBool() && !IsInSquad() && AI_IsSinglePlayer() )
+	if( ai_debug_loners.GetBool() && !InSquad() && AI_IsSinglePlayer() )
 	{
 		Vector right;
 		Vector vecPoint;

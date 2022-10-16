@@ -480,7 +480,6 @@ int	CAI_Squad::NumMembers( bool bIgnoreSilentMembers )
 //-------------------------------------
 // Purpose: Alert everyone in the squad to the presence of a new enmey
 //-------------------------------------
-
 void CAI_Squad::SquadNewEnemy( CBaseEntity *pEnemy )
 {
 	if ( !pEnemy )
@@ -517,7 +516,6 @@ void CAI_Squad::SquadNewEnemy( CBaseEntity *pEnemy )
 //			data - generic data handle
 //			sender - who sent the message (NULL by default, if not, will not resend to the sender)
 //-------------------------------------
-
 int	CAI_Squad::BroadcastInteraction( int interactionType, void *data, CBaseCombatCharacter *sender )
 {
 	//Must have a squad
@@ -567,6 +565,22 @@ void CAI_Squad::JustMadeSound( int soundPriority, float time )
 {
 	m_flSquadSoundWaitTime = time;
 	m_nSquadSoundPriority = soundPriority;
+}
+
+//-----------------------------------------------------------------------------
+// FValidateCover - determines whether or not the chosen
+// cover location is a good one to move to. (currently based
+// on proximity to others in the squad)
+//-----------------------------------------------------------------------------
+bool CAI_Squad::IsValidCover( const Vector &vecCoverLocation )
+{
+	if (SquadMemberInRange( vecCoverLocation, 128 ))
+	{
+		// another squad member is too close to this piece of cover.
+		return false;
+	}
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------

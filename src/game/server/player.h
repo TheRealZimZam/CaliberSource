@@ -358,8 +358,6 @@ public:
 	bool					IsHLTV( void ) const { return pl.hltv; }
 	virtual	bool			IsPlayer( void ) const { return true; }			// Spectators return TRUE for this, use IsObserver to seperate cases
 	virtual bool			IsNetClient( void ) const { return true; }		// Bots should return FALSE for this, they can't receive NET messages
-																			// Spectators should return TRUE for this
-
 	virtual bool			IsFakeClient( void ) const;
 
 	// Get the client index (entindex-1).
@@ -420,7 +418,7 @@ public:
 	// JOHN:  sends custom messages if player HUD data has changed  (eg health, ammo)
 	virtual void			UpdateClientData( void );
 	void					RumbleEffect( unsigned char index, unsigned char rumbleData, unsigned char rumbleFlags );
-	
+
 	// Player is moved across the transition by other means
 	virtual int				ObjectCaps( void ) { return BaseClass::ObjectCaps() & ~FCAP_ACROSS_TRANSITION; }
 	virtual void			Precache( void );
@@ -433,7 +431,7 @@ public:
 	virtual void			FlashlightTurnOn( void ) { };
 	virtual void			FlashlightTurnOff( void ) { };
 	virtual bool			IsIlluminatedByFlashlight( CBaseEntity *pEntity, float *flReturnDot ) {return false; }
-	
+
 	void					UpdatePlayerSound ( void );
 	virtual void			UpdateStepSound( surfacedata_t *psurface, const Vector &vecOrigin, const Vector &vecVelocity );
 	virtual void			PlayStepSound( Vector &vecOrigin, surfacedata_t *psurface, float fvol, bool force );
@@ -899,6 +897,9 @@ protected:
 	int						m_nPoisonRestored;		// track poison damage restored
 	// NOTE: bits damage type appears to only be used for time-based damage
 	BYTE					m_rgbTimeBasedDamage[CDMG_TIMEBASED];
+
+	bool					m_fNoPlayerSound;	// a debugging feature. Player makes no sound if this is true. 
+//	bool					m_fLongJump; // does this player have the longjump module?
 
 	// Player Physics Shadow
 	int						m_vphysicsCollisionState;

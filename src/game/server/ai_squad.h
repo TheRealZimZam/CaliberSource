@@ -125,6 +125,8 @@ public:
 	bool					IsSquadInflictor( CBaseEntity *pInflictor );
 
 	static bool				IsSilentMember( const CAI_BaseNPC *pNPC );
+	
+	bool					IsValidCover( const Vector &vecCoverLocation );
 
 	template <typename T>
 	void					SetSquadData( unsigned slot, const T &data )

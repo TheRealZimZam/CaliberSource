@@ -274,6 +274,7 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_iRespawnFrames, FIELD_FLOAT ),
 	DEFINE_FIELD( m_afPhysicsFlags, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hVehicle, FIELD_EHANDLE ),
+//	DEFINE_FIELD( m_fLongJump, FIELD_BOOLEAN ),
 
 	// recreate, don't restore
 	// DEFINE_FIELD( m_CommandContext, CUtlVector < CCommandContext > ),
@@ -442,6 +443,7 @@ BEGIN_DATADESC( CBasePlayer )
 END_DATADESC()
 
 int giPrecacheGrunt = 0;
+int gmsgLogo = 0;
 
 edict_t *CBasePlayer::s_PlayerEdict = NULL;
 
@@ -1806,7 +1808,6 @@ void CBasePlayer::Event_Killed( const CTakeDamageInfo &info )
 void CBasePlayer::Event_Dying()
 {
 	// NOT GIBBED, RUN THIS CODE
-
 	CTakeDamageInfo info;
 	DeathSound( info );
 
@@ -1829,7 +1830,10 @@ void CBasePlayer::Event_Dying()
 }
 
 
+//=========================================================
+// OBSOLETE - See playeranimstate
 // Set the activity based on an event or current state
+//=========================================================
 void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 {
 	int animDesired;
@@ -1852,97 +1856,120 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 
 	Activity idealActivity = ACT_IDLE;
 
-	// This could stand to be redone. Why is playerAnim abstracted from activity? (sjb)
-	if (playerAnim == PLAYER_JUMP)
+	if ( m_lifeState != LIFE_DEAD )
 	{
-		idealActivity = ACT_JUMP;
-	}
-	else if (playerAnim == PLAYER_SUPERJUMP)
-	{
-		idealActivity = ACT_LEAP;
-	}
-	else if (playerAnim == PLAYER_DIE)
-	{
-		if ( m_lifeState == LIFE_ALIVE )
+		// This could stand to be redone. Why is playerAnim abstracted from activity? (sjb)
+		// Because this should be a switch so we can save on those precious bytes (w.m)
+		switch (playerAnim) 
 		{
-			idealActivity = GetDeathActivity();
-		}
-	}
-	else if (playerAnim == PLAYER_IDLE || playerAnim == PLAYER_WALK)
-	{
-		idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_WALK_AIM ) : Weapon_TranslateActivity( ACT_WALK );
+			case PLAYER_JUMP:
+				idealActivity = ACT_JUMP;
+			break;
 
-		if ( !( GetFlags() & FL_ONGROUND ) && (m_Activity == ACT_JUMP || m_Activity == ACT_LEAP) )	// Still jumping
-		{
-			idealActivity = m_Activity;
-		}
-		else if ( speed < 1 )	//Very slow move/being slightly pushed while idle
-		{
-			idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_IDLE_ANGRY ) : Weapon_TranslateActivity( ACT_IDLE );
-			if ( GetWaterLevel() > 1 || GetFlags() & FL_FLY )
-			{
-				idealActivity = ACT_HOVER;
-			}
-		}
-		else if ( GetFlags() & FL_DUCKING )	// crouching
-		{
-			idealActivity = Weapon_TranslateActivity( ACT_CROUCHIDLE );
-			if ( speed > 1 )
-			{
-				idealActivity = Weapon_TranslateActivity( ACT_WALK_CROUCH );
-			}
-		}
-		else
-		{
-			if ( GetWaterLevel() > 1 )
-			{
-				idealActivity = ACT_SWIM;
-			}
-			else if ( speed > 160.0 )
-			{
-				// Jogging
-				idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_RUN_AIM ) : Weapon_TranslateActivity( ACT_RUN );
-				if ( speed > 240.0 )
+			case PLAYER_SUPERJUMP:
+				idealActivity = ACT_LEAP;
+			break;
+
+			case PLAYER_DIE:
+				if ( m_lifeState == LIFE_ALIVE )
 				{
-					// Full sprint
-					idealActivity = Weapon_TranslateActivity( ACT_SPRINT );
+					idealActivity = GetDeathActivity();
 				}
-			}
-			else if ( m_iHealth < sk_player_critical_health.GetInt() )
-			{
-				idealActivity = ACT_WALK_HURT;
-			}
-		}
-	}
-	else if (playerAnim == PLAYER_ATTACK1)
-	{
-		if ( m_Activity == ACT_HOVER	|| 
-			 m_Activity == ACT_SWIM		||
-			 m_Activity == ACT_JUMP		||
-			 m_Activity == ACT_LEAP		||
-			 m_Activity == ACT_DIESIMPLE )
-		{
-			idealActivity = m_Activity;
-		}
-		else if ( speed < 1 )
-		{
-			idealActivity = Weapon_TranslateActivity( ACT_RANGE_ATTACK1 );
-			if ( IsDucked() )
-				idealActivity = Weapon_TranslateActivity( ACT_RANGE_ATTACK1_LOW );
-		}
+			break;
 
-		if ( gpGlobals->curtime + m_flAimTime < 1 )
-			SetAimTime( 1.0f );
+			case PLAYER_IDLE:
+			case PLAYER_WALK:
+				idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_WALK_AIM ) : Weapon_TranslateActivity( ACT_WALK );
+
+				if ( m_iHealth < sk_player_critical_health.GetInt() )
+					idealActivity = ACT_WALK_HURT;
+
+				if ( !( GetFlags() & FL_ONGROUND ) && (m_Activity == ACT_JUMP || m_Activity == ACT_LEAP) )	// Still jumping
+				{
+					idealActivity = m_Activity;
+				}
+				else if ( speed < 1 )	//Very slow move/being slightly pushed while idle
+				{
+					idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_IDLE_ANGRY ) : Weapon_TranslateActivity( ACT_IDLE );
+
+					if (idealActivity == ACT_INVALID)
+						idealActivity = ACT_IDLE;
+
+					if ( GetWaterLevel() > 1 || GetFlags() & FL_FLY )
+						idealActivity = ACT_HOVER;
+				}
+				else if ( GetFlags() & FL_DUCKING )	// crouching
+				{
+					idealActivity = Weapon_TranslateActivity( ACT_CROUCHIDLE );
+					if ( speed > 1 )
+						idealActivity = Weapon_TranslateActivity( ACT_WALK_CROUCH );
+
+					if (idealActivity == ACT_INVALID)
+						idealActivity = ACT_CROUCHIDLE;
+				}
+				else
+				{
+					if ( GetWaterLevel() > 1 )
+					{
+						idealActivity = ACT_SWIM;
+					}
+					if ( speed > 160.0 )
+					{
+						// Jogging
+						idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_RUN_AIM ) : Weapon_TranslateActivity( ACT_RUN );
+						if ( speed > 240.0 )
+						{
+							// Full sprint
+							idealActivity = Weapon_TranslateActivity( ACT_SPRINT );
+						}
+
+						if (idealActivity == ACT_INVALID)
+							idealActivity = ACT_RUN;
+					}
+				}
+			break;
+
+			case PLAYER_ATTACK1:
+				if ( m_Activity == ACT_HOVER	|| 
+					 m_Activity == ACT_SWIM		||
+					 m_Activity == ACT_JUMP		||
+					 m_Activity == ACT_LEAP		||
+					 m_Activity == ACT_DIESIMPLE )
+				{
+					idealActivity = m_Activity;
+				}
+				else if ( speed < 1 )
+				{
+					idealActivity = Weapon_TranslateActivity( ACT_RANGE_ATTACK1 );
+					if ( IsDucked() )
+						idealActivity = Weapon_TranslateActivity( ACT_RANGE_ATTACK1_LOW );
+
+					if (idealActivity == ACT_INVALID)
+						idealActivity = ACT_RANGE_ATTACK1;
+				}
+
+				if ( gpGlobals->curtime + m_flAimTime < 1 )
+					SetAimTime( 1.0f );	//Always aim for at least a second
+			break;
+
+			case PLAYER_RELOAD:
+				idealActivity = Weapon_TranslateActivity( ACT_RELOAD );
+				if ( IsDucked() )
+					idealActivity = Weapon_TranslateActivity( ACT_RELOAD_LOW );
+
+				if (idealActivity == ACT_INVALID)
+					idealActivity = ACT_RELOAD;
+			break;
+
+			case PLAYER_IN_VEHICLE:
+				idealActivity = ACT_IDLE_MANNEDGUN;	//!!!TEMP
+			break;
+		}
 	}
-	else if (playerAnim == PLAYER_RELOAD)
+	else
 	{
-		idealActivity = Weapon_TranslateActivity( ACT_RELOAD );
-		if ( IsDucked() )
-			idealActivity = Weapon_TranslateActivity( ACT_RELOAD_LOW );
-	}
-	else if (playerAnim == PLAYER_IN_VEHICLE)
-	{
-		idealActivity = ACT_HOVER;	//!!!TEMP
+		// We are completely deadzor, stay dead until our corpse is created
+		idealActivity = GetDeathActivity();
 	}
 
 	SetActivity( idealActivity );
@@ -2173,7 +2200,7 @@ void CBasePlayer::PlayerDeathThink(void)
 		m_lifeState = LIFE_DEAD;
 		m_flDeathAnimTime = gpGlobals->curtime;
 	}
-	
+
 	StopAnimation();
 
 	AddEffects( EF_NOINTERP );
@@ -2915,10 +2942,24 @@ CBaseEntity	*CBasePlayer::GetHeldObject( void )
 //-----------------------------------------------------------------------------
 void CBasePlayer::Jump()
 {
+	// If this isn't the first frame pressing the jump button, break out.
+	if ( !FBitSet( m_afButtonPressed, IN_JUMP ) )
+		return;         // don't pogo stick
+
 	if (!(m_nButtons & IN_DUCK)) 
 	{
 		SetAnimation( PLAYER_JUMP );
 	}
+
+/*
+	if ( m_fLongJump &&
+		(pev->button & IN_DUCK) &&
+		( pev->flDuckTime > 0 ) &&
+		pev->velocity.Length() > 50 )
+	{
+		SetAnimation( PLAYER_SUPERJUMP );
+	}
+*/
 }
 
 void CBasePlayer::Duck( )
@@ -4379,6 +4420,12 @@ void CBasePlayer::UpdatePlayerSound( void )
 		}
 	}
 
+	if ( m_fNoPlayerSound )
+	{
+		// debugging flag, lets players move around and shoot without monsters hearing.
+		iVolume = 0;
+	}
+
 	if ( pSound )
 	{
 		pSound->SetSoundOrigin( GetAbsOrigin() );
@@ -4996,6 +5043,8 @@ void CBasePlayer::Spawn( void )
 	{
 		Msg( "Couldn't alloc player sound slot!\n" );
 	}
+
+	m_fNoPlayerSound = false;// normal sound behavior.
 
 	SetThink(NULL);
 	m_fInitHUD = true;
@@ -5903,6 +5952,34 @@ void CBasePlayer::ImpulseCommands( )
 	int iImpulse = (int)m_nImpulse;
 	switch (iImpulse)
 	{
+	case 99:
+		// Show logo
+		{
+		int iOn;
+
+		if (!gmsgLogo)
+		{
+			iOn = 1;
+			gmsgLogo = 1;
+		} 
+		else 
+		{
+			iOn = 0;
+		}
+
+		ASSERT( gmsgLogo > 0 );
+
+		CSingleUserRecipientFilter user( this );
+		user.MakeReliable();
+		UserMessageBegin( user, "Logo" );
+			WRITE_BYTE( iOn );
+		MessageEnd();
+
+		if(!iOn)
+			gmsgLogo = 0;
+		}
+		break;
+
 	case 100:
         // temporary flashlight for level designers
 		if ( IsSuitEquipped() )
@@ -5936,8 +6013,7 @@ void CBasePlayer::ImpulseCommands( )
 		}
 		break;
 
-	case	201:// paint decal
-		
+	case 201:// paint decal
 		if ( gpGlobals->curtime < m_flNextDecalTime )
 		{
 			// too early!
@@ -5961,7 +6037,7 @@ void CBasePlayer::ImpulseCommands( )
 
 		break;
 
-	case	202:// player jungle sound 
+	case 203:// player jungle sound 
 		if ( gpGlobals->curtime < m_flNextDecalTime )
 		{
 			// too early!
@@ -6187,7 +6263,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_brickbat" );
 		GiveNamedItem( "weapon_bugbait" );
 //		GiveNamedItem( "weapon_cguard" );
-		GiveNamedItem( "weapon_crossbow" );
+//		GiveNamedItem( "weapon_crossbow" );
 //		GiveNamedItem( "weapon_crowbar" );
 		GiveNamedItem( "weapon_flameprojector" );
 		GiveNamedItem( "weapon_flamethrower" );
@@ -6199,7 +6275,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 //		GiveNamedItem( "weapon_irifle" );
 		GiveNamedItem( "weapon_flash" );
 		GiveNamedItem( "weapon_molotov" );
-		GiveNamedItem( "weapon_physcannon" );
+//		GiveNamedItem( "weapon_physcannon" );
 //		GiveNamedItem( "weapon_physgun" );
 		GiveNamedItem( "weapon_pistol" );
 		GiveNamedItem( "weapon_rpg" );
@@ -6241,7 +6317,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 				pNPC->ReportAIState();
 		}
 		break;
-#if 0
+
 	case 105:// player makes no sound for NPCs to hear.
 		{
 			if ( m_fNoPlayerSound )
@@ -6256,7 +6332,6 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 			}
 		}
 		break;
-#endif
 
 	case 106:
 		// Give me the classname and targetname of this entity.
@@ -6322,22 +6397,32 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		break;
 	}
 
-	case	195:// show shortest paths for entire level to nearest node
+	case 109:// remove creature.
+		pEntity = FindEntityForward( this, true );
+		if ( pEntity )
+		{
+			UTIL_Remove( pEntity );
+//			if ( pEntity->m_takedamage )
+//				pEntity->SetThink(SUB_Remove);
+		}
+		break;
+
+	case 195:// show shortest paths for entire level to nearest node
 		{
 			Create("node_viewer_fly", GetLocalOrigin(), GetLocalAngles());
 		}
 		break;
-	case	196:// show shortest paths for entire level to nearest node
+	case 196:// show shortest paths for entire level to nearest node
 		{
 			Create("node_viewer_large", GetLocalOrigin(), GetLocalAngles());
 		}
 		break;
-	case	197:// show shortest paths for entire level to nearest node
+	case 197:// show shortest paths for entire level to nearest node
 		{
 			Create("node_viewer_human", GetLocalOrigin(), GetLocalAngles());
 		}
 		break;
-	case	202:// Random blood splatter
+	case 202:// Random blood splatter
 		{
 			Vector forward;
 			EyeVectors( &forward );
@@ -6350,15 +6435,6 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 				CBloodSplat *pBlood = CREATE_UNSAVED_ENTITY( CBloodSplat, "bloodsplat" );
 				pBlood->Spawn( this );
 			}
-		}
-		break;
-	case	203:// remove creature.
-		pEntity = FindEntityForward( this, true );
-		if ( pEntity )
-		{
-			UTIL_Remove( pEntity );
-//			if ( pEntity->m_takedamage )
-//				pEntity->SetThink(SUB_Remove);
 		}
 		break;
 	}

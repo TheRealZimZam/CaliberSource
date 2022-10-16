@@ -1618,7 +1618,7 @@ public:
 	void				RemoveFromSquad();
 	void				CheckSquad();
 	void				SetSquadName( string_t name )	{ m_SquadName = name; 	}
-	bool				IsInSquad() const				{ return m_pSquad != NULL; }
+	bool				InSquad() const					{ return m_pSquad != NULL; }
 	virtual bool		IsSilentSquadMember() const 	{ return false; }
 
 	int					NumWeaponsInSquad( const char *pszWeaponClassname );

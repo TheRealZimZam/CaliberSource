@@ -1648,6 +1648,7 @@ END_DATADESC()
 
 
 LINK_ENTITY_TO_CLASS( aiscripted_schedule, CAI_ScriptedSchedule );
+LINK_ENTITY_TO_CLASS( scripted_schedule, CAI_ScriptedSchedule );
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -1809,7 +1810,7 @@ void CAI_ScriptedSchedule::StartSchedule( CAI_BaseNPC *pTarget )
 				movementActivity = ACT_FLY;
 			}
 
-			if (!pTarget->ScheduledMoveToGoalEntity( SCHED_IDLE_WALK, pGoalEnt, movementActivity ))
+			if (!pTarget->ScheduledMoveToGoalEntity( SCHED_SCRIPTED_WALK, pGoalEnt, movementActivity ))
 			{
 				if (!(m_spawnflags & SF_SCRIPT_NO_COMPLAINTS))
 				{
@@ -1831,7 +1832,7 @@ void CAI_ScriptedSchedule::StartSchedule( CAI_BaseNPC *pTarget )
 			{
 				movementActivity = ACT_FLY;
 			}
-			if (!pTarget->ScheduledFollowPath( SCHED_IDLE_WALK, pGoalEnt, movementActivity ))
+			if (!pTarget->ScheduledFollowPath( SCHED_SCRIPTED_WALK, pGoalEnt, movementActivity ))
 			{
 				if (!(m_spawnflags & SF_SCRIPT_NO_COMPLAINTS))
 				{
@@ -1911,7 +1912,7 @@ void CAI_ScriptedSchedule::InputStopSchedule( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CAI_ScriptedSchedule::StopSchedule( CAI_BaseNPC *pTarget )
 {
-	if ( pTarget->IsCurSchedule( SCHED_IDLE_WALK ) )
+	if ( pTarget->IsCurSchedule( SCHED_SCRIPTED_WALK ) )
 	{
 		DevMsg( 2, "%s (%s): StopSchedule called on NPC %s.\n", GetClassname(), GetDebugName(), pTarget->GetDebugName() );
 		pTarget->ClearSchedule( "Stopping scripted schedule" );

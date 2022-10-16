@@ -61,7 +61,7 @@ CHudDev::CHudDev( const char *pElementName ) : CHudElement( pElementName ), Base
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
-	SetHiddenBits( HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
+	SetHiddenBits( HIDEHUD_PLAYERDEAD );
 
 	m_textureID_IconDev = vgui::surface()->CreateNewTextureID();
 	vgui::surface()->DrawSetTextureFile( m_textureID_IconDev, DEV_MATERIAL, true, true );
@@ -79,8 +79,16 @@ void CHudDev::VidInit()
 //-----------------------------------------------------------------------------
 bool CHudDev::ShouldDraw( void )
 {
+	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+	if ( !pPlayer )
+	{
+		return false;
+	}
+
+#if 0
 	if ( developer.GetBool() )
 		return true;
+#endif
 
 	return false;
 }

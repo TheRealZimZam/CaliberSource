@@ -102,7 +102,8 @@ C_BaseHLPlayer::C_BaseHLPlayer() :
 
 C_BaseHLPlayer::~C_BaseHLPlayer()
 {
-	m_PlayerAnimState->Release();
+	if ( m_PlayerAnimState )
+		m_PlayerAnimState->Release();
 }
 
 //-----------------------------------------------------------------------------
@@ -220,7 +221,7 @@ int C_BaseHLPlayer::DrawModel( int flags )
 
 const QAngle& C_BaseHLPlayer::GetRenderAngles()
 {
-	if ( IsRagdoll() )
+	if ( IsRagdoll() || IsPlayerDead() || m_PlayerAnimState == NULL )
 	{
 		return vec3_angle;
 	}
@@ -697,7 +698,8 @@ void C_BaseHLPlayer::PerformClientSideNPCSpeedModifiers( float flFrameTime, CUse
 
 void C_BaseHLPlayer::UpdateClientSideAnimation()
 {
-	m_PlayerAnimState->Update( EyeAngles()[YAW], EyeAngles()[PITCH] );
+	if ( m_PlayerAnimState )
+		m_PlayerAnimState->Update( EyeAngles()[YAW], EyeAngles()[PITCH] );
 
 	BaseClass::UpdateClientSideAnimation();
 }

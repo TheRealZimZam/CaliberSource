@@ -1209,6 +1209,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\hud_logo.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\hud_msg.cpp"
 				>
 			</File>

@@ -8,7 +8,7 @@
 Currently very WIP - use at your own discretion!
 Latest build 10/16/22 - Demo Pre-prealpha
 
-Variably compatible with all existing source maps, including Half-Life:Source and PlatinumSource(hl2beta)
+Variably compatible with all existing source maps, including Half-Life:Source and PlatinumSrc(hl2beta)
 
 
 All original assets by Valve Software

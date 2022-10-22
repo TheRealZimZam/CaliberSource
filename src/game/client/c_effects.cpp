@@ -32,9 +32,10 @@ extern ConVar cl_winddir;
 extern ConVar cl_windspeed;
 
 Vector g_vSplashColor( 0.5, 0.5, 0.5 );
-float g_flSplashScale = 0.15;
-float g_flSplashLifetime = 0.5f;
+//float g_flSplashScale = 0.3f;
+//float g_flSplashLifetime = 0.5f;
 float g_flSplashAlpha = 0.3f;
+ConVar r_RainSplashScale( "r_RainSplashScale", "0.8", FCVAR_NONE );
 ConVar r_RainSplashPercentage( "r_RainSplashPercentage", "50", FCVAR_NONE ); // N% chance of a rain particle making a splash.
 ConVar r_RainParticleDensity( "r_RainParticleDensity", "1", FCVAR_NONE, "Density of Particle Rain 0-1" );
 
@@ -253,14 +254,27 @@ inline bool CClient_Precipitation::SimulateRain( CPrecipitationParticle* pPartic
 				if ( RandomInt( 0, 100 ) < r_RainSplashPercentage.GetInt() )
 				{
 					trace_t trace;
-					// Ideally, this would trace both brush and water
-					UTIL_TraceLine(vOldPos, pParticle->m_Pos, MASK_WATER, NULL, COLLISION_GROUP_NONE, &trace);
-					if( trace.fraction < 1 )
+					UTIL_TraceLine(vOldPos, pParticle->m_Pos, (MASK_SOLID_BRUSHONLY|CONTENTS_WATER), NULL, COLLISION_GROUP_NONE, &trace);
+					if( trace.fraction < 1 || trace.DidHit() )
 					{
 						m_Splashes.AddToTail( trace.endpos );
 					}
 				}
 			}
+
+			// Tell the framework it's time to remove the particle from the list
+			return false;
+		}
+	}
+	else
+	{
+		// No raincheck, do it cheap
+		trace_t trace;
+		UTIL_TraceLine(vOldPos, pParticle->m_Pos, (MASK_SOLID_BRUSHONLY|CONTENTS_WATER), this, COLLISION_GROUP_NONE, &trace);
+		if( trace.fraction < 1 || trace.DidHit() )
+		{
+			if ( RandomInt( 0, 100 ) <= r_RainSplashPercentage.GetInt() )
+				m_Splashes.AddToTail( trace.endpos );
 
 			// Tell the framework it's time to remove the particle from the list
 			return false;
@@ -489,7 +503,7 @@ void CClient_Precipitation::CreateWaterSplashes()
 		
 		if ( CurrentViewForward().Dot( vSplash - CurrentViewOrigin() ) > 1 )
 		{
-			FX_WaterRipple( vSplash, g_flSplashScale, &g_vSplashColor, g_flSplashLifetime, g_flSplashAlpha );
+			FX_WaterSplash( vSplash, Vector(0,0,1), r_RainSplashScale.GetFloat(), &g_vSplashColor, g_flSplashAlpha, false );
 		}
 	}
 	m_Splashes.Purge();
@@ -1532,16 +1546,19 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 			}
 		}
 
-		// TERROR: Find an endpos
 		//!!!TODO; This is bad! a hardcoded endpoint doesnt work for ledges, or when the player is viewing from a high indoor position!
 		//!!! possible solution - determine if the player is viewing the particles from indoors (ie not in the trigger box),
 		//!!! if so, use the old logic that just falls through the floor until the lifetime ends - M.M
-		float endposCompatibility = 96.0f; 
+
+		// TERROR: Find an endpos
+		float endposCompatibility = 192.0f; 
 		if ( r_RainCheck.GetInt() != 0 )
-		{
 			endposCompatibility = 256.0f;
-		}
-		Vector vParticleEndPos( (vPlayerHeight - endposCompatibility) );
+
+		Vector vParticleEndPos( vPlayerHeight );
+		vParticleEndPos.z -= endposCompatibility;
+		//UTIL_TraceLine( vPlayerHeight, vParticleEndPos, MASK_SOLID_BRUSHONLY, NULL, COLLISION_GROUP_NONE, &trace );
+		//vParticleEndPos = trace.endpos;
 
 		CreateRainOrSnowParticle( vParticlePos, vParticleEndPos, vParticleVel );
 	}

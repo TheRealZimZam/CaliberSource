@@ -35,6 +35,8 @@ ConVar	cl_show_splashes( "cl_show_splashes", "1" );
 
 static Vector s_vecSlimeColor( 46.0f/255.0f, 90.0f/255.0f, 36.0f/255.0f );
 
+// Why dfuq is this in here??
+#if 0
 // Each channel does not contribute to the luminosity equally, as represented here
 #define	RED_CHANNEL_CONTRIBUTION	0.30f
 #define GREEN_CHANNEL_CONTRIBUTION	0.59f
@@ -70,8 +72,8 @@ void UTIL_GetNormalizedColorTintAndLuminosity( const Vector &color, Vector *tint
 			*tint = color / maxComponent;
 		}
 	}
-
 }
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: Retrieve and alter lighting for splashes
@@ -147,25 +149,18 @@ void FX_WaterRipple( const Vector &origin, float scale, Vector *pColor, float fl
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale )
+void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale, Vector *pColor, float flAlpha, bool playsound )
 {
 	if ( cl_show_splashes.GetBool() == false )
 		return;
 
 	VPROF_BUDGET( "FX_WaterSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 
-	Vector	color;
-	float	luminosity;
-	
-	// Get our lighting information
-	FX_GetSplashLighting( origin + ( normal * scale ), &color, &luminosity );
-
+	Vector color = pColor ? *pColor : Vector( 0.8f, 0.8f, 0.75f );
 	float flScale = scale / 8.0f;
 
 	if ( flScale > 4.0f )
-	{
 		flScale = 4.0f;
-	}
 
 	// Setup our trail emitter
 	CSmartPtr<CTrailParticles> sparkEmitter = CTrailParticles::Create( "splash" );
@@ -188,35 +183,38 @@ void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale )
 	Vector	offset;
 	float	colorRamp;
 
-	//Dump out drops
-	for ( int i = 0; i < 16; i++ )
+	//Dump out drops, but only if its big enough
+	if ( flScale > 0.25f )
 	{
-		offset = origin;
-		offset[0] += random->RandomFloat( -8.0f, 8.0f ) * flScale;
-		offset[1] += random->RandomFloat( -8.0f, 8.0f ) * flScale;
+		for ( int i = 0; i < 16; i++ )
+		{
+			offset = origin;
+			offset[0] += random->RandomFloat( -8.0f, 8.0f ) * flScale;
+			offset[1] += random->RandomFloat( -8.0f, 8.0f ) * flScale;
 
-		tParticle = (TrailParticle *) sparkEmitter->AddParticle( sizeof(TrailParticle), hMaterial, offset );
+			tParticle = (TrailParticle *) sparkEmitter->AddParticle( sizeof(TrailParticle), hMaterial, offset );
 
-		if ( tParticle == NULL )
-			break;
+			if ( tParticle == NULL )
+				break;
 
-		tParticle->m_flLifetime	= 0.0f;
-		tParticle->m_flDieTime	= random->RandomFloat( 0.25f, 0.5f );
+			tParticle->m_flLifetime	= 0.0f;
+			tParticle->m_flDieTime	= random->RandomFloat( 0.25f, 0.5f );
 
-		offDir = normal + RandomVector( -0.8f, 0.8f );
+			offDir = normal + RandomVector( -0.8f, 0.8f );
 
-		tParticle->m_vecVelocity = offDir * random->RandomFloat( SPLASH_MIN_SPEED * flScale * 3.0f, SPLASH_MAX_SPEED * flScale * 3.0f );
-		tParticle->m_vecVelocity[2] += random->RandomFloat( 32.0f, 64.0f ) * flScale;
+			tParticle->m_vecVelocity = offDir * random->RandomFloat( SPLASH_MIN_SPEED * flScale * 3.0f, SPLASH_MAX_SPEED * flScale * 3.0f );
+			tParticle->m_vecVelocity[2] += random->RandomFloat( 32.0f, 64.0f ) * flScale;
 
-		tParticle->m_flWidth		= random->RandomFloat( 1.0f, 3.0f );
-		tParticle->m_flLength		= random->RandomFloat( 0.025f, 0.05f );
+			tParticle->m_flWidth		= random->RandomFloat( 1.0f, 3.0f );
+			tParticle->m_flLength		= random->RandomFloat( 0.025f, 0.05f );
 
-		colorRamp = random->RandomFloat( 0.75f, 1.25f );
+			colorRamp = random->RandomFloat( 0.75f, 1.25f );
 
-		tParticle->m_color.r = min( 1.0f, color[0] * colorRamp ) * 255;
-		tParticle->m_color.g = min( 1.0f, color[1] * colorRamp ) * 255;
-		tParticle->m_color.b = min( 1.0f, color[2] * colorRamp ) * 255;
-		tParticle->m_color.a = luminosity * 255;
+			tParticle->m_color.r = min( 1.0f, color[0] * colorRamp ) * 255;
+			tParticle->m_color.g = min( 1.0f, color[1] * colorRamp ) * 255;
+			tParticle->m_color.b = min( 1.0f, color[2] * colorRamp ) * 255;
+			tParticle->m_color.a = flAlpha * 255;
+		}
 	}
 
 	// Setup the particle emitter
@@ -255,7 +253,7 @@ void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale )
 		pParticle->m_uchStartSize	= 24 * flScale * RemapValClamped( i, 7, 0, 1, 0.5f );
 		pParticle->m_uchEndSize		= min( 255, pParticle->m_uchStartSize * 2 );
 		
-		pParticle->m_uchStartAlpha	= RemapValClamped( i, 7, 0, 255, 32 ) * luminosity;
+		pParticle->m_uchStartAlpha	= RemapValClamped( i, 7, 0, 255, 32 ) * flAlpha;
 		pParticle->m_uchEndAlpha	= 0;
 		
 		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
@@ -263,26 +261,29 @@ void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale )
 	}
 
 	// Do a ripple
-	FX_WaterRipple( origin, flScale, &color, 1.5f, luminosity );
+	FX_WaterRipple( origin, flScale, &color, 1.5f, flAlpha );
 
 	//Play a sound
-	CLocalPlayerFilter filter;
+	if ( playsound )
+	{
+		CLocalPlayerFilter filter;
 
-	EmitSound_t ep;
-	ep.m_nChannel = CHAN_VOICE;
-	ep.m_pSoundName =  "Water.WaterSplash";
-	ep.m_flVolume = 1.0f;
-	ep.m_SoundLevel = SNDLVL_NORM;
-	ep.m_pOrigin = &origin;
+		EmitSound_t ep;
+		ep.m_nChannel = CHAN_VOICE;
+		ep.m_pSoundName =  "Water.WaterSplash";
+		ep.m_flVolume = 1.0f;
+		ep.m_SoundLevel = SNDLVL_NORM;
+		ep.m_pOrigin = &origin;
 
 
-	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+		C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void FX_SlimeSplash( const Vector &origin, const Vector &normal, float scale )
+void FX_SlimeSplash( const Vector &origin, const Vector &normal, float scale, bool playsound )
 {
 	if ( cl_show_splashes.GetBool() == false )
 		return;
@@ -403,22 +404,25 @@ void FX_SlimeSplash( const Vector &origin, const Vector &normal, float scale )
 	}
 
 	//Play a sound
-	CLocalPlayerFilter filter;
+	if ( playsound )
+	{
+		CLocalPlayerFilter filter;
 
-	EmitSound_t ep;
-	ep.m_nChannel = CHAN_VOICE;
-	ep.m_pSoundName =  "Water.WaterSplash";
-	ep.m_flVolume = 1.0f;
-	ep.m_SoundLevel = SNDLVL_NORM;
-	ep.m_pOrigin = &origin;
+		EmitSound_t ep;
+		ep.m_nChannel = CHAN_VOICE;
+		ep.m_pSoundName =  "Water.WaterSplash";
+		ep.m_flVolume = 1.0f;
+		ep.m_SoundLevel = SNDLVL_NORM;
+		ep.m_pOrigin = &origin;
 
-	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+		C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale )
+void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale, bool playsound )
 {
 	VPROF_BUDGET( "FX_BulletSplash", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	
@@ -487,18 +491,21 @@ void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale )
 	// Do a ripple
 	FX_WaterRipple( origin, flScale, &color, 1.5f, luminosity );
 
-	//Play a sound
-	CLocalPlayerFilter filter;
+	if ( playsound )
+	{
+		//Play a sound
+		CLocalPlayerFilter filter;
 
-	EmitSound_t ep;
-	ep.m_nChannel = CHAN_VOICE;
-	ep.m_pSoundName =  "Water.BulletImpact";
-	ep.m_flVolume = 1.0f;
-	ep.m_SoundLevel = SNDLVL_NORM;
-	ep.m_pOrigin = &origin;
+		EmitSound_t ep;
+		ep.m_nChannel = CHAN_VOICE;
+		ep.m_pSoundName =  "Water.BulletImpact";
+		ep.m_flVolume = 1.0f;
+		ep.m_SoundLevel = SNDLVL_NORM;
+		ep.m_pOrigin = &origin;
 
 
-	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+		C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -508,7 +515,7 @@ void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale )
 //			scale - 
 //			*pColor - 
 //-----------------------------------------------------------------------------
-void FX_BulletSlimeSplash( const Vector &origin, const Vector &normal, float scale )
+void FX_BulletSlimeSplash( const Vector &origin, const Vector &normal, float scale, bool playsound )
 {
 	if ( cl_show_splashes.GetBool() == false )
 		return;
@@ -599,16 +606,19 @@ void FX_BulletSlimeSplash( const Vector &origin, const Vector &normal, float sca
 #endif
 
 	//Play a sound
-	CLocalPlayerFilter filter;
+	if ( playsound )
+	{
+		CLocalPlayerFilter filter;
 
-	EmitSound_t ep;
-	ep.m_nChannel = CHAN_VOICE;
-	ep.m_pSoundName =  "Water.BulletImpact";
-	ep.m_flVolume = 1.0f;
-	ep.m_SoundLevel = SNDLVL_NORM;
-	ep.m_pOrigin = &origin;
+		EmitSound_t ep;
+		ep.m_nChannel = CHAN_VOICE;
+		ep.m_pSoundName =  "Water.BulletImpact";
+		ep.m_flVolume = 1.0f;
+		ep.m_SoundLevel = SNDLVL_NORM;
+		ep.m_pOrigin = &origin;
 
-	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+		C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -617,16 +627,20 @@ void FX_BulletSlimeSplash( const Vector &origin, const Vector &normal, float sca
 void SplashCallback( const CEffectData &data )
 {
 	Vector	normal;
+	Vector	color;
+	float	luminosity;
 
+	// Get our lighting information
+	FX_GetSplashLighting( data.m_vOrigin + ( data.m_vNormal * data.m_flScale ), &color, &luminosity );
 	AngleVectors( data.m_vAngles, &normal );
 
 	if ( data.m_fFlags & FX_WATER_IN_SLIME )
 	{
-		FX_SlimeSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
+		FX_SlimeSplash( data.m_vOrigin, data.m_vNormal, data.m_flScale );
 	}
 	else
 	{
-		FX_WaterSplash( data.m_vOrigin, Vector(0,0,1), data.m_flScale );
+		FX_WaterSplash( data.m_vOrigin, data.m_vNormal, data.m_flScale, &color, luminosity );
 	}
 }
 

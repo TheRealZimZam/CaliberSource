@@ -860,7 +860,7 @@ void PhysicsSplash( IPhysicsFluidController *pFluid, IPhysicsObject *pObject, CB
 		}
 		else
 		{
-			FX_WaterSplash( centerPoint, normal, random->RandomFloat( 8, 10 ) );
+			FX_WaterSplash( centerPoint, normal, random->RandomFloat( 8, 10 ), &color, luminosity );
 		}
 	}
 	else if ( !bInSlime )

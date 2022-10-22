@@ -61,10 +61,10 @@ private:
 };
 
 extern void FX_WaterRipple( const Vector &origin, float scale, Vector *pColor, float flLifetime=1.5, float flAlpha=1 );
-extern void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale );
-extern void FX_SlimeSplash( const Vector &origin, const Vector &normal, float scale );
-extern void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale );
-extern void FX_BulletSlimeSplash( const Vector &origin, const Vector &normal, float scale );
+extern void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale, Vector *pColor, float flAlpha=1, bool playsound = true );
+extern void FX_SlimeSplash( const Vector &origin, const Vector &normal, float scale, bool playsound = true );
+extern void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale, bool playsound = true  );
+extern void FX_BulletSlimeSplash( const Vector &origin, const Vector &normal, float scale, bool playsound = true );
 
 extern inline void FX_GetSplashLighting( Vector position, Vector *color, float *luminosity );
 

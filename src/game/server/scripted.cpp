@@ -117,12 +117,9 @@ BEGIN_DATADESC( CAI_ScriptedSequence )
 
 END_DATADESC()
 
-
 LINK_ENTITY_TO_CLASS( scripted_sequence, CAI_ScriptedSequence );
-#ifndef HL1_DLL
 LINK_ENTITY_TO_CLASS( aiscripted_sequence, CAI_ScriptedSequence );
-#endif
-#define CLASSNAME "scripted_sequence"
+
 
 //-----------------------------------------------------------------------------
 // Purpose: Cancels the given scripted sequence.
@@ -131,7 +128,7 @@ LINK_ENTITY_TO_CLASS( aiscripted_sequence, CAI_ScriptedSequence );
 void CAI_ScriptedSequence::ScriptEntityCancel( CBaseEntity *pentCine, bool bPretendSuccess )
 {
 	// make sure they are a scripted_sequence
-	if ( FClassnameIs( pentCine, CLASSNAME ) )
+	if ( FClassnameIs( pentCine, "scripted_sequence" ) || FClassnameIs( pentCine, "aiscripted_sequence" ) )
 	{
 		CAI_ScriptedSequence *pCineTarget = (CAI_ScriptedSequence *)pentCine;
 
@@ -1400,7 +1397,7 @@ void CAI_ScriptedSequence::DelayStart( bool bDelay )
 
 	while ( pentCine )
 	{
-		if ( FClassnameIs( pentCine, "scripted_sequence" ) )
+		if ( FClassnameIs( pentCine, "scripted_sequence" ) || FClassnameIs( pentCine, "aiscripted_sequence" ) )
 		{
 			CAI_ScriptedSequence *pTarget = (CAI_ScriptedSequence *)pentCine;
 			if (bDelay)
@@ -1599,7 +1596,14 @@ private:
 		SCHED_SCRIPT_RUN_PATH_GOAL,
 		SCHED_SCRIPT_ENEMY_IS_GOAL_AND_RUN_TO_GOAL,
 	};
-	
+
+//	enum Interruptability_t
+//	{
+//		GENERAL_INTERRUPTABILITY,
+//		DAMAGEORDEATH_INTERRUPTABILITY,
+//		DEATH_INTERRUPTABILITY
+//	};
+
 	//---------------------------------
 
 	EHANDLE 	m_hLastFoundEntity;
@@ -1759,7 +1763,8 @@ void CAI_ScriptedSchedule::StartSchedule( CAI_BaseNPC *pTarget )
 		NPC_STATE_NONE,
 		NPC_STATE_IDLE,
 		NPC_STATE_ALERT,
-		NPC_STATE_COMBAT
+		NPC_STATE_COMBAT,
+		NPC_STATE_SCRIPT
 	};
 
 	if ( pTarget->GetSleepState() > AISS_AWAKE )
@@ -1810,7 +1815,7 @@ void CAI_ScriptedSchedule::StartSchedule( CAI_BaseNPC *pTarget )
 				movementActivity = ACT_FLY;
 			}
 
-			if (!pTarget->ScheduledMoveToGoalEntity( SCHED_SCRIPTED_WALK, pGoalEnt, movementActivity ))
+			if (!pTarget->ScheduledMoveToGoalEntity( SCHED_IDLE_WALK, pGoalEnt, movementActivity ))
 			{
 				if (!(m_spawnflags & SF_SCRIPT_NO_COMPLAINTS))
 				{
@@ -1832,7 +1837,7 @@ void CAI_ScriptedSchedule::StartSchedule( CAI_BaseNPC *pTarget )
 			{
 				movementActivity = ACT_FLY;
 			}
-			if (!pTarget->ScheduledFollowPath( SCHED_SCRIPTED_WALK, pGoalEnt, movementActivity ))
+			if (!pTarget->ScheduledFollowPath( SCHED_IDLE_WALK, pGoalEnt, movementActivity ))
 			{
 				if (!(m_spawnflags & SF_SCRIPT_NO_COMPLAINTS))
 				{
@@ -1847,8 +1852,48 @@ void CAI_ScriptedSchedule::StartSchedule( CAI_BaseNPC *pTarget )
 
 	if ( bDidSetSchedule )
 	{
-		// Chain this to the target so that it can add the base and any custom interrupts to this
-		pTarget->SetScriptedScheduleIgnoreConditions( m_Interruptability );
+		// For all the old scripted schedules, gotta do the old code or else its gonna brick
+		if ( FClassnameIs( this, "aiscripted_schedule" ) )
+		{
+			static int g_GeneralConditions[] = 
+			{
+				COND_CAN_MELEE_ATTACK1,
+				COND_CAN_MELEE_ATTACK2,
+				COND_CAN_RANGE_ATTACK1,
+				COND_CAN_RANGE_ATTACK2,
+				COND_ENEMY_DEAD,
+				COND_HEAR_BULLET_IMPACT,
+				COND_HEAR_COMBAT,
+				COND_HEAR_DANGER,
+				COND_HEAR_PHYSICS_DANGER,
+				COND_NEW_ENEMY,
+				COND_PROVOKED,
+				COND_SEE_ENEMY,
+				COND_SEE_FEAR,
+				COND_SMELL,
+			};
+
+			static int g_DamageConditions[] = 
+			{
+				COND_HEAVY_DAMAGE,
+				COND_LIGHT_DAMAGE,
+				COND_RECEIVED_ORDERS,
+			};
+
+			pTarget->ClearIgnoreConditions( g_GeneralConditions, ARRAYSIZE(g_GeneralConditions) );
+			pTarget->ClearIgnoreConditions( g_DamageConditions, ARRAYSIZE(g_DamageConditions) );
+
+			if ( m_Interruptability > GENERAL_INTERRUPTABILITY )
+				pTarget->SetIgnoreConditions( g_GeneralConditions, ARRAYSIZE(g_GeneralConditions) );
+
+			if ( m_Interruptability > DAMAGEORSEEN_INTERRUPTABILITY )	//DAMAGEORDEATH_INTERRUPTABILITY
+				pTarget->SetIgnoreConditions( g_DamageConditions, ARRAYSIZE(g_DamageConditions) );
+		}
+		else
+		{
+			// Chain this to the target so that it can add the base and any custom interrupts to this
+			pTarget->SetScriptedScheduleIgnoreConditions( m_Interruptability );
+		}
 	}
 }
 
@@ -1912,7 +1957,7 @@ void CAI_ScriptedSchedule::InputStopSchedule( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CAI_ScriptedSchedule::StopSchedule( CAI_BaseNPC *pTarget )
 {
-	if ( pTarget->IsCurSchedule( SCHED_SCRIPTED_WALK ) )
+	if ( pTarget->IsCurSchedule( SCHED_IDLE_WALK ) )
 	{
 		DevMsg( 2, "%s (%s): StopSchedule called on NPC %s.\n", GetClassname(), GetDebugName(), pTarget->GetDebugName() );
 		pTarget->ClearSchedule( "Stopping scripted schedule" );

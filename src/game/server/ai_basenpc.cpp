@@ -1801,20 +1801,26 @@ void CAI_BaseNPC::SetScriptedScheduleIgnoreConditions( Interruptability_t interr
 {
 	static int g_GeneralConditions[] = 
 	{
-		COND_CAN_MELEE_ATTACK1,
-		COND_CAN_MELEE_ATTACK2,
-		COND_CAN_RANGE_ATTACK1,
-		COND_CAN_RANGE_ATTACK2,
 		COND_ENEMY_DEAD,
 		COND_HEAR_BULLET_IMPACT,
 		COND_HEAR_COMBAT,
 		COND_HEAR_DANGER,
 		COND_HEAR_PHYSICS_DANGER,
+		COND_HEAR_MOVE_AWAY,
+		COND_SMELL,
+		COND_BETTER_WEAPON_AVAILABLE,
+		COND_GIVE_WAY,
+	};
+
+	static int g_SeenConditions[] = 
+	{
+		COND_CAN_MELEE_ATTACK1,
+		COND_CAN_MELEE_ATTACK2,
+		COND_CAN_RANGE_ATTACK1,
+		COND_CAN_RANGE_ATTACK2,
 		COND_NEW_ENEMY,
-		COND_PROVOKED,
 		COND_SEE_ENEMY,
 		COND_SEE_FEAR,
-		COND_SMELL,
 	};
 
 	static int g_DamageConditions[] = 
@@ -1822,16 +1828,35 @@ void CAI_BaseNPC::SetScriptedScheduleIgnoreConditions( Interruptability_t interr
 		COND_HEAVY_DAMAGE,
 		COND_LIGHT_DAMAGE,
 		COND_RECEIVED_ORDERS,
+		COND_PROVOKED,
 	};
 
 	ClearIgnoreConditions( g_GeneralConditions, ARRAYSIZE(g_GeneralConditions) );
+	ClearIgnoreConditions( g_SeenConditions, ARRAYSIZE(g_GeneralConditions) );
 	ClearIgnoreConditions( g_DamageConditions, ARRAYSIZE(g_DamageConditions) );
 
-	if ( interrupt > GENERAL_INTERRUPTABILITY )
-		SetIgnoreConditions( g_GeneralConditions, ARRAYSIZE(g_GeneralConditions) );
+	switch ( interrupt )
+	{
+		case GENERAL_INTERRUPTABILITY:
+			// Ignore nothing
+			break;
 
-	if ( interrupt > DAMAGEORDEATH_INTERRUPTABILITY )
-		SetIgnoreConditions( g_DamageConditions, ARRAYSIZE(g_DamageConditions) );
+		case DAMAGEORSEEN_INTERRUPTABILITY:
+			SetIgnoreConditions( g_GeneralConditions, ARRAYSIZE(g_GeneralConditions) );
+			// Ignore general
+			break;
+		case DAMAGE_INTERRUPTABILITY:
+			SetIgnoreConditions( g_GeneralConditions, ARRAYSIZE(g_GeneralConditions) );
+			SetIgnoreConditions( g_SeenConditions, ARRAYSIZE(g_SeenConditions) );
+			// Ignore general and seen
+			break;
+		case NO_INTERRUPTABILITY:
+			SetIgnoreConditions( g_GeneralConditions, ARRAYSIZE(g_GeneralConditions) );
+			SetIgnoreConditions( g_SeenConditions, ARRAYSIZE(g_SeenConditions) );
+			SetIgnoreConditions( g_DamageConditions, ARRAYSIZE(g_DamageConditions) );
+			// Ignore everything
+			break;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -5841,8 +5866,8 @@ void CAI_BaseNPC::UpdateEnemyPos()
 			else
 			{
 				Vector vEnemyLKP = GetEnemyLKP();
-				TranslateNavGoal( GetEnemy(), vEnemyLKP );
 				float tolerance = GetGoalRepathTolerance( GetEnemy(), GOALTYPE_ENEMY, GetNavigator()->GetGoalPos(), vEnemyLKP);
+				TranslateNavGoal( GetEnemy(), vEnemyLKP );
 				if ( (GetNavigator()->GetGoalPos() - vEnemyLKP).Length() > tolerance )
 				{
 					// FIXME: when fleeing crowds, won't this severely limit the effectiveness of each individual?  Shouldn't this be a mutex that's held for some period so that at least one attacker is effective?

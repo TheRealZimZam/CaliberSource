@@ -2807,6 +2807,39 @@
 // Items
 //
 //-------------------------------------------------------------------------
+@PointClass base(Targetname, Parentname) size(-4 -4 -4, 4 4 4) = env_beverage : 
+	"HL1 Legacy: Beverage Dispenser."
+[
+	health(integer) : "Capacity" : 10 : "Number of cans in the dispenser."
+	beveragetype(choices) : "Beverage Type" : 0 = 
+	[
+		0 : "Cola-Coca"
+		1 : "Spirit"
+		2 : "Diet Coca"
+		3 : "Orange"
+		4 : "Surge"
+		5 : "Moxie"
+		6 : "Random"
+	]
+
+	input Activate(void) : "Enable this dispenser."
+]
+
+@PointClass base(env_beverage) = env_snacks :
+	"HL1 Legacy: Snack Dispenser."
+[
+	beveragetype(choices) : "Bar Type" : 0 = 
+	[
+		0 : "Big-Timer"
+		1 : "Hershell"
+		2 : "Goobies"
+		3 : "Buttertoe"
+		4 : "Clark's Double"
+		5 : "Soylent Orange"
+		6 : "Random"
+	]
+]
+
 @BaseClass color(0 0 200) base(Targetname, Angles, Shadow) sphere(fademindist) sphere(fademaxdist) = Item
 [
 	output OnPlayerTouch(void) : "Fires when the player touches this object"
@@ -2889,8 +2922,22 @@
 		1 : "Yes"
 	]
 ]
-@PointClass base(Item) studio("models/items/healthkit.mdl") = item_healthkit : "Small Health Kit" []
-@PointClass base(Item) studio("models/items/healthbox.mdl") = item_healthbox : "Large Health Kit" []
+@PointClass base(Item) studio("models/items/healthkit.mdl") = item_healthkit : "Small Health Kit"
+[
+	IsFood(choices) : "IsFood" : 0 : "Use Dintymoore model, and make food sounds instead of default healing noise." =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+@PointClass base(Item) studio("models/items/healthbox.mdl") = item_healthbox : "Large Health Kit"
+[
+//	IsFood(choices) : "IsFood" : 0 : "Use Wall-Turkey model, and make food sounds instead of default healing noise." =
+//	[
+//		0 : "No"
+//		1 : "Yes"
+//	]
+]
 @PointClass base(Item) studio("models/w_longjump.mdl") = item_longjump : "Longjumper" []
 @PointClass base(Item) studio("models/items/hevsuit.mdl") = item_suit : "HEV Suit" 
 [

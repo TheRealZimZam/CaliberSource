@@ -1687,24 +1687,6 @@
 	output OnTouchedByEntity(void) : "Fired when an entity touches the beam. Only fired if the entity passes the 'Touch Type' choice."
 ]
 
-@PointClass base(Targetname, Parentname) size(-4 -4 -4, 4 4 4) = env_beverage : 
-	"HL1 Legacy: Beverage Dispenser."
-[
-	health(integer) : "Capacity" : 10 : "Number of cans in the dispenser."
-	beveragetype(choices) : "Beverage Type" : 0 = 
-	[
-		0 : "Coca-Cola"
-		1 : "Sprite"
-		2 : "Diet Coke"
-		3 : "Orange"
-		4 : "Surge"
-		5 : "Moxie"
-		6 : "Random"
-	]
-
-	input Activate(void) : "Enable this dispenser."
-]
-
 @SolidClass base(Targetname, Parentname, Angles) = env_embers : 
 	"An entity used to create a volume in which to spawn fire embers." 
 [

@@ -103,7 +103,7 @@ public:
 	virtual void Sparks( IRecipientFilter& filer, float delay,
 		const Vector* pos, int nMagnitude, int nTrailLength, const Vector *pDir ) = 0;
 	virtual void Sprite( IRecipientFilter& filer, float delay,
-		const Vector* pos, int modelindex, float size, int brightness ) = 0;
+		const Vector* pos, int modelindex, float size, int brightness, float framerate ) = 0;
 	virtual void SpriteSpray( IRecipientFilter& filer, float delay,
 		const Vector* pos, const Vector* dir, int modelindex, int speed, float noise, int count ) = 0;
 	virtual void WorldDecal( IRecipientFilter& filer, float delay,

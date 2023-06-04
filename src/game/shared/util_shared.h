@@ -253,7 +253,7 @@ inline void UTIL_TraceLine( const Vector& vecAbsStart, const Vector& vecAbsEnd, 
 
 	if( r_visualizetraces.GetBool() )
 	{
-		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 0, 0, true, -1.0f );
+		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 0, 0, true, 0.5f );	//-1.0f?
 	}
 }
 
@@ -267,7 +267,7 @@ inline void UTIL_TraceLine( const Vector& vecAbsStart, const Vector& vecAbsEnd, 
 
 	if( r_visualizetraces.GetBool() )
 	{
-		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 0, 0, true, -1.0f );
+		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 0, 0, true, 0.5f );	//-1.0f?
 	}
 }
 
@@ -283,7 +283,7 @@ inline void UTIL_TraceHull( const Vector &vecAbsStart, const Vector &vecAbsEnd, 
 
 	if( r_visualizetraces.GetBool() )
 	{
-		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 255, 0, true, -1.0f );
+		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 255, 0, true, 0.5f );	//-1.0f?
 	}
 }
 
@@ -297,7 +297,7 @@ inline void UTIL_TraceHull( const Vector &vecAbsStart, const Vector &vecAbsEnd, 
 
 	if( r_visualizetraces.GetBool() )
 	{
-		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 255, 0, true, -1.0f );
+		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 255, 0, true, 0.5f );	//-1.0f?
 	}
 }
 
@@ -310,7 +310,7 @@ inline void UTIL_TraceRay( const Ray_t &ray, unsigned int mask,
 	
 	if( r_visualizetraces.GetBool() )
 	{
-		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 0, 0, true, -1.0f );
+		DebugDrawLine( ptr->startpos, ptr->endpos, 255, 0, 0, true, 0.5f );	//-1.0f?
 	}
 }
 
@@ -342,7 +342,7 @@ void		UTIL_Tracer( const Vector &vecStart, const Vector &vecEnd, int iEntIndex =
 
 bool		UTIL_IsLowViolence( void );
 bool		UTIL_ShouldShowBlood( int bloodColor );
-void		UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, int amount );
+//void		UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, int amount );
 
 void		UTIL_BloodImpact( const Vector &pos, const Vector &dir, int color, int amount );
 void		UTIL_BloodDecalTrace( trace_t *pTrace, int bloodColor );

@@ -22,6 +22,9 @@ ConVar anim_showmainactivity( "anim_showmainactivity", "0", FCVAR_CHEAT, "Show t
 #include "player.h"
 #endif
 
+extern ConVar mp_feetyawrate;
+extern ConVar mp_facefronttime;
+
 #define MOVING_MINIMUM_SPEED	0.5f
 
 // Speed to blend into next movement layer
@@ -89,7 +92,7 @@ CMultiPlayerAnimState::CMultiPlayerAnimState( CBasePlayer *pPlayer, MultiPlayerM
 
 	m_bForceAimYaw = false;
 
-	Init( pPlayer, movementData );
+	//Init( pPlayer, movementData );
 
 	InitGestureSlots();
 }
@@ -113,8 +116,14 @@ void CMultiPlayerAnimState::Init( CBasePlayer *pPlayer, MultiPlayerMovementData_
 	// Get the player this animation data works on.
 	m_pPlayer = pPlayer;
 
+	CModAnimConfig config;
+	config.m_flMaxBodyYawDegrees = 60;
+	config.m_LegAnimType = LEGANIM_8WAY;
+	config.m_bUseAimSequences = false;
+
 	// Copy the movement data.
 	memcpy( &m_MovementData, &movementData, sizeof( MultiPlayerMovementData_t ) );
+	BaseClass::Init( pPlayer, config );
 }
 
 //-----------------------------------------------------------------------------
@@ -124,12 +133,12 @@ void CMultiPlayerAnimState::Init( CBasePlayer *pPlayer, MultiPlayerMovementData_
 void CMultiPlayerAnimState::ClearAnimationState()
 {
 	// Reset state.
-	m_bJumping = false;
+//!!FIXME; This is crashing!!
+//!	ResetGestureSlots();
+//!!
 	m_bDying = false;
-	m_bCurrentFeetYawInitialized = false;
-	m_flLastAnimationStateClearTime = gpGlobals->curtime;
 
-	ResetGestureSlots();
+	BaseClass::ClearAnimationState();
 }
 
 //-----------------------------------------------------------------------------
@@ -167,15 +176,13 @@ void CMultiPlayerAnimState::Update( float eyeYaw, float eyePitch )
 	// Compute all the pose params.
 	if ( SetupPoseParameters( pStudioHdr ) )
 	{
-//!	ComputePoseParam_BodyPitch( pStudioHdr );		// Torso elevation.
-
 		// Pose parameter - Torso aiming (up/down).
 		ComputePoseParam_AimPitch( pStudioHdr );
 		// Pose parameter - Torso aiming (rotation).
 		ComputePoseParam_AimYaw( pStudioHdr );
 	}
-	// Always compute these, even if model doesnt currently support them
-	ComputePoseParam_BodyYaw();					// Torso rotation.
+
+	ComputePoseParam_BodyYaw();		// Torso rotation.
 	ComputePoseParam_MoveYaw( pStudioHdr );		//What direction are the player's legs running in.
 
 #ifdef CLIENT_DLL
@@ -322,10 +329,10 @@ void CMultiPlayerAnimState::ComputePoseParam_AimYaw( CStudioHdr *pStudioHdr )
 		{
 			float flYawDelta = AngleNormalize(  m_flGoalFeetYaw - m_flEyeYaw );
 
-			if ( fabs( flYawDelta ) > 45.0f/*m_AnimConfig.m_flMaxBodyYawDegrees*/ )
+			if ( fabs( flYawDelta ) > m_AnimConfig.m_flMaxBodyYawDegrees )
 			{
 				float flSide = ( flYawDelta > 0.0f ) ? -1.0f : 1.0f;
-				m_flGoalFeetYaw += ( 45.0f/*m_AnimConfig.m_flMaxBodyYawDegrees*/ * flSide );
+				m_flGoalFeetYaw += ( m_AnimConfig.m_flMaxBodyYawDegrees * flSide );
 			}
 		}
 	}
@@ -340,7 +347,7 @@ void CMultiPlayerAnimState::ComputePoseParam_AimYaw( CStudioHdr *pStudioHdr )
 		}
 		else
 		{
-			ConvergeYawAngles( m_flGoalFeetYaw, /*DOD_BODYYAW_RATE*/720.0f, gpGlobals->frametime, m_flCurrentFeetYaw );
+			ConvergeYawAngles( m_flGoalFeetYaw, mp_feetyawrate.GetFloat(), gpGlobals->frametime, m_flCurrentFeetYaw );
 			m_flLastAimTurnTime = gpGlobals->curtime;
 		}
 	}
@@ -413,6 +420,9 @@ void CMultiPlayerAnimState::DoAnimationEvent( PlayerAnimEvent_t event, int nData
 	switch( event )
 	{
 	case PLAYERANIMEVENT_ATTACK_PRIMARY:
+#ifdef HL1_DLL
+	case PLAYERANIMEVENT_FIRE_GUN:
+#endif
 		{
 			// Weapon primary fire.
 			RestartGesture( GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_GESTURE_RANGE_ATTACK1 );
@@ -672,22 +682,23 @@ bool CMultiPlayerAnimState::HandleMoving( Activity &idealActivity )
 {
 	// In TF we run all the time now.
 	float flSpeed = GetOuterXYSpeed();
-
-#if defined( TF_DLL )
 	if ( flSpeed > MOVING_MINIMUM_SPEED )
 	{
-		// Always assume a run.
-		idealActivity = ACT_RUN;
-	}
-#else
-	if ( flSpeed > MOVING_MINIMUM_SPEED )
-	{
-		if( flSpeed >= RUN_SPEED )
-			idealActivity = ACT_RUN;
+		if ( GetBasePlayer()->GetFlags() & FL_DUCKING )
+		{
+			if( flSpeed >= RUN_SPEED )
+				idealActivity = ACT_RUN_CROUCH;
+			else
+				idealActivity = ACT_WALK_CROUCH;
+		}
 		else
-			idealActivity = ACT_WALK;
+		{
+			if( flSpeed >= RUN_SPEED )
+				idealActivity = ACT_RUN;
+			else
+				idealActivity = ACT_WALK;
+		}
 	}
-#endif
 
 	return true;
 }
@@ -700,6 +711,8 @@ bool CMultiPlayerAnimState::HandleMoving( Activity &idealActivity )
 Activity CMultiPlayerAnimState::CalcMainActivity()
 {
 	Activity idealActivity = ACT_IDLE;
+	if ( GetBasePlayer()->GetFlags() & FL_DUCKING )
+		idealActivity = ACT_CROUCHIDLE;
 
 	if ( HandleJumping( idealActivity ) || 
 		HandleSwimming( idealActivity ) || 
@@ -734,6 +747,7 @@ Activity CMultiPlayerAnimState::CalcMainActivity()
 //-----------------------------------------------------------------------------
 Activity CMultiPlayerAnimState::TranslateActivity( Activity actDesired )
 {
+#if 0
 	Activity idealActivity = actDesired;
 
 	if ( GetBasePlayer()->GetFlags() & FL_DUCKING )
@@ -753,6 +767,20 @@ Activity CMultiPlayerAnimState::TranslateActivity( Activity actDesired )
 	}
 
 	return idealActivity;
+#endif
+
+	return BaseClass::TranslateActivity(actDesired);
+}
+
+const char* CMultiPlayerAnimState::GetWeaponPrefix()
+{
+	// Figure out the weapon suffix.
+	if ( !m_hActiveWeapon )
+		return "Pistol";
+
+	const char *pPrefix = m_hActiveWeapon->GetAnimPrefix();
+
+	return pPrefix;
 }
 
 //-----------------------------------------------------------------------------
@@ -760,6 +788,7 @@ Activity CMultiPlayerAnimState::TranslateActivity( Activity actDesired )
 // Input  :  - 
 // Output : float
 //-----------------------------------------------------------------------------
+/*
 float CMultiPlayerAnimState::GetCurrentMaxGroundSpeed()
 {
 	CStudioHdr *pStudioHdr = GetBasePlayer()->GetModelPtr();
@@ -793,12 +822,14 @@ float CMultiPlayerAnimState::GetCurrentMaxGroundSpeed()
 
 	return speed;
 }
+*/
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : *bIsMoving - 
 // Output : float
 //-----------------------------------------------------------------------------
+/*
 float CMultiPlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 {
 	// Get the player's current velocity and speed.
@@ -834,6 +865,7 @@ float CMultiPlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 
 	return flReturn;
 }
+*/
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -965,9 +997,16 @@ void CMultiPlayerAnimState::UpdateInterpolators()
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+/*
 void CMultiPlayerAnimState::ComputeFireSequence( void )
 {
+#ifdef CLIENT_DLL
+	UpdateLayerSequenceGeneric( pStudioHdr, FIRESEQUENCE_LAYER, m_bFiring, m_flFireCycle, m_iFireSequence, false );
+#else
+	// Server doesn't bother with different fire sequences.
+#endif
 }
+*/
 
 //=============================================================================
 //
@@ -1074,7 +1113,6 @@ void CMultiPlayerAnimState::ResetGestureSlot( int iGestureSlot )
 }
 
 #ifdef CLIENT_DLL
-
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -1113,7 +1151,6 @@ void CMultiPlayerAnimState::RunGestureSlotAnimEventsToCompletion( GestureSlot_t 
 		}
 	}
 }
-
 #endif
 
 //-----------------------------------------------------------------------------
@@ -1392,18 +1429,6 @@ const QAngle& CMultiPlayerAnimState::GetRenderAngles()
 	return m_angRender;
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : vel - 
-//-----------------------------------------------------------------------------
-void CMultiPlayerAnimState::GetOuterAbsVelocity( Vector& vel )
-{
-#if defined( CLIENT_DLL )
-	GetBasePlayer()->EstimateAbsVelocity( vel );
-#else
-	vel = GetBasePlayer()->GetAbsVelocity();
-#endif
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -1411,18 +1436,6 @@ void CMultiPlayerAnimState::GetOuterAbsVelocity( Vector& vel )
 void CMultiPlayerAnimState::Release( void )
 {
 	delete this;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  :  - 
-// Output : float
-//-----------------------------------------------------------------------------
-float CMultiPlayerAnimState::GetOuterXYSpeed()
-{
-	Vector vel;
-	GetOuterAbsVelocity( vel );
-	return vel.Length2D();
 }
 
 //-----------------------------------------------------------------------------

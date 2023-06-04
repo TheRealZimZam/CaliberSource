@@ -35,7 +35,7 @@ ConVar mp_feetyawrate(
 
 ConVar mp_facefronttime( 
 	"mp_facefronttime", 
-	"0", 
+	"0.1", 
 	FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, 
 	"After this amount of time of standing in place but aiming to one side, go ahead and move feet to face upper body." );
 
@@ -46,7 +46,7 @@ ConVar mp_ik( "mp_ik", "1", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, "Use IK on
 #define FADE_TURN_DEGREES	45.0f
 
 // After this, need to start turning feet
-#define MAX_TORSO_ANGLE		60.0f
+#define MAX_TORSO_ANGLE		50.0f
 
 // Below this amount, don't play a turning animation/perform IK
 #define MIN_TURN_ANGLE_REQUIRING_TURN_ANIMATION		15.0f
@@ -75,7 +75,6 @@ IPlayerAnimState* CreatePlayerAnimState( CBasePlayer *pPlayer )
 // ------------------------------------------------------------------------------------------------ //
 // CBasePlayerAnimState implementation.
 // ------------------------------------------------------------------------------------------------ //
-
 CBasePlayerAnimState::CBasePlayerAnimState()
 {
 	m_flEyeYaw = 0.0f;
@@ -90,11 +89,15 @@ CBasePlayerAnimState::CBasePlayerAnimState()
 	m_flJumpStartTime = 0.0f;	
 	m_bFirstJumpFrame = false;
 
+	m_bFiring = false;
+	m_flFireStartTime = 0.0f;	
+
 	m_flGaitYaw = 0.0f;
 	m_flGoalFeetYaw = 0.0f;
 	m_flCurrentFeetYaw = 0.0f;
 	m_flLastYaw = 0.0f;
 	m_flLastTurnTime = 0.0f;
+	m_nTurningInPlace = 0;
 	m_angRender.Init();
 	m_vLastMovePose.Init();
 	m_iCurrent8WayIdleSequence = -1;
@@ -110,7 +113,7 @@ CBasePlayerAnimState::~CBasePlayerAnimState()
 }
 
 
-void CBasePlayerAnimState::Init( CBaseAnimatingOverlay *pPlayer, const CModAnimConfig &config )
+void CBasePlayerAnimState::Init( CBasePlayer *pPlayer, const CModAnimConfig &config )
 {
 	m_pOuter = pPlayer;
 	m_AnimConfig = config;
@@ -128,10 +131,11 @@ void CBasePlayerAnimState::ClearAnimationState()
 {
 	ClearAnimationLayers();
 	m_bJumping = false;
+	m_bFiring = false;
+	m_bDying = false;
 	m_bCurrentFeetYawInitialized = false;
 	m_flLastAnimationStateClearTime = gpGlobals->curtime;
 }
-
 
 float CBasePlayerAnimState::TimeSinceLastAnimationStateClear() const
 {
@@ -234,6 +238,57 @@ void CBasePlayerAnimState::SetOuterPoseParameter( int iParam, float flValue )
 	GetOuter()->SetPoseParameter( iParam, flValue );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : event - 
+//-----------------------------------------------------------------------------
+void CBasePlayerAnimState::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
+{
+	//CBasePlayer *pPlayer = m_pOuter;
+	switch( PlayerAnimEvent_t )
+	{
+	case PLAYER_JUMP:
+	case PLAYER_SUPERJUMP:
+		{
+			// Jump.
+			m_bJumping = true;
+			m_bFirstJumpFrame = true;
+			m_flJumpStartTime = gpGlobals->curtime;
+
+			RestartMainSequence();
+
+			break;
+		}
+	case PLAYER_ATTACK1:
+	case PLAYER_ATTACK2:
+		{
+			// The middle part of the aim layer sequence becomes "shoot" until that animation is complete.
+			m_bFiring = true;
+			m_flFireStartTime = gpGlobals->curtime;
+			break;
+		}
+	case PLAYER_RELOAD:
+		{
+			// Weapon reload.
+			//pPlayer->RestartGesture( ACT_GESTURE_RELOAD );
+			break;
+		}
+	case PLAYER_DIE:
+		{
+			// Should be here - not supporting this yet!
+			Assert( 0 );
+
+			// Start playing the death animation
+			m_bDying = true;
+
+			RestartMainSequence();
+			break;
+		}
+	default:
+		break;
+	}
+}
+
 void CBasePlayerAnimState::ClearAnimationLayers()
 {
 	VPROF( "CBasePlayerAnimState::ClearAnimationLayers" );
@@ -248,6 +303,27 @@ void CBasePlayerAnimState::ClearAnimationLayers()
 		m_pOuter->GetAnimOverlay( i )->m_fFlags = 0;
 #endif
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : event - 
+//-----------------------------------------------------------------------------
+Activity CBasePlayerAnimState::TranslateActivity( Activity actDesired )
+{
+	Activity translateActivity = actDesired;
+
+	// Just keep the base activity if we're going to use the PREHISTORIC aim sequence system instead.
+	if ( !m_AnimConfig.m_bUseAimSequences )
+	{
+		if ( m_pOuter->GetActiveWeapon() )
+		{
+			translateActivity = m_pOuter->GetActiveWeapon()->ActivityOverride( translateActivity, NULL );
+		}
+	}
+
+	// 99% of the time this is just going to return the original activity
+	return BodyYawTranslateActivity( translateActivity );
 }
 
 void CBasePlayerAnimState::RestartMainSequence()
@@ -277,17 +353,45 @@ void CBasePlayerAnimState::ComputeSequences( CStudioHdr *pStudioHdr )
 Activity CBasePlayerAnimState::CalcMainActivity()
 {
 	Activity idealActivity = ACT_IDLE;
-
-	float flSpeed = GetOuterXYSpeed();
-
-	if ( flSpeed > MOVING_MINIMUM_SPEED )
+	if ( m_bJumping )
 	{
-		if( flSpeed >= SPRINT_SPEED )
-			idealActivity = ACT_SPRINT;
-		else if( flSpeed >= RUN_SPEED )
-			idealActivity = ACT_RUN;
-		else
-			idealActivity = ACT_WALK;
+		idealActivity = ACT_JUMP;
+		if ( m_bFirstJumpFrame )
+			m_bFirstJumpFrame = false;
+
+		// Don't check if he's on the ground for a sec.. sometimes the client still has the
+		// on-ground flag set right when the message comes in.
+		if ( gpGlobals->curtime - m_flJumpStartTime > 0.2f )
+		{
+			if ( GetOuter()->GetFlags() & FL_ONGROUND )
+			{
+				m_bJumping = false;
+				RestartMainSequence();	// Reset the animation.
+			}
+		}
+	}
+	else
+	{
+		if ( m_pOuter->GetFlags() & FL_DUCKING )
+			idealActivity = ACT_CROUCHIDLE;
+
+		float flSpeed = GetOuterXYSpeed();
+		if ( flSpeed > MOVING_MINIMUM_SPEED )
+		{
+			if ( m_pOuter->GetFlags() & FL_DUCKING )
+			{
+				idealActivity = ACT_WALK_CROUCH;
+			}
+			else
+			{
+				if( flSpeed >= SPRINT_SPEED )
+					idealActivity = ACT_SPRINT;
+				else if( flSpeed >= RUN_SPEED )
+					idealActivity = ACT_RUN;
+				else
+					idealActivity = ACT_WALK;
+			}
+		}
 	}
 
 //	ShowDebugInfo();
@@ -296,11 +400,109 @@ Activity CBasePlayerAnimState::CalcMainActivity()
 }
 
 //-----------------------------------------------------------------------------
-int CBasePlayerAnimState::CalcAimLayerSequence( float *flCycle, float *flAimSequenceWeight, bool bForceIdle )
+const char* CBasePlayerAnimState::GetWeaponPrefix()
 {
-	return 0;
+	CBaseCombatWeapon *pWeapon = m_pOuter->GetActiveWeapon();
+	if ( pWeapon )
+		return pWeapon->GetWpnData().szAnimationPrefix;
+	else
+		return "shotgun";
 }
 
+int CBasePlayerAnimState::CalcAimLayerSequence( float *flCycle, float *flAimSequenceWeight, bool bForceIdle )
+{
+#if 0
+	const char *pPrefix = GetWeaponPrefix();
+	if ( !pPrefix )
+		return 0;
+
+	if ( bForceIdle )
+	{
+		switch ( GetCurrentMainSequenceActivity() )
+		{
+			case ACT_CROUCHIDLE:
+				return CalcSequenceIndex( "%s%s", DEFAULT_CROUCH_IDLE_NAME, pPrefix );
+
+			default:
+				return CalcSequenceIndex( "%s%s", DEFAULT_IDLE_NAME, pPrefix );
+		}
+	}
+	else
+	{
+		switch ( GetCurrentMainSequenceActivity() )
+		{
+			case ACT_RUN:
+				return CalcSequenceIndex( "%s%s", DEFAULT_RUN_NAME, pPrefix );
+
+			case ACT_WALK:
+			case ACT_RUNTOIDLE:
+			case ACT_IDLETORUN:
+				return CalcSequenceIndex( "%s%s", DEFAULT_WALK_NAME, pPrefix );
+
+			case ACT_CROUCHIDLE:
+				return CalcSequenceIndex( "%s%s", DEFAULT_CROUCH_IDLE_NAME, pPrefix );
+
+			case ACT_RUN_CROUCH:
+				return CalcSequenceIndex( "%s%s", DEFAULT_CROUCH_WALK_NAME, pPrefix );
+
+			case ACT_IDLE:
+			default:
+				return CalcSequenceIndex( "%s%s", DEFAULT_IDLE_NAME, pPrefix );
+		}
+	}
+#else
+	const char *pWeaponPrefix = GetWeaponPrefix();
+	if ( !pWeaponPrefix )
+		return 0;
+
+	if ( strcmp( pWeaponPrefix, "pistol" ) == 0 )
+		pWeaponPrefix = "onehanded";
+
+	// Are we aiming or firing?
+	const char *pAimOrShoot = "aim";
+	if ( m_bFiring )
+		pAimOrShoot = "shoot";
+
+	// Are we standing or crouching?
+	int iSequence = 0;
+	const char *pPrefix = "ref";
+	if ( m_bDying )
+	{
+		// While dying, only play the main sequence.. don't layer this one on top.
+		*flAimSequenceWeight = 0;	
+	}
+	else
+	{
+		switch ( GetCurrentMainSequenceActivity() )
+		{
+			case ACT_CROUCHIDLE:
+			case ACT_WALK_CROUCH:
+			case ACT_RUN_CROUCH:
+				pPrefix = "crouch";
+				break;
+		}
+	}
+
+	iSequence = CalcSequenceIndex( "%s_%s_%s", pPrefix, pAimOrShoot, pWeaponPrefix );
+	
+	// Check if we're done firing.
+	if ( m_bFiring )
+	{
+		float dur = m_pOuter->SequenceDuration( iSequence );
+		*flCycle = (gpGlobals->curtime - m_flFireStartTime) / dur;
+		if ( *flCycle >= 1 )
+		{
+			*flCycle = 1;
+			m_bFiring = false;
+		}
+	}
+
+	return iSequence;
+#endif
+}
+
+
+//-----------------------------------------------------------------------------
 void CBasePlayerAnimState::ResetGroundSpeed( void )
 {
 	m_flMaxGroundSpeed = GetCurrentMaxGroundSpeed();
@@ -310,7 +512,7 @@ void CBasePlayerAnimState::ComputeMainSequence()
 {
 	VPROF( "CBasePlayerAnimState::ComputeMainSequence" );
 
-	CBaseAnimatingOverlay *pPlayer = GetOuter();
+	CBasePlayer *pPlayer = m_pOuter;
 
 	// Have our class or the mod-specific class determine what the current activity is.
 	Activity idealActivity = CalcMainActivity();
@@ -508,56 +710,6 @@ void CBasePlayerAnimState::ComputeAimSequence()
 }
 
 //-----------------------------------------------------------------------------
-Activity CBasePlayerAnimState::TranslateActivity( Activity actDesired )
-{
-	Activity idealActivity = actDesired;
-
-	if ( GetOuter()->GetFlags() & FL_DUCKING )
-	{
-		switch( idealActivity )
-		{
-		case ACT_IDLE:
-			idealActivity = ACT_CROUCHIDLE;
-			break;
-		case ACT_WALK:
-			idealActivity = ACT_WALK_CROUCH;
-			break;
-		case ACT_RUN:
-			idealActivity = ACT_RUN_CROUCH;
-			break;
-		}
-	}
-#if 0
-	else if ( GetOuter()->IsAiming() )
-	{
-		switch( idealActivity )
-		{
-		case ACT_IDLE:			idealActivity = ACT_IDLE_ANGRY; break;
-		case ACT_WALK:			idealActivity = ACT_WALK_AIM; break;
-		case ACT_RUN:			idealActivity = ACT_RUN_AIM; break;
-		case ACT_CROUCHIDLE:	idealActivity = ACT_RANGE_AIM_LOW; break;
-		case ACT_WALK_CROUCH:	idealActivity = ACT_WALK_CROUCH_AIM; break;
-		case ACT_RUN_CROUCH:	idealActivity = ACT_RUN_CROUCH_AIM; break;
-		default: break;
-		}
-	}
-#endif
-	else if ( GetOuter()->GetWaterLevel() > 1 || GetOuter()->GetFlags() & FL_FLY )
-	{
-		switch( idealActivity )
-		{
-		case ACT_IDLE:
-			idealActivity = ACT_HOVER;
-			break;
-		default:
-			idealActivity = ACT_SWIM;
-			break;
-		}
-	}
-
-	return idealActivity;
-}
-
 int CBasePlayerAnimState::CalcSequenceIndex( const char *pBaseName, ... )
 {
 	char szFullName[512];
@@ -583,8 +735,6 @@ int CBasePlayerAnimState::CalcSequenceIndex( const char *pBaseName, ... )
 	return iSequence;
 }
 
-
-
 void CBasePlayerAnimState::UpdateInterpolators()
 {
 	VPROF( "CBasePlayerAnimState::UpdateInterpolators" );
@@ -594,12 +744,10 @@ void CBasePlayerAnimState::UpdateInterpolators()
 	m_flMaxGroundSpeed = flCurMaxSpeed;
 }
 
-
 float CBasePlayerAnimState::GetInterpolatedGroundSpeed()
 {
 	return m_flMaxGroundSpeed;
 }
-
 
 float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 {
@@ -607,8 +755,8 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 	Vector vel;
 	GetOuterAbsVelocity( vel );
 
-	float speed = vel.Length2D();
-	bool bMoving = ( speed > MOVING_MINIMUM_SPEED );
+	float flSpeed = vel.Length2D();
+	bool bMoving = ( flSpeed > MOVING_MINIMUM_SPEED );
 
 	*bIsMoving = false;
 	float flReturnValue = 1.0f;
@@ -623,8 +771,8 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 		else
 		{
 			// Note this gets set back to 1.0 if sequence changes due to ResetSequenceInfo below
-			flReturnValue = speed / flGroundSpeed;
-			flReturnValue = clamp( flReturnValue, 0.5, 2 );	// don't go nuts here.
+			flReturnValue = flSpeed / flGroundSpeed;
+			flReturnValue = clamp( flReturnValue, 0.4f, 2.0f );	// don't go nuts here.
 		}
 		*bIsMoving = true;
 	}
@@ -632,12 +780,10 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 	return flReturnValue;
 }
 
-
 bool CBasePlayerAnimState::CanThePlayerMove()
 {
 	return true;
 }
-
 
 void CBasePlayerAnimState::ComputePlaybackRate()
 {
@@ -735,7 +881,6 @@ void CBasePlayerAnimState::ComputePoseParam_MoveYaw( CStudioHdr *pStudioHdr )
 		flYaw = flYaw - 360;
 	}
 
-	
 	if ( m_AnimConfig.m_LegAnimType == LEGANIM_9WAY )
 	{
 #ifndef CLIENT_DLL
@@ -819,7 +964,7 @@ void CBasePlayerAnimState::ComputePoseParam_BodyPitch( CStudioHdr *pStudioHdr )
 	VPROF( "CBasePlayerAnimState::ComputePoseParam_BodyPitch" );
 
 	// Get pitch from v_angle
-	float flPitch = GetOuter()->GetLocalAngles()[ PITCH ];	//m_flEyePitch
+	float flPitch = m_flEyePitch;	//GetOuter()->GetLocalAngles()[ PITCH ]
 	if ( flPitch > 180.0f )
 	{
 		flPitch -= 360.0f;
@@ -828,8 +973,14 @@ void CBasePlayerAnimState::ComputePoseParam_BodyPitch( CStudioHdr *pStudioHdr )
 
 	// See if we have a blender for pitch
 	int pitch = GetOuter()->LookupPoseParameter( pStudioHdr, "body_pitch" );
+
+	// Try aim pitch instead
 	if ( pitch < 0 )
-		return;
+		pitch = GetOuter()->LookupPoseParameter( pStudioHdr, "aim_pitch" );
+
+	// Test again
+//	if ( pitch < 0 )
+//		return;
 
 	GetOuter()->SetPoseParameter( pStudioHdr, pitch, flPitch );
 	g_flLastBodyPitch = flPitch;
@@ -960,6 +1111,7 @@ void CBasePlayerAnimState::ComputePoseParam_BodyYaw()
 			 gpGlobals->frametime, m_flCurrentFeetYaw );
 
 		m_flLastTurnTime = gpGlobals->curtime;
+		m_nTurningInPlace = 0;
 	}
 
 	float flCurrentTorsoYaw = AngleNormalize( m_flEyeYaw - m_flCurrentFeetYaw );
@@ -990,22 +1142,35 @@ float CBasePlayerAnimState::SetOuterBodyYaw( float flValue )
 //-----------------------------------------------------------------------------
 Activity CBasePlayerAnimState::BodyYawTranslateActivity( Activity activity )
 {
-	// Not even standing still, sigh
-	if ( activity != ACT_IDLE )
-		return activity;
-
-	// Not turning
-	switch ( m_nTurningInPlace )
+	if ( mp_ik.GetBool() )
 	{
-	default:
-	case TURN_NONE:
-		return activity;
-	case TURN_RIGHT:
-	case TURN_LEFT:
-		return mp_ik.GetBool() ? ACT_TURN : activity;
+		// Not even standing still, sigh
+//		if ( activity != ACT_IDLE )
+//			return activity;
+
+		// Moving too fast
+		if ( GetOuterXYSpeed() > MOVING_MINIMUM_SPEED )
+			return activity;
+
+		switch ( m_nTurningInPlace )
+		{
+		default:
+		case TURN_NONE:
+			return activity;
+
+		case TURN_RIGHT:
+			return ACT_TURN_RIGHT;
+		case TURN_LEFT:
+			return ACT_TURN_LEFT;
+		case TURN_180:
+			return ACT_TURN;
+		}
+
+		//Now see if the weapon we have has a entry
+		//Activity newactivity = m_pOuter->GetActiveWeapon()->ActivityOverride( activity, NULL );
+		//return newactivity;
 	}
 
-	Assert( 0 );
 	return activity;
 }
 
@@ -1014,7 +1179,9 @@ const QAngle& CBasePlayerAnimState::GetRenderAngles()
 	return m_angRender;
 }
 
-
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : vel - 
 //-----------------------------------------------------------------------------
 void CBasePlayerAnimState::GetOuterAbsVelocity( Vector& vel ) const
 {
@@ -1025,7 +1192,11 @@ void CBasePlayerAnimState::GetOuterAbsVelocity( Vector& vel ) const
 #endif
 }
 
-
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  :  - 
+// Output : float
+//-----------------------------------------------------------------------------
 float CBasePlayerAnimState::GetOuterXYSpeed() const
 {
 	Vector vel;

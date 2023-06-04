@@ -2,7 +2,6 @@
 //
 // Purpose: Weapon data file parsing, shared by game & client dlls.
 //
-// TODO; Better weapon spread system
 //=============================================================================//
 
 #ifndef WEAPON_PARSE_H

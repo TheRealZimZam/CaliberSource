@@ -89,7 +89,7 @@ LINK_ENTITY_TO_CLASS( grenade, CBaseGrenade );
 
 #if defined( CLIENT_DLL )
 
-BEGIN_PREDICTION_DATA( CBaseGrenade  )
+BEGIN_PREDICTION_DATA( CBaseGrenade )
 
 	DEFINE_PRED_FIELD( m_hThrower, FIELD_EHANDLE, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_bIsLive, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
@@ -145,7 +145,7 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 			&vecAbsOrigin,
 			!( contents & MASK_WATER ) ? g_sModelIndexFireball : g_sModelIndexWExplosion,
 			m_DmgRadius * .03, 
-			25,
+			40,
 			TE_EXPLFLAG_NONE,
 			m_DmgRadius,
 			m_flDamage,
@@ -159,15 +159,13 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 			&vecAbsOrigin, 
 			!( contents & MASK_WATER ) ? g_sModelIndexFireball : g_sModelIndexWExplosion,
 			m_DmgRadius * .03, 
-			25,
+			40,
 			TE_EXPLFLAG_NONE,
 			m_DmgRadius,
 			m_flDamage );
 	}
 
-#if !defined( CLIENT_DLL )
-	CSoundEnt::InsertSound ( SOUND_COMBAT, GetAbsOrigin(), BASEGRENADE_EXPLOSION_VOLUME, 3.0 );
-#endif
+	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), BASEGRENADE_EXPLOSION_VOLUME, 3.0 );
 
 	// Use the thrower's position as the reported position
 	Vector vecReported = m_hThrower ? m_hThrower->GetAbsOrigin() : vec3_origin;
@@ -177,14 +175,6 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 	RadiusDamage( info, GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 
 	UTIL_DecalTrace( pTrace, "Scorch" );
-
-	SetThink( &CBaseGrenade::SUB_Remove );
-	SetTouch( NULL );
-	SetSolid( SOLID_NONE );
-	
-	AddEffects( EF_NODRAW );
-	SetAbsVelocity( vec3_origin );
-
 	if ( GetWaterLevel() == 0 )
 	{
 		if ( random->RandomInt( 0, 1 ) == 1 )
@@ -200,17 +190,14 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 		}
 	}
 
-#if HL2_EPISODIC
-	// Because the grenade is zipped out of the world instantly, the EXPLOSION sound that it makes for
-	// the AI is also immediately destroyed. For this reason, we now make the grenade entity inert and
-	// throw it away in 1/10th of a second instead of right away. Removing the grenade instantly causes
-	// intermittent bugs with env_microphones who are listening for explosions. They will 'randomly' not
-	// hear explosion sounds when the grenade is removed and the SoundEnt thinks (and removes the sound)
-	// before the env_microphone thinks and hears the sound.
-	SetNextThink( gpGlobals->curtime + 0.1 );
-#else
+	SetThink( &CBaseGrenade::Smoke );
+	SetTouch( NULL );
+	SetSolid( SOLID_NONE );
+	
+	AddEffects( EF_NODRAW );
+	SetAbsVelocity( vec3_origin );
+
 	SetNextThink( gpGlobals->curtime );
-#endif//HL2_EPISODIC
 
 #if defined( HL2_DLL )
 	CBasePlayer *pPlayer = ToBasePlayer( m_hThrower.Get() );
@@ -223,27 +210,28 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 #endif
 }
 
-
 void CBaseGrenade::Smoke( void )
 {
+#if !defined( CLIENT_DLL )
 	Vector vecAbsOrigin = GetAbsOrigin();
 	if ( UTIL_PointContents ( vecAbsOrigin ) & MASK_WATER )
 	{
 		UTIL_Bubbles( vecAbsOrigin - Vector( 64, 64, 64 ), vecAbsOrigin + Vector( 64, 64, 64 ), 100 );
 	}
+#if 0
 	else
 	{
 		CPVSFilter filter( vecAbsOrigin );
-
 		te->Smoke( filter, 0.0, 
 			&vecAbsOrigin, g_sModelIndexSmoke,
 			m_DmgRadius * 0.03,
 			24 );
 	}
-#if !defined( CLIENT_DLL )
-	SetThink ( &CBaseGrenade::SUB_Remove );
 #endif
+
+	SetThink ( &CBaseGrenade::SUB_Remove );
 	SetNextThink( gpGlobals->curtime );
+#endif
 }
 
 void CBaseGrenade::Event_Killed( const CTakeDamageInfo &info )
@@ -429,7 +417,6 @@ void CBaseGrenade::BounceTouch( CBaseEntity *pOther )
 		m_flPlaybackRate = 1;
 	else if (m_flPlaybackRate < 0.5)
 		m_flPlaybackRate = 0;
-
 }
 
 
@@ -458,13 +445,13 @@ void CBaseGrenade::SlideTouch( CBaseEntity *pOther )
 	}
 }
 
-void CBaseGrenade ::BounceSound( void )
+void CBaseGrenade::BounceSound( void )
 {
 	const char *pszBounceSound = ( m_iszBounceSound == NULL_STRING ) ? "BaseGrenade.BounceSound" : STRING( m_iszBounceSound );
 	EmitSound( pszBounceSound );
 }
 
-void CBaseGrenade ::TumbleThink( void )
+void CBaseGrenade::TumbleThink( void )
 {
 	if (!IsInWorld())
 	{

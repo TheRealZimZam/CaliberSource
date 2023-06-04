@@ -15,9 +15,9 @@
 	#include "enginesprite.h"
 	#include "iclientmode.h"
 	#include "c_baseviewmodel.h"
-#	ifdef PORTAL
+#ifdef PORTAL
 		#include "c_prop_portal.h"
-#	endif //ifdef PORTAL
+#endif //ifdef PORTAL
 #else
 	#include "baseviewmodel.h"
 #endif
@@ -28,10 +28,9 @@
 const float MAX_SPRITE_SCALE = 64.0f;
 const float MAX_GLOW_PROXY_SIZE = 64.0f;
 
-LINK_ENTITY_TO_CLASS( env_sprite, CSprite );
-LINK_ENTITY_TO_CLASS( env_sprite_oriented, CSpriteOriented );
 #if !defined( CLIENT_DLL )
 LINK_ENTITY_TO_CLASS( env_glow, CSprite ); // For backwards compatibility, remove when no longer needed.
+LINK_ENTITY_TO_CLASS( env_sprite_clientside, CSprite );
 #endif
 
 #if !defined( CLIENT_DLL )
@@ -174,8 +173,18 @@ BEGIN_NETWORK_TABLE( CSprite, DT_Sprite )
 END_NETWORK_TABLE()
 
 
+LINK_ENTITY_TO_CLASS( env_sprite, CSprite );
+LINK_ENTITY_TO_CLASS( env_sprite_oriented, CSpriteOriented );
+
+#ifdef CLIENT_DLL
+extern CUtlVector< CSprite * > g_ClientsideSprites;
+#endif // CLIENT_DLL
+
 CSprite::CSprite()
 {
+#ifdef CLIENT_DLL
+	m_bClientOnly = false;
+#endif // CLIENT_DLL
 	m_flGlowProxySize = 2.0f;
 	m_flHDRColorScale = 1.0f;
 
@@ -183,6 +192,16 @@ CSprite::CSprite()
 	m_bDrawInMainRender = true;
 	m_bDrawInPortalRender = true;
 #endif
+}
+
+CSprite::~CSprite()
+{
+#ifdef CLIENT_DLL
+	if ( m_bClientOnly )
+	{
+		g_ClientsideSprites.FindAndFastRemove( this );
+	}
+#endif // CLIENT_DLL
 }
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -200,11 +219,20 @@ void CSprite::Spawn( void )
 	m_flMaxFrame = (float)modelinfo->GetModelFrameCount( GetModel() ) - 1;
 	AddEffects( EF_NOSHADOW | EF_NORECEIVESHADOW );
 
+/*
 #if defined( CLIENT_DLL )
 	SetNextClientThink( CLIENT_THINK_ALWAYS );
 #endif
+*/
 
 #if !defined( CLIENT_DLL )
+	if ( m_flGlowProxySize > MAX_GLOW_PROXY_SIZE )
+	{
+		// Clamp on Spawn to prevent per-frame spew
+		DevWarning( "env_sprite at setpos %0.0f %0.0f %0.0f has invalid glow size %f - clamping to %f\n",
+			GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z, m_flGlowProxySize.Get(), MAX_GLOW_PROXY_SIZE );
+		m_flGlowProxySize = MAX_GLOW_PROXY_SIZE;
+	}
 	if ( GetEntityName() != NULL_STRING && !(m_spawnflags & SF_SPRITE_STARTON) )
 	{
 		TurnOff();
@@ -228,7 +256,6 @@ void CSprite::Spawn( void )
 
 	// Clamp our scale if necessary
 	float scale = m_flSpriteScale;
-	
 	if ( scale < 0 || scale > MAX_SPRITE_SCALE )
 	{
 #if !defined( CLIENT_DLL ) 
@@ -248,6 +275,12 @@ void CSprite::Spawn( void )
 	m_nStartBrightness = m_nDestBrightness = m_nBrightness;
 #endif
 
+#ifndef CLIENT_DLL
+	// Server has no use for client-only entities.
+	// Seems like a waste to create the entity, only to UTIL_Remove it on Spawn, but this pattern works safely...
+	if ( FClassnameIs( this, "env_sprite_clientside" ) || m_spawnflags & SF_SPRITE_CLIENTSIDE )
+		UTIL_Remove( this );
+#endif // !CLIENT_DLL
 }
 
 
@@ -594,10 +627,6 @@ void CSprite::InputHideSprite( inputdata_t &inputdata )
 	TurnOff();
 }
 
-
-//-----------------------------------------------------------------------------
-// Purpose: Input handler that hides the sprite.
-//-----------------------------------------------------------------------------
 void CSprite::InputShowSprite( inputdata_t &inputdata )
 {
 	TurnOn();
@@ -709,9 +738,6 @@ int	CSprite::GetRenderBrightness( void )
 void CSprite::OnDataChanged( DataUpdateType_t updateType )
 {
 	BaseClass::OnDataChanged( updateType );
-
-	// Only think when sapping
-	SetNextClientThink( CLIENT_THINK_ALWAYS );
 	if ( updateType == DATA_UPDATE_CREATED )
 	{
 		m_flStartScale = m_flDestScale = m_flSpriteScale;
@@ -719,18 +745,29 @@ void CSprite::OnDataChanged( DataUpdateType_t updateType )
 	}
 
 	UpdateVisibility();
+
+	if ( m_flSpriteScale != m_flDestScale || m_nBrightness != m_nDestBrightness )
+	{
+		SetNextClientThink( CLIENT_THINK_ALWAYS );
+	}
+	else
+	{
+		SetNextClientThink( CLIENT_THINK_NEVER );
+	}
 }
 
 void CSprite::ClientThink( void )
 {
 	BaseClass::ClientThink();
 
+	bool bDisableThink = true;
 	// Module render colors over time
 	if ( m_flSpriteScale != m_flDestScale )
 	{
 		m_flStartScale		= m_flDestScale;
 		m_flDestScale		= m_flSpriteScale;
 		m_flScaleTimeStart	= gpGlobals->curtime;
+		bDisableThink = false;
 	}
 
 	if ( m_nBrightness != m_nDestBrightness )
@@ -738,7 +775,13 @@ void CSprite::ClientThink( void )
 		m_nStartBrightness		= m_nDestBrightness;
 		m_nDestBrightness		= m_nBrightness;
 		m_flBrightnessTimeStart = gpGlobals->curtime;
+		bDisableThink = false;
 	}
+
+	// changed bounds
+	InvalidatePhysicsRecursive(BOUNDS_CHANGED);	//BOUNDS_CHANGED
+	if ( bDisableThink )
+		SetNextClientThink(CLIENT_THINK_NEVER);
 }
 
 extern bool g_bRenderingScreenshot;
@@ -778,6 +821,7 @@ int CSprite::DrawModel( int flags )
 	//Must be a sprite
 	if ( modelinfo->GetModelType( GetModel() ) != mod_sprite )
 	{
+		Msg( "Sprite %d has non-mod_sprite model %s (type %d)\n", entindex(), modelinfo->GetModelName( GetModel() ), modelinfo->GetModelType( GetModel() ) );
 		Assert( 0 );
 		return 0;
 	}

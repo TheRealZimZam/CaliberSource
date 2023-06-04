@@ -33,6 +33,7 @@
 #define SF_BEAM_SHADEIN			0x0080
 #define SF_BEAM_SHADEOUT		0x0100
 #define	SF_BEAM_TAPEROUT		0x0200	// Tapers to zero
+#define	SF_BEAM_NOTILE			0x0400
 #define SF_BEAM_TEMPORARY		0x8000
 
 #define ATTACHMENT_INDEX_BITS	5

@@ -14,6 +14,7 @@
 #include "iplayeranimstate.h"
 #include "studio.h"
 #include "sequence_Transitioner.h"
+#include "shareddefs.h"
 
 #ifdef CLIENT_DLL
 	class C_BaseAnimatingOverlay;
@@ -47,9 +48,10 @@ public:
 	// How do the legs animate?
 	LegAnimType_t m_LegAnimType;
 
-	// Use aim sequences? (CS hostages don't).
+	// Use aim sequences, or just translate the activity? (CS hostages don't).
 	bool m_bUseAimSequences;
 };
+
 
 // ------------------------------------------------------------------------------------------------ //
 // CBasePlayerAnimState declaration.
@@ -65,13 +67,14 @@ public:
 	{
 		TURN_NONE = 0,
 		TURN_LEFT,
-		TURN_RIGHT
+		TURN_RIGHT,
+		TURN_180
 	};
 
 						CBasePlayerAnimState();
 	virtual ~CBasePlayerAnimState();
 
-	void Init( CBaseAnimatingOverlay *pPlayer, const CModAnimConfig &config );
+	void Init( CBasePlayer *pPlayer, const CModAnimConfig &config );
 	virtual void Release();
 
 	// Update() and DoAnimationEvent() together maintain the entire player's animation state.
@@ -82,7 +85,7 @@ public:
 	// DoAnimationEvent() receives and triggers all of the incidental animations -
 	// (firing, reloading, etc.)
 	virtual void Update( float eyeYaw, float eyePitch );
-//!	virtual void DoAnimationEvent( PlayerAnimEvent_t event, int nData );
+	virtual void DoAnimationEvent( int PlayerAnimEvent_t, int nData );
 
 	// This is called by the client when a new player enters the PVS to clear any events
 	// the dormant version of the entity may have been playing.
@@ -151,6 +154,9 @@ public:
 
 	// Allow inheriting classes to translate their desired activity, while keeping all
 	// internal ACT comparisons using the base activity
+	//virtual Activity TranslateActivity( Activity actDesired ) { return actDesired; }
+	// UNDONE:Add a simple check to see if the weapon should override it. Usually this is
+	// done in the inherited animstate, but since this is the new SP state, add it in anyway - M.
 	virtual Activity TranslateActivity( Activity actDesired );
 
 	// Allow inheriting classes to override SelectWeightedSequence
@@ -185,7 +191,7 @@ protected:
 protected:
 	
 	CModAnimConfig		m_AnimConfig;
-	CBaseAnimatingOverlay	*m_pOuter;
+	CBasePlayer			*m_pOuter;
 
 protected:
 	int					ConvergeAngles( float goal,float maxrate, float maxgap, float dt, float& current );
@@ -204,6 +210,14 @@ protected:
 	bool	m_bJumping;
 	float	m_flJumpStartTime;	
 	bool	m_bFirstJumpFrame;
+
+	// Aiming.
+	bool m_bFiring;
+	float m_flFireStartTime;
+
+	// Dying.
+	bool m_bDying;
+	Activity m_DeathActivity;
 
 	// The following variables are used for tweaking the yaw of the upper body when standing still and
 	//  making sure that it smoothly blends in and out once the player starts moving
@@ -232,7 +246,7 @@ private:
 	void		UpdateProneState();
 
 	// Get the string that's appended to animation names for the player's current weapon.
-	const char* GetWeaponSuffix();
+	const char* GetWeaponPrefix();
 
 	Activity			BodyYawTranslateActivity( Activity activity );
 

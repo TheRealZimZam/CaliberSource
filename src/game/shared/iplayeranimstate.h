@@ -10,16 +10,12 @@
 #pragma once
 #endif
 
-
-
 typedef enum
 {
-	LEGANIM_9WAY,		// Legs use a 9-way blend, with "move_x" and "move_y" pose parameters.
+	LEGANIM_GOLDSRC,	// Legs always point in the direction he's running and the torso rotates.
 	LEGANIM_8WAY,		// Legs use an 8-way blend with "move_yaw" pose param.
-	LEGANIM_GOLDSRC	// Legs always point in the direction he's running and the torso rotates.
+	LEGANIM_9WAY		// Legs use a 9-way blend, with "move_x" and "move_y" pose parameters.
 } LegAnimType_t;
-
-
 
 abstract_class IPlayerAnimState
 {
@@ -33,7 +29,7 @@ public:
 	//
 	// It also modulates these based on events triggered by DoAnimationEvent.
 	virtual void Update( float eyeYaw, float eyePitch ) = 0;
-//!	virtual void DoAnimationEvent() = 0;
+	virtual void DoAnimationEvent( int PlayerAnimEvent_t, int nData ) = 0;
 
 	// This is called by the client when a new player enters the PVS to clear any events
 	// the dormant version of the entity may have been playing.

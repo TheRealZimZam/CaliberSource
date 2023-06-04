@@ -71,7 +71,7 @@ ConVar	ai_debug_shoot_positions( "ai_debug_shoot_positions", "0", FCVAR_REPLICAT
 //-----------------------------------------------------------------------------
 void SpawnBlood(Vector vecSpot, const Vector &vecDir, int bloodColor, float flDamage)
 {
-	UTIL_BloodDrips( vecSpot, vecDir, bloodColor, (int)flDamage );
+	UTIL_BloodImpact( vecSpot, vecDir, bloodColor, (int)flDamage );
 }
 
 #if !defined( NO_ENTITY_PREDICTION )
@@ -1370,6 +1370,7 @@ void CBaseEntity::InvalidatePhysicsRecursive( int nChangeFlags )
 		nDirtyFlags |= EFL_DIRTY_ABSVELOCITY;
 	}
 
+	bool bSurroundDirty = false;
 	if ( nChangeFlags & POSITION_CHANGED )
 	{
 		nDirtyFlags |= EFL_DIRTY_ABSTRANSFORM;
@@ -1392,6 +1393,7 @@ void CBaseEntity::InvalidatePhysicsRecursive( int nChangeFlags )
 			// NOTE: This will handle the KD-tree, surrounding bounds, PVS
 			// render-to-texture shadow, shadow projection, and client leaf dirty
 			CollisionProp()->MarkSurroundingBoundsDirty();
+			bSurroundDirty = true;
 		}
 		else
 		{
@@ -1407,14 +1409,45 @@ void CBaseEntity::InvalidatePhysicsRecursive( int nChangeFlags )
 		nChangeFlags |= POSITION_CHANGED | VELOCITY_CHANGED;
 	}
 
+/*
+	if ( nChangeFlags & SEQUENCE_CHANGED )
+	{
+		if ( !bSurroundDirty )
+		{
+			if ( CollisionProp()->DoesSequenceChangeInvalidateSurroundingBox() )
+			{
+				// NOTE: This will handle the KD-tree, surrounding bounds, PVS
+				// render-to-texture shadow, shadow projection, and client leaf dirty
+				CollisionProp()->MarkSurroundingBoundsDirty();
+				bSurroundDirty = true;
+			}
+		}
+
+		// Children sequences do not change as a result of parent sequence changes
+		nChangeFlags &= ~SEQUENCE_CHANGED;
+	}
+*/
+#ifdef CLIENT_DLL
+	if ( !bSurroundDirty && (nChangeFlags & (POSITION_CHANGED|ANGLES_CHANGED|BOUNDS_CHANGED)) )
+	{
+		if ( entindex() != 0 )
+		{
+			MarkRenderHandleDirty();
+			g_pClientShadowMgr->AddToDirtyShadowList( this );
+			g_pClientShadowMgr->MarkRenderToTextureShadowDirty( GetShadowHandle() );
+		}
+	}
+#endif
+
 	AddEFlags( nDirtyFlags );
 
 	// Set flags for children
 	bool bOnlyDueToAttachment = false;
-	if ( nChangeFlags & ANIMATION_CHANGED )
+	if ( nChangeFlags & ( ANIMATION_CHANGED | BOUNDS_CHANGED ) )
 	{
 #ifdef CLIENT_DLL
-		g_pClientShadowMgr->MarkRenderToTextureShadowDirty( GetShadowHandle() );
+		if ( ( nChangeFlags & BOUNDS_CHANGED ) == 0 )
+			g_pClientShadowMgr->MarkRenderToTextureShadowDirty( GetShadowHandle() );
 #endif
 
 		// Only set this flag if the only thing that changed us was the animation.
@@ -1463,6 +1496,15 @@ void CBaseEntity::InvalidatePhysicsRecursive( int nChangeFlags )
 	//			pAnim->InvalidateBoneCache();		
 	//	}
 	//#endif
+
+
+	// Clear out cached bones
+	if ( nChangeFlags & (POSITION_CHANGED | ANGLES_CHANGED | ANIMATION_CHANGED) )
+	{
+		CBaseAnimating *pAnim = GetBaseAnimating();
+		if ( pAnim )
+			pAnim->InvalidateBoneCache();		
+	}
 }
 
 
@@ -1555,9 +1597,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 	if( IsPlayer() )
 	{
 		CBasePlayer *pPlayer = dynamic_cast<CBasePlayer*>(this);
-
 		int rumbleEffect = pPlayer->GetActiveWeapon()->GetRumbleEffect();
-
 		if( rumbleEffect != RUMBLE_INVALID )
 		{
 			if( rumbleEffect == RUMBLE_SHOTGUN_SINGLE )
@@ -1597,7 +1637,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 
 	Vector vecDir;
 	Vector vecEnd;
-	
+
 	// Skip multiple entities when tracing
 	CBulletsTraceFilter traceFilter( COLLISION_GROUP_NONE );
 	traceFilter.SetPassEntity( this ); // Standard pass entity for THIS so that it can be easily removed from the list after passing through a portal
@@ -1658,7 +1698,6 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		}
 		else
 		{
-
 			// Don't run the biasing code for the player at the moment.
 			vecDir = Manipulator.ApplySpread( info.m_vecSpread );
 		}
@@ -1670,7 +1709,8 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		float fPortalFraction = 2.0f;
 #endif
 
-
+		// This is that rare almost-stupid kind of balancing, dont need it for caliber.
+#if 0
 		if( IsPlayer() && info.m_iShots > 1 && iShot % 2 )
 		{
 			// Half of the shotgun pellets are hulls that make it easier to hit targets with the shotgun.
@@ -1687,6 +1727,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 #endif //#ifdef PORTAL
 		}
 		else
+#endif
 		{
 #ifdef PORTAL
 			Ray_t rayBullet;
@@ -1726,6 +1767,25 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			NDebugOverlay::Line(info.m_vecSrc, vecEnd, 255, 255, 255, false, .1 );
 #endif
 
+		//!!TODO;
+		// This is where the velocity check should come in.
+		// All we need to do is some maths to get how far away the impact point is,
+		// factor in the velocity and probably TIME_TO_TICKS, then delay the impact by that much.
+		// No need for expensive entites and actual simulation.
+		// Max delay should be about a second.
+#if 0
+		if ( info.m_flVelocity > 0 )
+		{
+			//!!TODOTODO;
+		//	float flBulletDelay = (Something with info.m_vecSrc, vecEnd, and m_flVelocity);
+
+			// Clamp the calculated delay to 1 second, any bullet traveling longer or slower than
+			// that (flak cannon, big shells, etc.) should use an actual simulated projectile.
+			//clamp( flBulletDelay, 0, 1.0 )
+		}
+#endif
+
+		// Might have to offload everything below here
 		if ( bStartedInWater )
 		{
 #ifdef GAME_DLL
@@ -1755,6 +1815,8 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			bHitWater = true;
 		}
 
+		Vector vecTracerDest = tr.endpos;
+
 		// Now hit all triggers along the ray that respond to shots...
 		// Clip the ray to the first collided solid returned from traceline
 		CTakeDamageInfo triggerInfo( pAttacker, pAttacker, info.m_iDamage, nDamageType );
@@ -1771,8 +1833,6 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			DevMsg("ERROR: Undefined ammo type!\n");
 			return;
 		}
-
-		Vector vecTracerDest = tr.endpos;
 
 		// do damage, paint decals
 		if (tr.fraction != 1.0)
@@ -1840,13 +1900,9 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 				if ( !(info.m_nFlags & FIRE_BULLETS_NO_IMPACTS) && (bStartedInWater || !bHitWater || (info.m_nFlags & FIRE_BULLETS_ALLOW_WATER_SURFACE_IMPACTS)) )
 				{
 					if ( bDoServerEffects == true )
-					{
 						DoImpactEffect( tr, nDamageType );
-					}
 					else
-					{
 						bDoImpacts = true;
-					}
 				}
 				else
 				{
@@ -1858,7 +1914,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 					
 					DispatchEffect( "RagdollImpact", data );
 				}
-	
+
 #ifdef GAME_DLL
 				if ( nAmmoFlags & AMMO_FORCE_DROP_IF_CARRIED )
 				{

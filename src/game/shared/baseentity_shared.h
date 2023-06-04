@@ -53,6 +53,7 @@ enum InvalidatePhysicsBits_t
 	ANGLES_CHANGED		= 0x2,
 	VELOCITY_CHANGED	= 0x4,
 	ANIMATION_CHANGED	= 0x8,
+	BOUNDS_CHANGED		= 0x16,
 };
 
 

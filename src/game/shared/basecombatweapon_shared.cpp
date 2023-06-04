@@ -151,7 +151,6 @@ void CBaseCombatWeapon::SwitchAmmoType( void )
 
 	// Now force a reload after switching ammo types
 	m_bUsingSecondaryAmmo = !m_bUsingSecondaryAmmo;
-
 }
 
 //-----------------------------------------------------------------------------

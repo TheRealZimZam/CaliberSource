@@ -146,7 +146,6 @@ struct MultiPlayerMovementData_t
 	float		m_flWalkSpeed;
 	float		m_flRunSpeed;
 	float		m_flSprintSpeed;
-	float		m_flBodyYawRate;
 };
 
 //=============================================================================
@@ -191,24 +190,20 @@ public:
 	void OnNewModel( void );
 
 	// Gestures.
-	void	ResetGestureSlots( void );
-	void	ResetGestureSlot( int iGestureSlot );
+	void ResetGestureSlots( void );
+	void ResetGestureSlot( int iGestureSlot );
 	void AddVCDSequenceToGestureSlot( int iGestureSlot, int iGestureSequence, bool bAutoKill = true );
 
 	// Feet.
 	bool	m_bForceAimYaw;
 
 protected:
-	
-//!	virtual void Init( CBasePlayer *pPlayer, MultiPlayerMovementData_t &movementData ); 
+
 	CBasePlayer *GetBasePlayer( void )				{ return m_pPlayer; }
 
 	// Allow inheriting classes to override SelectWeightedSequence
 	virtual int SelectWeightedSequence( Activity activity ) { return GetBasePlayer()->SelectWeightedSequence( activity ); }
 	virtual void RestartMainSequence();
-
-	void GetOuterAbsVelocity( Vector& vel );
-	float GetOuterXYSpeed();
 
 	virtual bool HandleJumping( Activity &idealActivity );
 	virtual bool HandleMoving( Activity &idealActivity );
@@ -233,7 +228,7 @@ protected:
 
 	virtual void PlayFlinchGesture( Activity iActivity );
 
-	virtual float CalcMovementPlaybackRate( bool *bIsMoving );
+	//virtual float CalcMovementPlaybackRate( bool *bIsMoving );
 
 	// Pose paramters.
 	bool				SetupPoseParameters( CStudioHdr *pStudioHdr );
@@ -242,7 +237,9 @@ protected:
 	void				ComputePoseParam_BodyHeight( CStudioHdr *pStudioHdr );
 	void				ConvergeYawAngles( float flGoalYaw, float flYawRate, float flDeltaTime, float &flCurrentYaw );
 
-	virtual float GetCurrentMaxGroundSpeed();
+	const char* GetWeaponPrefix();
+
+	//virtual float GetCurrentMaxGroundSpeed();
 	virtual void ComputeSequences( CStudioHdr *pStudioHdr );
 	void ComputeMainSequence();
 	void UpdateInterpolators();
@@ -286,17 +283,11 @@ protected:
 
 	MultiPlayerMovementData_t	m_MovementData;
 
-	// Jumping.
-	bool	m_bJumping;
-	float	m_flJumpStartTime;	
-	bool	m_bFirstJumpFrame;
-
 	// Swimming.
 	bool	m_bInSwim;
 	bool	m_bFirstSwimFrame;
 
-	// Dying
-	bool	m_bDying;
+	// Dying.
 	bool	m_bFirstDyingFrame;
 
 	// Last activity we've used on the lower body. Used to determine if animations should restart.

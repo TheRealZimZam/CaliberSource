@@ -760,41 +760,6 @@ void UTIL_Tracer( const Vector &vecStart, const Vector &vecEnd, int iEntIndex,
 }
 
 
-void UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, int amount )
-{
-	if ( !UTIL_ShouldShowBlood( color ) )
-		return;
-
-	if ( color == DONT_BLEED || amount == 0 )
-		return;
-
-	if ( g_Language.GetInt() == LANGUAGE_GERMAN && color == BLOOD_COLOR_RED )
-		color = 0;
-
-	if ( g_pGameRules->IsMultiplayer() )
-	{
-		// scale up blood effect in multiplayer for better visibility
-		amount *= 4;
-	}
-
-	if ( amount > 255 )
-		amount = 255;
-
-	if (color == BLOOD_COLOR_MECH)
-	{
-		g_pEffects->Sparks(origin);
-		if (random->RandomFloat(0, 2) >= 1)
-		{
-			UTIL_Smoke(origin, random->RandomInt(10, 15), 10);
-		}
-	}
-	else
-	{
-		// Normal blood impact
-		UTIL_BloodImpact( origin, direction, color, amount );
-	}
-}	
-
 //-----------------------------------------------------------------------------
 // Purpose: Returns low violence settings
 //-----------------------------------------------------------------------------
@@ -877,19 +842,9 @@ void UTIL_BloodDecalTrace( trace_t *pTrace, int bloodColor )
 				default:
 				break;
 		}
-#if 0
-		//TODO; Shouldnt this be a switch with all possibilites??
-		if ( bloodColor == BLOOD_COLOR_RED )
-		{
-			UTIL_DecalTrace( pTrace, "Blood" );
-		}
-		else
-		{
-			UTIL_DecalTrace( pTrace, "YellowBlood" );
-		}
-#endif
 	}
 }
+
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -900,6 +855,18 @@ void UTIL_BloodDecalTrace( trace_t *pTrace, int bloodColor )
 //-----------------------------------------------------------------------------
 void UTIL_BloodImpact( const Vector &pos, const Vector &dir, int color, int amount )
 {
+	if ( !UTIL_ShouldShowBlood( color ) )
+		return;
+
+	if ( color == DONT_BLEED || amount == 0 )
+		return;
+
+	if ( g_pGameRules->IsMultiplayer() )
+		amount *= 4;
+
+	if ( amount > 255 )
+		amount = 255;
+
 	CEffectData	data;
 
 	data.m_vOrigin = pos;

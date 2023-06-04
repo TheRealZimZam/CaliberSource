@@ -75,7 +75,7 @@ ConVar	temp_demofixes( "temp_demofixes","1", FCVAR_REPLICATED );
 ConVar  physcannon_mega_enabled( "physcannon_mega_enabled", "0", FCVAR_CHEAT | FCVAR_REPLICATED );
 
 // Enables a bunch of cheeky stuff
-ConVar	sv_funmode( "sv_funmode","1", FCVAR_CHEAT | FCVAR_REPLICATED );
+ConVar	sv_funmode( "sv_funmode","0", FCVAR_SPONLY | FCVAR_REPLICATED, "Enable F(ucking).U(nfair).N(ightmare) Mode" );
 
 // Controls the application of the robus radius damage model.
 ConVar	sv_robust_explosions( "sv_robust_explosions","1", FCVAR_REPLICATED );
@@ -209,6 +209,16 @@ ConVar	sk_npc_dmg_gunship_to_plr	( "sk_npc_dmg_gunship_to_plr", "0", FCVAR_REPLI
 ConVar	sk_npc_dmg_strider			( "sk_npc_dmg_strider", "0", FCVAR_REPLICATED );
 ConVar	sk_npc_dmg_strider_to_plr	( "sk_npc_dmg_strider_to_plr", "0", FCVAR_REPLICATED );
 
+#ifndef CLIENT_DLL
+const char *CHalfLife2::GetGameDescription( void )
+{
+	if ( IsMultiplayer() )
+		return "Caliber: Deathmatch";
+	else
+		return "Caliber";
+}
+#endif
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : iDmgType - 
@@ -307,6 +317,7 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 	//-----------------------------------------------------------------------------
 	void CHalfLife2::PlayerSpawn( CBasePlayer *pPlayer )
 	{
+//		pPlayer->EquipSuit();
 	}
 
 	//-----------------------------------------------------------------------------
@@ -1354,6 +1365,25 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 	{
 	}
 
+#if 0
+	bool CHalfLife2::CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pWeapon )
+	{
+		if ( FClassnameIs( pWeapon, "weapon_satchel" ) )
+		{
+			CWeaponSatchel *satchel = static_cast< CWeaponSatchel * >( pPlayer->Weapon_OwnsThisType( "weapon_satchel" ) );
+			if ( satchel )
+			{
+				if ( satchel->HasChargeDeployed() )
+				{
+					return false;
+				}
+			}
+		}
+
+		return BaseClass::CanHavePlayerItem(pPlayer, pWeapon);
+	}
+#endif
+
 	void CHalfLife2::Think( void )
 	{
 		BaseClass::Think();
@@ -1642,7 +1672,7 @@ void CHalfLife2::AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo )
 	}
 
 	// Random crits!
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		// Do a random scale
 		pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() * random->RandomFloat( 1.0f, 1.25f ) );
@@ -1674,7 +1704,7 @@ void CHalfLife2::AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo )
 float CHalfLife2::AdjustPlayerDamageInflicted( float damage )
 {
 	// Random crits!
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		// Do a random scale
 		return damage * (sk_dmg_inflict_scale4.GetFloat() * random->RandomFloat( 0.85f, 1.25f ));

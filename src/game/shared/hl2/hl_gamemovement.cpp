@@ -62,8 +62,6 @@ void CHL2GameMovement::SwallowUseKey()
 {
 	mv->m_nOldButtons |= IN_USE;
 	player->m_afButtonPressed &= ~IN_USE;
-
-	GetHL2Player()->m_bPlayUseDenySound = false;
 }
 
 #if !defined( CLIENT_DLL )
@@ -307,7 +305,7 @@ bool CHL2GameMovement::ContinueForcedMove()
 //-----------------------------------------------------------------------------
 bool CHL2GameMovement::OnLadder( trace_t &trace )
 {
-	return ( GetLadder() != NULL ) ? true : false;
+	return ( GetLadder() != NULL ) ? true : BaseClass::OnLadder(trace);
 }
 
 //-----------------------------------------------------------------------------
@@ -546,6 +544,15 @@ bool CHL2GameMovement::ExitLadderViaDismountNode( CFuncLadder *ladder, bool stri
 //-----------------------------------------------------------------------------
 void CHL2GameMovement::FullLadderMove()
 {
+	// Is it a legacy ladder?
+#if defined(HL2_DLL)
+	if (GetLadder() == NULL)
+	{
+		BaseClass::FullLadderMove();
+		return;
+	}
+#endif
+
 #if !defined( CLIENT_DLL )
 	CFuncLadder *ladder = GetLadder();
 	Assert( ladder );
@@ -685,7 +692,6 @@ void CHL2GameMovement::FullLadderMove()
 			player->SetMoveType( MOVETYPE_WALK );
 			player->SetMoveCollide( MOVECOLLIDE_DEFAULT );
 			SetLadder( NULL );
-			GetHL2Player()->m_bPlayUseDenySound = false;
 
 			// Dismount with a bit of velocity in facing direction
 			VectorScale( m_vecForward, USE_DISMOUNT_SPEED, mv->m_vecVelocity );
@@ -907,6 +913,10 @@ bool CHL2GameMovement::CheckLadderAutoMount( CFuncLadder *ladder, const Vector& 
 //-----------------------------------------------------------------------------
 bool CHL2GameMovement::LadderMove( void )
 {
+	// Prioritize brush ladders over entity ones
+	if (GetLadder() == NULL)
+		BaseClass::LadderMove();
+
 	if ( player->GetMoveType() == MOVETYPE_NOCLIP )
 	{
 		SetLadder( NULL );
@@ -992,12 +1002,6 @@ bool CHL2GameMovement::LadderMove( void )
 	if ( !ladder )
 	{
 		return false;
-	}
-
-	// Don't play the deny sound
-	if ( pressed_use )
-	{
-		GetHL2Player()->m_bPlayUseDenySound = false;
 	}
 
 	// Make sure we are on the ladder
@@ -1112,7 +1116,6 @@ bool CHL2GameMovement::LadderMove( void )
 			}
 		}
 
-#if 1
 		if( sv_ladder_useonly.GetBool() )
 		{
 			// Stick up climbs up, stick down climbs down. No matter which way you're looking.
@@ -1125,7 +1128,6 @@ bool CHL2GameMovement::LadderMove( void )
 				factor = -1.0f;
 			}
 		}
-#endif	//_XBOX
 
 		mv->m_vecVelocity = MAX_CLIMB_SPEED * factor * ladderUp;
 	}

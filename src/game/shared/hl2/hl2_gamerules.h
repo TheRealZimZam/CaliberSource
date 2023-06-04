@@ -69,10 +69,11 @@ private:
 
 	virtual void			InitDefaultAIRelationships( void );
 	virtual const char*		AIClassText(int classType);
-	virtual const char *GetGameDescription( void ) { return "Half-Life 2"; }
+	virtual const char*		GetGameDescription( void );
 
 	// Ammo
 	virtual void			PlayerThink( CBasePlayer *pPlayer );
+//	virtual bool			CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pWeapon );
 	virtual float			GetAmmoDamage( CBaseEntity *pAttacker, CBaseEntity *pVictim, int nAmmoType );
 
 	virtual bool			ShouldBurningPropsEmitLight();
@@ -96,7 +97,7 @@ private:
 	void AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo );
 	float AdjustPlayerDamageInflicted( float damage );
 
-	int						DefaultFOV( void ) { return 80; }
+	int						DefaultFOV( void ) { return 85; }
 #endif
 };
 

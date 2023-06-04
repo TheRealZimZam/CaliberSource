@@ -47,7 +47,7 @@ BEGIN_PREDICTION_DATA( CBaseHLCombatWeapon )
 END_PREDICTION_DATA()
 
 ConVar sk_auto_reload_time( "sk_auto_reload_time", "12", FCVAR_REPLICATED );
-ConVar sk_realistic_spread( "sk_realistic_spread", "1", FCVAR_REPLICATED );
+ConVar sk_realistic_spread( "sk_realistic_spread", "0", FCVAR_REPLICATED );
 ConVar sk_spread_moving( "sk_spread_moving", "1.2", FCVAR_REPLICATED );	// Moving/walking
 ConVar sk_spread_movingfast( "sk_spread_movingfast", "1.4", FCVAR_REPLICATED );	// Moving/jogging/sprinting
 ConVar sk_spread_flying( "sk_spread_flying", "1.5", FCVAR_REPLICATED );	// Jumping/flying/swimming
@@ -83,6 +83,7 @@ void CBaseHLCombatWeapon::ItemHolsterFrame( void )
 //-----------------------------------------------------------------------------
 bool CBaseHLCombatWeapon::CanLower()
 {
+	//Don't bother if we don't have the animation
 	if ( SelectWeightedSequence( ACT_VM_IDLE_LOWERED ) == ACTIVITY_NOT_AVAILABLE )
 		return false;
 	return true;
@@ -94,8 +95,7 @@ bool CBaseHLCombatWeapon::CanLower()
 //-----------------------------------------------------------------------------
 bool CBaseHLCombatWeapon::Lower( void )
 {
-	//Don't bother if we don't have the animation
-	if ( SelectWeightedSequence( ACT_VM_IDLE_LOWERED ) == ACTIVITY_NOT_AVAILABLE )
+	if ( !CanLower() )
 		return false;
 
 	m_bLowered = true;
@@ -273,9 +273,11 @@ Vector CBaseHLCombatWeapon::CalculateBulletSpread( WeaponProficiency_t proficien
 
 	if ( sk_realistic_spread.GetBool() )
 	{
+		// This also applies to npcs - shooting on the move is mainly for looks
 		if ( GetOwner()->GetAbsVelocity().Length() > 120 )	//walkspeed
 			fSpreadModifier = sk_spread_moving.GetFloat();
 
+		// Player only
 		if ( GetOwner() && GetOwner()->IsPlayer() )
 		{
 			CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(GetOwner());

@@ -15,12 +15,12 @@
 // Definitions
 // ------------------------------------------------------------------------- //
 
-#define NUM_AR2_EXPLOSION_PARTICLES	300
-#define AR2_DUST_RADIUS				340
-#define AR2_DUST_LIFETIME			3
-#define AR2_DUST_SPEED				350
-#define AR2_DUST_STARTSIZE			30
-#define AR2_DUST_ENDSIZE			45
+#define NUM_ASS_EXPLOSION_PARTICLES	300
+#define ASS_DUST_RADIUS				340
+#define ASS_DUST_LIFETIME			3
+#define ASS_DUST_SPEED				350
+#define ASS_DUST_STARTSIZE			30
+#define ASS_DUST_ENDSIZE			45
 
 
 static Vector g_AssassinSmokeColor(0.3, 0.3, 0.3);
@@ -168,13 +168,13 @@ bool C_AssassinSmoke::SimulateAndRender(Particle *pBaseParticle, ParticleDraw *p
 
 	// Update its lifetime.
 	pParticle->m_Lifetime += pDraw->GetTimeDelta();
-	if(pParticle->m_Lifetime > AR2_DUST_LIFETIME)
+	if(pParticle->m_Lifetime > ASS_DUST_LIFETIME)
 	{
 		return false;
 	}
 
 	// Draw.
-	float lifetimePercent = pParticle->m_Lifetime / AR2_DUST_LIFETIME;
+	float lifetimePercent = pParticle->m_Lifetime / ASS_DUST_LIFETIME;
 	
 	//Vector color = g_AssassinSmokeColor;
 
@@ -196,7 +196,7 @@ bool C_AssassinSmoke::SimulateAndRender(Particle *pBaseParticle, ParticleDraw *p
 		tPos,
 		color,
 		0.6f * sin(3.14159 * lifetimePercent),
-		AR2_DUST_STARTSIZE + (AR2_DUST_ENDSIZE - AR2_DUST_STARTSIZE) * lifetimePercent);
+		ASS_DUST_STARTSIZE + (ASS_DUST_ENDSIZE - ASS_DUST_STARTSIZE) * lifetimePercent);
 
 	// Move it (this comes after rendering to make it clear that moving the particle here won't change
 	// its rendering for this frame since m_TransformedPos has already been set).

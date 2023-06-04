@@ -452,7 +452,7 @@ void C_AR2Explosion::RenderParticles( CParticleRenderIterator *pIterator )
 				alpha = AR2_DUST_ALPHA * ( 1.0f - lifetimePercent );
 			}
 
-			alpha *= GetAlphaDistanceFade( tPos, IsXbox() ? 100 : 50, IsXbox() ? 200 : 150 );
+			alpha *= GetAlphaDistanceFade( tPos, !IsXbox() ? 100 : 50, !IsXbox() ? 200 : 150 );
 
 			RenderParticle_ColorSizeAngle(
 				pIterator->GetParticleDraw(),

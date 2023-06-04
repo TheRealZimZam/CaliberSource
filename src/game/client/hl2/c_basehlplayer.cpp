@@ -11,6 +11,8 @@
 #include "c_ai_basenpc.h"
 #include "in_buttons.h"
 #include "collisionutils.h"
+#include "c_basetempentity.h"
+#include "cl_animevent.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -25,20 +27,66 @@ extern ConVar zoom_sensitivity_ratio;
 extern ConVar default_fov;
 extern ConVar sensitivity;
 
-#define	HL2MP_WALK_SPEED 100
-#define	HL2MP_JOG_SPEED 140
-#define	HL2MP_RUN_SPEED 200
-#define	HL2MP_SPRINT_SPEED 320
-#define SINGLEPLAYER_ANIMSTATE 1
+#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
+
+#if SINGLEPLAYER_ANIMSTATE
+#else
+//extern ConVar hl2_walkspeed;
+//extern ConVar hl2_jogspeed;
+//extern ConVar hl2_runspeed;
+//extern ConVar hl2_sprintspeed;
+#define	HL2_WALK_SPEED 120
+#define	HL2_JOG_SPEED 170
+#define	HL2_RUN_SPEED 240
+#define	HL2_SPRINT_SPEED 300
+#endif
+
 
 ConVar cl_npc_speedmod_intime( "cl_npc_speedmod_intime", "0.25", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
 ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
+static ConVar cl_playermodel( "cl_playermodel", "none", FCVAR_USERINFO | FCVAR_ARCHIVE | FCVAR_SERVER_CAN_EXECUTE, "Default Player Model");
+
+//////////////////////////////////////////////////////////////////////
+
+class C_TEPlayerAnimEvent : public C_BaseTempEntity
+{
+public:
+	DECLARE_CLASS( C_TEPlayerAnimEvent, C_BaseTempEntity );
+	DECLARE_CLIENTCLASS();
+
+	virtual void PostDataUpdate( DataUpdateType_t updateType )
+	{
+		// Create the effect.
+		C_BaseHLPlayer *pPlayer = dynamic_cast< C_BaseHLPlayer* >( m_hPlayer.Get() );
+		if ( pPlayer && !pPlayer->IsDormant() )
+		{
+			pPlayer->DoAnimationEvent((PLAYER_ANIM)m_iEvent.Get(), m_nData );
+		}	
+	}
+
+public:
+	CNetworkHandle( CBasePlayer, m_hPlayer );
+	CNetworkVar( int, m_iEvent );
+	CNetworkVar( int, m_nData );
+};
+
+IMPLEMENT_CLIENTCLASS_EVENT( C_TEPlayerAnimEvent, DT_TEPlayerAnimEvent, CTEPlayerAnimEvent );
+
+// ------------------------------------------------------------------------------------------ //
+// Data tables and prediction tables.
+// ------------------------------------------------------------------------------------------ //
+BEGIN_RECV_TABLE_NOBASE( C_TEPlayerAnimEvent, DT_TEPlayerAnimEvent )
+	RecvPropEHandle( RECVINFO( m_hPlayer ) ),
+	RecvPropInt( RECVINFO( m_iEvent ) ),
+	RecvPropInt( RECVINFO( m_nData ) )
+END_RECV_TABLE()
 
 IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropDataTable( RECVINFO_DT(m_HL2Local),0, &REFERENCE_RECV_TABLE(DT_HL2Local) ),
 	RecvPropBool( RECVINFO( m_fIsSprinting ) ),
 	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
 	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
+	RecvPropInt( RECVINFO( m_iSpawnInterpCounter ) ),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )
@@ -77,21 +125,28 @@ C_BaseHLPlayer::C_BaseHLPlayer() :
 	AddVar( &m_Local.m_vecPunchAngleVel, &m_Local.m_iv_vecPunchAngleVel, LATCH_SIMULATION_VAR );
 	AddVar( &m_angEyeAngles, &m_iv_angEyeAngles, LATCH_SIMULATION_VAR );
 
-#ifdef SINGLEPLAYER_ANIMSTATE
-// Base animstate
-	m_PlayerAnimState = CreatePlayerAnimState( this );
+#if SINGLEPLAYER_ANIMSTATE
+		// Base animstate
+		m_PlayerAnimState = CreatePlayerAnimState( this );
 #else
-	// Setup the movement data.
-	MultiPlayerMovementData_t movementData;
-	movementData.m_flBodyYawRate = 720.0f;
-	movementData.m_flRunSpeed = HL2MP_RUN_SPEED;
-	movementData.m_flWalkSpeed = HL2MP_WALK_SPEED;
-	movementData.m_flSprintSpeed = -1.0f;
+	// FIXME; MP state is extremely broken and WIP, rn it just crashes anyway
+	// Probably not going to spend time fixing because the few additional
+	// features arent really worth it - we only need animations so the player
+	// can admire himself in the mirror anyway.
+/*
+		// Setup the movement data.
+		MultiPlayerMovementData_t movementData;
+		movementData.m_flRunSpeed = HL2_RUN_SPEED;
+		movementData.m_flWalkSpeed = HL2_WALK_SPEED;
+		movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
 
-	// Create animation state for this player.
-	CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
-	m_PlayerAnimState->Init( this, movementData );
+		// Create animation state for this player.
+		CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
+		m_PlayerAnimState->Init( this, movementData );
+*/
 #endif
+
+	m_fLastPredFreeze = -1;
 
 	m_flZoomStart		= 0.0f;
 	m_flZoomEnd			= 0.0f;
@@ -107,6 +162,18 @@ C_BaseHLPlayer::~C_BaseHLPlayer()
 }
 
 //-----------------------------------------------------------------------------
+void C_BaseHLPlayer::Spawn( void )
+{
+    BaseClass::Spawn();
+
+//	SetModel( "models/gordon.mdl" );
+
+//	m_iSpawnInterpCounterCache = 0;
+
+	UpdateVisibility();
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : updateType - 
 //-----------------------------------------------------------------------------
@@ -119,6 +186,15 @@ void C_BaseHLPlayer::OnDataChanged( DataUpdateType_t updateType )
 	}
 
 	BaseClass::OnDataChanged( updateType );
+}
+
+void C_BaseHLPlayer::PostDataUpdate( DataUpdateType_t updateType )
+{
+	// C_BaseEntity assumes we're networking the entity's angles, so pretend that it
+	// networked the same value we already have.
+	SetNetworkAngles( GetLocalAngles() );
+	
+	BaseClass::PostDataUpdate( updateType );
 }
 
 //-----------------------------------------------------------------------------
@@ -204,6 +280,20 @@ void C_BaseHLPlayer::Zoom( float FOVOffset, float time )
 // Input  : flags - 
 // Output : int
 //-----------------------------------------------------------------------------
+bool C_BaseHLPlayer::ShouldDraw( void )
+{
+    if ( !IsAlive() )
+        return false;
+
+    if ( IsLocalPlayer() && IsRagdoll() )
+        return true;
+
+    if ( IsRagdoll() )
+        return false;
+
+    return BaseClass::ShouldDraw();
+}
+
 int C_BaseHLPlayer::DrawModel( int flags )
 {
 	// No pitch for player
@@ -222,25 +312,17 @@ int C_BaseHLPlayer::DrawModel( int flags )
 const QAngle& C_BaseHLPlayer::GetRenderAngles()
 {
 	if ( IsRagdoll() || IsPlayerDead() || m_PlayerAnimState == NULL )
-	{
-		return vec3_angle;
-	}
+		return BaseClass::GetRenderAngles();
 	else
-	{
 		return m_PlayerAnimState->GetRenderAngles();
-	}
 }
 
 const QAngle& C_BaseHLPlayer::EyeAngles()
 {
 	if ( IsLocalPlayer() && g_nKillCamMode == OBS_MODE_NONE )
-	{
 		return BaseClass::EyeAngles();
-	}
 	else
-	{
 		return m_angEyeAngles;
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -704,6 +786,12 @@ void C_BaseHLPlayer::UpdateClientSideAnimation()
 	BaseClass::UpdateClientSideAnimation();
 }
 
+void C_BaseHLPlayer::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
+{
+	if ( m_PlayerAnimState )
+		m_PlayerAnimState->DoAnimationEvent( PlayerAnimEvent_t, nData );
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Input handling
 //-----------------------------------------------------------------------------
@@ -718,4 +806,44 @@ bool C_BaseHLPlayer::CreateMove( float flInputSampleTime, CUserCmd *pCmd )
 	}
 
 	return bResult;
+}
+
+//-----------------------------------------------------------------------------
+bool C_BaseHLPlayer::ShouldPredict( void )
+{
+	// Do this before calling into baseclass so prediction data block gets allocated
+	if ( IsLocalPlayer() )
+	{
+#if 0
+		// Disable prediction when player hops onto a moving train or elevator :-/
+		if ( GetGroundEntity() && GetGroundEntity()->GetMoveType() == MOVETYPE_PUSH )
+		{
+			Vector vel = GetGroundEntity()->GetLocalVelocity();
+			if ( vel.Length() > 0.002f )
+			{
+				m_fLastPredFreeze = gpGlobals->curtime;
+			}
+		}
+
+		// disable prediction for 3 seconds after touching a moving entity
+		if ( ( gpGlobals->curtime - m_fLastPredFreeze ) < 3 )
+		{
+			if ( GetPredictable() )
+			{
+				QuickShutdownPredictable();
+			}
+
+			return false;
+		}
+
+		if ( !GetPredictable() && IsIntermediateDataAllocated() )
+		{
+			QuickInitPredictable();
+		}
+#endif
+
+		return true;
+	}
+
+	return false;
 }

@@ -279,7 +279,6 @@ void C_NPC_Barnacle::CBarnaclePhysicsDelegate::GetNodeForces( CSimplePhysics::CN
 // Purpose: 
 //-----------------------------------------------------------------------------
 #define TIP_SNAP_FACTOR 200
-// Todo: this really ought to be SIMD.
 void C_NPC_Barnacle::ComputeVisualTipPoint( Vector *pTip )
 {
 	float flTipMove = TIP_SNAP_FACTOR * gpGlobals->frametime;

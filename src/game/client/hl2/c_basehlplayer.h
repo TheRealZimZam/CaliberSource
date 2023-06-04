@@ -28,6 +28,11 @@ public:
 						~C_BaseHLPlayer();
 
 	virtual void		OnDataChanged( DataUpdateType_t updateType );
+	virtual void		PostDataUpdate( DataUpdateType_t updateType );
+
+	virtual bool		ShouldPredict( void );
+
+	virtual void		Spawn( void );
 
 	void				Weapon_DropPrimary( void );
 	virtual float		GetDefaultAnimSpeed( void );
@@ -42,6 +47,7 @@ public:
 	bool				IsFlashlightActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_FLASHLIGHT; }
 	bool				IsBreatherActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_BREATHER; }
 
+	virtual bool		ShouldDraw( void );
 	virtual int			DrawModel( int flags );
 	virtual const		QAngle& GetRenderAngles();
 	virtual const		QAngle& EyeAngles( void );
@@ -56,6 +62,7 @@ public:
 	void			PerformClientSideNPCSpeedModifiers( float flFrameTime, CUserCmd *pCmd );
 	
 	virtual void	UpdateClientSideAnimation();
+	void			DoAnimationEvent( int PlayerAnimEvent_t, int nData = 0 );
 
 	bool				IsWeaponLowered( void ) { return m_HL2Local.m_bWeaponLowered; }
 
@@ -73,6 +80,9 @@ private:
 	QAngle	m_angEyeAngles;
 	CInterpolatedVar< QAngle >	m_iv_angEyeAngles;
 
+	int m_iSpawnInterpCounter;
+	float m_fLastPredFreeze;
+
 	bool				TestMove( const Vector &pos, float fVertDist, float radius, const Vector &objPos, const Vector &objDir );
 
 	float				m_flZoomStart;
@@ -80,7 +90,6 @@ private:
 	float				m_flZoomRate;
 	float				m_flZoomStartTime;
 
-	bool				m_bPlayUseDenySound;		// Signaled by PlayerUse, but can be unset by HL2 ladder code...
 	float				m_flSpeedMod;
 	float				m_flExitSpeedMod;
 

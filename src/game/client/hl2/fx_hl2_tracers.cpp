@@ -25,6 +25,7 @@ extern ConVar muzzleflash_light;
 
 
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheTracers )
+CLIENTEFFECT_MATERIAL( "sprites/smoke" )
 CLIENTEFFECT_MATERIAL( "effects/gunshiptracer" )
 CLIENTEFFECT_MATERIAL( "effects/ar2_tracer" )
 CLIENTEFFECT_MATERIAL( "effects/ar2_tracer_player" )
@@ -238,7 +239,6 @@ DECLARE_CLIENT_EFFECT( "HelicopterTracer", HelicopterTracerCallback );
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : start - 
-// TODO; This needs a Dlight
 //-----------------------------------------------------------------------------
 void FX_PlayerAR2Tracer( const Vector &start, const Vector &end )
 {
@@ -262,16 +262,30 @@ void FX_PlayerAR2Tracer( const Vector &start, const Vector &end )
 	//Create the line
 	CFXStaticLine *tracerLine = new CFXStaticLine( "Tracer", dStart, dEnd, random->RandomFloat( 6.0f, 12.0f ), 0.01f, "effects/ar2_tracer_player", 0 );
 	assert( tracerLine );
-
 	//Throw it into the list
 	clienteffects->AddEffect( tracerLine );
+
+	// A bit of smoke behind the rocket
+#if 0
+	FXLineData_t lineData;
+	lineData.m_flDieTime = 0.1f;
+	lineData.m_flStartAlpha= 0.75f;
+	lineData.m_flEndAlpha = 0.0f;
+	lineData.m_flStartScale = random->RandomFloat( 0.5f, 1.0f );
+	lineData.m_flEndScale = random->RandomFloat( 0.75f, 1.25f ); 
+	lineData.m_pMaterial = materials->FindMaterial( "sprites/smoke", 0, 0 );
+	lineData.m_vecStart = start;
+	lineData.m_vecStartVelocity = 5000;
+	lineData.m_vecEnd = end;
+	lineData.m_vecEndVelocity = 3000;
+	FX_AddLine( lineData );
+#endif
 }
 
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : start - 
-// TODO; This needs a Dlight
 //-----------------------------------------------------------------------------
 void FX_AR2Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 {
@@ -293,6 +307,22 @@ void FX_AR2Tracer( Vector& start, Vector& end, int velocity, bool makeWhiz )
 
 	//Add it
 	FX_AddDiscreetLine( start, dir, velocity, length, dist, random->RandomFloat( 1.0f, 1.5f ), life, "effects/ar2_tracer" );
+
+	// A bit of smoke behind the rocket
+#if 0
+	FXLineData_t lineData;
+	lineData.m_flDieTime = (life*2);
+	lineData.m_flStartAlpha= 0.75f;
+	lineData.m_flEndAlpha = 0.1f;
+	lineData.m_flStartScale = random->RandomFloat( 0.5f, 1.0f );
+	lineData.m_flEndScale = random->RandomFloat( 0.75f, 1.25f ); 
+	lineData.m_pMaterial = materials->FindMaterial( "sprites/smoke", 0, 0 );
+	lineData.m_vecStart = start;
+	lineData.m_vecStartVelocity = velocity;
+	lineData.m_vecEnd = end;
+	lineData.m_vecEndVelocity = (velocity*.5f);
+	FX_AddLine( lineData );
+#endif
 
 	if( makeWhiz )
 	{

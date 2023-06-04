@@ -72,6 +72,7 @@ private:
 DECLARE_HUDELEMENT( CHudDamageIndicator );
 DECLARE_HUD_MESSAGE( CHudDamageIndicator, Damage );
 
+// 0 for old handling (player.cpp), 1 for new hl2 system
 #define USE_HUDANIMATIONS	0
 
 #ifdef USE_HUDANIMATIONS

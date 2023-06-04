@@ -23,8 +23,9 @@ public:
 	virtual void	Init( void );
 
 	void			MsgFunc_SayText(bf_read &msg);
-	void			MsgFunc_SayText2( bf_read &msg );
 	void			MsgFunc_TextMsg(bf_read &msg);
+	
+	virtual bool	ShouldDraw();
 };
 
 #endif	//HUD_CHAT_H

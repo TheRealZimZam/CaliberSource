@@ -104,7 +104,7 @@ void TE_Smoke( IRecipientFilter& filter, float delay,
 void TE_Sparks( IRecipientFilter& filter, float delay,
 	const Vector* pos, int nMagnitude, int nTrailLength, const Vector *pDir );
 void TE_Sprite( IRecipientFilter& filter, float delay,
-	const Vector* pos, int modelindex, float size, int brightness );
+	const Vector* pos, int modelindex, float size, int brightness, float framerate );
 void TE_Sprite( IRecipientFilter& filter, float delay, KeyValues *pKeyValues );
 void TE_SpriteSpray( IRecipientFilter& filter, float delay,
 	const Vector* pos, const Vector* dir, int modelindex, int speed, float noise, int count );
@@ -448,12 +448,12 @@ public:
 		}
 	}
 	virtual void Sprite( IRecipientFilter& filter, float delay,
-		const Vector* pos, int modelindex, float size, int brightness )
+		const Vector* pos, int modelindex, float size, int brightness, float framerate )
 	{
 		if ( !SuppressTE( filter ) )
 		{
 			TE_Sprite( filter, delay,
-				pos, modelindex, size, brightness );
+				pos, modelindex, size, brightness, framerate );
 		}
 	}
 	virtual void SpriteSpray( IRecipientFilter& filter, float delay,

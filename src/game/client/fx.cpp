@@ -60,7 +60,6 @@ ConVar explosion_light( "explosion_light", "1", FCVAR_ARCHIVE );
 
 extern void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType );
 
-
 //===================================================================
 //===================================================================
 class CImpactOverlay : public CWarpOverlay
@@ -98,26 +97,59 @@ public:
 
 };
 
+
 //-----------------------------------------------------------------------------
-// Purpose: Play random ricochet sound
-// Input  : *pos - 
-// TODO; Sound location needs to be fixed, currently it plays accross the entire
-// map. It should be emiting from the origin of the hit, and the db volume takes
-// care of the range.
+// Purpose: Returns a normalized tint and luminosity for a specified color
+// Input  : &color - normalized input color to extract information from
+//			*tint - normalized tint of that color
+//			*luminosity - normalized luminosity of that color
 //-----------------------------------------------------------------------------
-void FX_RicochetSound( const Vector& pos )
+void UTIL_GetNormalizedColorTintAndLuminosity( const Vector &color, Vector *tint, float *luminosity )
 {
-	Vector org = pos;
-	CLocalPlayerFilter filter;
- 	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.Ricochet", &org );
+	// Give luminosity if requested
+	if ( luminosity != NULL )
+	{
+		// Each channel contributes differently than the others
+		*luminosity =	( color.x * RED_CHANNEL_CONTRIBUTION ) +
+						( color.y * GREEN_CHANNEL_CONTRIBUTION ) +
+						( color.z * BLUE_CHANNEL_CONTRIBUTION );
+	}
+
+	// Give tint if requested
+	if ( tint != NULL )
+	{
+		if ( color == vec3_origin )
+		{
+			*tint = vec3_origin;
+		}
+		else
+		{
+			float maxComponent = max( color.x, max( color.y, color.z ) );
+			*tint = color / maxComponent;
+		}
+	}
 }
 
-void FX_MGRicochetSound( const Vector& pos )
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : &pos - 
+// Output : Returns true on success, false on failure.
+//-----------------------------------------------------------------------------
+bool EffectOccluded( const Vector &pos, pixelvis_handle_t *queryHandle )
 {
-	Vector org = pos;
-	CLocalPlayerFilter filter;
-	// FIXME; This is a looped sound
- 	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.MGRicochet", &org );
+	if ( !queryHandle )
+	{
+		// NOTE: This is called by networking code before the current view is set up.
+		// so use the main view instead
+		trace_t	tr;
+		UTIL_TraceLine( pos, MainViewOrigin(), MASK_OPAQUE, NULL, COLLISION_GROUP_NONE, &tr );
+		
+		return ( tr.fraction < 1.0f ) ? true : false;
+	}
+	pixelvis_queryparams_t params;
+	params.Init(pos);
+	
+	return PixelVisibility_FractionVisible( params, queryHandle ) > 0.0f ? false : true;
 }
 
 //-----------------------------------------------------------------------------
@@ -192,6 +224,25 @@ bool FX_GetAttachmentTransform( ClientEntityHandle_t hEntity, int attachmentInde
 	// Entity doesn't exist
 	SetIdentityMatrix( transform );
 	return false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Play random ricochet sound
+// Input  : *pos - 
+//-----------------------------------------------------------------------------
+void FX_RicochetSound( const Vector& pos )
+{
+	Vector org = pos;
+	CLocalPlayerFilter filter;
+ 	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.Ricochet", &org );
+}
+
+void FX_MGRicochetSound( const Vector& pos )
+{
+	Vector org = pos;
+	CLocalPlayerFilter filter;
+	// FIXME; This is a looped sound
+ 	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, "FX_RicochetSound.MGRicochet", &org );
 }
 
 //-----------------------------------------------------------------------------
@@ -760,7 +811,8 @@ void SmokeCallback( const CEffectData &data )
 
 DECLARE_CLIENT_EFFECT( "Smoke", SmokeCallback );
 
-
+// This really should be in fx_hl2_impacts!!!
+#if 0
 //-----------------------------------------------------------------------------
 // Purpose: Shockwave for gunship bullet impacts!
 // Input  : &pos - 
@@ -795,9 +847,10 @@ void GunshipImpactCallback( const CEffectData & data )
 
 	vecPosition = data.m_vOrigin;
 
-	FX_GunshipImpact( vecPosition, Vector( 0, 0, 1 ), 100, 0, 200 );
+	FX_GunshipImpact( vecPosition, Vector( 0, 0, 1 ), 50, 100, 200 );
 }
 DECLARE_CLIENT_EFFECT( "GunshipImpact", GunshipImpactCallback );
+#endif
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -809,12 +862,24 @@ void CommandPointerCallback( const CEffectData & data )
 	{
 		if( commandercolors[ i ].index == data.m_nColor )
 		{
-			FX_GunshipImpact( data.m_vOrigin, Vector( 0, 0, 1 ), commandercolors[ i ].r, commandercolors[ i ].g, commandercolors[ i ].b );
+			VPROF_BUDGET( "FX_CommandPointer", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+			if ( CImpactOverlay *pOverlay = new CImpactOverlay )
+			{
+				pOverlay->m_flLifetime	= 0;
+				VectorMA( data.m_vOrigin, 1.0f, Vector( 0, 0, 1 ), pOverlay->m_vPos ); // Doesn't show up on terrain if you don't do this(sjb)
+				pOverlay->m_nSprites	= 1;
+				
+				pOverlay->m_vBaseColors[0].Init(  commandercolors[ i ].r, commandercolors[ i ].g, commandercolors[ i ].b );
+
+				pOverlay->m_Sprites[0].m_flHorzSize = 0.01f;
+				pOverlay->m_Sprites[0].m_flVertSize = 0.01f;
+
+				pOverlay->Activate();
+			}
 			return;
 		}
 	}
 }
-
 DECLARE_CLIENT_EFFECT( "CommandPointer", CommandPointerCallback );
 
 

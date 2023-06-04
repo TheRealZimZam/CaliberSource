@@ -36,6 +36,7 @@ public:
 	int				m_nModelIndex;
 	float			m_fScale;
 	int				m_nBrightness;
+	float			m_iFramerate;
 };
 
 
@@ -47,6 +48,7 @@ IMPLEMENT_CLIENTCLASS_EVENT_DT(C_TESprite, DT_TESprite, CTESprite)
 	RecvPropInt( RECVINFO(m_nModelIndex)),
 	RecvPropFloat( RECVINFO(m_fScale )),
 	RecvPropInt( RECVINFO(m_nBrightness)),
+	RecvPropFloat( RECVINFO(m_iFramerate)),
 END_RECV_TABLE()
 
 
@@ -59,6 +61,7 @@ C_TESprite::C_TESprite( void )
 	m_nModelIndex = 0;
 	m_fScale = 0;
 	m_nBrightness = 0;
+	m_iFramerate = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -73,7 +76,7 @@ C_TESprite::~C_TESprite( void )
 // Recording 
 //-----------------------------------------------------------------------------
 static inline void RecordSprite( const Vector& start, int nModelIndex, 
-								 float flScale, int nBrightness )
+								 float flScale, int nBrightness, float iFramerate )
 {
 	if ( !ToolsEnabled() )
 		return;
@@ -94,6 +97,7 @@ static inline void RecordSprite( const Vector& start, int nModelIndex,
   		msg->SetString( "model", pModelName );
  		msg->SetFloat( "scale", flScale );
  		msg->SetInt( "brightness", nBrightness );
+		msg->SetFloat( "framerate", iFramerate );
 
 		ToolFramework_PostToolMessage( HTOOLHANDLE_INVALID, msg );
 		msg->deleteThis();
@@ -109,16 +113,16 @@ void C_TESprite::PostDataUpdate( DataUpdateType_t updateType )
 	VPROF( "C_TESprite::PostDataUpdate" );
 
 	float a = ( 1.0 / 255.0 ) * m_nBrightness;
-	tempents->TempSprite( m_vecOrigin, vec3_origin, m_fScale, m_nModelIndex, kRenderTransAdd, 0, a, 0, FTENT_SPRANIMATE );
-	RecordSprite( m_vecOrigin, m_nModelIndex, m_fScale, m_nBrightness );
+	tempents->TempSprite( m_vecOrigin, vec3_origin, m_fScale, m_nModelIndex, kRenderTransAdd, 0, a, m_iFramerate, FTENT_SPRANIMATE );
+	RecordSprite( m_vecOrigin, m_nModelIndex, m_fScale, m_nBrightness, m_iFramerate );
 }
 
 void TE_Sprite( IRecipientFilter& filter, float delay,
-	const Vector* pos, int modelindex, float size, int brightness )
+	const Vector* pos, int modelindex, float size, int brightness, float framerate )
 {
 	float a = ( 1.0 / 255.0 ) * brightness;
-	tempents->TempSprite( *pos, vec3_origin, size, modelindex, kRenderTransAdd, 0, a, 0, FTENT_SPRANIMATE );
-	RecordSprite( *pos, modelindex, size, brightness );
+	tempents->TempSprite( *pos, vec3_origin, size, modelindex, kRenderTransAdd, 0, a, framerate, FTENT_SPRANIMATE );
+	RecordSprite( *pos, modelindex, size, brightness, framerate );
 }
 
 void TE_Sprite( IRecipientFilter& filter, float delay, KeyValues *pKeyValues )
@@ -131,6 +135,7 @@ void TE_Sprite( IRecipientFilter& filter, float delay, KeyValues *pKeyValues )
 	int nModelIndex = pModelName[0] ? modelinfo->GetModelIndex( pModelName ) : 0;
 	float flScale = pKeyValues->GetFloat( "scale" );
 	int nBrightness = pKeyValues->GetInt( "brightness" );
+	float iFramerate = pKeyValues->GetFloat( "framerate" );
 
-	TE_Sprite( filter, delay, &vecOrigin, nModelIndex, flScale, nBrightness );
+	TE_Sprite( filter, delay, &vecOrigin, nModelIndex, flScale, nBrightness, iFramerate );
 }

@@ -122,8 +122,6 @@ C_FireSmoke::C_FireSmoke()
 	m_bClipTested		= false;
 
 	m_flChildFlameSpread = FLAME_CHILD_SPREAD;
-
-	//m_pEmitter = NULL;
 	
 	//Clear all child flames
 	for ( int i = 0; i < NUM_CHILD_FLAMES; i++ )
@@ -329,7 +327,7 @@ bool C_FireSmoke::ShouldDraw()
 {
 	if ( GetOwnerEntity() && GetOwnerEntity()->GetRenderColor().a == 0 )
 		return false;
-	//^^^ This might be gay, fire should be a good way to reveal stealthed enemies -- WM
+	//^^^ This might be gay, fire should be a good way to reveal stealthed enemies -- M
 	// It shouldnt be gay, because stealth enemies are never set to 0 alpha unless set by designer,
 	// just a really low number like 5 or 10.
 
@@ -956,7 +954,7 @@ void C_EntityFlame::Simulate( void )
 	{
 		UpdateHitBoxFlames();
 	}
-	else	//if (!!m_pEmitter)
+	else if (!!m_pEmitter)
 	{
 		m_pEmitter->SetSortOrigin( GetAbsOrigin() );
 

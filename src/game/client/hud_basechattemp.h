@@ -17,14 +17,35 @@
 #include "vgui_controls/frame.h"
 #include <vgui_controls/TextEntry.h>
 #include <vgui_controls/RichText.h>
+#include <vgui_controls/button.h>
+#include <vgui_controls/checkbutton.h>
 
 class CBaseHudChatInputLine;
 class CBaseHudChatEntry;
+class CHudChatFilterPanel;
 
 namespace vgui
 {
 	class IScheme;
 };
+
+#define CHATLINE_NUM_FLASHES 8.0f
+#define CHATLINE_FLASH_TIME 5.0f
+#define CHATLINE_FADE_TIME 1.0f
+
+#define CHAT_HISTORY_FADE_TIME 0.25f
+#define CHAT_HISTORY_IDLE_TIME 15.0f
+#define CHAT_HISTORY_IDLE_FADE_TIME 2.5f
+#define CHAT_HISTORY_ALPHA 127
+
+extern Color g_ColorBlue;
+extern Color g_ColorRed;
+extern Color g_ColorGreen;
+extern Color g_ColorDarkGreen;
+extern Color g_ColorYellow;
+extern Color g_ColorGrey;
+
+extern ConVar cl_showtextmsg;
 
 enum ChatFilters
 {
@@ -36,21 +57,45 @@ enum ChatFilters
 	CHAT_FILTER_TEAMCHANGE = 16
 };
 
-#define CHATLINE_NUM_FLASHES 4.0f
-#define CHATLINE_FLASH_TIME 1.0f
-#define CHATLINE_FADE_TIME 2.0f
 
-#define CHAT_HISTORY_FADE_TIME 0.25f
+//-----------------------------------------------------------------------------
+enum TextColor
+{
+	COLOR_NORMAL = 1,
+	COLOR_USEOLDCOLORS = 2,
+	COLOR_PLAYERNAME = 3,
+	COLOR_LOCATION = 4,
+	COLOR_ACHIEVEMENT = 5,
+	COLOR_MAX
+};
+
+//--------------------------------------------------------------------------------------------------------------
+struct TextRange
+{
+	int start;
+	int end;
+	Color color;
+};
+
+void StripEndNewlineFromString( char *str );
+void StripEndNewlineFromString( wchar_t *str );
+
+char* ConvertCRtoNL( char *str );
+wchar_t* ConvertCRtoNL( wchar_t *str );
+wchar_t* ReadLocalizedString( bf_read &msg, wchar_t *pOut, int outSize, bool bStripNewline, char *originalString = NULL, int originalSize = 0 );
+wchar_t* ReadChatTextString( bf_read &msg, wchar_t *pOut, int outSize );
+char* RemoveColorMarkup( char *str );
 
 //-----------------------------------------------------------------------------
 // Purpose: An output/display line of the chat interface
 //-----------------------------------------------------------------------------
-class CBaseHudChatLine : public vgui::RichText
+class CBaseHudChatLine : public vgui::Label
 {
-	typedef vgui::RichText BaseClass;
+	typedef vgui::Label BaseClass;
 
 public:
 	CBaseHudChatLine( vgui::Panel *parent, const char *panelName );
+	~CBaseHudChatLine();
 
 	void			SetExpireTime( void );
 
@@ -62,34 +107,75 @@ public:
 
 	int				GetCount( void );
 
-	virtual void	ApplySchemeSettings(vgui::IScheme *pScheme);
-
 	vgui::HFont		GetFont() { return m_hFont; }
 
 	Color			GetTextColor( void ) { return m_clrText; }
 	void			SetNameLength( int iLength ) { m_iNameLength = iLength;	}
 	void			SetNameColor( Color cColor ){ m_clrNameColor = cColor; 	}
 		
-	virtual void	PerformFadeout( void );
+	virtual void	Paint( void );
+	virtual void	ApplySchemeSettings(vgui::IScheme *pScheme);
+
+	void			SetNameStart( int iStart ) { m_iNameStart = iStart;	}
 
 protected:
 	int				m_iNameLength;
-	vgui::HFont		m_hFont;
 
 	Color			m_clrText;
 	Color			m_clrNameColor;
 
-	float			m_flExpireTime;
-	
+	CUtlVector< TextRange > m_textRanges;
+	wchar_t					*m_text;
+
+	int				m_iNameStart;
+
 private:
+	float			m_flExpireTime;
 	float			m_flStartTime;
 	int				m_nCount;
 
+	vgui::HFont		m_hFont;
 	vgui::HFont		m_hFontMarlett;
-
 
 private:
 	CBaseHudChatLine( const CBaseHudChatLine & ); // not defined, not accessible
+};
+
+
+class CHudChatHistory : public vgui::RichText
+{
+	DECLARE_CLASS_SIMPLE( CHudChatHistory, vgui::RichText );
+public:
+
+	CHudChatHistory( vgui::Panel *pParent, const char *panelName );
+
+	virtual void	ApplySchemeSettings(vgui::IScheme *pScheme);
+};
+
+class CHudChatFilterButton : public vgui::Button
+{
+	DECLARE_CLASS_SIMPLE( CHudChatFilterButton, vgui::Button );
+
+public:
+
+	CHudChatFilterButton(  vgui::Panel *pParent, const char *pName, const char *pText );
+
+	virtual void DoClick( void );
+};
+
+class CHudChatFilterCheckButton : public vgui::CheckButton
+{
+	DECLARE_CLASS_SIMPLE( CHudChatFilterCheckButton, vgui::CheckButton );
+
+public:
+
+	CHudChatFilterCheckButton( vgui::Panel *pParent, const char *pName, const char *pText, int iFlag );
+
+	int		GetFilterFlag( void ) { return m_iFlag; }
+
+private:
+
+	int m_iFlag;
 };
 
 
@@ -104,16 +190,14 @@ public:
 
 	enum
 	{
-		CHAT_INTERFACE_LINES = 8,
+		CHAT_INTERFACE_LINES = 6,
 		MAX_CHARS_PER_LINE = 128
 	};
 
-					CBaseHudChat( const char *pElementName );
-					~CBaseHudChat();
+	CBaseHudChat( const char *pElementName );
 
 	virtual void	CreateChatInputLine( void );
-	virtual void	CreateChatLines( void );
-	
+
 	virtual void	Init( void );
 
 	void			LevelInit( const char *newmap );
@@ -122,7 +206,6 @@ public:
 	void			MsgFunc_TextMsg(const char *pszName, int iSize, void *pbuf);
 	
 	virtual void	Printf( int iFilter, const char *fmt, ... );
-	virtual void	ChatPrintf( int iPlayerIndex, const char *fmt, ... );
 	
 	void			StartMessageMode( int iMessageModeType );
 	void			StopMessageMode( void );
@@ -132,10 +215,9 @@ public:
 	virtual void	Paint( void );
 	virtual void	OnTick( void );
 	virtual void	Reset();
+#ifdef _XBOX
 	virtual bool	ShouldDraw();
-	
-	void			FadeChatHistory();
-
+#endif
 	vgui::Panel		*GetInputPanel( void );
 
 	static int		m_nLineCounter;
@@ -145,15 +227,48 @@ public:
 	// IGameEventListener interface:
 	virtual void FireGameEvent( IGameEvent *event);
 
+	CHudChatHistory			*GetChatHistory();
+
+	void					FadeChatHistory();
+	float					m_flHistoryFadeTime;
+	float					m_flHistoryIdleTime;
+
+	virtual void			MsgFunc_SayText( bf_read &msg );
+	virtual void			MsgFunc_SayText2( bf_read &msg );
+	virtual void			MsgFunc_TextMsg( bf_read &msg );
+	virtual void			MsgFunc_VoiceSubtitle( bf_read &msg );
+
+	
+	CBaseHudChatInputLine	*GetChatInput( void ) { return m_pChatInput; }
+	CHudChatFilterPanel		*GetChatFilterPanel( void );
+
+	virtual int				GetFilterFlags( void ) { return m_iFilterFlags; }
+	void					SetFilterFlag( int iFilter );
+
+	//-----------------------------------------------------------------------------
+	virtual Color	GetDefaultTextColor( void );
+	virtual Color	GetTextColorForClient( TextColor colorNum, int clientIndex );
+	virtual Color	GetClientColor( int clientIndex );
+
+	virtual int		GetFilterForString( const char *pString );
+
+	virtual const char *GetDisplayedSubtitlePlayerName( int clientIndex );
+
+	bool			IsVoiceSubtitle( void ) { return m_bEnteringVoice; }
+	void			SetVoiceSubtitleState( bool bState ) { m_bEnteringVoice = bState; }
+
 protected:
 	CBaseHudChatLine		*FindUnusedChatLine( void );
-	void				ExpireOldest( void );
+	void					ExpireOldest( void );
 
 	CBaseHudChatInputLine	*m_pChatInput;
 	CBaseHudChatLine		*m_ChatLines[ CHAT_INTERFACE_LINES ];
 	int					m_iFontHeight;
-	
-	float				m_flFadeTime;
+
+	CHudChatHistory			*m_pChatHistory;
+
+	CHudChatFilterButton	*m_pFiltersButton;
+	CHudChatFilterPanel		*m_pFilterPanel;
 
 private:	
 	void			Clear( void );
@@ -163,6 +278,11 @@ private:
 	int				m_nMessageMode;
 
 	int				m_nVisibleHeight;
+
+	vgui::HFont		m_hChatFont;
+
+	int				m_iFilterFlags;
+	bool			m_bEnteringVoice;
 };
 
 class CBaseHudChatEntry : public vgui::TextEntry
@@ -192,12 +312,16 @@ public:
 			if ( code != KEY_ESCAPE )
 			{
 				if ( m_pHudChat )
+				{
 					m_pHudChat->Send();
+				}
 			}
 		
 			// End message mode.
 			if ( m_pHudChat )
+			{
 				m_pHudChat->StopMessageMode();
+			}
 		}
 		else if ( code == KEY_TAB )
 		{
@@ -240,9 +364,31 @@ public:
 		BaseClass::Paint();
 	}
 
+	vgui::Label		*GetPrompt( void ) { return m_pPrompt; }
+
 protected:
 	vgui::Label		*m_pPrompt;
 	CBaseHudChatEntry	*m_pInput;
+};
+
+
+class CHudChatFilterPanel : public vgui::EditablePanel
+{
+	DECLARE_CLASS_SIMPLE( CHudChatFilterPanel, vgui::EditablePanel );
+
+public:
+
+	CHudChatFilterPanel(  vgui::Panel *pParent, const char *pName );
+
+	virtual void ApplySchemeSettings( vgui::IScheme *pScheme );
+	MESSAGE_FUNC_PTR( OnFilterButtonChecked, "CheckButtonChecked", panel );
+
+	CBaseHudChat *GetChatParent( void ) { return dynamic_cast < CBaseHudChat * > ( GetParent() ); }
+
+	virtual void SetVisible(bool state);
+
+private:
+
 };
 
 #endif // HUD_BASECHAT_H

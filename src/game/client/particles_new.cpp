@@ -447,7 +447,7 @@ int CNewParticleEffect::DrawModel( int flags )
 		g_pParticleSystemMgr->AddToRenderCache( this );
 	}
 
-	if ( !IsRetail() && cl_particles_show_bbox.GetBool() )
+	if ( cl_particles_show_bbox.GetBool() )
 	{
 		Vector center = GetRenderOrigin();
 		Vector mins   = m_MinBounds - center;

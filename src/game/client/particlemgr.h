@@ -258,6 +258,11 @@ public:
 	// else like an attachment's space.
 	virtual void	StartRender( VMatrix &effectMatrix ) {}
 
+	// Simulate the particle and render it.
+	// Return false if you want to remove the particle.
+	// Set sortKey to the distance of the particle and they will be incrementally sorted each frame.
+//	virtual bool	SimulateAndRender(Particle *pParticle, ParticleDraw* pParticleDraw, float &sortKey)=0;
+
 	// Simulate the particles.
 	virtual bool	ShouldSimulate() const = 0;
 	virtual void	SetShouldSimulate( bool bSim ) = 0;

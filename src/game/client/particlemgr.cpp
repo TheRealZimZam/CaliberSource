@@ -360,7 +360,7 @@ int CParticleEffectBinding::DrawModel( int flags )
 		}
 	}
 
-	if ( !IsRetail() && cl_particles_show_bbox.GetBool() )
+	if ( cl_particles_show_bbox.GetBool() )
 	{
 		Vector center = (m_Min + m_Max)/2;
 		Vector mins   = m_Min - center;
@@ -703,7 +703,8 @@ int CParticleEffectBinding::DrawMaterialParticles(
 	}
 
 	// Flush out any remaining particles.
-	builder.End( false, true );
+//	if( !bOnlySimulate )
+		builder.End( false, true );
 	
 	return m_nActiveParticles;
 }
@@ -1712,10 +1713,10 @@ void CParticleMgr::SpewActiveParticleSystems( )
 
 void CParticleMgr::UpdateNewEffects( float flTimeDelta )
 {
-// #ifdef TF_CLIENT_DLL
-// 	extern bool g_bDontMakeSkipToTimeTakeForever;
-// 	g_bDontMakeSkipToTimeTakeForever = true;
-// #endif
+#ifdef TF_CLIENT_DLL
+	extern bool g_bDontMakeSkipToTimeTakeForever;
+	g_bDontMakeSkipToTimeTakeForever = true;
+#endif
 	flTimeDelta *= r_particle_timescale.GetFloat();
 	VPROF_BUDGET( "CParticleMSG::UpdateNewEffects", "Particle Simulation" );
 

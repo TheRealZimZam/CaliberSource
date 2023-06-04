@@ -1065,11 +1065,31 @@ void C_BasePlayer::Flashlight( void )
 	UpdateFlashlight();
 
 	// Check for muzzle flash and apply to view model
+#if 0
+	C_BaseEntity *ve = cl_entitylist->GetEnt( render->GetViewEntity() );
+	
+	// Add muzzle flash to gun model if player is flashing
+	if ( ve && ve->IsEffectActive( EF_MUZZLEFLASH) )		
+	{
+		if ( this == GetLocalPlayer() )
+		{
+			for ( int i = 0; i < MAX_VIEWMODELS; i++ )
+			{
+				C_BaseViewModel *vm = GetViewModel( i );
+				if ( !vm )
+					continue;
+
+				vm->ActivateEffect( EF_MUZZLEFLASH, true );
+			}
+		}
+	}
+#else
 	C_BaseAnimating *ve = this;
 	if ( GetObserverMode() == OBS_MODE_IN_EYE )
 	{
 		ve = dynamic_cast< C_BaseAnimating* >( GetObserverTarget() );
 	}
+#endif
 }
 
 
@@ -1610,7 +1630,10 @@ void C_BasePlayer::ThirdPersonSwitch( bool bThirdperson )
 //-----------------------------------------------------------------------------
 bool C_BasePlayer::ShouldDrawLocalPlayer()
 {
-	return input->CAM_IsThirdPerson() || ( ToolsEnabled() && ToolFramework_IsThirdPersonCamera() ) || cl_first_person_uses_world_model.GetBool();
+	//TODO; This needs to factor in mirrors
+	return input->CAM_IsThirdPerson() 
+	|| ( ToolsEnabled() && ToolFramework_IsThirdPersonCamera() ) 
+	|| cl_first_person_uses_world_model.GetBool();
 }
 
 //-----------------------------------------------------------------------------

@@ -49,6 +49,16 @@ C_AI_BaseNPC::C_AI_BaseNPC()
 {
 }
 
+bool C_AI_BaseNPC::ShouldFadeOnDeath( void )
+{
+	// Running on DX8
+	if ( engine->GetDXSupportLevel() < 80 )
+		return true;
+
+	// Defer to the server
+	return m_bFadeCorpse;
+}
+
 //-----------------------------------------------------------------------------
 // Makes ragdolls ignore npcclip brushes
 //-----------------------------------------------------------------------------

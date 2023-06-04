@@ -24,6 +24,7 @@
 #include "particle_collision.h"
 #include "c_baseentity.h"
 #include "baseparticleentity.h"
+#include "view.h"
 
 class CFleckParticles;
 
@@ -36,6 +37,7 @@ public:
 					C_Splash();
 	virtual			~C_Splash();
 
+	virtual const char *GetEffectName() { return "LeakEffect"; }
 public:
 
 	// Call this to move the source..
@@ -61,8 +63,12 @@ public:
 
 // IParticleEffect.
 public:
+//	virtual bool	SimulateAndRender(Particle *pParticle, ParticleDraw *pDraw, float &sortKey);	//Obsoleet
+
 	virtual void	Update(float fTimeDelta);
-	virtual bool	SimulateAndRender(Particle *pParticle, ParticleDraw *pDraw, float &sortKey);
+	virtual void	RenderParticles( CParticleRenderIterator *pIterator );
+	virtual void	SimulateParticles( CParticleSimulateIterator *pIterator );
+
 	void			Think(void);			// Used to remove entity
 	void			InitParticleCollisions(void);
 
@@ -85,7 +91,9 @@ public:
 
 	float				m_flNoise;
 
-	Vector				m_VelocityOffset;		// Emit the particles in a certain direction.
+	bool				m_bSplashSound;
+
+//	Vector				m_VelocityOffset;		// Emit the particles in a certain direction.
 
 	bool				m_bEmit;				// Keep emitting particles?
 	int					m_nNumDecals;			// How many decals to drop
@@ -99,13 +107,14 @@ private:
 
 	PMaterialHandle		m_MaterialHandle;
 
-	TimedEvent			m_ParticleSpawn;
+	TimedEvent			m_tParticleSpawn;
 	float				m_flSplashEndZ;			// Z value where splash disappears
 	
 	Vector				m_Pos;
 	CParticleMgr*		m_pParticleMgr;
-
 	CParticleCollision	m_ParticleCollision;
+
+	//CSmartPtr<CSimpleEmitter> m_pLeakEmitter;
 };
 
 #endif

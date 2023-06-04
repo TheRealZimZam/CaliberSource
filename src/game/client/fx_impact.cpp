@@ -19,6 +19,7 @@
 #include "tier0/memdbgon.h"
 
 static ConVar  r_drawflecks( "r_drawflecks", "1" );
+static ConVar  r_leakeffects( "r_leakeffects", "1" );
 extern ConVar r_drawmodeldecals;
 
 ImpactSoundRouteFn g_pImpactSoundRouteFn = NULL;
@@ -192,7 +193,6 @@ char const *GetImpactDecal( C_BaseEntity *pEntity, int iMaterial, int iDamageTyp
 //------------------------------------------------------------------------------
 void LeakEffect( trace_t &tr )
 {
-#if 1
 	Vector			diffuseColor, baseColor;
 	Vector			vTraceDir	= (tr.endpos - tr.startpos);
 	VectorNormalize(vTraceDir);
@@ -208,11 +208,13 @@ void LeakEffect( trace_t &tr )
 	if( !found )
 		return;
 
+	IMaterialVar*	pLeakChance = pTraceMaterial->FindVar( "$leakchance", &found );
+	if (found && pLeakChance->GetIntValue() < random->RandomInt(0,100))
+		return;
+
 	C_Splash* pLeak = new C_Splash();
 	if (!pLeak)
 		return;
-
-	ClientEntityList().AddNonNetworkableEntity( pLeak->GetIClientUnknown() );
 
 	IMaterialVar*	pLeakColorVar = pTraceMaterial->FindVar( "$leakcolor", &found );
 	if (found)
@@ -237,7 +239,6 @@ void LeakEffect( trace_t &tr )
 	}
 
 	pLeak->m_flSpawnRate		= pLeakVar->GetFloatValue();
-	pLeak->m_flParticleLifetime = 10;
 	pLeak->m_flWidthMin			= 1;
 	pLeak->m_flWidthMax			= 5;
 	pLeak->SetLocalOrigin( tr.endpos );
@@ -246,10 +247,18 @@ void LeakEffect( trace_t &tr )
 	VectorAngles( tr.plane.normal, angles );
 	pLeak->SetLocalAngles( angles );
 
+	IMaterialVar*	pLeakSound = pTraceMaterial->FindVar( "$leaksound", &found );
+	if (found)
+		pLeak->m_bSplashSound	= pLeakSound->GetIntValue();
+
+	IMaterialVar*	pLeakTime = pTraceMaterial->FindVar( "$leaktime", &found );
+	if (found)
+		pLeak->m_flStopEmitTime	= gpGlobals->curtime+pLeakTime->GetFloatValue();
+	else
+		pLeak->m_flStopEmitTime	= gpGlobals->curtime+5.0;
+
 	pLeak->Start(ParticleMgr(), NULL);
-	pLeak->m_flStopEmitTime	= gpGlobals->curtime+5.0;
-	pLeak->SetNextClientThink(gpGlobals->curtime+20.0);
-#endif
+	pLeak->SetNextClientThink(gpGlobals->curtime+20.0);	//Remove thyself after 20 seconds
 }
 
 //-----------------------------------------------------------------------------
@@ -274,15 +283,15 @@ static ImpactEffect_t s_pImpactEffect[26] =
 	{ NULL,					NULL },							// CHAR_TEX_GRATE			
 	{ NULL,					NULL },							// CHAR_TEX_ALIENFLESH		
 	{ NULL,					NULL },							// CHAR_TEX_CLIP			
-	{ NULL,					NULL },							// CHAR_TEX_GRASS		
-	{ NULL,					NULL },							// CHAR_TEX_SNOW		
+	{ "impact_dirt",		NULL },							// CHAR_TEX_GRASS		
+	{ "impact_snow",		NULL },							// CHAR_TEX_SNOW		
 	{ NULL,					NULL },							// CHAR_TEX_PLASTIC		
 	{ "impact_metal",		NULL },							// CHAR_TEX_METAL			
-	{ "impact_dirt",		NULL },							// CHAR_TEX_SAND			
-	{ NULL,					NULL },							// CHAR_TEX_FOLIAGE		
-	{ "impact_computer",	NULL },							// CHAR_TEX_COMPUTER		
-	{ NULL,					NULL },							// CHAR_TEX_UNUSED		
-	{ NULL,					NULL },							// CHAR_TEX_BRICK		
+	{ "impact_sand",		NULL },							// CHAR_TEX_SAND		
+	{ "impact_foliage",		NULL },							// CHAR_TEX_FOLIAGE	
+	{ "impact_plaster",		NULL },							// CHAR_TEX_PLASTER	
+	{ "impact_concrete",	NULL },							// CHAR_TEX_ASPHALT		
+	{ "impact_computer",	NULL },							// CHAR_TEX_COMPUTER	
 	{ NULL,					NULL },							// CHAR_TEX_SLOSH			
 	{ "impact_concrete",	"impact_concrete_noflecks" },	// CHAR_TEX_TILE			
 	{ NULL,					NULL },							// CHAR_TEX_CARDBOARD		
@@ -354,6 +363,12 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 	if ( tr.surface.flags & (SURF_SKY|SURF_NODRAW|SURF_HINT|SURF_SKIP) )
 		return;
 
+	//---------------------------
+	// Do leak effect
+	//---------------------------
+	if ( r_leakeffects.GetBool() )
+		LeakEffect(tr);
+
 	if ( cl_new_impact_effects.GetInt() )
 	{
 		PerformNewCustomEffects( vecOrigin, tr, shotDir, iMaterial, iScale, nFlags );
@@ -370,27 +385,42 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 	// Grab the material type
 	//---------------------------
 
-#if 0
+#if 1
 	switch( iMaterial )
 	{
 	case CHAR_TEX_CONCRETE:
+	case CHAR_TEX_ASPHALT:
 	case CHAR_TEX_TILE:
-	case CHAR_TEX_WOOD:
+		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
+		break;
+
+	case CHAR_TEX_PLASTER:
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
 		break;
 
 	case CHAR_TEX_FOLIAGE:
+	case CHAR_TEX_WOOD:
+	case CHAR_TEX_CARDBOARD:
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
 		break;
 
 	case CHAR_TEX_DIRT:
-	case CHAR_TEX_SAND:
-//!	case CHAR_TEX_SNOW:
+	case CHAR_TEX_GRASS:
+	case CHAR_TEX_SNOW:
 		FX_DustImpact( vecOrigin, &tr, iScale );
 		break;
 
-	case CHAR_TEX_METAL:
-	case CHAR_TEX_VENT:
+	case CHAR_TEX_SAND:
+		FX_DustImpact( vecOrigin, &tr, iScale, true );
+		break;
+
+	default:
+		DevWarning( 2, "Unknown hit material!\n" );
+		break;
+	}
+
+	if ( ( iMaterial == CHAR_TEX_METAL ) || ( iMaterial == CHAR_TEX_VENT ) )
+	{
 		Vector	reflect;
 		float	dot = shotDir.Dot( tr.plane.normal );
 		reflect = shotDir + ( tr.plane.normal * ( dot*-2.0f ) );
@@ -400,25 +430,15 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 		reflect[2] += random->RandomFloat( -0.2f, 0.2f );
 
 		FX_MetalSpark( vecOrigin, reflect, tr.plane.normal, iScale );
-		break;
-
-	case CHAR_TEX_COMPUTER:
-		Vector	offset = vecOrigin + ( tr.plane.normal * 1.0f );
-		g_pEffects->Sparks( offset );
-		break;
-
-	case CHAR_TEX_ANTLION:
-	case CHAR_TEX_EGGSHELL:
-		FX_AntlionImpact( vecOrigin, &tr );
-		break;
-
-	default:
-//		DevWarning( 2, "Unknown hit material!\n" );
-		break;
 	}
-#endif
+	else if ( iMaterial == CHAR_TEX_COMPUTER )
+	{
+		Vector	offset = vecOrigin + ( tr.plane.normal * 1.0f );
 
-	if ( ( iMaterial == CHAR_TEX_CONCRETE ) || ( iMaterial == CHAR_TEX_TILE ) )
+		g_pEffects->Sparks( offset );
+	}
+#else
+	if ( ( iMaterial == CHAR_TEX_CONCRETE ) || ( iMaterial == CHAR_TEX_ASPHALT ) ( iMaterial == CHAR_TEX_PLASTER ) || || ( iMaterial == CHAR_TEX_TILE ) )
 	{
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
 	}
@@ -426,7 +446,7 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 	{
 		FX_DebrisFlecks( vecOrigin, &tr, iMaterial, iScale, bNoFlecks );
 	}
-	else if ( ( iMaterial == CHAR_TEX_DIRT ) || ( iMaterial == CHAR_TEX_SNOW ) )
+	else if ( ( iMaterial == CHAR_TEX_DIRT ) || ( iMaterial == CHAR_TEX_GRASS ) || ( iMaterial == CHAR_TEX_SNOW ) )
 	{
 		FX_DustImpact( vecOrigin, &tr, iScale );
 	}
@@ -452,8 +472,10 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 
 		g_pEffects->Sparks( offset );
 	}
+#endif
+
 #ifdef HL2_DLL
-	else if ( ( iMaterial == CHAR_TEX_ANTLION ) || ( iMaterial == CHAR_TEX_EGGSHELL ) )
+	if ( ( iMaterial == CHAR_TEX_ANTLION ) || ( iMaterial == CHAR_TEX_EGGSHELL ) )
 	{
 		FX_AntlionImpact( vecOrigin, &tr );
 	}
@@ -465,10 +487,6 @@ void PerformCustomEffects( const Vector &vecOrigin, trace_t &tr, const Vector &s
 	}
 #endif// HL2_DLL
 
-	//---------------------------
-	// Do leak effect
-	//---------------------------
-	LeakEffect(tr);
 }
 
 //-----------------------------------------------------------------------------

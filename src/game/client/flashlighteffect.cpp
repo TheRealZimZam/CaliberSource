@@ -373,12 +373,19 @@ void CFlashlightEffect::UpdateLightNew(const Vector &vecPos, const Vector &vecFo
 //-----------------------------------------------------------------------------
 void CFlashlightEffect::UpdateLightOld(const Vector &vecPos, const Vector &vecDir, int nDistance)
 {
-	if ( !m_pPointLight || ( m_pPointLight->key != m_nEntIndex ))
+	// kill the new flashlight if we have one
+	LightOffNew();
+
+	if ( !m_pPointLight || ( m_pPointLight->key != LIGHT_INDEX_PLAYER_BRIGHT + m_nEntIndex ))
 	{
-		// Set up the environment light
-		m_pPointLight = effects->CL_AllocDlight(m_nEntIndex);
+		// Set up the bright light
+		m_pPointLight = effects->CL_AllocDlight(LIGHT_INDEX_PLAYER_BRIGHT + m_nEntIndex);
 		m_pPointLight->flags = 0.0f;
-		m_pPointLight->radius = 96;	//80
+#ifdef HL1_DLL
+		m_pPointLight->radius = 80;
+#else
+		m_pPointLight->radius = 96;
+#endif
 	}
 	
 	// For bumped lighting
@@ -387,7 +394,7 @@ void CFlashlightEffect::UpdateLightOld(const Vector &vecPos, const Vector &vecDi
 	Vector end;
 	end = vecPos + nDistance * vecDir;
 	
-	// Trace a line outward, skipping the player model and the view model.
+	// Trace a line outward, don't use hitboxes (too slow)
 	trace_t pm;
 	CTraceFilterSkipPlayerAndViewModel traceFilter;
 	UTIL_TraceLine( vecPos, end, MASK_ALL, &traceFilter, &pm );
@@ -401,19 +408,20 @@ void CFlashlightEffect::UpdateLightOld(const Vector &vecPos, const Vector &vecDi
 		falloff = 500.0 / falloff;
 	
 	falloff *= falloff;
-	
+
+#ifdef HL1_DLL
 	m_pPointLight->radius = 80;
-	m_pPointLight->color.r = m_pPointLight->color.g = m_pPointLight->color.b = 255 * falloff;
-	m_pPointLight->color.exponent = 0;
+#else
+	m_pPointLight->radius = 96;
+#endif
+	m_pPointLight->color.r = m_pPointLight->color.g = m_pPointLight->color.b = 250 * falloff;
+	m_pPointLight->color.exponent = 5;	//5
 	
 	// Make it live for a bit
-	m_pPointLight->die = gpGlobals->curtime + 0.2f;
+	m_pPointLight->die = gpGlobals->curtime + 0.1f;
 	
 	// Update list of surfaces we influence
 	render->TouchLight( m_pPointLight );
-	
-	// kill the new flashlight if we have one
-	LightOffNew();
 }
 
 //-----------------------------------------------------------------------------

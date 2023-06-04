@@ -39,7 +39,6 @@ protected:
 	virtual void	PlaySound( void );
 
 	virtual void	CreateCore( float scale );
-	virtual void	CreateSpriteCore( int sprite, float scale );
 	virtual void	CreateDebris( void );
 	virtual void	CreateMisc( void );
 	virtual void	CreateDynamicLight( float scale );

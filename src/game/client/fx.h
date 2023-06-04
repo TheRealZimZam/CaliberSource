@@ -72,10 +72,10 @@ void FX_Blood( Vector &pos, Vector &dir, float r, float g, float b, float a );
 void FX_CreateImpactDust( Vector &origin, Vector &normal );
 void FX_EnergySplash( const Vector &pos, const Vector &normal, int nFlags = FX_ENERGYSPLASH_DEFAULT );
 void FX_MicroExplosion( const Vector &position, const Vector &normal );
-void FX_Explosion( Vector& origin, Vector& normal, char materialType, int scale );
+void FX_Explosion( Vector& origin, Vector& normal, char materialType, int scale, int flags );
 void FX_ConcussiveExplosion( Vector& origin, Vector& normal ); 
-void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale, bool Sand = false );
-void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool Sand = false );
+void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale, bool bSand = false );
+void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool bSand = false );
 void FX_MuzzleEffect( const Vector &origin, const QAngle &angles, float scale, ClientEntityHandle_t hEntity, unsigned char *pFlashColor = NULL, bool bOneFrame = false );
 void FX_MuzzleEffectAttached( float scale, ClientEntityHandle_t hEntity, int attachmentIndex, unsigned char *pFlashColor = NULL, bool bOneFrame = false  );
 void FX_StriderMuzzleEffect( const Vector &origin, const QAngle &angles, float scale, ClientEntityHandle_t hEntity, unsigned char *pFlashColor = NULL );
@@ -87,10 +87,18 @@ void FX_CreateGaussExplosion( const Vector &pos, const Vector &dir, int type );
 void FX_GaussTracer( Vector& start, Vector& end, int velocity, bool makeWhiz = true );
 void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType );
 
-// Lighting information utility
+//-----------------------------------------------------------------------------
+// Purpose: Returns a normalized tint and luminosity for a specified color
+//-----------------------------------------------------------------------------
+// Each channel does not contribute to the luminosity equally, as represented here
+#define	RED_CHANNEL_CONTRIBUTION	0.30f
+#define GREEN_CHANNEL_CONTRIBUTION	0.59f
+#define	BLUE_CHANNEL_CONTRIBUTION	0.11f
 void UTIL_GetNormalizedColorTintAndLuminosity( const Vector &color, Vector *tint = NULL, float *luminosity = NULL );
 
-// Useful function for testing whether to draw noZ effects
+//-----------------------------------------------------------------------------
+// Purpose: Useful function for testing whether to draw noZ effects
+//-----------------------------------------------------------------------------
 bool EffectOccluded( const Vector &pos, pixelvis_handle_t *queryHandle = 0 );
 
 class CTeslaInfo

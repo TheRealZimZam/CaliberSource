@@ -24,6 +24,8 @@
 #include "tier0/memdbgon.h"
 
 extern ConVar explosion_light;
+ConVar perf_explosion_misc( "perf_explosion_misc", "1", FCVAR_ARCHIVE );
+ConVar perf_explosion_scale( "perf_explosion_scale", "1", FCVAR_ARCHIVE );
 
 #define	__EXPLOSION_DEBUG	0
 
@@ -190,10 +192,7 @@ void C_BaseExplosionEffect::Create( const Vector &position, float force, int mod
 	//NOTENOTE; Env_explode clamps at 10 (if enabled), but nothing else does...
 	if ( scale != 0 )
 	{
-		if ( model != 0 )
-			CreateSpriteCore( model, scale );	//Old-style explosion, just send a sprite out
-		else
-			CreateCore( scale );	//Default explosion
+		CreateCore( scale );	//Default explosion
 	}
 
 	CreateDebris();
@@ -315,8 +314,8 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 		//
 
 #ifndef _XBOX
-
-		for ( i = 0; i < 8; i++ )
+		int	numCoreSmokeSprites = 8 * perf_explosion_scale.GetFloat();
+		for ( i = 0; i < numCoreSmokeSprites; i++ )
 		{
 			offset.Random( -16.0f, 16.0f );
 			offset += m_vecOrigin;
@@ -371,9 +370,9 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 		Vector	forward;
 
 #ifndef _XBOX 
-		int	numRingSprites = 32 + scale;
+		int	numRingSprites = (32 + scale) * perf_explosion_scale.GetFloat();
 #else
-		int	numRingSprites = 24 + scale;
+		int	numRingSprites = (24 + scale) * perf_explosion_scale.GetFloat();
 #endif
 
 		float flIncr = (2*M_PI) / (float) numRingSprites; // Radians
@@ -438,7 +437,8 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 		m_Material_Embers[1] = pSimple->GetPMaterial( "effects/fire_embers2" );
 	}
 
-	for ( i = 0; i < 16; i++ )	//scale * 2
+	int	numEmbers = (16) * perf_explosion_scale.GetFloat();	//scale * 2
+	for ( i = 0; i < numEmbers; i++ )
 	{
 		offset.Random( -32.0f, 32.0f );
 		offset += m_vecOrigin;
@@ -489,18 +489,13 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 
 	if ( m_Material_FireCloud == NULL )
 	{
-		// By default choose one of two materials for each fireball
-	//!	const char *material = ( random->RandomInt( 0, 1 ) ) ? "effects/fire_cloud1" : "effects/fire_cloud2";
-	//!	m_Material_FireCloud = pSimple->GetPMaterial( material );
-		//^^^ This isnt working... Its not choosing one for each instance but one for the entire level/state
-
 		m_Material_FireCloud = pSimple->GetPMaterial( "effects/fire_cloud1" );
 	}
 
 #ifndef _XBOX
-	int numFireballs = 32;	//scale * 4 - changed back due to decimals not going in smoothly
+	int numFireballs = 32 * perf_explosion_scale.GetFloat();	//scale * 4 - changed back due to decimals not going in smoothly
 #else
-	int numFireballs = 24;
+	int numFireballs = 24 * perf_explosion_scale.GetFloat();
 #endif
 
 	for ( i = 0; i < numFireballs; i++ )
@@ -549,36 +544,6 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 	}
 }
 
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void C_BaseExplosionEffect::CreateSpriteCore( int sprite, float scale )
-{
-	//TODO
-/*
-	switch( sprite )
-	{
-		case 1:
-		// Zerog
-		break;
-
-		case 2:
-		// Flare
-		break;
-
-		case 3:
-		// Water
-		break;
-
-		default:
-			//Zerog
-			break;
-	}
-*/
-	CreateCore( scale );
-}
-
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -613,9 +578,9 @@ void C_BaseExplosionEffect::CreateDebris( void )
 	pSparkEmitter->GetBinding().SetBBox( m_vecOrigin - Vector( 128, 128, 128 ), m_vecOrigin + Vector( 128, 128, 128 ) );
 
 #ifndef _XBOX
-	int		numSparks = random->RandomInt( 8, 16 );
+	int		numSparks = random->RandomInt( 8, 16 ) * perf_explosion_scale.GetFloat();
 #else
-	int		numSparks = random->RandomInt( 4, 8 );
+	int		numSparks = random->RandomInt( 4, 8 ) * perf_explosion_scale.GetFloat();
 #endif
 
 	Vector	dir;
@@ -660,9 +625,9 @@ void C_BaseExplosionEffect::CreateDebris( void )
 	
 
 #ifdef _XBOX
-	int	numFlecks = random->RandomInt( 8, 16 );
+	int	numFlecks = random->RandomInt( 8, 16 ) * perf_explosion_scale.GetFloat();
 #else	
-	int	numFlecks = random->RandomInt( 16, 32 );
+	int	numFlecks = random->RandomInt( 16, 32 ) * perf_explosion_scale.GetFloat();
 #endif // _XBOX
 
 
@@ -712,8 +677,8 @@ void C_BaseExplosionEffect::CreateDebris( void )
 //-----------------------------------------------------------------------------
 void C_BaseExplosionEffect::CreateMisc( void )
 {
-//	if ( !perf_explosion_misc.GetBool() )
-//		return;
+	if ( !perf_explosion_misc.GetBool() )
+		return;
 
 	Vector	offset;
 	int		i;
@@ -778,13 +743,13 @@ void C_BaseExplosionEffect::CreateDynamicLight( float scale )
 		float flLightScale;
 		flLightScale = random->RandomFloat( 64.0f, 68.0f ) * scale;
 
-		dlight_t *dl = effects->CL_AllocDlight ( 0 );
+		dlight_t *dl = effects->CL_AllocDlight( LIGHT_INDEX_TE_DYNAMIC );
 	
 		VectorCopy (m_vecOrigin, dl->origin);
 
-		dl->color.r = 255;
+		dl->color.r = 250;
 		dl->color.g = 220;
-		dl->color.b = 120;
+		dl->color.b = 100;
 		dl->radius	= flLightScale;	//random->RandomFloat( 384.0f, 512.0f )
 		dl->die		= gpGlobals->curtime + 0.1f;
 		dl->decay	= 128.0f;

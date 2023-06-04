@@ -106,17 +106,17 @@ public:
 	virtual void			BreakModel(const Vector &pos, const QAngle &angles, const Vector &size, const Vector &dir, float random, float life, int count, int modelIndex, char flags);
 	virtual void			Bubbles( const Vector &mins, const Vector &maxs, float height, int modelIndex, int count, float speed );
 	virtual void			BubbleTrail( const Vector &start, const Vector &end, float height, int modelIndex, int count, float speed );
-	virtual void			Sprite_Explode( C_LocalTempEntity *pTemp, float scale, int flags );
 	virtual void			FizzEffect( C_BaseEntity *pent, int modelIndex, int density, int current );
 	virtual C_LocalTempEntity		*DefaultSprite( const Vector &pos, int spriteIndex, float framerate );
 	virtual void			Sprite_Smoke( C_LocalTempEntity *pTemp, float scale );
-	virtual C_LocalTempEntity		*TempSprite( const Vector &pos, const Vector &dir, float scale, int modelIndex, int rendermode, int renderfx, float a, float life, int flags, const Vector &normal = vec3_origin );
+	virtual C_LocalTempEntity		*TempSprite( const Vector &pos, const Vector &dir, float scale, int modelIndex, int rendermode, int renderfx, float a, float framerate, int flags, const Vector &normal = vec3_origin );
 	virtual void			AttachTentToPlayer( int client, int modelIndex, float zoffset, float life );
 	virtual void			KillAttachedTents( int client );
+	virtual void			Sprite_Explode( C_LocalTempEntity *pTemp, float scale, int flags );
 	virtual void			Sprite_Spray( const Vector &pos, const Vector &dir, int modelIndex, int count, int speed, int iRand );
 	void					Sprite_Trail( const Vector &vecStart, const Vector &vecEnd, int modelIndex, int nCount, float flLife, float flSize, float flAmplitude, int nRenderamt, float flSpeed );
 
-	virtual void			PlaySound ( C_LocalTempEntity *pTemp, float damp );
+	virtual void			PlaySound( C_LocalTempEntity *pTemp, float damp );
 	virtual void			EjectBrass( const Vector &pos1, const QAngle &angles, const QAngle &gunAngles, int type );
 	virtual C_LocalTempEntity		*SpawnTempModel( model_t *pModel, const Vector &vecOrigin, const QAngle &vecAngles, const Vector &vecVelocity, float flLifeTime, int iFlags );
 	void					RocketFlare( const Vector& pos );

@@ -8,16 +8,31 @@
 #include "hud_chat.h"
 #include "hud_macros.h"
 #include "text_message.h"
+#include "engine/IEngineSound.h"
 #include "vguicenterprint.h"
-#include "hud_basechat.h"
-#include <vgui/ILocalize.h>
 
+extern ConVar cl_showtextmsg;
 
+// converts all '\r' characters to '\n', so that the engine can deal with the properly
+// returns a pointer to str
+static char* ConvertCRtoNL( char *str )
+{
+	for ( char *ch = str; *ch != 0; ch++ )
+		if ( *ch == '\r' )
+			*ch = '\n';
+	return str;
+}
+
+static void StripEndNewlineFromString( char *str )
+{
+	int s = strlen( str ) - 1;
+	if ( str[s] == '\n' || str[s] == '\r' )
+		str[s] = 0;
+}
 
 DECLARE_HUDELEMENT( CHudChat );
 
 DECLARE_HUD_MESSAGE( CHudChat, SayText );
-DECLARE_HUD_MESSAGE( CHudChat, SayText2 );
 DECLARE_HUD_MESSAGE( CHudChat, TextMsg );
 
 //=====================
@@ -34,45 +49,7 @@ void CHudChat::Init( void )
 	BaseClass::Init();
 
 	HOOK_HUD_MESSAGE( CHudChat, SayText );
-	HOOK_HUD_MESSAGE( CHudChat, SayText2 );
 	HOOK_HUD_MESSAGE( CHudChat, TextMsg );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Reads in a player's Chat text from the server
-//-----------------------------------------------------------------------------
-void CHudChat::MsgFunc_SayText2( bf_read &msg )
-{
-	int client = msg.ReadByte();
-	bool bWantsToChat = msg.ReadByte();
-
-	wchar_t szBuf[6][256];
-	char untranslated_msg_text[256];
-	wchar_t *msg_text = ReadLocalizedString( msg, szBuf[0], sizeof( szBuf[0] ), false, untranslated_msg_text, sizeof( untranslated_msg_text ) );
-
-	// keep reading strings and using C format strings for subsituting the strings into the localised text string
-	ReadChatTextString ( msg, szBuf[1], sizeof( szBuf[1] ) );		// player name
-	ReadChatTextString ( msg, szBuf[2], sizeof( szBuf[2] ) );		// chat text
-	ReadLocalizedString( msg, szBuf[3], sizeof( szBuf[3] ), true );
-	ReadLocalizedString( msg, szBuf[4], sizeof( szBuf[4] ), true );
-
-	g_pVGuiLocalize->ConstructString( szBuf[5], sizeof( szBuf[5] ), msg_text, 4, szBuf[1], szBuf[2], szBuf[3], szBuf[4] );
-
-	char ansiString[512];
-	g_pVGuiLocalize->ConvertUnicodeToANSI( ConvertCRtoNL( szBuf[5] ), ansiString, sizeof( ansiString ) );
-
-	if ( bWantsToChat )
-	{
-		// print raw chat text
-		ChatPrintf( client, CHAT_FILTER_NONE, "%s", ansiString );
-
-		Msg( "%s\n", RemoveColorMarkup(ansiString) );
-	}
-	else
-	{
-		// print raw chat text
-		ChatPrintf( client, CHAT_FILTER_NONE, "%s", ansiString );
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -88,6 +65,9 @@ void CHudChat::MsgFunc_SayText( bf_read &msg )
 	msg.ReadByte(); // client ID
 	msg.ReadString( szString, sizeof(szString) );
 	Printf( CHAT_FILTER_NONE, "%s", szString );
+
+	CLocalPlayerFilter filter;
+	C_BaseEntity::EmitSound( filter, SOUND_FROM_LOCAL_PLAYER, "HudChat.Message" );
 }
 
 
@@ -107,7 +87,7 @@ void CHudChat::MsgFunc_TextMsg( bf_read &msg )
 {
 	char szString[2048];
 	int msg_dest = msg.ReadByte();
-	static char szBuf[6][256];
+	static char szBuf[6][128];
 
 	msg.ReadString( szString, sizeof(szString) );
 	char *msg_text = hudtextmessage->LookupString( szString, &msg_dest );
@@ -141,7 +121,7 @@ void CHudChat::MsgFunc_TextMsg( bf_read &msg )
 	StripEndNewlineFromString( sstr4 );
 	char *psz = szBuf[5];
 
-	if ( !cl_showtextmsg.GetInt() )
+	if ( !cl_showtextmsg.GetBool() )
 		return;
 
 	switch ( msg_dest )
@@ -169,3 +149,14 @@ void CHudChat::MsgFunc_TextMsg( bf_read &msg )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+bool CHudChat::ShouldDraw( void )
+{
+//!TODO;
+//!	if ( IsTakingAFreezecamScreenshot() )
+//!		return false;
+
+	return BaseClass::ShouldDraw();
+}

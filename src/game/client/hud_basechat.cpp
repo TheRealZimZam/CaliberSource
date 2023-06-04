@@ -19,12 +19,6 @@
 #include "vgui/keycode.h"
 #include <KeyValues.h>
 #include "ienginevgui.h"
-#include "c_playerresource.h"
-#include "ihudlcd.h"
-#include "vgui/IInput.h"
-#include "vgui/ILocalize.h"
-#include "multiplay_gamerules.h"
-
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -32,145 +26,9 @@
 #define CHAT_WIDTH_PERCENTAGE 0.6f
 
 #ifndef _XBOX
-ConVar hud_saytext_time( "hud_saytext_time", "12", 0 );
+ConVar hud_chat_saytext_time( "hud_chat_saytext_time", "10", 0 );
+ConVar hud_chat_time( "hud_chat_time", "8", 0 );
 ConVar cl_showtextmsg( "cl_showtextmsg", "1", 0, "Enable/disable text messages printing on the screen." );
-ConVar cl_chatfilters( "cl_chatfilters", "31", FCVAR_CLIENTDLL | FCVAR_ARCHIVE, "Stores the chat filter settings " );
-
-
-Color g_ColorBlue( 153, 204, 255, 255 );
-Color g_ColorRed( 255, 63.75, 63.75, 255 );
-Color g_ColorGreen( 153, 255, 153, 255 );
-Color g_ColorDarkGreen( 64, 255, 64, 255 );
-Color g_ColorYellow( 255, 178.5, 0.0, 255 );
-Color g_ColorGrey( 204, 204, 204, 255 );
-
-//--------------------------------------------------------------------------------------------------------
-/**
-* Simple utility function to allocate memory and duplicate a wide string
-*/
-#ifdef _WIN32
-inline wchar_t *CloneWString( const wchar_t *str )
-{
-	wchar_t *cloneStr = new wchar_t [ wcslen(str)+1 ];
-	wcscpy( cloneStr, str );
-	return cloneStr;
-}
-#endif
-
-// removes all color markup characters, so Msg can deal with the string properly
-// returns a pointer to str
-char* RemoveColorMarkup( char *str )
-{
-	char *out = str;
-	for ( char *in = str; *in != 0; ++in )
-	{
-		if ( *in > 0 && *in < COLOR_MAX )
-		{
-			continue;
-		}
-		*out = *in;
-		++out;
-	}
-	*out = 0;
-
-	return str;
-}
-
-// converts all '\r' characters to '\n', so that the engine can deal with the properly
-// returns a pointer to str
-char* ConvertCRtoNL( char *str )
-{
-	for ( char *ch = str; *ch != 0; ch++ )
-		if ( *ch == '\r' )
-			*ch = '\n';
-	return str;
-}
-
-// converts all '\r' characters to '\n', so that the engine can deal with the properly
-// returns a pointer to str
-wchar_t* ConvertCRtoNL( wchar_t *str )
-{
-	for ( wchar_t *ch = str; *ch != 0; ch++ )
-		if ( *ch == L'\r' )
-			*ch = L'\n';
-	return str;
-}
-
-void StripEndNewlineFromString( char *str )
-{
-	int s = strlen( str ) - 1;
-	if ( s >= 0 )
-	{
-		if ( str[s] == '\n' || str[s] == '\r' )
-			str[s] = 0;
-	}
-}
-
-void StripEndNewlineFromString( wchar_t *str )
-{
-	int s = wcslen( str ) - 1;
-	if ( s >= 0 )
-	{
-		if ( str[s] == L'\n' || str[s] == L'\r' )
-			str[s] = 0;
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Reads a string from the current message and checks if it is translatable
-//-----------------------------------------------------------------------------
-wchar_t* ReadLocalizedString( bf_read &msg, wchar_t *pOut, int outSize, bool bStripNewline, char *originalString, int originalSize )
-{
-	char szString[2048];
-	szString[0] = 0;
-	msg.ReadString( szString, sizeof(szString) );
-
-	if ( originalString )
-	{
-		Q_strncpy( originalString, szString, originalSize );
-	}
-
-	const wchar_t *pBuf = g_pVGuiLocalize->Find( szString );
-	if ( pBuf )
-	{
-		wcsncpy( pOut, pBuf, outSize/sizeof(wchar_t) );
-		pOut[outSize/sizeof(wchar_t)-1] = 0;
-	}
-	else
-	{
-		g_pVGuiLocalize->ConvertANSIToUnicode( szString, pOut, outSize );
-	}
-
-	if ( bStripNewline )
-		StripEndNewlineFromString( pOut );
-
-	return pOut;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Reads a string from the current message, converts it to unicode, and strips out color codes
-//-----------------------------------------------------------------------------
-wchar_t* ReadChatTextString( bf_read &msg, wchar_t *pOut, int outSize )
-{
-	char szString[2048];
-	szString[0] = 0;
-	msg.ReadString( szString, sizeof(szString) );
-
-	g_pVGuiLocalize->ConvertANSIToUnicode( szString, pOut, outSize );
-
-	StripEndNewlineFromString( pOut );
-
-	// converts color control characters into control characters for the normal color
-	for ( wchar_t *test = pOut; test && *test; ++test )
-	{
-		if ( *test && (*test < COLOR_MAX ) )
-		{
-			*test = COLOR_NORMAL;
-		}
-	}
-
-	return pOut;
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -184,20 +42,10 @@ CBaseHudChatLine::CBaseHudChatLine( vgui::Panel *parent, const char *panelName )
 	m_flExpireTime = 0.0f;
 	m_flStartTime = 0.0f;
 	m_iNameLength	= 0;
-	m_text = NULL;
 
 	SetPaintBackgroundEnabled( true );
 	
 	SetVerticalScrollbar( false );
-}
-
-CBaseHudChatLine::~CBaseHudChatLine()
-{
-	if ( m_text )
-	{
-		delete[] m_text;
-		m_text = NULL;
-	}
 }
 	
 
@@ -206,20 +54,14 @@ void CBaseHudChatLine::ApplySchemeSettings(vgui::IScheme *pScheme)
 	BaseClass::ApplySchemeSettings(pScheme);
 
 	m_hFont = pScheme->GetFont( "Default" );
+	m_hFontMarlett = pScheme->GetFont( "Marlett" );
 
-#ifdef HL1_CLIENT_DLL
 	SetBgColor( Color( 0, 0, 0, 0 ) );
 	SetFgColor( Color( 0, 0, 0, 0 ) );
 
 	SetBorder( NULL );
-#else
-	SetBgColor( Color( 0, 0, 0, 100 ) );
-#endif
 
-
-	m_hFontMarlett = pScheme->GetFont( "Marlett" );
-
-	m_clrText = pScheme->GetColor( "FgColor", GetFgColor() );
+	m_clrText = pScheme->GetColor( "Chat.Text", GetFgColor() );
 	SetFont( m_hFont );
 }
 
@@ -257,13 +99,20 @@ void CBaseHudChatLine::PerformFadeout( void )
 		int alpha = 63 + 192 * (1.0f - frac1 );
 		alpha = clamp( alpha, 0, 255 );
 
+#if 0
 		wchar_t wbuf[4096];
 		GetText(0, wbuf, sizeof(wbuf));
-
 		SetText( "" );
-
 		InsertColorChange( Color( r, g, b, 255 ) );
 		InsertString( wbuf );
+#else
+		vgui::surface()->DrawSetTextFont( m_hFontMarlett );
+		vgui::surface()->DrawSetTextColor( alpha, 0, 0, alpha );
+		vgui::surface()->DrawSetTextPos( 0, 4 );
+		wchar_t ch[2];
+		g_pVGuiLocalize->ConvertANSIToUnicode( "4", ch, sizeof( ch ) );
+		vgui::surface()->DrawPrintText( ch, 1 );
+#endif
 	}
 	else if ( curtime <= m_flExpireTime && curtime > m_flExpireTime - CHATLINE_FADE_TIME )
 	{
@@ -272,6 +121,7 @@ void CBaseHudChatLine::PerformFadeout( void )
 		int alpha = frac * 255;
 		alpha = clamp( alpha, 0, 255 );
 
+#if 0
 		wchar_t wbuf[4096];
 		GetText(0, wbuf, sizeof(wbuf));
 
@@ -279,9 +129,13 @@ void CBaseHudChatLine::PerformFadeout( void )
 
 		InsertColorChange( Color( lr * frac, lg * frac, lb * frac, alpha ) );
 		InsertString( wbuf );
+#else
+		SetFgColor( Color( lr * frac, lg * frac, lb * frac, alpha ) );
+#endif
 	}
 	else
 	{
+#if 0
 		wchar_t wbuf[4096];
 		GetText(0, wbuf, sizeof(wbuf));
 
@@ -289,6 +143,9 @@ void CBaseHudChatLine::PerformFadeout( void )
 
 		InsertColorChange( Color( lr, lg, lb, 255 ) );
 		InsertString( wbuf );
+#else
+		SetFgColor( Color( lr, lg, lb, 255 ) );
+#endif
 	}
 
 	OnThink();
@@ -301,7 +158,7 @@ void CBaseHudChatLine::PerformFadeout( void )
 void CBaseHudChatLine::SetExpireTime( void )
 {
 	m_flStartTime = gpGlobals->curtime;
-	m_flExpireTime = m_flStartTime + hud_saytext_time.GetFloat();
+	m_flExpireTime = m_flStartTime + hud_chat_saytext_time.GetFloat();
 	m_nCount = CBaseHudChat::m_nLineCounter++;
 }
 
@@ -372,25 +229,22 @@ void CBaseHudChatInputLine::ApplySchemeSettings(vgui::IScheme *pScheme)
 	BaseClass::ApplySchemeSettings(pScheme);
 	
 	// FIXME:  Outline
-	vgui::HFont hFont = pScheme->GetFont( "ChatFont" );
+	vgui::HFont hFont = pScheme->GetFont( "Default" );
 
 	m_pPrompt->SetFont( hFont );
 	m_pInput->SetFont( hFont );
 
-	m_pInput->SetFgColor( pScheme->GetColor( "Chat.TypingText", pScheme->GetColor( "Panel.FgColor", Color( 255, 255, 255, 255 ) ) ) );
-
-	SetPaintBackgroundEnabled( true );
-	m_pPrompt->SetPaintBackgroundEnabled( true );
+	SetPaintBackgroundEnabled( false );
+	m_pPrompt->SetPaintBackgroundEnabled( false );
 	m_pPrompt->SetContentAlignment( vgui::Label::a_west );
 	m_pPrompt->SetTextInset( 2, 0 );
 
-	m_pInput->SetMouseInputEnabled( true );
-
 #ifdef HL1_CLIENT_DLL
 	m_pInput->SetBgColor( Color( 255, 255, 255, 0 ) );
+#else
+	m_pInput->SetFgColor( pScheme->GetColor( "Chat.Text", GetFgColor()) );
+	m_pInput->SetBgColor( pScheme->GetColor( "Chat.Panel", GetBgColor()) );
 #endif
-
-	SetBgColor( Color( 0, 0, 0, 0) );
 
 }
 
@@ -440,126 +294,6 @@ vgui::Panel *CBaseHudChatInputLine::GetInputPanel( void )
 }
 #endif //_XBOX
 
-
-CHudChatFilterButton::CHudChatFilterButton( vgui::Panel *pParent, const char *pName, const char *pText ) : 
-BaseClass( pParent, pName, pText )
-{
-}
-
-CHudChatFilterCheckButton::CHudChatFilterCheckButton( vgui::Panel *pParent, const char *pName, const char *pText, int iFlag ) : 
-BaseClass( pParent, pName, pText )
-{
-	m_iFlag = iFlag;
-}
-
-
-CHudChatFilterPanel::CHudChatFilterPanel( vgui::Panel *pParent, const char *pName ) : BaseClass ( pParent, pName )
-{
-	SetParent( pParent );
-
-	new CHudChatFilterCheckButton( this, "joinleave_button", "Sky is blue?", CHAT_FILTER_JOINLEAVE );
-	new CHudChatFilterCheckButton( this, "namechange_button", "Sky is blue?", CHAT_FILTER_NAMECHANGE );
-	new CHudChatFilterCheckButton( this, "publicchat_button", "Sky is blue?", CHAT_FILTER_PUBLICCHAT );
-	new CHudChatFilterCheckButton( this, "servermsg_button", "Sky is blue?", CHAT_FILTER_SERVERMSG );
-	new CHudChatFilterCheckButton( this, "teamchange_button", "Sky is blue?", CHAT_FILTER_TEAMCHANGE );
-}
-
-void CHudChatFilterPanel::ApplySchemeSettings(vgui::IScheme *pScheme)
-{
-	LoadControlSettings( "resource/UI/ChatFilters.res" );
-
-	BaseClass::ApplySchemeSettings( pScheme );
-
-	Color cColor = pScheme->GetColor( "DullWhite", GetBgColor() );
-	SetBgColor( Color ( cColor.r(), cColor.g(), cColor.b(), CHAT_HISTORY_ALPHA ) );
-
-	SetFgColor( pScheme->GetColor( "Blank", GetFgColor() ) );
-}
-
-void CHudChatFilterPanel::OnFilterButtonChecked( vgui::Panel *panel )
-{
-	CHudChatFilterCheckButton *pButton = dynamic_cast < CHudChatFilterCheckButton * > ( panel );
-
-	if ( pButton && GetChatParent() && IsVisible() )
-	{
-		if ( pButton->IsSelected() )
-		{
-			GetChatParent()->SetFilterFlag( GetChatParent()->GetFilterFlags() | pButton->GetFilterFlag() );
-		}
-		else
-		{
-			GetChatParent()->SetFilterFlag( GetChatParent()->GetFilterFlags() & ~ pButton->GetFilterFlag() );
-		}
-	}
-}
-
-void CHudChatFilterPanel::SetVisible(bool state)
-{
-	if ( state == true )
-	{
-		for (int i = 0; i < GetChildCount(); i++)
-		{
-			CHudChatFilterCheckButton *pButton = dynamic_cast < CHudChatFilterCheckButton * > ( GetChild(i) );
-
-			if ( pButton )
-			{
-				if ( cl_chatfilters.GetInt() & pButton->GetFilterFlag() )
-				{
-					pButton->SetSelected( true );
-				}
-				else
-				{
-					pButton->SetSelected( false );
-				}
-			}
-		}
-	}
-
-	BaseClass::SetVisible( state );
-}
-
-void CHudChatFilterButton::DoClick( void )
-{
-	BaseClass::DoClick();
-
-	CBaseHudChat *pChat = dynamic_cast < CBaseHudChat * > (GetParent() );
-
-	if ( pChat )
-	{
-		pChat->GetChatInput()->RequestFocus();
-
-		if ( pChat->GetChatFilterPanel() )
-		{
-			if ( pChat->GetChatFilterPanel()->IsVisible() )
-			{
-				pChat->GetChatFilterPanel()->SetVisible( false );
-			}
-			else
-			{
-				pChat->GetChatFilterPanel()->SetVisible( true );
-				pChat->GetChatFilterPanel()->MakePopup();
-				pChat->GetChatFilterPanel()->SetMouseInputEnabled( true );
-			}
-		}
-	}
-}
-
-CHudChatHistory::CHudChatHistory( vgui::Panel *pParent, const char *panelName ) : BaseClass( pParent, "HudChatHistory" )
-{
-	vgui::HScheme scheme = vgui::scheme()->LoadSchemeFromFileEx( enginevgui->GetPanel( PANEL_CLIENTDLL ), "resource/ChatScheme.res", "ChatScheme");
-	SetScheme(scheme);
-
-	InsertFade( -1, -1 );
-}
-
-void CHudChatHistory::ApplySchemeSettings( vgui::IScheme *pScheme )
-{
-	BaseClass::ApplySchemeSettings( pScheme );
-
-	SetFont( pScheme->GetFont( "ChatFont" ) );
-	SetAlpha( 255 );
-}
-
 int CBaseHudChat::m_nLineCounter = 1;
 //-----------------------------------------------------------------------------
 // Purpose: Text chat input/output hud element
@@ -570,39 +304,43 @@ CBaseHudChat::CBaseHudChat( const char *pElementName )
 	vgui::Panel *pParent = g_pClientMode->GetViewport();
 	SetParent( pParent );
 
-	vgui::HScheme scheme = vgui::scheme()->LoadSchemeFromFileEx( enginevgui->GetPanel( PANEL_CLIENTDLL ), "resource/ChatScheme.res", "ChatScheme" );
+	vgui::HScheme scheme = vgui::scheme()->LoadSchemeFromFileEx( enginevgui->GetPanel( PANEL_CLIENTDLL ), "resource/ClientScheme.res", "ClientScheme");
 	SetScheme(scheme);
 
-	g_pVGuiLocalize->AddFile( "resource/chat_%language%.txt" );
-
 	m_nMessageMode = 0;
+	m_flFadeTime = 0;	//Start invisible
 
-	vgui::ivgui()->AddTickSignal( GetVPanel() );
+	CBaseHudChatLine *line = m_ChatLines[ 0 ];
+
+	if ( line )
+	{
+		vgui::HFont font = line->GetFont();
+		m_iFontHeight = vgui::surface()->GetFontTall( font ) + 2;
+
+		// Put input area at bottom
+		int w, h;
+		GetSize( w, h );
+		m_pChatInput->SetBounds( 1, h - m_iFontHeight - 1, w-2, m_iFontHeight );
+	}
+
+	if ( IsPC() )
+	{
+		vgui::ivgui()->AddTickSignal( GetVPanel() );
+	}
 
 	// (We don't actually want input until they bring up the chat line).
 	MakePopup();
 	SetZPos( -30 );
 
 	SetHiddenBits( HIDEHUD_CHAT );
+}
 
-	m_pFiltersButton = new CHudChatFilterButton( this, "ChatFiltersButton", "Filters" );
+CBaseHudChat::~CBaseHudChat()
+{
+	if ( IsXbox() )
+		return;
 
-	if ( m_pFiltersButton )
-	{
-		m_pFiltersButton->SetScheme( scheme );
-		m_pFiltersButton->SetVisible( true );
-		m_pFiltersButton->SetEnabled( true );
-		m_pFiltersButton->SetMouseInputEnabled( true );
-		m_pFiltersButton->SetKeyBoardInputEnabled( false );
-	}
-
-	m_pChatHistory = new CHudChatHistory( this, "HudChatHistory" );
-
-	CreateChatLines();
-	CreateChatInputLine();
-	GetChatFilterPanel();
-
-	m_iFilterFlags = cl_chatfilters.GetInt();
+	gameeventmanager->RemoveListener( this );
 }
 
 void CBaseHudChat::CreateChatInputLine( void )
@@ -610,47 +348,20 @@ void CBaseHudChat::CreateChatInputLine( void )
 #ifndef _XBOX
 	m_pChatInput = new CBaseHudChatInputLine( this, "ChatInputLine" );
 	m_pChatInput->SetVisible( false );
-
-	if ( GetChatHistory() )
-	{
-		GetChatHistory()->SetMaximumCharCount( 127 * 100 );
-		GetChatHistory()->SetVisible( true );
-	}
 #endif
 }
 
 void CBaseHudChat::CreateChatLines( void )
 {
 #ifndef _XBOX
-	m_ChatLine = new CBaseHudChatLine( this, "ChatLine1" );
-	m_ChatLine->SetVisible( false );		
-
-#endif
-}
-
-
-#define BACKGROUND_BORDER_WIDTH 20
-
-CHudChatFilterPanel *CBaseHudChat::GetChatFilterPanel( void )
-{
-	if ( m_pFilterPanel == NULL )
+	for ( int i = 0; i < CHAT_INTERFACE_LINES; i++ )
 	{
-		m_pFilterPanel = new CHudChatFilterPanel( this, "HudChatFilterPanel"  );
-
-		if ( m_pFilterPanel )
-		{
-			vgui::HScheme scheme = vgui::scheme()->LoadSchemeFromFileEx( enginevgui->GetPanel( PANEL_CLIENTDLL ), "resource/ChatScheme.res", "ChatScheme");
-
-			m_pFilterPanel->SetScheme( scheme );
-			m_pFilterPanel->InvalidateLayout( true, true );
-			m_pFilterPanel->SetMouseInputEnabled( true );
-			m_pFilterPanel->SetPaintBackgroundType( 2 );
-			m_pFilterPanel->SetPaintBorderEnabled( true );
-			m_pFilterPanel->SetVisible( false );
-		}
+		char sz[ 32 ];
+		Q_snprintf( sz, sizeof( sz ), "ChatLine%02i", i );
+		m_ChatLines[ i ] = new CBaseHudChatLine( this, sz );
+		m_ChatLines[ i ]->SetVisible( false );		
 	}
-
-	return m_pFilterPanel;
+#endif
 }
 
 void CBaseHudChat::ApplySchemeSettings( vgui::IScheme *pScheme )
@@ -659,23 +370,27 @@ void CBaseHudChat::ApplySchemeSettings( vgui::IScheme *pScheme )
 
 	BaseClass::ApplySchemeSettings( pScheme );
 
-	SetPaintBackgroundType( 2 );
-	SetPaintBorderEnabled( true );
-	SetPaintBackgroundEnabled( true );
-
+	SetPaintBackgroundEnabled( false );
 	SetKeyBoardInputEnabled( false );
 	SetMouseInputEnabled( false );
 	m_nVisibleHeight = 0;
 
+	// Put input area at bottom
+	if ( m_pChatInput )
+	{
+		int w, h;
+		GetSize( w, h );
+		m_pChatInput->SetBounds( 1, h - m_iFontHeight - 1, w-2, m_iFontHeight );
+	}
+
 #ifdef HL1_CLIENT_DLL
 	SetBgColor( Color( 0, 0, 0, 0 ) );
 	SetFgColor( Color( 0, 0, 0, 0 ) );
+#else
+	//#define CHAT_HISTORY_ALPHA 16
+	Color cColor = pScheme->GetColor( "Chat.Panel", GetBgColor() );
+	SetBgColor( Color( cColor.r(), cColor.g(), cColor.b(), cColor.a() ) );
 #endif
-
-	Color cColor = pScheme->GetColor( "DullWhite", GetBgColor() );
-	SetBgColor( Color ( cColor.r(), cColor.g(), cColor.b(), CHAT_HISTORY_ALPHA ) );
-
-	GetChatHistory()->SetVerticalScrollbar( false );
 }
 
 void CBaseHudChat::Reset( void )
@@ -686,285 +401,43 @@ void CBaseHudChat::Reset( void )
 #endif
 }
 
-#ifdef _XBOX
 bool CBaseHudChat::ShouldDraw()
 {
-	// never think, never draw
-	return false;
+	if ( IsXbox() )
+		return false;
+
+	if ( m_flFadeTime == 0 )
+		return false;
+
+	return cl_showtextmsg.GetBool();
 }
-#endif
 
 void CBaseHudChat::Paint( void )
 {
 #ifndef _XBOX
 	if ( m_nVisibleHeight == 0 )
 		return;
+
+	int w, h;
+	GetSize( w, h );
+
+	vgui::surface()->DrawSetColor( Color( 0, 0, 0, 100 ) );
+	vgui::surface()->DrawFilledRect( 0, h - m_nVisibleHeight, w, h );
+
+	vgui::surface()->DrawSetColor( GetBgColor() );
+	vgui::surface()->DrawOutlinedRect( 0, h - m_nVisibleHeight, w, h );
 #endif
 }
-
-CHudChatHistory *CBaseHudChat::GetChatHistory( void )
-{
-	return m_pChatHistory;
-}
-
-
 
 void CBaseHudChat::Init( void )
 {
 	if ( IsXbox() )
 		return;
 
-	ListenForGameEvent( "hltv_chat" );
-}
+	CreateChatInputLine();
+	CreateChatLines();
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : *pszName - 
-//			iSize - 
-//			*pbuf - 
-//-----------------------------------------------------------------------------
-void CBaseHudChat::MsgFunc_SayText( bf_read &msg )
-{
-	char szString[256];
-
-	int client = msg.ReadByte();
-	msg.ReadString( szString, sizeof(szString) );
-	bool bWantsToChat = msg.ReadByte();
-
-	if ( bWantsToChat )
-	{
-		// print raw chat text
-		ChatPrintf( client, CHAT_FILTER_NONE, "%s", szString );
-	}
-	else
-	{
-		// try to lookup translated string
-		Printf( CHAT_FILTER_NONE, "%s", hudtextmessage->LookupString( szString ) );
-	}
-
-	CLocalPlayerFilter filter;
-	C_BaseEntity::EmitSound( filter, SOUND_FROM_LOCAL_PLAYER, "HudChat.Message" );
-
-	Msg( "%s", szString );
-}
-
-int CBaseHudChat::GetFilterForString( const char *pString )
-{
-	if ( !Q_stricmp( pString, "#HL_Name_Change" ) ) 
-	{
-		return CHAT_FILTER_NAMECHANGE;
-	}
-
-	return CHAT_FILTER_NONE;
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: Reads in a player's Chat text from the server
-//-----------------------------------------------------------------------------
-void CBaseHudChat::MsgFunc_SayText2( bf_read &msg )
-{
-	// Got message during connection
-	if ( !g_PR )
-		return;
-
-	int client = msg.ReadByte();
-	bool bWantsToChat = msg.ReadByte();
-
-	wchar_t szBuf[6][256];
-	char untranslated_msg_text[256];
-	wchar_t *msg_text = ReadLocalizedString( msg, szBuf[0], sizeof( szBuf[0] ), false, untranslated_msg_text, sizeof( untranslated_msg_text ) );
-
-	// keep reading strings and using C format strings for subsituting the strings into the localised text string
-	ReadChatTextString ( msg, szBuf[1], sizeof( szBuf[1] ) );		// player name
-	ReadChatTextString ( msg, szBuf[2], sizeof( szBuf[2] ) );		// chat text
-	ReadLocalizedString( msg, szBuf[3], sizeof( szBuf[3] ), true );
-	ReadLocalizedString( msg, szBuf[4], sizeof( szBuf[4] ), true );
-
-	g_pVGuiLocalize->ConstructString( szBuf[5], sizeof( szBuf[5] ), msg_text, 4, szBuf[1], szBuf[2], szBuf[3], szBuf[4] );
-
-	char ansiString[512];
-	g_pVGuiLocalize->ConvertUnicodeToANSI( ConvertCRtoNL( szBuf[5] ), ansiString, sizeof( ansiString ) );
-
-	if ( bWantsToChat )
-	{
-		int iFilter = CHAT_FILTER_NONE;
-
-		if ( client > 0 && (g_PR->GetTeam( client ) != g_PR->GetTeam( GetLocalPlayerIndex() )) )
-		{
-			iFilter = CHAT_FILTER_PUBLICCHAT;
-		}
-
-		// print raw chat text
-		ChatPrintf( client, iFilter, "%s", ansiString );
-
-		Msg( "%s\n", RemoveColorMarkup(ansiString) );
-
-		CLocalPlayerFilter filter;
-		C_BaseEntity::EmitSound( filter, SOUND_FROM_LOCAL_PLAYER, "HudChat.Message" );
-	}
-	else
-	{
-		// print raw chat text
-		ChatPrintf( client, GetFilterForString( untranslated_msg_text), "%s", ansiString );
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Message handler for text messages
-// displays a string, looking them up from the titles.txt file, which can be localised
-// parameters:
-//   byte:   message direction  ( HUD_PRINTCONSOLE, HUD_PRINTNOTIFY, HUD_PRINTCENTER, HUD_PRINTTALK )
-//   string: message
-// optional parameters:
-//   string: message parameter 1
-//   string: message parameter 2
-//   string: message parameter 3
-//   string: message parameter 4
-// any string that starts with the character '#' is a message name, and is used to look up the real message in titles.txt
-// the next (optional) one to four strings are parameters for that string (which can also be message names if they begin with '#')
-//-----------------------------------------------------------------------------
-void CBaseHudChat::MsgFunc_TextMsg( bf_read &msg )
-{
-	char szString[2048];
-	int msg_dest = msg.ReadByte();
-
-	wchar_t szBuf[5][256];
-	wchar_t outputBuf[256];
-
-	for ( int i=0; i<5; ++i )
-	{
-		msg.ReadString( szString, sizeof(szString) );
-		char *tmpStr = hudtextmessage->LookupString( szString, &msg_dest );
-		const wchar_t *pBuf = g_pVGuiLocalize->Find( tmpStr );
-		if ( pBuf )
-		{
-			// Copy pBuf into szBuf[i].
-			int nMaxChars = sizeof( szBuf[i] ) / sizeof( wchar_t );
-			wcsncpy( szBuf[i], pBuf, nMaxChars );
-			szBuf[i][nMaxChars-1] = 0;
-		}
-		else
-		{
-			if ( i )
-			{
-				StripEndNewlineFromString( tmpStr );  // these strings are meant for subsitution into the main strings, so cull the automatic end newlines
-			}
-			g_pVGuiLocalize->ConvertANSIToUnicode( tmpStr, szBuf[i], sizeof(szBuf[i]) );
-		}
-	}
-
-	if ( !cl_showtextmsg.GetInt() )
-		return;
-
-	int len;
-	switch ( msg_dest )
-	{
-	case HUD_PRINTCENTER:
-		g_pVGuiLocalize->ConstructString( outputBuf, sizeof(outputBuf), szBuf[0], 4, szBuf[1], szBuf[2], szBuf[3], szBuf[4] );
-		internalCenterPrint->Print( ConvertCRtoNL( outputBuf ) );
-		break;
-
-	case HUD_PRINTNOTIFY:
-		g_pVGuiLocalize->ConstructString( outputBuf, sizeof(outputBuf), szBuf[0], 4, szBuf[1], szBuf[2], szBuf[3], szBuf[4] );
-		g_pVGuiLocalize->ConvertUnicodeToANSI( outputBuf, szString, sizeof(szString) );
-		len = strlen( szString );
-		if ( len && szString[len-1] != '\n' && szString[len-1] != '\r' )
-		{
-			Q_strncat( szString, "\n", sizeof(szString), 1 );
-		}
-		Msg( "%s", ConvertCRtoNL( szString ) );
-		break;
-
-	case HUD_PRINTTALK:
-		g_pVGuiLocalize->ConstructString( outputBuf, sizeof(outputBuf), szBuf[0], 4, szBuf[1], szBuf[2], szBuf[3], szBuf[4] );
-		g_pVGuiLocalize->ConvertUnicodeToANSI( outputBuf, szString, sizeof(szString) );
-		len = strlen( szString );
-		if ( len && szString[len-1] != '\n' && szString[len-1] != '\r' )
-		{
-			Q_strncat( szString, "\n", sizeof(szString), 1 );
-		}
-		Printf( CHAT_FILTER_NONE, "%s", ConvertCRtoNL( szString ) );
-		Msg( "%s", ConvertCRtoNL( szString ) );
-		break;
-
-	case HUD_PRINTCONSOLE:
-		g_pVGuiLocalize->ConstructString( outputBuf, sizeof(outputBuf), szBuf[0], 4, szBuf[1], szBuf[2], szBuf[3], szBuf[4] );
-		g_pVGuiLocalize->ConvertUnicodeToANSI( outputBuf, szString, sizeof(szString) );
-		len = strlen( szString );
-		if ( len && szString[len-1] != '\n' && szString[len-1] != '\r' )
-		{
-			Q_strncat( szString, "\n", sizeof(szString), 1 );
-		}
-		Msg( "%s", ConvertCRtoNL( szString ) );
-		break;
-	}
-}
-
-void CBaseHudChat::MsgFunc_VoiceSubtitle( bf_read &msg )
-{
-	// Got message during connection
-	if ( !g_PR )
-		return;
-
-	if ( !cl_showtextmsg.GetInt() )
-		return;
-
-	char szString[2048];
-	char szPrefix[64];	//(Voice)
-	wchar_t szBuf[128];
-
-	int client = msg.ReadByte();
-	int iMenu = msg.ReadByte();
-	int iItem = msg.ReadByte();
-
-	const char *pszSubtitle = "";
-
-	CGameRules *pGameRules = GameRules();
-
-	CMultiplayRules *pMultiRules = dynamic_cast< CMultiplayRules * >( pGameRules );
-
-	Assert( pMultiRules );
-
-	if ( pMultiRules )
-	{
-		pszSubtitle = pMultiRules->GetVoiceCommandSubtitle( iMenu, iItem );
-	}
-
-	SetVoiceSubtitleState( true );
-
-	const wchar_t *pBuf = g_pVGuiLocalize->Find( pszSubtitle );
-	if ( pBuf )
-	{
-		// Copy pBuf into szBuf[i].
-		int nMaxChars = sizeof( szBuf ) / sizeof( wchar_t );
-		wcsncpy( szBuf, pBuf, nMaxChars );
-		szBuf[nMaxChars-1] = 0;
-	}
-	else
-	{
-		g_pVGuiLocalize->ConvertANSIToUnicode( pszSubtitle, szBuf, sizeof(szBuf) );
-	}
-
-	int len;
-	g_pVGuiLocalize->ConvertUnicodeToANSI( szBuf, szString, sizeof(szString) );
-	len = strlen( szString );
-	if ( len && szString[len-1] != '\n' && szString[len-1] != '\r' )
-	{
-		Q_strncat( szString, "\n", sizeof(szString), 1 );
-	}
-
-	const wchar_t *pVoicePrefix = g_pVGuiLocalize->Find( "#Voice" );
-	g_pVGuiLocalize->ConvertUnicodeToANSI( pVoicePrefix, szPrefix, sizeof(szPrefix) );
-	
-	ChatPrintf( client, CHAT_FILTER_NONE, "%c(%s) %s%c: %s", COLOR_PLAYERNAME, szPrefix, GetDisplayedSubtitlePlayerName( client ), COLOR_NORMAL, ConvertCRtoNL( szString ) );
-
-	SetVoiceSubtitleState( false );
-}
-
-const char *CBaseHudChat::GetDisplayedSubtitlePlayerName( int clientIndex )
-{
-	return g_PR->GetPlayerName( clientIndex );
+	gameeventmanager->AddListener( this, "hltv_chat", false );
 }
 
 #ifndef _XBOX
@@ -1010,37 +483,82 @@ int CBaseHudChat::GetChatInputOffset( void )
 void CBaseHudChat::OnTick( void )
 {
 #ifndef _XBOX
-	m_nVisibleHeight = 0;
+	int i;
+	for ( i = 0; i < CHAT_INTERFACE_LINES; i++ )
+	{
+		CBaseHudChatLine *line = m_ChatLines[ i ];
+		if ( !line )
+			continue;
 
-	CBaseHudChatLine *line = m_ChatLine;
+		if ( !line->IsVisible() )
+			continue;
+
+		if ( !line->IsReadyToExpire() )
+			continue;
+
+		line->Expire();
+	}
+
+	int w, h;
+
+	GetSize( w, h );
+
+	CBaseHudChatLine *line = m_ChatLines[ 0 ];
 
 	if ( line )
 	{
 		vgui::HFont font = line->GetFont();
-		m_iFontHeight = vgui::surface()->GetFontTall( font ) + 2;
+		if ( font )
+		{
+			m_iFontHeight = vgui::surface()->GetFontTall( font ) + 2;
 
-		// Put input area at bottom
-
-		int iChatX, iChatY, iChatW, iChatH;
-		int iInputX, iInputY, iInputW, iInputH;
-		
-		m_pChatInput->GetBounds( iInputX, iInputY, iInputW, iInputH );
-		GetBounds( iChatX, iChatY, iChatW, iChatH );
-
-		m_pChatInput->SetBounds( iInputX, iChatH - (m_iFontHeight * 1.75), iInputW, m_iFontHeight );
-
-		//Resize the History Panel so it fits more lines depending on the screen resolution.
-		int iChatHistoryX, iChatHistoryY, iChatHistoryW, iChatHistoryH;
-
-		GetChatHistory()->GetBounds( iChatHistoryX, iChatHistoryY, iChatHistoryW, iChatHistoryH );
-
-		iChatHistoryH = (iChatH - (m_iFontHeight * 2.25)) - iChatHistoryY;
-
-		GetChatHistory()->SetBounds( iChatHistoryX, iChatHistoryY, iChatHistoryW, iChatHistoryH );
+			// Put input area at bottom
+			int w, h;
+			GetSize( w, h );
+			m_pChatInput->SetBounds( 1, h - m_iFontHeight - 1, w-2, m_iFontHeight );
+		}
 	}
 
-	FadeChatHistory();
+	// Sort chat lines 
+	qsort( m_ChatLines, CHAT_INTERFACE_LINES, sizeof( CBaseHudChatLine * ), SortLines );
 
+	// Step backward from bottom
+	int currentY = h - m_iFontHeight - 1;
+	int startY = currentY;
+	int ystep = m_iFontHeight;
+
+	currentY -= GetChatInputOffset();
+
+	// Walk backward
+	for ( i = CHAT_INTERFACE_LINES - 1; i >= 0 ; i-- )
+	{
+		CBaseHudChatLine *line = m_ChatLines[ i ];
+		if ( !line )
+			continue;
+
+		if ( !line->IsVisible() )
+		{
+			line->SetSize( w, m_iFontHeight );
+			continue;
+		}
+
+		line->PerformFadeout();
+		line->SetSize( w, m_iFontHeight * line->GetNumLines() );
+		line->SetPos( 0, ( currentY+m_iFontHeight) - m_iFontHeight * line->GetNumLines() );
+		
+		currentY -= ystep * line->GetNumLines();
+	}
+
+	if ( currentY != startY )
+	{
+		m_nVisibleHeight = startY - currentY + 2;
+	}
+	else
+	{
+		m_nVisibleHeight = 0;
+	}
+
+	vgui::surface()->MovePopupToBack( GetVPanel() );
 #endif
 }
 
@@ -1057,7 +575,7 @@ void CBaseHudChat::OnTick( void )
 int CBaseHudChat::ComputeBreakChar( int width, const char *text, int textlen )
 {
 #ifndef _XBOX
-	CBaseHudChatLine *line = m_ChatLine;
+	CBaseHudChatLine *line = m_ChatLines[ 0 ];
 	vgui::HFont font = line->GetFont();
 
 	int currentlen = 0;
@@ -1108,20 +626,137 @@ int CBaseHudChat::ComputeBreakChar( int width, const char *text, int textlen )
 // Input  : *fmt - 
 //			... - 
 //-----------------------------------------------------------------------------
-#pragma warning( push )
-#pragma warning( disable: 4748 ) // /GS can not protect parameters and local variables from local buffer overrun because optimizations are disabled in function
 void CBaseHudChat::Printf( int iFilter, const char *fmt, ... )
 {
+#ifndef _XBOX
 	va_list marker;
 	char msg[4096];
 
+	const char *pTranslatedFmt = hudtextmessage->LookupString(fmt);
+
 	va_start(marker, fmt);
-	Q_vsnprintf(msg, sizeof( msg), fmt, marker);
+	Q_vsnprintf( msg, sizeof( msg ), pTranslatedFmt, marker );
 	va_end(marker);
 
-	ChatPrintf( 0, iFilter, "%s", msg );
+	// Strip any trailing '\n'
+	if ( strlen( msg ) > 0 && msg[ strlen( msg )-1 ] == '\n' )
+	{
+		msg[ strlen( msg ) - 1 ] = 0;
+	}
+
+	// Strip leading \n characters ( or notify/color signifiers )
+	char *pmsg = msg;
+	while ( *pmsg && ( *pmsg == '\n' || *pmsg == 1 || *pmsg == 2 ) )
+	{
+		pmsg++;
+	}
+	
+	if ( !*pmsg )
+		return;
+
+	// Search for return characters
+	char *pos = strstr( pmsg, "\n" );
+	if ( pos )
+	{
+		char msgcopy[ 8192 ];
+		Q_strncpy( msgcopy, pmsg, sizeof( msgcopy ) );
+
+		int offset = pos - pmsg;
+		
+		// Terminate first part
+		msgcopy[ offset ] = 0;
+		
+		// Print first part
+#if defined( CSTRIKE_DLL ) || defined( DOD_DLL ) // reltodo
+		Printf( iFilter, "%s", msgcopy );
+
+		// Print remainder
+		Printf( iFilter, "%s", &msgcopy[ offset ] + 1 );
+#else
+		Printf( iFilter, msgcopy );
+
+		// Print remainder
+		Printf( iFilter, &msgcopy[ offset ] + 1 );
+#endif
+		return;
+	}
+
+	CBaseHudChatLine *firstline = m_ChatLines[ 0 ];
+
+	int len = strlen( pmsg );
+
+	// Check for string too long and split into multiple lines 
+	// 
+	int breakpos = ComputeBreakChar( firstline->GetWide() - 10, pmsg, len );
+	if ( breakpos > 0 && breakpos < len )
+	{
+		char msgcopy[ 8192 ];
+		Q_strncpy( msgcopy, pmsg, sizeof( msgcopy ) );
+
+		int offset = breakpos;
+		
+		char savechar;
+
+		savechar = msgcopy[ offset ];
+
+		// Terminate first part
+		msgcopy[ offset ] = 0;
+		
+		// Print first part
+#if defined( CSTRIKE_DLL ) || defined( DOD_DLL ) // reltodo
+		Printf( iFilter, "%s", msgcopy );
+#else
+		Printf( iFilter, msgcopy );
+#endif
+
+		// Was breakpos a printable char?
+		if ( savechar > 32 )
+		{
+			msgcopy[ offset ] = savechar;
+
+			// Print remainder
+#if defined( CSTRIKE_DLL ) || defined( DOD_DLL ) // reltodo
+			Printf( iFilter, "%s", &msgcopy[ offset ] );
+#else
+			Printf( iFilter, &msgcopy[ offset ] );
+#endif
+		}
+		else
+		{
+#if defined( CSTRIKE_DLL ) || defined( DOD_DLL ) // reltodo
+			Printf( iFilter, "%s", &msgcopy[ offset ] + 1 );
+#else
+			Printf( iFilter, &msgcopy[ offset ] + 1 );
+#endif
+		}
+		return;
+	}
+
+	CBaseHudChatLine *line = FindUnusedChatLine();
+	if ( !line )
+	{
+		ExpireOldest();
+		line = FindUnusedChatLine();
+	}
+
+	if ( !line )
+	{
+		return;
+	}
+
+	line->SetText( "" );
+	line->InsertColorChange( line->GetTextColor() );
+	line->SetExpireTime();
+	line->InsertString( pmsg );
+	line->SetVisible( true );
+	line->SetNameLength( 0 );
+
+// Way too much
+//	CLocalPlayerFilter filter;
+//	C_BaseEntity::EmitSound( filter, SOUND_FROM_LOCAL_PLAYER, "HudChat.Message" );
+#endif
 }
-#pragma warning( pop )
+	
 #pragma optimize( "", on )
 
 //-----------------------------------------------------------------------------
@@ -1131,6 +766,7 @@ void CBaseHudChat::StartMessageMode( int iMessageModeType )
 {
 #ifndef _XBOX
 	m_nMessageMode = iMessageModeType;
+	m_flFadeTime = gpGlobals->curtime + hud_chat_time.GetFloat();
 
 	m_pChatInput->ClearEntry();
 
@@ -1143,36 +779,11 @@ void CBaseHudChat::StartMessageMode( int iMessageModeType )
 		m_pChatInput->SetPrompt( L"Say (TEAM) :" );
 	}
 	
-	if ( GetChatHistory() )
-	{
-		GetChatHistory()->SetMouseInputEnabled( true );
-		GetChatHistory()->SetKeyBoardInputEnabled( false );
-		GetChatHistory()->SetVerticalScrollbar( true );
-		GetChatHistory()->ResetAllFades( true );
-		GetChatHistory()->SetPaintBorderEnabled( true );
-		GetChatHistory()->SetVisible( true );
-	}
-
 	vgui::SETUP_PANEL( this );
 	SetKeyBoardInputEnabled( true );
-	SetMouseInputEnabled( true );
 	m_pChatInput->SetVisible( true );
 	vgui::surface()->CalculateMouseVisible();
 	m_pChatInput->RequestFocus();
-	m_pChatInput->SetPaintBorderEnabled( true );
-	m_pChatInput->SetMouseInputEnabled( true );
-
-	//Place the mouse cursor near the text so people notice it.
-	int x, y, w, h;
-	GetChatHistory()->GetBounds( x, y, w, h );
-	vgui::input()->SetCursorPos( x + ( w/2), y + (h/2) );
-
-	m_flHistoryFadeTime = gpGlobals->curtime + CHAT_HISTORY_FADE_TIME;
-
-	m_pFilterPanel->SetVisible( false );
-
-	engine->ClientCmd_Unrestricted( "gameui_preventescapetoshow\n" );
-		
 #endif
 }
 
@@ -1182,272 +793,22 @@ void CBaseHudChat::StartMessageMode( int iMessageModeType )
 void CBaseHudChat::StopMessageMode( void )
 {
 #ifndef _XBOX
-
-	engine->ClientCmd_Unrestricted( "gameui_allowescapetoshow\n" );
-
 	SetKeyBoardInputEnabled( false );
-	SetMouseInputEnabled( false );
-	
-	if ( GetChatHistory() )
-	{
-		GetChatHistory()->SetPaintBorderEnabled( false );
-		GetChatHistory()->GotoTextEnd();
-		GetChatHistory()->SetMouseInputEnabled( false );
-		GetChatHistory()->SetVerticalScrollbar( false );
-		GetChatHistory()->ResetAllFades( false, true, CHAT_HISTORY_FADE_TIME );
-		GetChatHistory()->SelectNoText();
-	}
-
-	//Clear the entry since we wont need it anymore.
-	m_pChatInput->ClearEntry();
-
-	m_flHistoryFadeTime = gpGlobals->curtime + CHAT_HISTORY_FADE_TIME;
+	m_pChatInput->SetVisible( false );
 #endif
 }
 
-
 void CBaseHudChat::FadeChatHistory( void )
 {
-	float frac = ( m_flHistoryFadeTime -  gpGlobals->curtime ) / CHAT_HISTORY_FADE_TIME;
+#if 0
+	float frac = ( m_flFadeTime - gpGlobals->curtime ) / CHAT_HISTORY_FADE_TIME;
 
 	int alpha = frac * CHAT_HISTORY_ALPHA;
 	alpha = clamp( alpha, 0, CHAT_HISTORY_ALPHA );
 
-	if ( alpha >= 0 )
-	{
-		if ( GetChatHistory() )
-		{
-			if ( IsMouseInputEnabled() )
-			{
-				SetAlpha( 255 );
-				GetChatHistory()->SetBgColor( Color( 0, 0, 0, CHAT_HISTORY_ALPHA - alpha ) );
-				m_pChatInput->GetPrompt()->SetAlpha( (CHAT_HISTORY_ALPHA*2) - alpha );
-				m_pChatInput->GetInputPanel()->SetAlpha( (CHAT_HISTORY_ALPHA*2) - alpha );
-				SetBgColor( Color( GetBgColor().r(), GetBgColor().g(), GetBgColor().b(), CHAT_HISTORY_ALPHA - alpha ) );
-				m_pFiltersButton->SetAlpha( (CHAT_HISTORY_ALPHA*2) - alpha );
-			}
-			else
-			{
-				GetChatHistory()->SetBgColor( Color( 0, 0, 0, alpha ) );
-				SetBgColor( Color( GetBgColor().r(), GetBgColor().g(), GetBgColor().b(), alpha ) );
-			
-				m_pChatInput->GetPrompt()->SetAlpha( alpha );
-				m_pChatInput->GetInputPanel()->SetAlpha( alpha );
-				m_pFiltersButton->SetAlpha( alpha );
-			}
-		}
-	}
-}
-
-void CBaseHudChat::SetFilterFlag( int iFilter )
-{
-	m_iFilterFlags = iFilter;
-
-	cl_chatfilters.SetValue( m_iFilterFlags );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-Color CBaseHudChat::GetTextColorForClient( TextColor colorNum, int clientIndex )
-{
-	Color c;
-	switch ( colorNum )
-	{
-	case COLOR_PLAYERNAME:
-		c = GetClientColor( clientIndex );
-	break;
-
-	case COLOR_LOCATION:
-		c = g_ColorDarkGreen;
-		break;
-
-	case COLOR_ACHIEVEMENT:
-		{
-			vgui::IScheme *pSourceScheme = vgui::scheme()->GetIScheme( vgui::scheme()->GetScheme( "SourceScheme" ) ); 
-			if ( pSourceScheme )
-			{
-				c = pSourceScheme->GetColor( "SteamLightGreen", GetBgColor() );
-			}
-			else
-			{
-				c = GetDefaultTextColor();
-			}
-		}
-		break;
-
-	default:
-		c = GetDefaultTextColor();
-	}
-
-	return Color( c[0], c[1], c[2], 255 );
-}
-
-//-----------------------------------------------------------------------------
-Color CBaseHudChat::GetDefaultTextColor( void )
-{
-	return g_ColorYellow;
-}
-
-//-----------------------------------------------------------------------------
-Color CBaseHudChat::GetClientColor( int clientIndex )
-{
-	if ( clientIndex == 0 ) // console msg
-	{
-		return g_ColorGreen;
-	}
-	else if( g_PR )
-	{
-		return g_ColorGrey;
-	}
-
-	return g_ColorYellow;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Parses a line of text for color markup and inserts it via Colorize()
-//-----------------------------------------------------------------------------
-void CBaseHudChatLine::InsertAndColorizeText( wchar_t *buf, int clientIndex )
-{
-	if ( m_text )
-	{
-		delete[] m_text;
-		m_text = NULL;
-	}
-	m_textRanges.RemoveAll();
-
-	m_text = CloneWString( buf );
-
-	CBaseHudChat *pChat = dynamic_cast<CBaseHudChat*>(GetParent() );
-
-	if ( pChat == NULL )
-		return;
-
-	wchar_t *txt = m_text;
-	int lineLen = wcslen( m_text );
-	if ( m_text[0] == COLOR_PLAYERNAME || m_text[0] == COLOR_LOCATION || m_text[0] == COLOR_NORMAL || m_text[0] == COLOR_ACHIEVEMENT )
-	{
-		while ( txt && *txt )
-		{
-			TextRange range;
-
-			switch ( *txt )
-			{
-			case COLOR_PLAYERNAME:
-			case COLOR_LOCATION:
-			case COLOR_ACHIEVEMENT:
-			case COLOR_NORMAL:
-				{
-					// save this start
-					range.start = (txt-m_text) + 1;
-					range.color = pChat->GetTextColorForClient( (TextColor)(*txt), clientIndex );
-					range.end = lineLen;
-
-					int count = m_textRanges.Count();
-					if ( count )
-					{
-						m_textRanges[count-1].end = range.start - 1;
-					}
-
-					m_textRanges.AddToTail( range );
-				}
-				++txt;
-				break;
-
-			default:
-				++txt;
-			}
-		}
-	}
-
-	if ( !m_textRanges.Count() && m_iNameLength > 0 && m_text[0] == COLOR_USEOLDCOLORS )
-	{
-		TextRange range;
-		range.start = 0;
-		range.end = m_iNameStart;
-		range.color = pChat->GetTextColorForClient( COLOR_NORMAL, clientIndex );
-		m_textRanges.AddToTail( range );
-
-		range.start = m_iNameStart;
-		range.end = m_iNameStart + m_iNameLength;
-		range.color = pChat->GetTextColorForClient( COLOR_PLAYERNAME, clientIndex );
-		m_textRanges.AddToTail( range );
-
-		range.start = range.end;
-		range.end = wcslen( m_text );
-		range.color = pChat->GetTextColorForClient( COLOR_NORMAL, clientIndex );
-		m_textRanges.AddToTail( range );
-	}
-
-	if ( !m_textRanges.Count() )
-	{
-		TextRange range;
-		range.start = 0;
-		range.end = wcslen( m_text );
-		range.color = pChat->GetTextColorForClient( COLOR_NORMAL, clientIndex );
-		m_textRanges.AddToTail( range );
-	}
-
-	for ( int i=0; i<m_textRanges.Count(); ++i )
-	{
-		wchar_t * start = m_text + m_textRanges[i].start;
-		if ( *start > 0 && *start < COLOR_MAX )
-		{
-			m_textRanges[i].start += 1;
-		}
-	}
-
-	Colorize();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Inserts colored text into the RichText control at the given alpha
-//-----------------------------------------------------------------------------
-void CBaseHudChatLine::Colorize( int alpha )
-{
-	// clear out text
-	SetText( "" );
-
-	CBaseHudChat *pChat = dynamic_cast<CBaseHudChat*>(GetParent() );
-
-	if ( pChat && pChat->GetChatHistory() )
-	{	
-		pChat->GetChatHistory()->InsertString( "\n" );
-	}
-
-	wchar_t wText[4096];
-	Color color;
-	for ( int i=0; i<m_textRanges.Count(); ++i )
-	{
-		wchar_t * start = m_text + m_textRanges[i].start;
-		int len = m_textRanges[i].end - m_textRanges[i].start + 1;
-		if ( len > 1 )
-		{
-			wcsncpy( wText, start, len );
-			wText[len-1] = 0;
-			color = m_textRanges[i].color;
-			color[3] = alpha;
-			InsertColorChange( color );
-			InsertString( wText );
-
-			CBaseHudChat *pChat = dynamic_cast<CBaseHudChat*>(GetParent() );
-
-			if ( pChat && pChat->GetChatHistory() )
-			{	
-				pChat->GetChatHistory()->InsertColorChange( color );
-				pChat->GetChatHistory()->InsertString( wText );
-				pChat->GetChatHistory()->InsertFade( hud_saytext_time.GetFloat(), CHAT_HISTORY_IDLE_FADE_TIME );
-
-				if ( i == m_textRanges.Count()-1 )
-				{
-					pChat->GetChatHistory()->InsertFade( -1, -1 );
-				}
-			}
-
-		}
-	}
-
-	InvalidateLayout( true );
+	if ( alpha <= 1 )
+		m_flFadeTime = 0;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1457,9 +818,61 @@ void CBaseHudChatLine::Colorize( int alpha )
 CBaseHudChatLine *CBaseHudChat::FindUnusedChatLine( void )
 {
 #ifndef _XBOX
-	return m_ChatLine;
+	for ( int i = 0; i < CHAT_INTERFACE_LINES; i++ )
+	{
+		CBaseHudChatLine *line = m_ChatLines[ i ];
+		if ( !line )
+			continue;
+
+		if ( line->IsVisible() )
+			continue;
+
+		return line;
+	}
+	return NULL;
 #else
 	return NULL;
+#endif
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CBaseHudChat::ExpireOldest( void )
+{
+#ifndef _XBOX
+	float oldestTime = 100000000.0f;
+	CBaseHudChatLine *oldest = NULL;
+
+	for ( int i = 0; i < CHAT_INTERFACE_LINES; i++ )
+	{
+		CBaseHudChatLine *line = m_ChatLines[ i ];
+		if ( !line )
+			continue;
+
+		if ( !line->IsVisible() )
+			continue;
+
+		if ( !oldest )
+		{
+			oldest = line;
+			oldestTime = line->GetStartTime();
+			continue;
+		}
+
+		if ( line->GetStartTime() < oldestTime )
+		{
+			oldest = line;
+			oldestTime = line->GetStartTime();
+		}
+	}
+
+	if ( !oldest )
+	{
+		oldest = m_ChatLines[ 0  ];
+	}
+
+	oldest->Expire(); 
 #endif
 }
 
@@ -1491,7 +904,7 @@ This is a very long string that I am going to attempt to paste into the cs hud c
 		char szbuf[144];	// more than 128
 		Q_snprintf( szbuf, sizeof(szbuf), "%s \"%s\"", m_nMessageMode == MM_SAY ? "say" : "say_team", ansi );
 
-		engine->ClientCmd_Unrestricted(szbuf);
+		engine->ClientCmd(szbuf);
 	}
 	
 	m_pChatInput->ClearEntry();
@@ -1519,6 +932,19 @@ void CBaseHudChat::Clear( void )
 #ifndef _XBOX
 	// Kill input prompt
 	StopMessageMode();
+
+	// Expire all messages
+	for ( int i = 0; i < CHAT_INTERFACE_LINES; i++ )
+	{
+		CBaseHudChatLine *line = m_ChatLines[ i ];
+		if ( !line )
+			continue;
+
+		if ( !line->IsVisible() )
+			continue;
+
+		line->Expire();
+	}
 #endif
 }
 
@@ -1541,117 +967,8 @@ void CBaseHudChat::LevelShutdown( void )
 // Input  : *fmt - 
 //			... - 
 //-----------------------------------------------------------------------------
-void CBaseHudChat::ChatPrintf( int iPlayerIndex, int iFilter, const char *fmt, ... )
+void CBaseHudChat::ChatPrintf( int iPlayerIndex, const char *fmt, ... )
 {
-	va_list marker;
-	char msg[4096];
-
-	va_start(marker, fmt);
-	Q_vsnprintf(msg, sizeof( msg), fmt, marker);
-	va_end(marker);
-
-	// Strip any trailing '\n'
-	if ( strlen( msg ) > 0 && msg[ strlen( msg )-1 ] == '\n' )
-	{
-		msg[ strlen( msg ) - 1 ] = 0;
-	}
-
-	// Strip leading \n characters ( or notify/color signifiers ) for empty string check
-	char *pmsg = msg;
-	while ( *pmsg && ( *pmsg == '\n' || ( *pmsg > 0 && *pmsg < COLOR_MAX ) ) )
-	{
-		pmsg++;
-	}
-
-	if ( !*pmsg )
-		return;
-
-	// Now strip just newlines, since we want the color info for printing
-	pmsg = msg;
-	while ( *pmsg && ( *pmsg == '\n' ) )
-	{
-		pmsg++;
-	}
-
-	if ( !*pmsg )
-		return;
-
-	CBaseHudChatLine *line = (CBaseHudChatLine *)FindUnusedChatLine();
-	if ( !line )
-	{
-		line = (CBaseHudChatLine *)FindUnusedChatLine();
-	}
-
-	if ( !line )
-	{
-		return;
-	}
-
-	if ( iFilter != CHAT_FILTER_NONE )
-	{
-		if ( !(iFilter & GetFilterFlags() ) )
-			return;
-	}
-
-	if ( *pmsg < 32 )
-	{
-		hudlcd->AddChatLine( pmsg + 1 );
-	}
-	else
-	{
-		hudlcd->AddChatLine( pmsg );
-	}
-
-	line->SetText( "" );
-
-	int iNameStart = 0;
-	int iNameLength = 0;
-
-	player_info_t sPlayerInfo;
-	if ( iPlayerIndex == 0 )
-	{
-		Q_memset( &sPlayerInfo, 0, sizeof(player_info_t) );
-		Q_strncpy( sPlayerInfo.name, "Console", sizeof(sPlayerInfo.name)  );	
-	}
-	else
-	{
-		engine->GetPlayerInfo( iPlayerIndex, &sPlayerInfo );
-	}	
-
-	int bufSize = (strlen( pmsg ) + 1 ) * sizeof(wchar_t);
-	wchar_t *wbuf = static_cast<wchar_t *>( _alloca( bufSize ) );
-	if ( wbuf )
-	{
-		Color clrNameColor = GetClientColor( iPlayerIndex );
-
-		line->SetExpireTime();
-
-		g_pVGuiLocalize->ConvertANSIToUnicode( pmsg, wbuf, bufSize);
-
-		// find the player's name in the unicode string, in case there is no color markup
-		const char *pName = sPlayerInfo.name;
-
-		if ( pName )
-		{
-			wchar_t wideName[MAX_PLAYER_NAME_LENGTH];
-			g_pVGuiLocalize->ConvertANSIToUnicode( pName, wideName, sizeof( wideName ) );
-
-			const wchar_t *nameInString = wcsstr( wbuf, wideName );
-
-			if ( nameInString )
-			{
-				iNameStart = (nameInString - wbuf);
-				iNameLength = wcslen( wideName );
-			}
-		}
-
-		line->SetVisible( false );
-		line->SetNameStart( iNameStart );
-		line->SetNameLength( iNameLength );
-		line->SetNameColor( clrNameColor );
-
-		line->InsertAndColorizeText( wbuf, iPlayerIndex );
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -1669,7 +986,7 @@ void CBaseHudChat::FireGameEvent( IGameEvent *event )
 		if ( !player )
 			return;
 		
-		ChatPrintf( player->entindex(), CHAT_FILTER_NONE, "(SourceTV) %s", event->GetString( "text" ) );
+		ChatPrintf( player->entindex(), "(SourceTV) %s", event->GetString( "text" ) );
 	}
 #endif
 }

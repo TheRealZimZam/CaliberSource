@@ -948,10 +948,10 @@ void CClient_Precipitation::CreateAshParticle( void )
 			pParticle->m_vecVelocity = Vector( RandomFloat( -20.0f, 20.0f ), RandomFloat( -20.0f, 20.0f ), RandomFloat( -10, -15 ) );
 		}
 
-		float color = random->RandomInt( 125, 225 );
-		pParticle->m_uchColor[0] = color;
-		pParticle->m_uchColor[1] = color;
-		pParticle->m_uchColor[2] = color;
+		//float color = random->RandomInt( 125, 225 );
+		pParticle->m_uchColor[0] = m_clrRender->r;
+		pParticle->m_uchColor[1] = m_clrRender->g;
+		pParticle->m_uchColor[2] = m_clrRender->b;
 
 		pParticle->m_uchStartSize	= 1;
 		pParticle->m_uchEndSize		= 1.5;

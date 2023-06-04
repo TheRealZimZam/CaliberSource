@@ -532,11 +532,6 @@ vgui::Panel *ClientModeShared::GetMessagePanel()
 //-----------------------------------------------------------------------------
 void ClientModeShared::StartMessageMode( int iMessageModeType )
 {
-	// Can only show chat UI in multiplayer!!!
-	if ( gpGlobals->maxClients == 1 )
-	{
-		return;
-	}
 	if ( m_pChatElement )
 	{
 		m_pChatElement->StartMessageMode( iMessageModeType );
@@ -933,7 +928,7 @@ void ClientModeShared::FireGameEvent( IGameEvent *event )
 						char szLocalized[128];
 						g_pVGuiLocalize->ConvertUnicodeToANSI( wszLocalizedString, szLocalized, sizeof( szLocalized ) );
 
-						hudChat->ChatPrintf( iPlayerIndex, CHAT_FILTER_SERVERMSG, "%s", szLocalized );
+						hudChat->Printf( CHAT_FILTER_SERVERMSG, "%s", szLocalized );
 					}
 				}
 			}

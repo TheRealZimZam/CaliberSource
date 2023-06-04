@@ -7,6 +7,7 @@
 #include "cbase.h"
 #include "tempentity.h"  // FLAGS
 #include "c_te_particlesystem.h"
+#include "c_te_legacytempents.h"
 #include "RagdollExplosionEnumerator.h"
 #include "glow_overlay.h"
 #include "fx_explosion.h"
@@ -15,10 +16,16 @@
 #include "tier1/keyvalues.h"
 #include "toolframework_client.h"
 
+#define	OLD_EXPLOSION	0
+#if OLD_EXPLOSION
+#include "dlight.h"
+#include "r_efx.h"
+#include "fx.h"
+#endif
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	OLD_EXPLOSION	0
 
 
 // Enumator class for ragdolls being affected by explosive forces
@@ -268,8 +275,44 @@ void C_TEExplosion::PostDataUpdate( DataUpdateType_t updateType )
 		return;
 	}
 
+#if OLD_EXPLOSION
+	if (m_fScale != 0)
+	{
+		if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) )
+			tempents->Sprite_Explode( tempents->DefaultSprite( m_vecOrigin, m_nModelIndex, m_nFrameRate ), m_fScale, m_nFlags );
+
+		if ( !(m_nFlags & TE_EXPLFLAG_NODLIGHTS) )
+		{
+			dlight_t	*dl;
+
+			// big flash
+			dl = effects->CL_AllocDlight (LIGHT_INDEX_TE_DYNAMIC);
+			VectorCopy (m_vecOrigin, dl->origin);
+			dl->radius = 200;
+			dl->color.r = dl->color.g = 250;
+			dl->color.b = 100;
+			dl->die = gpGlobals->curtime + 0.1;
+			dl->decay = 800;
+			
+			// red glow
+			dl = effects->CL_AllocDlight (LIGHT_INDEX_TE_DYNAMIC+1);
+			VectorCopy (m_vecOrigin, dl->origin);
+			dl->radius = 150;
+			dl->color.r = 255;
+			dl->color.g = 190;
+			dl->color.b = 40;
+			dl->die = gpGlobals->curtime + 1.0;
+			dl->decay = 200;
+		}
+	}
+
+	FX_Explosion( m_vecOrigin, m_vecNormal, m_chMaterialType, m_fScale, m_nFlags );
+
+#else
 	if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) )
 	{
+		tempents->Sprite_Explode( tempents->DefaultSprite( m_vecOrigin, m_nModelIndex, m_nFrameRate ), (m_fScale/2), m_nFlags );
+	
 		if ( CExplosionOverlay *pOverlay = new CExplosionOverlay )
 		{
 			pOverlay->m_flLifetime	= 0;
@@ -287,6 +330,7 @@ void C_TEExplosion::PostDataUpdate( DataUpdateType_t updateType )
 	}
 
 	BaseExplosionEffect().Create( m_vecOrigin, m_nMagnitude, m_nModelIndex, m_fScale, m_nFlags );
+#endif
 }
 
 void C_TEExplosion::RenderParticles( CParticleRenderIterator *pIterator )
@@ -317,7 +361,6 @@ void TE_Explosion( IRecipientFilter& filter, float delay,
 	__g_C_TEExplosion.m_bShouldAffectRagdolls = bShouldAffectRagdolls;
 
 	__g_C_TEExplosion.PostDataUpdate( DATA_UPDATE_CREATED );
-
 }
 
 void TE_Explosion( IRecipientFilter& filter, float delay, KeyValues *pKeyValues )
@@ -337,6 +380,6 @@ void TE_Explosion( IRecipientFilter& filter, float delay, KeyValues *pKeyValues 
 	int nMaterialType = pKeyValues->GetInt( "materialtype" );
 	int nRadius = pKeyValues->GetInt( "radius" );
 	int nMagnitude = pKeyValues->GetInt( "magnitude" );
-	TE_Explosion( filter, 0.0f, &vecOrigin, nModelIndex, flScale, nFrameRate,
+	TE_Explosion( filter, delay, &vecOrigin, nModelIndex, flScale, nFrameRate,
 		nFlags, nRadius, nMagnitude, &vecNormal, (unsigned char)nMaterialType, false );
 }

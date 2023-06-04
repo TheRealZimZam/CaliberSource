@@ -10,6 +10,7 @@
 #include "dlight.h"
 #include "ClientEffectPrecacheSystem.h"
 #include "FX_Sparks.h"
+#include "tempentity.h"
 #include "iefx.h"
 #include "c_te_effect_dispatch.h"
 #include "engine/IEngineSound.h"
@@ -42,7 +43,10 @@ CLIENTEFFECT_REGISTER_END()
 PMaterialHandle g_Material_Spark = NULL;
 
 static ConVar fx_drawmetalspark( "fx_drawmetalspark", "1", FCVAR_DEVELOPMENTONLY, "Draw metal spark effects." );
+ConVar perf_spark_scale( "perf_spark_scale", "1", FCVAR_ARCHIVE );
 
+// Why dfuq is this in here??
+#if 0
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : &pos - 
@@ -64,7 +68,7 @@ bool EffectOccluded( const Vector &pos, pixelvis_handle_t *queryHandle )
 	
 	return PixelVisibility_FractionVisible( params, queryHandle ) > 0.0f ? false : true;
 }
-
+#endif
 
 CSimpleGlowEmitter::CSimpleGlowEmitter( const char *pDebugName, const Vector &sortOrigin, float flDeathTime )
 	: CSimpleEmitter( pDebugName )
@@ -331,7 +335,7 @@ void FX_ElectricSpark( const Vector &pos, int nMagnitude, int nTrailLength, cons
 	// Big sparks.
 	//
 	Vector	dir;
-	int		numSparks = nMagnitude * nMagnitude * random->RandomFloat( 2, 4 );
+	int		numSparks = (nMagnitude * nMagnitude * random->RandomFloat( 2, 4 )) * perf_spark_scale.GetFloat();
 
 	int i;
 	TrailParticle	*pParticle;
@@ -407,7 +411,7 @@ void FX_ElectricSpark( const Vector &pos, int nMagnitude, int nTrailLength, cons
 	pSparkEmitter2->m_ParticleCollision.SetGravity( 400.0f );
 	pSparkEmitter2->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
 
-	numSparks = nMagnitude * random->RandomInt( 16, 32 );
+	numSparks = (nMagnitude * random->RandomInt( 16, 32 )) * perf_spark_scale.GetFloat();
 
 	// Dump out sparks
 	for ( i = 0; i < numSparks; i++ )
@@ -723,7 +727,7 @@ void FX_MetalSpark( const Vector &position, const Vector &direction, const Vecto
 #define	RICOCHET_SPARK_GRAVITY	300.0f
 
 //TODO; This needs optimization and a scale - 1 for bullets, 2 for shells, 3 for ludicrous shells
-void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal, int Scale )
+void FX_RicochetSpark( const Vector &position, const Vector &direction, const Vector &surfaceNormal, int iScale )
 {
 	VPROF_BUDGET( "FX_RicochetSpark", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 
@@ -746,7 +750,7 @@ void FX_RicochetSpark( const Vector &position, const Vector &direction, const Ve
 	data.SetLifeTime( 0.15f );
 	data.SetYaw( random->RandomInt( 0, 360 ) );
 	
-	int scale = random->RandomInt( 16, 20 );	//* iScale
+	int scale = random->RandomInt( 16, 20 ) * iScale;
 	data.SetScale( scale, 0 );
 
 	FX_AddQuad( data );
@@ -768,11 +772,11 @@ void FX_RicochetSpark( const Vector &position, const Vector &direction, const Ve
 	sparkEmitter->SetCollisionDamped( 0.25f );
 	sparkEmitter->GetBinding().SetBBox( offset - Vector( 32, 32, 32 ), offset + Vector( 32, 32, 32 ) );
 
-	int	numMetals = random->RandomInt( 1, 3 );	//* iScale
+	int	numMetals = random->RandomInt( 1, 3 ) * iScale;
 
 	TrailParticle	*pParticle;
 	Vector	dir;
-	float	length	= 0.1f;	//* iScale
+	float	length	= 0.1f;
 
 	// Send the ember and trail
 	for ( int i = 0; i < numMetals; i++ )
@@ -859,7 +863,7 @@ void FX_Sparks( const Vector &pos, int nMagnitude, int nTrailLength, const Vecto
 	// Big sparks.
 	//
 	Vector	dir;
-	int		numSparks = nMagnitude * nMagnitude * random->RandomFloat( 2, 4 );
+	int		numSparks = (nMagnitude * nMagnitude * random->RandomFloat( 2, 4 )) * perf_spark_scale.GetFloat();
 
 	int i;
 	TrailParticle	*pParticle;
@@ -914,7 +918,7 @@ void FX_Sparks( const Vector &pos, int nMagnitude, int nTrailLength, const Vecto
 	pSparkEmitter2->m_ParticleCollision.SetGravity( 400.0f );
 	pSparkEmitter2->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
 
-	numSparks = nMagnitude * random->RandomInt( 4, 8 );
+	numSparks = (nMagnitude * random->RandomInt( 4, 8 )) * perf_spark_scale.GetFloat();
 
 	// Dump out sparks
 	for ( i = 0; i < numSparks; i++ )
@@ -1159,7 +1163,7 @@ void FX_MicroExplosion( const Vector &position, const Vector &normal )
 #define	EXPLOSION_FLECK_DAMPEN			0.3f
 #define	EXPLOSION_FLECK_ANGULAR_SPRAY	0.8f
 
-void FX_Explosion( Vector& origin, Vector& normal, char materialType, int scale )
+void FX_Explosion( Vector& origin, Vector& normal, char materialType, int scale, int flags )
 {
 	VPROF_BUDGET( "FX_Explosion", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
 	Vector	offset = origin + ( normal * 2.0f );
@@ -1349,15 +1353,15 @@ void FX_Explosion( Vector& origin, Vector& normal, char materialType, int scale 
 	}
 
 	// Play a sound
-#if 0
-	CLocalPlayerFilter filter;
+	if ( !(flags & TE_EXPLFLAG_NOSOUND) )
+	{
+		CLocalPlayerFilter filter;
+		EmitSound_t ep;
+		ep.m_pSoundName =  "BaseExplosionEffect.Sound";
+		ep.m_pOrigin = &offset;
 
-	EmitSound_t ep;
-	ep.m_pSoundName =  "BaseExplosionEffect.Sound";
-	ep.m_pOrigin = &offset;
-
-	C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
-#endif
+		C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+	}
 }
 
 //-----------------------------------------------------------------------------

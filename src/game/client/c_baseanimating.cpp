@@ -3309,17 +3309,13 @@ void MaterialFootstepSound( C_BaseAnimating *pEnt, bool bLeftFoot, float flVolum
 
 	int attachment;
 
-	//!!!PERF - These string lookups here aren't the swiftest, but
+	//TODO; !!!PERF - These string lookups here aren't the swiftest, but
 	// this doesn't get called very frequently unless a lot of NPCs
 	// are using this code.
 	if( bLeftFoot )
-	{
 		attachment = pEnt->LookupAttachment( "LeftFoot" );
-	}
 	else
-	{
 		attachment = pEnt->LookupAttachment( "RightFoot" );
-	}
 
 	if( attachment == -1 )
 	{
@@ -3444,9 +3440,9 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 
 	case CL_EVENT_FOOTSTEP_LEFT:
 		{
-#ifndef HL2MP
-			//TODO; This is terrible
 			char pSoundName[256];
+			//TODO; This is terrible
+#ifndef HL2MP
 			if ( !options || !options[0] )
 			{
 				options = "NPC_CombineS";
@@ -3459,10 +3455,12 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 			if ( vel.Length2DSqr() > RUN_SPEED_ESTIMATE_SQR )
 			{
 				Q_snprintf( pSoundName, 256, "%s.RunFootstepLeft", options );
+				MaterialFootstepSound( this, true, VOL_NORM * 0.5f);	//!!!TODO;Temp until models are done
 			}
 			else
 			{
 				Q_snprintf( pSoundName, 256, "%s.FootstepLeft", options );
+				MaterialFootstepSound( this, true, VOL_NORM * 0.25f );	//!!!TODO;Temp until models are done
 			}
 			EmitSound( pSoundName );
 		}
@@ -3470,9 +3468,9 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 
 	case CL_EVENT_FOOTSTEP_RIGHT:
 		{
-#ifndef HL2MP
-			//TODO; This is terrible
 			char pSoundName[256];
+			//TODO; This is terrible
+#ifndef HL2MP
 			if ( !options || !options[0] )
 			{
 				options = "NPC_CombineS";
@@ -3485,10 +3483,12 @@ void C_BaseAnimating::FireEvent( const Vector& origin, const QAngle& angles, int
 			if ( vel.Length2DSqr() > RUN_SPEED_ESTIMATE_SQR )
 			{
 				Q_snprintf( pSoundName, 256, "%s.RunFootstepRight", options );
+				MaterialFootstepSound( this, false, VOL_NORM * 0.5f);	//!!!TODO;Temp until models are done
 			}
 			else
 			{
 				Q_snprintf( pSoundName, 256, "%s.FootstepRight", options );
+				MaterialFootstepSound( this, false, VOL_NORM * 0.25f );	//!!!TODO;Temp until models are done
 			}
 			EmitSound( pSoundName );
 		}
@@ -4075,7 +4075,6 @@ const QAngle& C_BaseAnimating::GetRenderAngles( void )
 	if ( IsRagdoll() )
 	{
 		return vec3_angle;
-			
 	}
 	else
 	{

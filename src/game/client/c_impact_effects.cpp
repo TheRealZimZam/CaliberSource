@@ -177,12 +177,18 @@ static void CreateFleckParticles( const Vector& origin, const Vector &color, tra
 	PMaterialHandle	*hMaterial;
 	switch ( materialType )
 	{
+	case CHAR_TEX_CONCRETE:
+		hMaterial = g_Mat_Fleck_Cement;
+		break;
+
+	case CHAR_TEX_TILE:
+		hMaterial = g_Mat_Fleck_Tile;
+		break;
+
 	case CHAR_TEX_WOOD:
 		hMaterial = g_Mat_Fleck_Wood;
 		break;
 
-	case CHAR_TEX_CONCRETE:
-	case CHAR_TEX_TILE:
 	default:
 		hMaterial = g_Mat_Fleck_Cement;
 		break;
@@ -962,7 +968,7 @@ void FX_Blood( Vector &pos, Vector &dir, float r, float g, float b, float a )
 // Input  : &origin - position
 //			&tr - trace information
 //-----------------------------------------------------------------------------
-void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale, bool Sand )
+void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale, bool bSand )
 {
 	if ( !fx_drawimpactdust.GetBool() )
 		return;
@@ -1073,11 +1079,11 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, int iScale, bool Sand )
 	}
 
 #else
-	FX_DustImpact( origin, tr, (float)iScale, Sand );
+	FX_DustImpact( origin, tr, (float)iScale, bSand );
 #endif // _XBOX
 }
 
-void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool Sand )
+void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool bSand )
 {
 	//
 	// PC version
@@ -1261,10 +1267,10 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool Sand 
 	}
 
 	// Extra particles for sand/very dry dirt
-	if ( Sand )
+	if ( bSand )
 	{
-		int IHangingDust = random->RandomInt( 1, 2 );
-		for ( i = 0; i < IHangingDust; i++ )
+		int iHangingDust = random->RandomInt( 1, 2 );
+		for ( i = 0; i < iHangingDust; i++ )
 		{
 			pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Mat_DustPuff[0], origin );
 

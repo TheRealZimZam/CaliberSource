@@ -15,6 +15,26 @@
 #include "c_baseanimating.h"
 #include "c_sprite.h"
 
+/*
+// FOR REFERENCE, These are the built-in tracer colors.  Note, color 4 is the one
+//  that uses the tracerred/tracergreen/tracerblue and traceralpha cvar settings
+color24 gTracerColors[] =
+{
+	{ 255, 255, 255 },		// White
+	{ 255, 0, 0 },			// Red
+	{ 0, 255, 0 },			// Green
+	{ 0, 0, 255 },			// Blue
+	{ 0, 0, 0 },			// Tracer default, filled in from cvars, etc.
+	{ 255, 167, 17 },		// Yellow-orange sparks
+	{ 255, 130, 90 },		// Yellowish streaks (garg)
+	{ 55, 60, 144 },		// Blue egon streak
+	{ 255, 130, 90 },		// More Yellowish streaks (garg)
+	{ 255, 140, 90 },		// More Yellowish streaks (garg)
+	{ 200, 130, 90 },		// More red streaks (garg)
+	{ 255, 120, 70 },		// Darker red streaks (garg)
+};
+*/
+
 // Temporary entity array
 #define TENTPRIORITY_LOW	0
 #define TENTPRIORITY_HIGH	1
@@ -66,7 +86,6 @@ public:
 	C_LocalTempEntity();
 
 	virtual void					Prepare( model_t *pmodel, float time );
-
 	virtual bool					IsActive( void );
 	virtual bool					Frame( float frametime, int framenumber );
 
@@ -89,7 +108,6 @@ public:
 	void							SetParticleEffect( const char *pszParticleEffect ) { m_pszParticleEffect = pszParticleEffect; }
 
 protected:
-
 	pfnDrawHelper					m_pfnDrawHelper;
 
 public:
@@ -117,8 +135,6 @@ public:
 
 	float							m_flSpriteScale;
 	int								m_nFlickerFrame;
-
-	// 
 	float							m_flFrameRate;
 	float							m_flFrame;
 
@@ -141,7 +157,6 @@ private:
 
 	// Draw tempent as a studio model
 	int								DrawStudioModel( int flags );
-
 };
 
 #endif // TEMPENTITY_H

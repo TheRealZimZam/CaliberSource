@@ -42,7 +42,9 @@ protected:
 	ClientShadowHandle_t m_FlashlightHandle;
 
 	// Vehicle headlight dynamic light pointer
-	dlight_t *m_pPointLight;
+	dlight_t* m_pPointLight;
+//	dlight_t* m_pEnvironmentLight;
+//	dlight_t* m_pBrightLight;
 	float m_flDistMod;
 
 	// Texture for flashlight

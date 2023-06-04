@@ -665,11 +665,8 @@ void BloodImpactCallback( const CEffectData & data )
 			break;
 		}
 	}
-
-	if ( bFoundBlood == false )
-	{
 #endif
-// Keep all the game-generated FX on the old system for compatibility and easier testing
+
 	Vector vecPosition;
 	vecPosition = data.m_vOrigin;
 

@@ -93,8 +93,6 @@ ITempEnts *tempents = ( ITempEnts * )&g_TempEnts;
 #endif
 
 
-
-
 C_LocalTempEntity::C_LocalTempEntity()
 {
 #ifdef _DEBUG
@@ -1209,7 +1207,7 @@ C_LocalTempEntity *CTempEnts::ClientProjectile( const Vector& vecOrigin, const V
 //			flags - 
 // Output : C_LocalTempEntity
 //-----------------------------------------------------------------------------
-C_LocalTempEntity *CTempEnts::TempSprite( const Vector &pos, const Vector &dir, float scale, int modelIndex, int rendermode, int renderfx, float a, float life, int flags, const Vector &normal )
+C_LocalTempEntity *CTempEnts::TempSprite( const Vector &pos, const Vector &dir, float scale, int modelIndex, int rendermode, int renderfx, float a, float framerate, int flags, const Vector &normal )
 {
 	C_LocalTempEntity			*pTemp;
 	const model_t		*model;
@@ -1232,7 +1230,7 @@ C_LocalTempEntity *CTempEnts::TempSprite( const Vector &pos, const Vector &dir, 
 		return NULL;
 
 	pTemp->m_flFrameMax = frameCount - 1;
-	pTemp->m_flFrameRate = 10;
+	pTemp->m_flFrameRate = framerate;
 	pTemp->SetRenderMode( (RenderMode_t)rendermode );
 	pTemp->m_nRenderFX = renderfx;
 	pTemp->m_flSpriteScale = scale;
@@ -1244,8 +1242,9 @@ C_LocalTempEntity *CTempEnts::TempSprite( const Vector &pos, const Vector &dir, 
 
 	pTemp->SetVelocity( dir );
 	pTemp->SetLocalOrigin( pos );
-	if ( life )
-		pTemp->die = gpGlobals->curtime + life;
+	//If its an animated sprite, do framerate - if its not animated, then use framerate as lifetime
+	if ( frameCount < 1 )
+		pTemp->die = gpGlobals->curtime + framerate;
 	else
 		pTemp->die = gpGlobals->curtime + (frameCount * 0.1) + 1;
 
@@ -1634,7 +1633,7 @@ void CTempEnts::Sprite_Smoke( C_LocalTempEntity *pTemp, float scale )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: No ass no brammo
 // Input  : pos1 - 
 //			angles - 
 //			type - 

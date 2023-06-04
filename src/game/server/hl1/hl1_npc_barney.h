@@ -8,13 +8,14 @@
 #ifndef NPC_BARNEY_H
 #define NPC_BARNEY_H
 
-#include "hl1_npc_talker.h"
+#include "ai_basenpc.h"
+#include "npc_talker.h"
 
 //=========================================================
 //=========================================================
-class CNPC_Barney : public CHL1NPCTalker
+class CNPC_OldBarney : public CNPCSimpleTalker
 {
-	DECLARE_CLASS( CNPC_Barney, CHL1NPCTalker );
+	DECLARE_CLASS( CNPC_OldBarney, CNPCSimpleTalker );
 public:
 	
 	DECLARE_DATADESC();
@@ -34,6 +35,7 @@ public:
 	void    SetYawSpeed ( void );
 
 	bool    CheckRangeAttack1 ( float flDot, float flDist );
+	void	CheckAmmo( void ) { if ( m_cAmmoLoaded <= 0 ) SetCondition( COND_NO_PRIMARY_AMMO ); }
 	void    BarneyFirePistol ( void );
 	
 	int		OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo );
@@ -57,7 +59,7 @@ public:
 	void	SUB_StartLVFadeOut( float delay = 10.0f, bool bNotSolid = true );
 	void	SUB_LVFadeOut( void  );
 
-	NPC_STATE CNPC_Barney::SelectIdealState ( void );
+	NPC_STATE CNPC_OldBarney::SelectIdealState ( void );
 
 	bool	m_fGunDrawn;
 	float	m_flPainTime;

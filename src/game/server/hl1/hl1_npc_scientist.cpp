@@ -197,7 +197,11 @@ void CNPC_Scientist::Activate()
 //-----------------------------------------------------------------------------
 Class_T	CNPC_Scientist::Classify( void )
 {
-	return	CLASS_HUMAN_PASSIVE;
+#ifdef HL1_DLL
+	return CLASS_HUMAN_PASSIVE;
+#else
+	return CLASS_CITIZEN_PASSIVE;
+#endif
 }
 
 int CNPC_Scientist::GetSoundInterests ( void )
@@ -671,7 +675,7 @@ int CNPC_Scientist::SelectSchedule( void )
 	}
 	else if ( HasCondition( COND_PLAYER_PUSHING ) && !(GetSpawnFlags() & SF_NPC_PREDISASTER ) )
 	{		// Player wants me to move
-			return SCHED_HL1TALKER_FOLLOW_MOVE_AWAY;
+			return SCHED_MOVE_AWAY;	//SCHED_HL1TALKER_FOLLOW_MOVE_AWAY
 	}
 
 	if ( BehaviorSelectSchedule() )
@@ -1188,8 +1192,8 @@ int CNPC_SittingScientist::FIdleSpeak ( void )
 		
 		Msg( "Asking some question!\n" );
 		
-		IdleHeadTurn( pentFriend );
-		SENTENCEG_PlayRndSz( edict(), TLK_PQUESTION, 1.0, SNDLVL_TALKING, 0, pitch );
+		//!IdleHeadTurn( pentFriend );
+		SENTENCEG_PlayRndSz( edict(), TLK_PLQUESTION, 1.0, SNDLVL_TALKING, 0, pitch );
 		// set global min delay for next conversation
 		GetExpresser()->BlockSpeechUntil( gpGlobals->curtime + random->RandomFloat(4.8, 5.2) );
 		return TRUE;
@@ -1200,7 +1204,7 @@ int CNPC_SittingScientist::FIdleSpeak ( void )
 	{
 		Msg( "Making idle statement!\n" );
 
-		SENTENCEG_PlayRndSz( edict(), TLK_PIDLE, 1.0, SNDLVL_TALKING, 0, pitch );
+		SENTENCEG_PlayRndSz( edict(), TLK_PLIDLE, 1.0, SNDLVL_TALKING, 0, pitch );
 		// set global min delay for next conversation
 		GetExpresser()->BlockSpeechUntil( gpGlobals->curtime + random->RandomFloat(4.8, 5.2) );
 		return TRUE;

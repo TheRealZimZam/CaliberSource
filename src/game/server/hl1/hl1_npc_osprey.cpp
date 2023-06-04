@@ -25,9 +25,9 @@
 #include	"engine/IEngineSound.h"
 #include	"ammodef.h"
 #include	"basecombatweapon.h"
-#include	"hl1_basegrenade.h"
+#include	"basegrenade_shared.h"
 #include	"soundenvelope.h"
-#include	"hl1_cbasehelicopter.h"
+#include	"cbasehelicopter.h"
 #include	"IEffects.h"
 #include	"smoke_trail.h"
 
@@ -58,7 +58,7 @@ public:
 	
 	void Spawn( void );
 	void Precache( void );
-	Class_T  Classify( void ) { return CLASS_NONE; };
+	Class_T  Classify( void ) { return CLASS_MILITARY; };
 	int  BloodColor( void ) { return DONT_BLEED; }
 
 	void FindAllThink( void );
@@ -71,16 +71,10 @@ public:
 	void InitializeRotorSound( void );
 	void PrescheduleThink( void );
 
-	void DyingThink( void );
-
-	void CrashTouch( CBaseEntity *pOther );
-
-/*	
-	
 	void CrashTouch( CBaseEntity *pOther );
 	void DyingThink( void );
 	void CommandUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );	
-*/
+
 	void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 
 	float m_startTime;
@@ -204,7 +198,7 @@ void CNPC_Osprey::Spawn( void )
 	m_startTime = gpGlobals->curtime + 1;
 
 	//FindAllThink();
-//	SetUse( CommandUse );
+	SetUse( CommandUse );
 
 /*	if (!( m_spawnflags & SF_WAITFORTRIGGER))
 	{
@@ -222,7 +216,6 @@ void CNPC_Osprey::Spawn( void )
 	m_hLeftSmoke = NULL;
 	m_hRightSmoke = NULL;
 }
-
 
 void CNPC_Osprey::Precache( void )
 {
@@ -243,6 +236,11 @@ void CNPC_Osprey::Precache( void )
 	PrecacheScriptSound( "Apache.RotorSpinup" );
 
 	BaseClass::Precache();
+}
+
+void CNPC_Osprey::CommandUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	SetNextThink( gpGlobals->curtime + 0.1f );
 }
 
 void CNPC_Osprey::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
@@ -641,6 +639,9 @@ void CNPC_Osprey::CrashTouch( CBaseEntity *pOther )
 	BaseClass::CrashTouch( pOther );
 }
 
+
+//WTF??
+#if 0
 //------------------------------------------------------------------------------
 // Purpose :
 // Input   :
@@ -1584,4 +1585,4 @@ bool CBaseHelicopter::HasReachedTarget( void )
 	else
 		return( flDist < 512 );
 }
-
+#endif

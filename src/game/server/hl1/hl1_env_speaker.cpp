@@ -20,6 +20,9 @@
 #include "ndebugoverlay.h"
 #include "soundscape.h"
 
+// memdbgon must be the last include file in a .cpp file!!!
+#include "tier0/memdbgon.h"
+
 #define SPEAKER_START_SILENT			1	// wait for trigger 'on' to start announcements
 
 // ===================================================================================
@@ -27,9 +30,9 @@
 // Speaker class. Used for announcements per level, for door lock/unlock spoken voice. 
 //
 
-class CSpeaker : public CPointEntity
+class CHL1Speaker : public CPointEntity
 {
-	DECLARE_CLASS( CSpeaker, CPointEntity );
+	DECLARE_CLASS( CHL1Speaker, CPointEntity );
 public:
 	bool KeyValue( const char *szKeyName, const char *szValue );
 	void Spawn( void );
@@ -38,16 +41,16 @@ public:
 	void SpeakerThink( void );
 	
 	virtual int	ObjectCaps( void ) { return (CBaseEntity::ObjectCaps() & ~FCAP_ACROSS_TRANSITION); }
-	
+
 	int	m_preset;			// preset number
 	string_t m_iszMessage;
 
 	DECLARE_DATADESC();
 };
 
-LINK_ENTITY_TO_CLASS( speaker, CSpeaker );
+LINK_ENTITY_TO_CLASS( speaker, CHL1Speaker );
 
-BEGIN_DATADESC( CSpeaker )
+BEGIN_DATADESC( CHL1Speaker )
 	DEFINE_FIELD( m_preset, FIELD_INTEGER ),
 	DEFINE_KEYFIELD( m_iszMessage, FIELD_STRING, "message" ),
 	DEFINE_THINKFUNC( SpeakerThink ),
@@ -57,7 +60,7 @@ END_DATADESC()
 //
 // ambient_generic - general-purpose user-defined static sound
 //
-void CSpeaker::Spawn( void )
+void CHL1Speaker::Spawn( void )
 {
 	char* szSoundFile = (char*) STRING( m_iszMessage );
 
@@ -65,18 +68,18 @@ void CSpeaker::Spawn( void )
 	{
 		Msg( "SPEAKER with no Level/Sentence! at: %f, %f, %f\n", GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z );
 		SetNextThink( gpGlobals->curtime + 0.1 );
-		SetThink( &CSpeaker::SUB_Remove );
+		SetThink( &CHL1Speaker::SUB_Remove );
 		return;
 	}
     SetSolid( SOLID_NONE );
     SetMoveType( MOVETYPE_NONE );
 
 	
-	SetThink(&CSpeaker::SpeakerThink);
+	SetThink(&CHL1Speaker::SpeakerThink);
 	SetNextThink( TICK_NEVER_THINK );
 
 	// allow on/off switching via 'use' function.
-	SetUse ( &CSpeaker::ToggleUse );
+	SetUse ( &CHL1Speaker::ToggleUse );
 
 	Precache( );
 }
@@ -84,19 +87,19 @@ void CSpeaker::Spawn( void )
 #define ANNOUNCE_MINUTES_MIN	0.25	 
 #define ANNOUNCE_MINUTES_MAX	2.25
 
-void CSpeaker::Precache( void )
+void CHL1Speaker::Precache( void )
 {
 	if ( !FBitSet ( GetSpawnFlags(), SPEAKER_START_SILENT ) )
 		// set first announcement time for random n second
 		SetNextThink( gpGlobals->curtime + random->RandomFloat( 5.0, 15.0 ) );
 }
-void CSpeaker::SpeakerThink( void )
+
+void CHL1Speaker::SpeakerThink( void )
 {
 	char* szSoundFile = NULL;
 	float flvolume = m_iHealth * 0.1;
 	int flags = 0;
 	int pitch = 100;
-
 
 	// Wait for the talking characters to finish first.
 	if ( !g_AIFriendliesTalkSemaphore.IsAvailable( this ) || !g_AIFoesTalkSemaphore.IsAvailable( this ) )
@@ -105,7 +108,7 @@ void CSpeaker::SpeakerThink( void )
 		SetNextThink( gpGlobals->curtime + releaseTime + random->RandomFloat( 5, 10 ) );
 		return;
 	}
-	
+
 	if (m_preset)
 	{
 		// go lookup preset text, assign szSoundFile
@@ -124,13 +127,16 @@ void CSpeaker::SpeakerThink( void )
 		case 11: szSoundFile = "C3A1_"; break;
 		case 12: szSoundFile = "C3A2_"; break;
 		}
-	} else
+	}
+	else
+	{
 		szSoundFile = (char*) STRING( m_iszMessage );
+	}
 	
 	if (szSoundFile[0] == '!')
 	{
 		// play single sentence, one shot
-		UTIL_EmitAmbientSound ( GetSoundSourceIndex(), GetAbsOrigin(), szSoundFile, 
+		UTIL_EmitAmbientSound( GetSoundSourceIndex(), GetAbsOrigin(), szSoundFile, 
 			flvolume, SNDLVL_120dB, flags, pitch);
 
 		// shut off and reset
@@ -139,7 +145,6 @@ void CSpeaker::SpeakerThink( void )
 	else
 	{
 		// make random announcement from sentence group
-
 		if ( SENTENCEG_PlayRndSz( edict(), szSoundFile, flvolume, SNDLVL_120dB, flags, pitch) < 0 )
 			 Msg(  "Level Design Error!\nSPEAKER has bad sentence group name: %s\n",szSoundFile); 
 
@@ -155,16 +160,15 @@ void CSpeaker::SpeakerThink( void )
 	return;
 }
 
-
 //
 // ToggleUse - if an announcement is pending, cancel it.  If no announcement is pending, start one.
 //
-void CSpeaker::ToggleUse ( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+void CHL1Speaker::ToggleUse ( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	int fActive = (GetNextThink() > 0.0);
 
 	// fActive is TRUE only if an announcement is pending
-	
+
 	if ( useType != USE_TOGGLE )
 	{
 		// ignore if we're just turning something on that's already on, or
@@ -189,8 +193,6 @@ void CSpeaker::ToggleUse ( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TY
 	}
 
 	// Toggle announcements
-
-	
 	if ( fActive )
 	{
 		// turn off announcements
@@ -200,13 +202,13 @@ void CSpeaker::ToggleUse ( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TY
 	{
 		// turn on announcements
 		SetNextThink( gpGlobals->curtime + 0.1 );
-	} 
+	}
 }
 
 // KeyValue - load keyvalue pairs into member data
 // NOTE: called BEFORE spawn!
 
-bool CSpeaker::KeyValue( const char *szKeyName, const char *szValue )
+bool CHL1Speaker::KeyValue( const char *szKeyName, const char *szValue )
 {
 	// preset
 	if (FStrEq(szKeyName, "preset"))

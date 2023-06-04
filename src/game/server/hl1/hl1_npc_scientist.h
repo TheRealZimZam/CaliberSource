@@ -8,18 +8,19 @@
 #ifndef	NPC_SCIENTIST_H
 #define	NPC_SCIENTIST_H
 
-#include "hl1_npc_talker.h"
+#include "ai_basenpc.h"
+#include "npc_talker.h"
 
 //=========================================================
 //=========================================================
-class CNPC_Scientist : public CHL1NPCTalker
+
+class CNPC_Scientist : public CNPCSimpleTalker
 {
-	DECLARE_CLASS( CNPC_Scientist, CHL1NPCTalker );
+	DECLARE_CLASS( CNPC_Scientist, CNPCSimpleTalker );
 public:
 	
 //	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
-
 
 	void	Precache( void );
 	void	Spawn( void );

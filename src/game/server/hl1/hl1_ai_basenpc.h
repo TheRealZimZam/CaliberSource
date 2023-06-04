@@ -34,6 +34,7 @@ public:
 	{
 
 	}
+	float	GetIdealAccel() const { return 500; }
 
 	void	TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 	bool	ShouldGib( const CTakeDamageInfo &info );

@@ -810,7 +810,7 @@
 [
 ]
 
-@NPCClass base(BaseNPC) studio("models/Stalker.mdl") = npc_stalker : "Stalker"
+@NPCClass base(BaseNPC) studio("models/stalker.mdl") = npc_stalker : "Stalker"
 [
 	BeamPower(choices) : "Beam Power" : "Low" =
 	[
@@ -1109,7 +1109,7 @@
 
 @BaseClass base(BaseNPC, RappelNPC) = BaseCombine
 [
-	additionalequipment(choices) : "Weapons" : "weapon_smg1" =
+	additionalequipment(choices) : "Weapons" : "weapon_smg2" =
 	[
 //		"weapon_ar1" : "AR1"
 		"weapon_ar2" : "AR2"
@@ -1122,11 +1122,13 @@
 		"weapon_stunstick" : "Stun Stick"
 		"weapon_flamethrower" : "Flamethrower"
 		"weapon_rpg" : "RPG"
+		"weapon_flash" : "FLASH"
 		"0" : "Nothing"
 	]
 
 	spawnflags(Flags) = 
 	[
+		32768 :  "Autosquad" : 1
 		65536 :  "Start LookOff" : 0
 		131072	: "Don't drop grenades" : 0
 		262144  : "Don't drop ar2 alt fire (elite only) " : 0
@@ -1137,6 +1139,15 @@
 		"0" : "Normal Tactics"
 		"1" : "Pressure the enemy (Keep advancing)"
 		"2" : "Pressure until within 30ft, then normal"
+	]
+
+	type(choices) : "Soldier Type" : "Regular" =
+	[
+		"0" : "Regular"
+		"1" : "Demolitions/Squad Leader"
+		"2" : "Shock"
+		"3" : "Flamethrower"
+		"4" : "Elite"
 	]
 
 	NumGrenades(choices) : "Number of Grenades" : "2" =
@@ -1183,9 +1194,8 @@
 	input Assault(string) : "Start an assault. Parameter passed in should be the name of the rally point."
 ]
 
-@PointClass base(Parentname, BaseNPC) studio("models/junk/w_traffcone.mdl") = npc_launcher : "Launcher"
+@PointClass base(Parentname, BaseNPC) studio("models/props_junk/trafficcone001a.mdl") = npc_launcher : "Launcher"
 [
-
 	spawnflags(Flags) = 
 	[
 		65536  :  "Check LOS" : 1
@@ -1198,13 +1208,14 @@
 	] 
 	MissileModel(studio) : "Missile Model" : "models/Weapons/wscanner_grenade.mdl"
 	LaunchSound(sound) : "Launch Sound" : "npc/waste_scanner/grenade_fire.wav"
-	FlySound(sound) :	"Fly Sound": "ambient/objects/machine2.wav"
+	FlySound(sound) : "Fly Sound": "ambient/machines/machine2.wav"
 
-	SmokeTrail(choices) : "Smoke Trail" : 1 = 
+	SmokeTrail(choices) : "Smoke Trail Type" : 1 = 
 	[
 		0: "Off"
 		1: "On"
-		2: "On Homing"
+		2: "On When Homing"
+		3: "Alien"
 	] 
 	LaunchSmoke(choices) : "Launch Smoke" : 1 = 
 	[
@@ -1350,8 +1361,9 @@
 		1 : "Normal collision detection."
 	]
 
-	shootsound(choices) : "Shoot Sound" : "Weapon_AR2.NPC_Single" : "Gunfire sound to make" = 
+	shootsound(choices) : "Shoot Sound" : "NoSound" : "Gunfire sound to make" = 
 	[
+		"NoSound" : "None"
 		"Weapon_AR2.NPC_Single" : "AR2"
 		"Weapon_SMG1.NPC_Single" : "SMG1"
 		"Weapon_Shotgun.NPC_Single" : "Shotgun"
@@ -1559,7 +1571,7 @@
 	output OnRelease(string) : "When I let go of something"
 ]
 
-// Launcher (WIP, BRUSH BASED FOR NOW)
+// Launcher 
 @PointClass base(Parentname, BaseNPC) studio("models/junk/w_traffcone.mdl") = npc_launcher : "Launcher"
 [
 
@@ -2250,6 +2262,11 @@
 	output OnDogCatch(void) : "Fires when dog catches an object."
 ]
 
+@NPCClass base(BaseNPC) studio() = monster_furniture : "Monster Furniture" 
+[
+	model(studio) : "model"
+]
+
 //NPC for scripted sequences
 @PointClass base(BaseNPC, RenderFields, Shadow) studio() = monster_generic : "Generic Script NPC"
 [
@@ -2440,7 +2457,7 @@
 //
 //-------------------------------------------------------------------------
 
-@SolidClass base(EnableDisable, Parentname, Origin, Global) = func_healthcharger: "Wall health recharger" 
+@SolidClass base(Targetname, EnableDisable, Parentname, Origin, Global) = func_healthcharger: "Wall health recharger" 
 [
 	// dmdelay(integer) : "Deathmatch recharge delay" : 0
 	_minlight(string) : "Minimum light level"
@@ -2450,7 +2467,7 @@
 	output OnPlayerUse(void) : "Fired when the player +USEs the charger."
 ]
 
-@SolidClass base(Targetname, Parentname, Origin) = func_recharge: "Battery recharger" 
+@SolidClass base(Targetname, EnableDisable, Parentname, Origin, Global) = func_recharge: "Battery recharger" 
 [
 	// dmdelay(integer) : "Deathmatch recharge delay" : 0
 	_minlight(string) : "Minimum light level"
@@ -2552,8 +2569,9 @@
 	spawnflags(flags) =
 	[
 		1 : "Active" : 0
-		4 : "OBSOLETE" : 0
-		8 : "OBSOLETE" : 0
+	//	2 : "Player Only" : 0
+	//	4 : "Humans Only" : 0
+	//	8 : "Aliens Only" : 0
 		16: "Only Direct" : 0
 		32: "Controllable" : 0
 		64: "Damage Kick" : 0
@@ -2578,9 +2596,12 @@
 	barrel(string) : "Barrel Length" : "0"
 	barrely(string) : "Barrel Horizontal" : "0"
 	barrelz(string) : "Barrel Vertical" : "0"
+	recoilforce(string) : "Units to travel in recoil" : "0"
+	recoiltime(string) : "How long the recoil is applied" : "0"
 	spritesmoke(sprite) : "Smoke Sprite" : ""
 	spriteflash(sprite) : "Flash Sprite" : ""
 	spritescale(string) : "Sprite scale" : "1"
+	firesound(sound) : "Fire Sound" : ""
 	usesound(sound) : "Use Sound" : ""
 	rotatestartsound(sound) : "Rotate Start Sound" : ""
 	rotatesound(sound) : "Rotate Loop Sound" : ""
@@ -2715,7 +2736,7 @@
 	PulseWidth(float) : "Pulse Width" : "20" : "Width of the pulse"
 	PulseLife(float) : "Pulse Life" : 2 : "(Seconds)  How long the pulse lasts"
 	PulseLag(float) : "Pulse Lag" : "0.05" : "(Seconds)  How far behind is pulse tail"
-	PulseFireSound(sound)   : "Pulse Fire Sound" : "" : "Sound played when pulse fires"
+//	PulseFireSound(sound)   : "Pulse Fire Sound" : "" : "Sound played when pulse fires"
 ]
 
 
@@ -2762,7 +2783,7 @@
 	barrel_volume(target_destination) : "Barrel Volume" : "" : "Name of a trigger the specifies the volume in which cannisters must be placed."
 ]
 
-@SolidClass base(BaseTank) = func_tank_combine_cannon : "Combine sentry cannon"
+@SolidClass base(BaseTank) = func_tank_combinecannon : "Combine sentry cannon"
 [
 	ammotype(choices) : "Ammo type" : "" = 
 	[
@@ -2799,7 +2820,7 @@
 
 	spawnflags(Flags) =
 	[
-		1 : "Start Constrained" : 0
+		1 : "Start Constrained" : 1
 	]
 ]
 
@@ -3275,7 +3296,6 @@
 	"Sends an achievement system related event from the map to the achievement system."
 [
 	//keyvalues
-	
 	AchievementEvent(choices) : "Achievement Event" : 0 : "Named event is sent to the achievement system when this entity receives a 'FireEvent' input." =
 	[
 		"ACHIEVEMENT_EVENT_HL2_HIT_CANCOP_WITHCAN"				: "[HL2] Hit the trashcan cop with the can."

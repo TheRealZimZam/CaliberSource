@@ -1,28 +1,63 @@
 //=============================================================================
 //
-// IAC Source FGD 
+// CSource FGD 
 //
 //=============================================================================
 
 @include "base.fgd"
 @include "halflife2.fgd"
 
-//-------------------------------------------------------------------------
-// NPCs
-// baseclass also defined here to reflect small changes that might conflict with base hl2
-//
-//-------------------------------------------------------------------------
-
 
 //=============================================================================
 // Brush Entities
 //=============================================================================
+// Mortar Field
+@SolidClass base(Targetname, EnableDisable, Origin, Parentname) = func_mortar_field : "Mortar Field" 
+[
+	m_flSpread(float) : "Spread Radius" : 0 : "Spread of fire"
+	m_flDelay(float) : "Fire Delay" : 1 : "How much delay there is in-between shells."
+	m_iCount(integer) : "Repeat Count" : 4 : "Count of mortar shells"
 
+	m_fControl(choices) : "Targeting" : 0 : "Random: will fire anywhere in bounds. "+
+	"Above activator: will fire above or below entity activated the mortar. "+
+	"X/Y Controller: position set by momentary_rot_buttons (tactical map)." =
+	[
+		0 : "Random"
+		1 : "Above activator"
+		2 : "X/Y Controller"
+	]
 
+	m_iszXController(target_destination) : "X Controller" : "" : "momentary_rot_button controlling X location"
+	m_iszYController(target_destination) : "Y Controller" : "" : "momentary_rot_button controlling Y location"
+
+	// Inputs
+	input Trigger(void) : "Trigger"
+
+	// Outputs
+	output OnFire(void) : "Fires when the mortar field becomes active"
+]
+
+// Lightning Field (mortarfield without explosions)
+@SolidClass base(Targetname, EnableDisable, Origin, Parentname) = func_lightning_field : "Lightning Field" 
+[
+	m_flSpread(float) : "Spread Radius" : 0 : "Spread of lightning"
+	m_flDelay(float) : "Fire Delay" : 1 : "How much delay there is in-between strikes."
+	m_iCount(integer) : "Repeat Count" : 1 : "Count of strikes"
+
+	// Inputs
+	input Trigger(void) : "Trigger"
+
+	// Outputs
+	output OnFire(void) : "Fires when the lighting field becomes active"
+]
 
 //=============================================================================
 // Entities
 //=============================================================================
+// If the arty is offmap, this is where the flashes come from
+@PointClass base(Targetname, Parentname) iconsprite("editor/info_target.vmt") sphere(radius) = info_offmap_mortar : "Mortar fire position"
+[
+]
 
 //=============================================================================
 // NPC's
@@ -41,15 +76,13 @@
 [
 ]
 
-@NPCClass base(TalkNPC, BaseNPC, PlayerCompanion) studio("models/Conscript.mdl") = npc_conscript : "Conscript"
+@NPCClass base(TalkNPC, BaseNPC, PlayerCompanion) studio("models/Conscript.mdl") = npc_german : "German"
 [
-	additionalequipment(choices) : "Weapons" : "weapon_ar2" =
+	additionalequipment(choices) : "Weapons" : "weapon_mp40" =
 	[
+		"weapon_mp40" : "MP40"
 		"weapon_pistol" : "Pistol"
 		"weapon_smg1" : "SMG1"
-		"weapon_stunstick" : "Stun Stick"
-		"weapon_shotgun" : "Shotgun"
-		"weapon_ar2" : "AR2"
 		"0" : "Nothing"
 	]
 
@@ -82,12 +115,12 @@
 		"weapon_pistol" : "Pistol"
 		"weapon_smg1"  : "SMG1"
 		"weapon_stunstick"  : "Stun Stick"
-		"weapon_shotgun"  : "Shotgun (WIP)"
-		"weapon_ar2"  : "AR2 (WIP)"
+		"weapon_shotgun"  : "Shotgun"
+		"weapon_ar2"  : "AR2"
 		"0"  : "Nothing"
 	]
 
-	manhacks(Choices) : "Number of Manhacks" : 0 =
+	manhacks(Choices) : "Number of Drones" : 0 =
 	[
 		0 : "None"
 		1 : "1"
@@ -123,18 +156,21 @@
 	output OnCupCopped(void) : "Fires if the player hits me with the cupcop can. ONLY use for x360 achievement."
 ]
 
-@NPCClass base(BaseCombine) studio("models/Combine_Soldier.mdl") = npc_grunt : "AFT Soldier"
+@NPCClass base(BaseCombine) studio("models/Combine_Soldier.mdl") = npc_grunt : "Grunt"
 [
 	input Assault(string) : "Start an assault. Parameter passed in should be the name of the rally point."
 
-	// Changing to squad-leader enables alt-fire
 	model(choices) : "Model" : "models/combine_soldier.mdl" : "Regular Soldier" = 
 	[
-	//TODO; Change model names when implemented
 		"models/combine_soldier.mdl" : "Regular Soldier"
-	//	"models/combine_soldier_shock.mdl" : "Shock Soldier"
-		"models/combine_soldier_prisonguard.mdl" : "Nova Prospekt Soldier"
-		"models/combine_super_soldier.mdl" : "Demo Soldier/Squad Leader"
+		"models/combine_soldier_city.mdl" : "Riot Police"
+		"models/combine_soldier_airbase.mdl" : "Desert Camo"
+		"models/combine_squad_leader.mdl" : "Squad Leader"
+		"models/combine_squad_leader_airbase.mdl" : "Desert Squad Leader"
+		"models/combine_grenadier.mdl" : "Grenadier"
+		"models/combine_shocktrooper.mdl" : "Shotgunner"
+		"models/combine_flamethrower.mdl" : "Flamethrower"
+		"models/combine_elite.mdl" : "Fake Elite"
 	]
 
 	tacticalvariant(choices) : "Tactical Variant" : "0" =
@@ -152,14 +188,15 @@
 	]
 ]
 
-@NPCClass base(BaseCombine) studio("models/Combine_Soldier.mdl") = npc_elite : "AFT Elite"
+@NPCClass base(BaseCombine) studio("models/Combine_Soldier.mdl") = npc_elite : "Elite"
 [
 	input Assault(string) : "Start an assault. Parameter passed in should be the name of the rally point."
 
 	model(choices) : "Model" : "models/combine_elite.mdl" : "Regular Elite" = 
 	[
 		"models/combine_elite.mdl" : "Regular Elite"
-		"models/combine_paratroop.mdl" : "Airborne Elite"
+		"models/combine_paratrooper.mdl" : "Airborne Elite"
+		"models/combine_sniper.mdl" : "Sniper Elite"
 	]
 
 	tacticalvariant(choices) : "Tactical Variant" : "0" =
@@ -187,39 +224,25 @@
 
 @PointClass base(Weapon) studio("models/weapons/w_bat.mdl") = weapon_swing : "Swing weapon"
 [
-	model(choices) : "Model" : "models/weapons/w_bat.mdl" : "Default world model" = 
-	[
-		"models/weapons/w_bat.mdl" : "Bat"
-		"models/weapons/w_crowbar.mdl" : "Crowbar"
-		"models/weapons/w_hammer.mdl" : "Hammer"
-		"models/weapons/w_pipe.mdl" : "Pipe"
-	]
-
 	weapontype(choices) : "Weapon type" : "0" =
 	[
-		"0" : "Bat"
-		"1" : "Crowbar"
-		"2" : "Hammer"
+		"0" : "Random"
+		"1" : "Bat"
+		"2" : "Crowbar"
 		"3" : "Pipe"
+		"4" : "Hammer"
 	]
 ]
 
 @PointClass base(Weapon) studio("models/weapons/w_knife.mdl") = weapon_stab : "Stab weapon"
 [
-	model(choices) : "Model" : "models/weapons/w_bottle.mdl" : "Default world model" = 
-	[
-		"models/weapons/w_bottle.mdl" : "Bottle"
-		"models/weapons/w_knife.mdl" : "Knife"
-		"models/weapons/w_rebar.mdl" : "Rebar"
-		"models/weapons/w_shank.mdl" : "Shank"
-	]
-	
 	weapontype(choices) : "Weapon type" : "0" =
 	[
-		"0" : "Bottle"
-		"1" : "Knife"
-		"2" : "Rebar"
+		"0" : "Random"
+		"1" : "Bottle"
+		"2" : "Knife"
 		"3" : "Shank"
+		"4" : "Rebar"
 	]
 ]
 
@@ -233,8 +256,8 @@
 //@PointClass base(Weapon) studio("models/weapons/w_crossbow.mdl") = weapon_scrapgun : "Scrapgun" []
 @PointClass base(Weapon) studio("models/weapons/w_supershotgun.mdl") = weapon_supershotgun : "Auto-Shotgun" []
 @PointClass base(Weapon) studio("models/weapons/w_molotov.mdl") = weapon_molotov : "Molotov" []
-//@PointClass base(Weapon) studio("models/weapons/w_grenade.mdl") = weapon_smokegrenade : "Gas Grenade" []
-@PointClass base(Weapon) studio("models/weapons/w_concgrenade.mdl") = weapon_concgrenade : "Stun Grenade" []
+//@PointClass base(Weapon) studio("models/weapons/w_grenade.mdl") = weapon_smoke : "Gas Grenade" []
+@PointClass base(Weapon) studio("models/weapons/w_concgrenade.mdl") = weapon_emp : "Stun Grenade" []
 @PointClass base(Weapon) studio("models/weapons/w_rpg.mdl") = weapon_flash : "FLASH" []
 @PointClass base(Weapon) studio("models/weapons/w_crossbow.mdl") = weapon_flashlight : "Flashlight" []
 @PointClass base(Weapon) studio("models/weapons/w_45.mdl") = weapon_45 : "45-70" []

@@ -879,6 +879,8 @@ bool CNavMesh::GetGroundHeight( const Vector &pos, float *height, Vector *normal
 		{
 			if (FClassnameIs( result.m_pEnt, "prop_door" ) ||
 				FClassnameIs( result.m_pEnt, "prop_door_rotating" ) ||
+				FClassnameIs( result.m_pEnt, "func_door" ) ||
+				FClassnameIs( result.m_pEnt, "func_door_rotating" ) ||
 				FClassnameIs( result.m_pEnt, "func_breakable" ))// && VARS( result.pHit )->takedamage == DAMAGE_YES))
 			{
 				ignore = result.m_pEnt;

@@ -14,8 +14,43 @@
 #include "props.h"
 
 typedef enum { expRandom = 0, expDirected, expUsePrecise} Explosions;
-typedef enum { matGlass = 0, matWood, matMetal, matFlesh, matCinderBlock, matCeilingTile, matComputer, matUnbreakableGlass, matRocks, matWeb, matNone, matLastMaterial } Materials;
 
+// TODO; The best way to do this, actually, would be to use surface properties -
+// this is a bad kind of obsolete that could stand to be redone
+#if 1
+typedef enum 
+{ 
+	matGlass = 0,
+	matWood,
+	matMetal,
+	matFlesh,
+	matCinderBlock,
+	matCeilingTile,
+	matComputer,
+	matUnbreakableGlass,
+	matRocks,
+	matWeb,
+	matNone,
+	matLastMaterial } Materials;
+#else
+typedef enum 
+{ 
+	matNone = 0,
+	matDirt,
+	matWood,
+	matRock,
+	matMetal,
+	matGlass,
+	matCinderBlock,
+	matCeilingTile,
+	matPlaster,
+	matPlastic,
+	matComputer,
+	matFlesh,
+	matWeb,
+	matUnbreakableGlass,
+	matLastMaterial } Materials;
+#endif
 
 #define	NUM_SHARDS 6 // this many shards spawned when breakable objects break;
 
@@ -52,6 +87,7 @@ public:
 	void Break( CBaseEntity *pBreaker );
 
 	// Input handlers
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void InputAddHealth( inputdata_t &inputdata );
 	void InputBreak( inputdata_t &inputdata );
 	void InputRemoveHealth( inputdata_t &inputdata );
@@ -136,6 +172,7 @@ private:
 	int			m_iMinHealthDmg;		// minimum damage attacker must have to cause damage
 	bool		m_bExtraImpactFX;
 	bool		m_bTookPhysicsDamage;
+//	bool		m_bUseNewMaterials;
 
 	string_t	m_iszPropData;
 	string_t	m_iszModelName;

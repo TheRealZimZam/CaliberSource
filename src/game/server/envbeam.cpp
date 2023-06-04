@@ -186,7 +186,6 @@ void CEnvBeam::Spawn( void )
 			SetNextThink( gpGlobals->curtime + 1.0f );
 		}
 	}
-
 }
 
 
@@ -759,4 +758,7 @@ void CEnvBeam::BeamUpdateVars( void )
 	{
 		SetBeamFlags( FBEAM_SHADEOUT );
 	}
+
+	if (HasSpawnFlags( SF_BEAM_NOTILE ))
+		SetBeamFlags( FBEAM_NOTILE );
 }

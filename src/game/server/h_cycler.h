@@ -13,6 +13,7 @@
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+//TODO; Basenpc??? Cant this inherit from something lower on the line?
 class CCycler : public CAI_BaseNPC
 {
 public:

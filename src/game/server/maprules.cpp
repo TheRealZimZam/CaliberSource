@@ -214,7 +214,7 @@ void CGameScore::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE us
 }
 
 
-// CGameEnd / game_end	-- Ends the game in MP
+// CGameEnd / game_end	-- Ends the game in MP, Shows scorescreen in SP
 
 class CGameEnd : public CRulePointEntity
 {
@@ -240,7 +240,7 @@ LINK_ENTITY_TO_CLASS( game_end, CGameEnd );
 
 void CGameEnd::InputGameEnd( inputdata_t &inputdata )
 {
-	g_pGameRules->EndMultiplayerGame();
+	Use(inputdata.pActivator, inputdata.pCaller, USE_ON, 0);
 }
 
 void CGameEnd::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
@@ -248,7 +248,10 @@ void CGameEnd::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useT
 	if ( !CanFireForActivator( pActivator ) )
 		return;
 
-	g_pGameRules->EndMultiplayerGame();
+	if ( g_pGameRules->IsMultiplayer() )
+		g_pGameRules->EndMultiplayerGame();
+	else
+		engine->ServerCommand( UTIL_VarArgs( "%s\n", "disconnect" ) );
 }
 
 
@@ -369,8 +372,8 @@ void CGameText::Display( CBaseEntity *pActivator )
 	}
 }
 
-
-/* TODO: Replace with an entity I/O version
+#ifdef HL1_DLL
+//TODO: Replace with an entity I/O version
 //
 // CGameTeamSet / game_team_set	-- Changes the team of the entity it targets to the activator's team
 // Flag: Fire once
@@ -416,7 +419,7 @@ void CGameTeamSet::InputTrigger( inputdata_t &inputdata )
 		UTIL_Remove( this );
 	}
 }
-*/
+#endif
 
 
 //
@@ -505,7 +508,7 @@ void CGamePlayerZone::InputCountPlayersInZone( inputdata_t &inputdata )
 }
 
 
-/*
+#ifdef HL1_DLL
 // Disable.  Eventually will be replace by new activator filter entities.  (LHL)
 //
 // CGamePlayerHurt / game_player_hurt	-- Damages the player who fires it
@@ -565,12 +568,11 @@ void CGamePlayerHurt::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TY
 		UTIL_Remove( this );
 	}
 }
-*/
+#endif
 
 //
 // CGamePlayerEquip / game_playerequip	-- Sets the default player equipment
 // Flag: USE Only
-
 #define SF_PLAYEREQUIP_USEONLY			0x0001
 #define MAX_EQUIP		32
 

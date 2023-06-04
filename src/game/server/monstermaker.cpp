@@ -124,6 +124,11 @@ void CBaseNPCMaker::Spawn( void )
 		m_spawnflags |= SF_NPCMAKER_FADE;
 	}
 
+	if ( m_spawnflags & SF_NPCMAKER_CYCLIC )
+		SetUse ( &CBaseNPCMaker::CyclicUse );// drop one monster each time we fire
+	else
+		SetUse ( &CBaseNPCMaker::ToggleUse );// so can be turned on/off
+
 	//Start on?
 	if ( m_bDisabled == false )
 	{
@@ -255,12 +260,23 @@ bool CBaseNPCMaker::IsDepleted()
 	return true;
 }
 
+//=========================================================
+// CyclicUse - drops one monster from the monstermaker
+// each time we call this.
+//=========================================================
+void CBaseNPCMaker::CyclicUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	MakeNPC();
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Toggle the spawner's state
 //-----------------------------------------------------------------------------
-void CBaseNPCMaker::Toggle( void )
+void CBaseNPCMaker::ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
+	if ( !ShouldToggle( useType, m_bDisabled ) )
+		return;
+
 	if ( m_bDisabled )
 	{
 		Enable();
@@ -332,7 +348,7 @@ void CBaseNPCMaker::InputDisable( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CBaseNPCMaker::InputToggle( inputdata_t &inputdata )
 {
-	Toggle();
+	ToggleUse( inputdata.pActivator, inputdata.pCaller, USE_TOGGLE, inputdata.value.Int() );
 }
 
 //-----------------------------------------------------------------------------
@@ -364,8 +380,6 @@ void CBaseNPCMaker::InputSetSpawnFrequency( inputdata_t &inputdata )
 	m_flSpawnFrequency = inputdata.value.Float();
 }
 
-LINK_ENTITY_TO_CLASS( npc_maker, CNPCMaker );
-
 BEGIN_DATADESC( CNPCMaker )
 
 	DEFINE_KEYFIELD( m_iszNPCClassname,		FIELD_STRING,	"NPCType" ),
@@ -377,6 +391,8 @@ BEGIN_DATADESC( CNPCMaker )
 
 END_DATADESC()
 
+LINK_ENTITY_TO_CLASS( monstermaker, CNPCMaker );
+LINK_ENTITY_TO_CLASS( npc_maker, CNPCMaker );
 
 //-----------------------------------------------------------------------------
 // Constructor
@@ -419,6 +435,7 @@ void CNPCMaker::MakeNPC( void )
 	if ( !pent )
 	{
 		Warning("NULL Ent in NPCMaker!\n" );
+		SetThink( NULL );
 		return;
 	}
 	
@@ -804,6 +821,7 @@ void CTemplateNPCMaker::MakeNPC( void )
 	if ( !pent )
 	{
 		Warning("NULL Ent in NPCMaker!\n" );
+		SetThink( NULL );
 		return;
 	}
 	
@@ -887,6 +905,7 @@ void CTemplateNPCMaker::MakeNPCInLine( void )
 	if ( !pent )
 	{
 		Warning("NULL Ent in NPCMaker!\n" );
+		SetThink( NULL );
 		return;
 	}
 	
@@ -982,6 +1001,7 @@ void CTemplateNPCMaker::MakeNPCInRadius( void )
 	if ( !pent )
 	{
 		Warning("NULL Ent in NPCMaker!\n" );
+		SetThink( NULL );
 		return;
 	}
 	

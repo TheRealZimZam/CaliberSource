@@ -2,8 +2,6 @@
 //
 // Purpose: 
 //
-// TODO; Alternate textures shouldnt be a spawnflag-allow them to be configured
-// on a per entity basis if possible
 //===========================================================================//
 
 #include "cbase.h"
@@ -16,8 +14,7 @@
 // Spawnflags
 #define SF_SPOTLIGHT_START_LIGHT_ON			0x1
 #define SF_SPOTLIGHT_NO_DYNAMIC_LIGHT		0x2
-#define SF_SPOTLIGHT_ALT_SPRITE				0x4
-
+#define SF_SPOTLIGHT_NO_TOGGLE				0x4	//For perf, delete the env_spotlight entity after its done doing its thing
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -61,11 +58,14 @@ private:
 private:
 	bool	m_bSpotlightOn;
 	bool	m_bEfficientSpotlight;
+	bool	m_bIgnoreSolid;
 	Vector	m_vSpotlightTargetPos;
 	Vector	m_vSpotlightCurrentPos;
 	Vector	m_vSpotlightDir;
-	bool	m_bSpotlightAltSprite;
-	int		m_nHaloSprite;
+
+	string_t				m_iszBeamSprite;
+	string_t				m_iszHaloSprite;
+	short					m_nHaloSprite;
 	CHandle<CBeam>			m_hSpotlight;
 	CHandle<CSpotlightEnd>	m_hSpotlightTarget;
 	
@@ -86,15 +86,18 @@ BEGIN_DATADESC( CPointSpotlight )
 	DEFINE_FIELD( m_bEfficientSpotlight,	FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_vSpotlightTargetPos,	FIELD_POSITION_VECTOR ),
 	DEFINE_FIELD( m_vSpotlightCurrentPos,	FIELD_POSITION_VECTOR ),
-	DEFINE_FIELD( m_bSpotlightAltSprite,	FIELD_BOOLEAN ),
 
 	// Robin: Don't Save, recreated after restore/transition
 	//DEFINE_FIELD( m_hSpotlight,			FIELD_EHANDLE ),
 	//DEFINE_FIELD( m_hSpotlightTarget,		FIELD_EHANDLE ),
 
 	DEFINE_FIELD( m_vSpotlightDir,			FIELD_VECTOR ),
-	DEFINE_FIELD( m_nHaloSprite,			FIELD_INTEGER ),
 
+	DEFINE_KEYFIELD( m_iszBeamSprite, FIELD_STRING, "spotlightmodel" ),
+	DEFINE_KEYFIELD( m_iszHaloSprite, FIELD_STRING, "spotlighthalo" ),
+	DEFINE_FIELD( m_nHaloSprite, FIELD_SHORT ),
+
+	DEFINE_KEYFIELD( m_bIgnoreSolid, FIELD_BOOLEAN, "IgnoreSolid" ),
 	DEFINE_KEYFIELD( m_flSpotlightMaxLength,FIELD_FLOAT, "SpotlightLength"),
 	DEFINE_KEYFIELD( m_flSpotlightGoalWidth,FIELD_FLOAT, "SpotlightWidth"),
 	DEFINE_KEYFIELD( m_flHDRColorScale, FIELD_FLOAT, "HDRColorScale" ),
@@ -115,6 +118,7 @@ END_DATADESC()
 
 
 LINK_ENTITY_TO_CLASS(point_spotlight, CPointSpotlight);
+LINK_ENTITY_TO_CLASS(beam_spotlight, CPointSpotlight);	//TEMP
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -128,6 +132,7 @@ CPointSpotlight::CPointSpotlight()
 #endif
 	m_flHDRColorScale = 1.0f;
 	m_nMinDXLevel = 0;
+	m_bIgnoreSolid = false;
 }
 
 
@@ -139,10 +144,15 @@ void CPointSpotlight::Precache(void)
 	BaseClass::Precache();
 
 	// Sprites.
-	m_nHaloSprite = PrecacheModel("sprites/light_glow03.vmt");
-	//!!! should there be an if here? precaching both might be unnessecary
-	PrecacheModel( "sprites/glow_test01.vmt" );
-	PrecacheModel( "sprites/glow_test02.vmt" );
+	if ( m_iszBeamSprite != NULL_STRING )
+		PrecacheModel( STRING( m_iszBeamSprite ) );
+	else
+		PrecacheModel( "sprites/glow_test01.vmt" );
+
+	if ( m_iszHaloSprite != NULL_STRING )
+		m_nHaloSprite = PrecacheModel( STRING( m_iszHaloSprite ) );
+	else
+		m_nHaloSprite = PrecacheModel( "sprites/light_glow03.vmt" );
 }
 
 
@@ -157,6 +167,10 @@ void CPointSpotlight::Spawn(void)
 	AddSolidFlags( FSOLID_NOT_SOLID );
 	SetMoveType( MOVETYPE_NONE );
 	m_bEfficientSpotlight = true;
+
+	// Beam_spotlight is always cheap
+	if( FClassnameIs( this, "beam_spotlight" ) )
+		AddSpawnFlags( SF_SPOTLIGHT_NO_TOGGLE );
 
 	// Check for user error
 	if (m_flSpotlightMaxLength <= 0)
@@ -321,15 +335,27 @@ int CPointSpotlight::UpdateTransmitState()
 void CPointSpotlight::SpotlightThink( void )
 {
 	if ( GetMoveParent() )
-	{
 		SetNextThink( gpGlobals->curtime + TICK_INTERVAL );
+	else
+		SetNextThink( gpGlobals->curtime + 0.2f );
+
+	// Create a client spotlight, then delete this
+	if ( FBitSet(m_spawnflags, SF_SPOTLIGHT_NO_TOGGLE) )
+	{
+		//!!TODO;
+		/*
+		// Always turn the beam on
+		m_bEfficientSpotlight = true;
+		inputdata_t inputdata;
+		InputLightOn( inputdata );
+		*/
+
+		SetThink( &CPointSpotlight::SUB_Remove );
 	}
 	else
 	{
-		SetNextThink( gpGlobals->curtime + 0.1f );
+		SpotlightUpdate();
 	}
-
-	SpotlightUpdate();
 }
 
 //------------------------------------------------------------------------------
@@ -344,12 +370,21 @@ void CPointSpotlight::SpotlightCreate(void)
 
 	AngleVectors( GetAbsAngles(), &m_vSpotlightDir );
 
-	trace_t tr;
-	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + m_vSpotlightDir * m_flSpotlightMaxLength, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr);
+	Vector vTargetPos;
+	if ( m_bIgnoreSolid )
+	{
+		vTargetPos = GetAbsOrigin() + m_vSpotlightDir * m_flSpotlightMaxLength;
+	}
+	else
+	{
+		trace_t tr;
+		UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + m_vSpotlightDir * m_flSpotlightMaxLength, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
+		vTargetPos = tr.endpos;
+	}
 
 	m_hSpotlightTarget = (CSpotlightEnd*)CreateEntityByName( "spotlight_end" );
 	m_hSpotlightTarget->Spawn();
-	m_hSpotlightTarget->SetAbsOrigin( tr.endpos );
+	m_hSpotlightTarget->SetAbsOrigin( vTargetPos );
 	m_hSpotlightTarget->SetOwnerEntity( this );
 	m_hSpotlightTarget->m_clrRender = m_clrRender;
 	m_hSpotlightTarget->m_Radius = m_flSpotlightMaxLength;
@@ -360,25 +395,20 @@ void CPointSpotlight::SpotlightCreate(void)
 	}
 
 	//m_hSpotlight = CBeam::BeamCreate( "sprites/spotlight.vmt", m_flSpotlightGoalWidth );
-	if ( FBitSet (m_spawnflags, SF_SPOTLIGHT_ALT_SPRITE) )
-	{
-		//Soft/Misty spotlight
+	if ( m_iszBeamSprite == NULL_STRING )
 		m_hSpotlight = CBeam::BeamCreate( "sprites/glow_test01.vmt", m_flSpotlightGoalWidth );
-	}
 	else
-	{
-		//Hard spotlight
-		m_hSpotlight = CBeam::BeamCreate( "sprites/glow_test02.vmt", m_flSpotlightGoalWidth );
-	}
+		m_hSpotlight = CBeam::BeamCreate( STRING(m_iszBeamSprite), m_flSpotlightGoalWidth );
+
 	// Set the temporary spawnflag on the beam so it doesn't save (we'll recreate it on restore)
 	m_hSpotlight->SetHDRColorScale( m_flHDRColorScale );
 	m_hSpotlight->AddSpawnFlags( SF_BEAM_TEMPORARY );
 	m_hSpotlight->SetColor( m_clrRender->r, m_clrRender->g, m_clrRender->b ); 
 	m_hSpotlight->SetHaloTexture(m_nHaloSprite);
-	m_hSpotlight->SetHaloScale(60);
+	m_hSpotlight->SetHaloScale(60);	//TODO;
 	m_hSpotlight->SetEndWidth(m_flSpotlightGoalWidth);
 	m_hSpotlight->SetBeamFlags( (FBEAM_SHADEOUT|FBEAM_NOTILE) );
-	m_hSpotlight->SetBrightness( 64 );
+	m_hSpotlight->SetBrightness( m_clrRender->a );	//TODO;
 	m_hSpotlight->SetNoise( 0 );
 	m_hSpotlight->SetMinDXLevel( m_nMinDXLevel );
 
@@ -402,9 +432,17 @@ Vector CPointSpotlight::SpotlightCurrentPos(void)
 	AngleVectors( GetAbsAngles(), &m_vSpotlightDir );
 
 	//	Get beam end point.  Only collide with solid objects, not npcs
-	trace_t tr;
-	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + (m_vSpotlightDir * 2 * m_flSpotlightMaxLength), MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
-	return tr.endpos;
+	Vector vEndPos = GetAbsOrigin() + ( m_vSpotlightDir * 2 * m_flSpotlightMaxLength );
+	if ( m_bIgnoreSolid )
+	{
+		return vEndPos;
+	}
+	else
+	{
+		trace_t tr;
+		UTIL_TraceLine( GetAbsOrigin(), vEndPos, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
+		return tr.endpos;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -450,7 +488,7 @@ void CPointSpotlight::SpotlightUpdate(void)
 		SpotlightDestroy();
 		return;
 	}
-	
+
 	if ( !m_hSpotlightTarget )
 	{
 		DevWarning( "**Attempting to update point_spotlight but target ent is NULL\n" );

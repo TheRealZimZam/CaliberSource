@@ -193,7 +193,7 @@ void CGenericNPC::Precache()
 }	
 
 // a really large health is set to make sure these never die.
-const int TOO_MUCH_HEALTH_TO_DIE = 1000;
+const int TOO_MUCH_HEALTH_TO_DIE = 9001;
 //=======================================================================================
 // Furniture: A dumb "NPC" that is uses in scripted sequences
 //			  where an NPC needs to be frame locked with a prop.

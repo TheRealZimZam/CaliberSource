@@ -63,14 +63,14 @@ bool CNPCSimpleTalker::KeyValue( const char *szKeyName, const char *szValue )
 
 void CNPCSimpleTalker::Precache( void )
 {
-	/*
 	// FIXME:  Need to figure out how to hook these...
+/*
 	if ( m_iszUse != NULL_STRING )
 		GetExpresser()->ModifyConcept( TLK_STARTFOLLOW, STRING( m_iszUse ) );
 	if ( m_iszUnUse != NULL_STRING )
 		GetExpresser()->ModifyConcept( TLK_STOPFOLLOW, STRING( m_iszUnUse ) );
+*/
 
-	*/
 	BaseClass::Precache();
 }
 
@@ -204,13 +204,13 @@ void CNPCSimpleTalker::StartTask( const Task_t *pTask )
 		break;
 
 	case TASK_TALKER_BETRAYED:
-		Speak( TLK_BETRAYED );
+		SpeakIfAllowed( TLK_BETRAYED );
 		TaskComplete();
 		break;
 
 	case TASK_TALKER_STOPSHOOTING:
 		// tell player to stop shooting
-		Speak( TLK_NOSHOOT );
+		SpeakIfAllowed( TLK_NOSHOOT );
 		TaskComplete();
 		break;
 	default:
@@ -300,11 +300,13 @@ Activity CNPCSimpleTalker::NPC_TranslateActivity( Activity eNewActivity )
 
 void CNPCSimpleTalker::Event_Killed( const CTakeDamageInfo &info )
 {
+#ifdef HL1_DLL
 	AlertFriends( info.GetAttacker() );
 	if ( info.GetAttacker()->GetFlags() & FL_CLIENT )
 	{
 		LimitFollowers( info.GetAttacker(), 0 );
 	}
+#endif
 	BaseClass::Event_Killed( info );
 }
 
@@ -367,13 +369,14 @@ void CNPCSimpleTalker::AlertFriends( CBaseEntity *pKiller )
 				{
 					CNPCSimpleTalker*pTalkNPC = (CNPCSimpleTalker *)pFriend;
 
+#if 0
 					if (pTalkNPC && pTalkNPC->IsOkToCombatSpeak())
 					{
 						// FIXME: need to check CanSpeakConcept?
 						pTalkNPC->Speak( TLK_BETRAYED );
 					}
-#if 0
-					pNPC->SetSchedule( SCHED_TALKER_BETRAYED );
+#else
+					pTalkNPC->SetSchedule( SCHED_TALKER_BETRAYED );
 #endif
 				}
 				else
@@ -628,22 +631,19 @@ int CNPCSimpleTalker::FIdleSpeak( void )
 			if ( pTarget->IsAlive() )
 			{
 				SetSpeechTarget( GetTarget() );
-				if (GetExpresser()->CanSpeakConcept( TLK_PLHURT3) && 
-					(GetTarget()->m_iHealth <= GetTarget()->m_iMaxHealth / 8))
+				if (GetTarget()->m_iHealth <= GetTarget()->m_iMaxHealth / 8)
 				{
-					Speak( TLK_PLHURT3 );
+					SpeakIfAllowed( TLK_PLHURT3 );
 					return true;
 				}
-				else if (GetExpresser()->CanSpeakConcept( TLK_PLHURT2) && 
-					(GetTarget()->m_iHealth <= GetTarget()->m_iMaxHealth / 4))
+				else if (GetTarget()->m_iHealth <= GetTarget()->m_iMaxHealth / 4)
 				{
-					Speak( TLK_PLHURT2 );
+					SpeakIfAllowed( TLK_PLHURT2 );
 					return true;
 				}
-				else if (GetExpresser()->CanSpeakConcept( TLK_PLHURT1) &&
-					(GetTarget()->m_iHealth <= GetTarget()->m_iMaxHealth / 2))
+				else if (GetTarget()->m_iHealth <= GetTarget()->m_iMaxHealth / 2)
 				{
-					Speak( TLK_PLHURT1 );
+					SpeakIfAllowed( TLK_PLHURT1 );
 					return true;
 				}
 			}
@@ -657,6 +657,7 @@ int CNPCSimpleTalker::FIdleSpeak( void )
 	}
 
 	// ROBIN: Disabled idle question & answer for now
+	// MM: This is handled in the baseclass
 	/*
 	// if there is a friend nearby to speak to, play sentence, set friend's response time, return
 	CBaseEntity *pFriend = FindNearestFriend(false);
@@ -791,6 +792,7 @@ void CNPCSimpleTalker::SetAnswerQuestion( CNPCSimpleTalker *pSpeaker )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+#ifdef HL1_DLL
 int CNPCSimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
 	CTakeDamageInfo subInfo = info;
@@ -809,12 +811,14 @@ int CNPCSimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 			{
 				pTalkNPC->Speak( TLK_NOSHOOT );
 			}
-#endif
+#else
 			pTalkNPC->SetSchedule( SCHED_TALKER_IDLE_STOP_SHOOTING );
+#endif
 		}
 	}
 	return BaseClass::OnTakeDamage_Alive( subInfo );
 }
+#endif
 
 int CNPCSimpleTalker::SelectNonCombatSpeechSchedule()
 {
@@ -910,10 +914,7 @@ void CNPCSimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 	{
 		if ( !m_FollowBehavior.GetFollowTarget() && IsInterruptable() )
 		{
-#if TOML_TODO
 			LimitFollowers( pCaller , 1 );
-#endif
-
 			if ( m_afMemory & bits_MEMORY_PROVOKED )
 				Msg( "I'm not following you, you evil person!\n" );
 			else
@@ -926,6 +927,49 @@ void CNPCSimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 			StopFollowing();
 		}
 	}
+}
+
+void CNPCSimpleTalker::StartFollowing( CBaseEntity *pLeader )
+{
+	if ( !HasSpawnFlags( SF_NPC_GAG ) )
+	{
+		if ( m_iszUse != NULL_STRING )
+		{
+			PlaySentence( STRING( m_iszUse ), 0.0f );
+		}
+		else
+		{
+			SpeakIfAllowed( TLK_STARTFOLLOW );
+		}
+
+		SetSpeechTarget( pLeader );
+	}
+
+	m_FollowBehavior.SetFollowTarget( pLeader ); 
+	DeferSchedulingToBehavior( &m_FollowBehavior );
+}
+
+void CNPCSimpleTalker::StopFollowing( void )
+{
+	if ( !(m_afMemory & bits_MEMORY_PROVOKED) )
+	{
+		if ( !HasSpawnFlags( SF_NPC_GAG ) )
+		{
+			if ( m_iszUnUse != NULL_STRING )
+			{
+				PlaySentence( STRING( m_iszUnUse ), 0.0f );
+			}
+			else
+			{
+				SpeakIfAllowed( TLK_STOPFOLLOW );
+			}
+
+			SetSpeechTarget( GetFollowTarget() );
+		}
+	}
+
+	m_FollowBehavior.SetFollowTarget( NULL ); 
+	DeferSchedulingToBehavior( NULL );
 }
 
 //-----------------------------------------------------------------------------

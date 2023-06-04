@@ -834,7 +834,7 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 	bool		gibbed = false;
 
 	EmitSound( "BaseCombatCharacter.CorpseGib" );
-	CSoundEnt::InsertSound( SOUND_MEAT, GetAbsOrigin(), 256, 25, this );
+	CSoundEnt::InsertSound( SMELL_MEAT, GetAbsOrigin(), 256, 25, this );
 
 	//Create a big puff of blood
 	Vector vecDamageDir = WorldSpaceCenter() - info.GetDamagePosition();
@@ -870,7 +870,7 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 	if (gibbed)
 	{
 		EmitSound( "BaseCombatCharacter.CorpseGib" );
-		CSoundEnt::InsertSound( SOUND_MEAT, GetAbsOrigin(), 256, 20, this );
+		CSoundEnt::InsertSound( SMELL_MEAT, GetAbsOrigin(), 256, 20, this );
 	}
 	return gibbed;
 }

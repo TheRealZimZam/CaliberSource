@@ -80,7 +80,7 @@ enum SCOND_t
 	COND_WAY_CLEAR,					// I no longer have to give way
 
 	COND_HEAR_COMBAT,				// Heard combat sounds
-	COND_HEAR_WORLD,
+	COND_HEAR_WORLD,				// World sounds (machines, doors, non-player footsteps, etc.)
 	COND_HEAR_PLAYER,
 	COND_HEAR_DANGER,				// Near something dangerous (grenade, map-danger, etc.)
 	COND_HEAR_BULLET_IMPACT,		// Heard a bullet/weapon impact

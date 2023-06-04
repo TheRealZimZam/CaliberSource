@@ -2173,6 +2173,7 @@ void CAI_FollowGoal::InputOutsideTransition( inputdata_t &inputdata )
 //
 // Purpose: Formation definitions
 //
+// TODO; This should be softcoded, its probably gonna change frequently
 
 // @TODO (toml 11-21-03): rework follow so we don't have to have class specifc formations in this file
 
@@ -2224,11 +2225,13 @@ struct AI_FollowFormation_t
 };
 
 //-------------------------------------
+// Medium cirlce with lots of tolerance
 
 static AI_FollowSlot_t g_SimpleFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
-	{ 1, { 0, 0, 0 }, 0, 96, 120, -1, 112 },
+	{ 1, { 0, 0, 0 }, 0, 96, 138, -1, 112 },
 	{ 1, { 0, 0, 0 }, 0, 112, 152, -1, 112 },
 	{ 1, { 0, 0, 0 }, 0, 112, 152, -1, 112 },
 	{ 1, { 0, 0, 0 }, 0, 112, 152, -1, 112 },
@@ -2251,9 +2254,9 @@ static AI_FollowFormation_t g_SimpleFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_SimpleFollowFormationSlots),
 	168,						// followPointTolerance
-	36,							// targetMoveTolerance
+	16,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
-	190,						// walkTolerance
+	220,						// walkTolerance
 	300,						// coverTolerance
 	300,						// enemyLOSTolerance
 	300,						// chaseEnemyTolerance
@@ -2266,6 +2269,7 @@ static AI_FollowFormation_t g_SimpleFollowFormation =
 
 static AI_FollowSlot_t g_WideFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 1, { 0, 0, 0 }, 0, 96, 180, -1, 112 },
 	{ 1, { 0, 0, 0 }, 0, 96, 180, -1, 112 },
 	{ 1, { 0, 0, 0 }, 0, 96, 200, -1, 112 },
@@ -2290,7 +2294,7 @@ static AI_FollowFormation_t g_WideFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_WideFollowFormationSlots),
 	168,						// followPointTolerance
-	42,							// targetMoveTolerance
+	32,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	190,						// walkTolerance
 	600,						// coverTolerance
@@ -2300,11 +2304,12 @@ static AI_FollowFormation_t g_WideFollowFormation =
 };
 
 //-------------------------------------
-// Tight wedge
+// Tight wedge - Used for commander mode orders
 #define COMMANDER_TOLERANCE 16	//13.0 * 1.415
 
 static AI_FollowSlot_t g_CommanderFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 2, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
 	{ 1, { 0, -COMMANDER_TOLERANCE, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
 	{ 1, { 0, COMMANDER_TOLERANCE, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
@@ -2320,7 +2325,7 @@ static AI_FollowFormation_t g_CommanderFollowFormation =
 	144,						// followPointTolerance
 	8,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
-	16,							// walkTolerance
+	16,	// Always run			// walkTolerance
 	400,						// coverTolerance
 	300,						// enemyLOSTolerance
 	300,						// chaseEnemyTolerance
@@ -2332,6 +2337,7 @@ static AI_FollowFormation_t g_CommanderFollowFormation =
 
 static AI_FollowSlot_t g_AntlionFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 150, 250, -1, 128 },
@@ -2356,7 +2362,7 @@ static AI_FollowFormation_t g_AntlionFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_AntlionFollowFormationSlots),
 	168,						// followPointTolerance
-	36,							// targetMoveTolerance
+	32,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	190,						// walkTolerance
 	1024,						// coverTolerance
@@ -2370,6 +2376,7 @@ static AI_FollowFormation_t g_AntlionFollowFormation =
 
 static AI_FollowSlot_t g_TightFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 1, { 0, 0, 0 }, 0, 0,  0, -1, 48 },
 	{ 1, { 0, 0, 0 }, 0, 0,  0, -1, 48 },
 	{ 1, { 0, 0, 0 }, 0, 0,  0, -1, 48 },
@@ -2383,7 +2390,7 @@ static AI_FollowFormation_t g_TightFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_CommanderFollowFormationSlots),
 	48,							// followPointTolerance
-	6,							// targetMoveTolerance
+	8,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	12,							// walkTolerance
 	300,						// coverTolerance
@@ -2396,6 +2403,7 @@ static AI_FollowFormation_t g_TightFollowFormation =
 
 static AI_FollowSlot_t g_MediumFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 1, { 0, 0, 0 }, 0, 156, 156, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 156, 156, -1, 128 },
 	{ 1, { 0, 0, 0 }, 0, 156, 156, -1, 128 },
@@ -2420,7 +2428,7 @@ static AI_FollowFormation_t g_MediumFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_MediumFollowFormationSlots),
 	168,						// followPointTolerance
-	36,							// targetMoveTolerance
+	32,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	190,						// walkTolerance
 	300,						// coverTolerance
@@ -2434,6 +2442,7 @@ static AI_FollowFormation_t g_MediumFollowFormation =
 
 static AI_FollowSlot_t g_SidekickFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 2, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
 	{ 2, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
@@ -2446,7 +2455,7 @@ static AI_FollowFormation_t g_SidekickFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS | AIFF_REQUIRE_LOS_OUTSIDE_COMBAT,
 	ARRAYSIZE(g_SidekickFollowFormationSlots),
 	168,						// followPointTolerance
-	36,							// targetMoveTolerance
+	40,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	190,						// walkTolerance
 	300,						// coverTolerance
@@ -2461,6 +2470,7 @@ static AI_FollowFormation_t g_SidekickFollowFormation =
 
 static AI_FollowSlot_t g_HunterFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 3, { 480, -240, -400 }, 0, 48, 64, 1000, 60 },
 	{ 3, { 480, 240, -400 }, 0, 48, 64, 1000, 60 },
 	{ 2, { 480, 0, -400 }, 0, 48, 64, 1000, 60 },
@@ -2473,7 +2483,7 @@ static AI_FollowFormation_t g_HunterFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_HunterFollowFormationSlots),
 	48,							// followPointTolerance
-	48,							// targetMoveTolerance
+	40,							// targetMoveTolerance
 	60,//180,						// repathOnRouteTolerance
 	0,							// walkTolerance
 	960,						// coverTolerance
@@ -2487,6 +2497,7 @@ static AI_FollowFormation_t g_HunterFollowFormation =
 
 static AI_FollowSlot_t g_VortigauntFollowFormationSlots[] = 
 {
+//priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
 	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
 	{ 1, { 0, 0, 0 }, 0, 120, 160, 256, 128 },
@@ -2511,7 +2522,7 @@ static AI_FollowFormation_t g_VortigauntFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS | AIFF_REQUIRE_LOS_OUTSIDE_COMBAT,
 	ARRAYSIZE(g_VortigauntFollowFormationSlots),
 	168,						// followPointTolerance
-	36,							// targetMoveTolerance
+	32,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	190,						// walkTolerance
 	300,						// coverTolerance

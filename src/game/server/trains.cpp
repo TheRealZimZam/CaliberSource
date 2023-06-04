@@ -317,14 +317,10 @@ void CFuncPlat::Setup( void )
 	}
 
 	if (m_flSpeed == 0)
-	{
 		m_flSpeed = 150;
-	}
 
 	if ( m_volume == 0.0f )
-	{
 		m_volume = 0.85f;
-	}
 }
 
 
@@ -761,7 +757,6 @@ public:
 
 LINK_ENTITY_TO_CLASS( func_train, CFuncTrain );
 
-
 BEGIN_DATADESC( CFuncTrain )
 
 	DEFINE_FIELD( m_hCurrentTarget, FIELD_EHANDLE ),
@@ -1040,22 +1035,20 @@ void CFuncTrain::SetupTarget( void )
 void CFuncTrain::Spawn( void )
 {
 	Precache();
-	
+
 	if ( m_flSpeed == 0 )
-	{
 		m_flSpeed = 100;
-	}
-	
+
+	if ( m_volume == 0.0f )
+		m_volume = 0.85f;
+
+	// ??? If its set to 0 designer doesnt want to do damage...
+//	if ( m_flBlockDamage == 0 )
+//		m_flBlockDamage = 2;
+
 	if ( !m_target )
-	{
 		Warning("FuncTrain '%s' has no target.\n", GetDebugName());
-	}
-	
-	if ( m_flBlockDamage == 0 )
-	{
-		m_flBlockDamage = 2;
-	}
-	
+
 	SetMoveType( MOVETYPE_PUSH );
 	SetSolid( SOLID_BSP );
 	SetModel( STRING( GetModelName() ) );
@@ -1065,11 +1058,6 @@ void CFuncTrain::Spawn( void )
 	}
 
 	m_activated = false;
-
-	if ( m_volume == 0.0f )
-	{
-		m_volume = 0.85f;
-	}
 }
 
 
@@ -1167,11 +1155,16 @@ void CFuncTrain::Stop( void )
 	}
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose: Tracktrain - new train
+//-----------------------------------------------------------------------------
+
 BEGIN_DATADESC( CFuncTrackTrain )
 
 	DEFINE_KEYFIELD( m_length, FIELD_FLOAT, "wheels" ),
 	DEFINE_KEYFIELD( m_height, FIELD_FLOAT, "height" ),
-	DEFINE_KEYFIELD( m_maxSpeed, FIELD_FLOAT, "startspeed" ),
+	DEFINE_KEYFIELD( m_maxSpeed, FIELD_FLOAT, "maxspeed" ),
 	DEFINE_KEYFIELD( m_flBank, FIELD_FLOAT, "bank" ),
 	DEFINE_KEYFIELD( m_flBlockDamage, FIELD_FLOAT, "dmg" ),
 	DEFINE_KEYFIELD( m_iszSoundMove, FIELD_SOUNDNAME, "MoveSound" ),
@@ -1219,6 +1212,7 @@ BEGIN_DATADESC( CFuncTrackTrain )
 
 	// Outputs
 	DEFINE_OUTPUT( m_OnStart, "OnStart" ),
+	DEFINE_OUTPUT( m_OnStop, "OnStop" ),
 	DEFINE_OUTPUT( m_OnNext, "OnNextPoint" ),
 
 	// Function Pointers
@@ -1566,6 +1560,7 @@ void CFuncTrackTrain::SetSpeed( float flSpeed, bool bAccel /*= false */  )
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::Stop( void )
 {
+	m_OnStop.FireOutput(this,this);
 	SetLocalVelocity( vec3_origin );
 	SetLocalAngularVelocity( vec3_angle );
 	m_oldSpeed = m_flSpeed;
@@ -2106,7 +2101,20 @@ void CFuncTrackTrain::UpdateOrientationBlend( TrainOrientationType_t eOrientatio
 
 	Quaternion qtPrev;
 	Quaternion qtNext;
-	
+
+#if 0
+	// hack to avoid gimble lock
+	if( angPrev[PITCH] == 90 )
+		angPrev[PITCH] = 89;
+	if( angPrev[PITCH] == -90 )
+		angPrev[PITCH] = -89;
+
+	if( angNext[PITCH] == 90 )
+		angNext[PITCH] = 89;
+	if( angNext[PITCH] == -90 )
+		angNext[PITCH] = 89;
+#endif
+
 	AngleQuaternion( angPrev, qtPrev );
 	AngleQuaternion( angNext, qtNext );
 
@@ -2133,7 +2141,7 @@ void CFuncTrackTrain::UpdateOrientationBlend( TrainOrientationType_t eOrientatio
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::DoUpdateOrientation( const QAngle &curAngles, const QAngle &angles, float flInterval )
 {
-	float vy, vx;
+	float vy, vx, vz;
 	if ( !(m_spawnflags & SF_TRACKTRAIN_NOPITCH) )
 	{
 		vx = UTIL_AngleDistance( angles.x, curAngles.x );
@@ -2144,7 +2152,16 @@ void CFuncTrackTrain::DoUpdateOrientation( const QAngle &curAngles, const QAngle
 	}
 
 	vy = UTIL_AngleDistance( angles.y, curAngles.y );
-	
+
+	if ( (m_spawnflags & SF_TRACKTRAIN_ALLOWROLL ) )
+	{
+		vz = UTIL_AngleDistance( angles.z, curAngles.z );
+	}
+	else
+	{
+		vz = 0;
+	}
+
 	// HACKHACK: Clamp really small angular deltas to avoid rotating movement on things
 	// that are close enough
 	if ( fabs(vx) < 0.1 )
@@ -2155,6 +2172,10 @@ void CFuncTrackTrain::DoUpdateOrientation( const QAngle &curAngles, const QAngle
 	{
 		vy = 0;
 	}
+	if ( fabs(vz) < 0.1 )
+	{
+		vz = 0;
+	}
 
 	if ( flInterval == 0 )
 	{
@@ -2162,8 +2183,7 @@ void CFuncTrackTrain::DoUpdateOrientation( const QAngle &curAngles, const QAngle
 		flInterval = 0.1;
 	}
 
-	QAngle vecAngVel( vx / flInterval, vy / flInterval, GetLocalAngularVelocity().z );
-
+	QAngle vecAngVel( vx / flInterval, vy / flInterval, vz / flInterval );
 	if ( m_flBank != 0 )
 	{
 		if ( vecAngVel.y < -5 )
@@ -2179,7 +2199,7 @@ void CFuncTrackTrain::DoUpdateOrientation( const QAngle &curAngles, const QAngle
 			vecAngVel.z = UTIL_AngleDistance( UTIL_ApproachAngle( 0, curAngles.z, m_flBank*4 ), curAngles.z) * 4;
 		}
 	}
-	
+
 	SetLocalAngularVelocity( vecAngVel );
 }
 
@@ -2227,6 +2247,8 @@ void CFuncTrackTrain::Next( void )
 		return;
 	}
 
+//	if ( !m_ppath )
+//		m_ppath = CPathTrack::Instance(FIND_ENTITY_BY_TARGETNAME( NULL, STRING(pev->target) ));
 	if ( !m_ppath )
 	{	
 		DevMsg( 2, "TRAIN(%s): Lost path\n", GetDebugName() );
@@ -2473,19 +2495,18 @@ void CFuncTrackTrain::Find( void )
 		return;
 	}
 
-
-
 	Vector nextPos = m_ppath->GetLocalOrigin();
 	Vector look = nextPos;
 	m_ppath->LookAhead( look, m_length, 0 );
 	nextPos.z += m_height;
 	look.z += m_height;
 
-	QAngle nextAngles;
+	QAngle nextAngles = m_ppath->GetLocalAngles();
 	if ( HasSpawnFlags( SF_TRACKTRAIN_FIXED_ORIENTATION ) )
 	{
 		nextAngles = GetLocalAngles();
 	}
+#if 0
 	else
 	{
 		VectorAngles( look - nextPos, nextAngles );
@@ -2494,15 +2515,15 @@ void CFuncTrackTrain::Find( void )
 			nextAngles.x = 0;
 		}
 	}
-
+#endif
 	Teleport( &nextPos, &nextAngles, NULL );
-
 	ArriveAtNode( m_ppath );
 
-	if ( m_flSpeed != 0 )
+	if ( m_flSpeed > 0 )
 	{
 		SetNextThink( gpGlobals->curtime + 0.1f );
 		SetThink( &CFuncTrackTrain::Next );
+		//m_flSpeed = m_startSpeed;
 		SoundUpdate();
 	}
 }
@@ -2584,27 +2605,10 @@ CFuncTrackTrain *CFuncTrackTrain::Instance( edict_t *pent )
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::Spawn( void )
 {
-	if ( m_maxSpeed == 0 )
-	{
-		if ( m_flSpeed == 0 )
-		{
-			m_maxSpeed = 100;
-		}
-		else
-		{
-			m_maxSpeed = m_flSpeed;
-		}
-	}
-
-	if ( m_nMoveSoundMinPitch == 0 )
-	{
-		m_nMoveSoundMinPitch = 60;
-	}
-
-	if ( m_nMoveSoundMaxPitch == 0 )
-	{
-		m_nMoveSoundMaxPitch = 200;
-	}
+	if ( m_flSpeed == 0 )
+		m_maxSpeed = 100;
+	else
+		m_maxSpeed = m_flSpeed;
 
 	SetLocalVelocity(vec3_origin);
 	SetLocalAngularVelocity( vec3_angle );
@@ -2612,9 +2616,7 @@ void CFuncTrackTrain::Spawn( void )
 	m_dir = 1;
 
 	if ( !m_target )
-	{
 		Msg("FuncTrackTrain '%s' has no target.\n", GetDebugName());
-	}
 
 	SetModel( STRING( GetModelName() ) );
 	SetMoveType( MOVETYPE_PUSH );
@@ -2624,7 +2626,6 @@ void CFuncTrackTrain::Spawn( void )
 	SetSolid( SOLID_BSP );
 #else
 	SetSolid( HasSpawnFlags( SF_TRACKTRAIN_HL1TRAIN ) ? SOLID_BSP : SOLID_VPHYSICS );
-	//SetSolid( SOLID_VPHYSICS );
 #endif
 
 	if ( HasSpawnFlags( SF_TRACKTRAIN_UNBLOCKABLE_BY_PLAYER ) )
@@ -2635,6 +2636,12 @@ void CFuncTrackTrain::Spawn( void )
 	{
 		AddSolidFlags( FSOLID_NOT_SOLID );
 	}
+
+	if ( m_nMoveSoundMinPitch == 0 )
+		m_nMoveSoundMinPitch = 60;
+
+	if ( m_nMoveSoundMaxPitch == 0 )
+		m_nMoveSoundMaxPitch = 200;
 
 	m_controlMins = CollisionProp()->OBBMins();
 	m_controlMaxs = CollisionProp()->OBBMaxs();

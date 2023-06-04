@@ -86,9 +86,6 @@ enum NodeInfoBits_e
 	bits_DONT_DROP				=	( 1 << 14 ),
 	
 	/****** NOTE: will need to change node graph save/load code if exceed 16 bits here ******/
-
-
-
 	bits_NODE_WC_NEED_REBUILD	=	0x10000000,	// Used to more nodes in WC edit mode
 	bits_NODE_WC_CHANGED		=	0x20000000,	// Node changed during WC edit
 

@@ -22,10 +22,9 @@
 
 extern CServerGameDLL g_ServerGameDLL;
 
-#if 0
 // Draw the editor sprite in-game for debug purposes
 ConVar showlogic( "showlogic", "0", FCVAR_CHEAT | FCVAR_DEVELOPMENTONLY, "Show sprites of logic entities" );
-
+#if 0
 //-----------------------------------------------------------------------------
 // Purpose: CLogicalEntitySprite
 // Can only be used for dormant entities, logics that are removed
@@ -37,14 +36,18 @@ class CLogicalEntitySprite : public CLogicalEntity
 
 public:
 	CLogicalEntitySprite( void );
+	void Think( void );
 
 private:
 	string_t m_iszSpriteName;
 };
 
 BEGIN_DATADESC( CLogicalEntitySprite )
-	DEFINE_KEYFIELD( m_iszSpriteName,		FIELD_STRING, "spritename" ),
+	DEFINE_KEYFIELD( m_iszSpriteName,		FIELD_STRING, "devsprite" ),
 END_DATADESC()
+
+//TODO; Code this thing
+//Make a sprite, remove it when this thing is removed
 #endif
 
 //-----------------------------------------------------------------------------
@@ -1710,6 +1713,7 @@ private:
 	int BuildCaseMap(unsigned char *puchMap);
 
 	// Inputs
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void InputValue( inputdata_t &inputdata );
 	void InputPickRandom( inputdata_t &inputdata );
 	void InputPickRandomShuffle( inputdata_t &inputdata );
@@ -1866,6 +1870,12 @@ void CLogicCase::InputPickRandom( inputdata_t &inputdata )
 	}
 }
 
+void CLogicCase::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	inputdata_t inputdata;
+	inputdata.pActivator = pActivator;
+	InputPickRandom( inputdata );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Makes the case statement choose a case at random.
@@ -2905,6 +2915,7 @@ CTriggerRelay::CTriggerRelay( void )
 	m_flRefireInterval = -1;
 	m_flRefireDuration = -1;
 	m_flTimeRefireDone = -1;
+	triggerType = USE_ON;
 }
 
 bool CTriggerRelay::KeyValue( const char *szKeyName, const char *szValue )
@@ -3053,7 +3064,7 @@ END_DATADESC()
 
 void CMultiManager::InputManagerTrigger( inputdata_t &data )
 {
-	ManagerUse ( NULL, NULL, USE_TOGGLE, 0 );
+	ManagerUse( data.pActivator, NULL, USE_TOGGLE, 0 );
 }
 
 bool CMultiManager::KeyValue( const char *szKeyName, const char *szValue )
@@ -3334,7 +3345,7 @@ void CTriggerEndSection::InputEndSection( inputdata_t &data )
 		//HACKY MCHACK - This works, but it's nasty. Alfred is going to fix a
 		//bug in gameui that prevents you from dropping to the main menu after
 		// calling disconnect.
-		 engine->ClientCommand ( pPlayer->edict(), "toggleconsole;disconnect\n");
+		 engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
 	}
 
 	UTIL_Remove( this );

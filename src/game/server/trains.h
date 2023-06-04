@@ -28,6 +28,7 @@
 #define SF_TRACKTRAIN_HL1TRAIN					0x0080
 #define SF_TRACKTRAIN_USE_MAXSPEED_FOR_PITCH	0x0100
 #define SF_TRACKTRAIN_UNBLOCKABLE_BY_PLAYER		0x0200
+#define SF_TRACKTRAIN_ALLOWROLL					0x0400
 
 #define TRAIN_ACTIVE	0x80 
 #define TRAIN_NEW		0xc0
@@ -54,6 +55,7 @@ enum TrainOrientationType_t
         TrainOrientation_LinearBlend,
         TrainOrientation_EaseInEaseOut,
 };
+
 
 class CFuncTrackTrain : public CBaseEntity
 {
@@ -180,7 +182,7 @@ private:
 	TrainVelocityType_t m_eVelocityType;
 	bool		m_bSoundPlaying;
 
-	COutputEvent m_OnStart,m_OnNext; 
+	COutputEvent m_OnStart,m_OnStop,m_OnNext; 
 
 	bool		m_bManualSpeedChanges;		// set when we want to send entity IO to govern speed and obey our TrainVelocityType_t
 	float		m_flDesiredSpeed;			// target speed, when m_bManualSpeedChanges is set

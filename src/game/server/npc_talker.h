@@ -50,6 +50,7 @@
 // Used for scientists and barneys
 //=========================================================
 
+#define SF_NPC_PREDISASTER			( 1 << 16 )	// This is a predisaster scientist or barney. Influences how they speak.
 #define TLK_CFRIENDS		4
 
 //=============================================================================
@@ -111,8 +112,10 @@ public:
 
 	virtual CAI_Expresser *CreateExpresser() { return new CNPCSimpleTalkerExpresser(this); }
 	
-	virtual void			StartFollowing( CBaseEntity *pLeader ) { m_FollowBehavior.SetFollowTarget( pLeader ); DeferSchedulingToBehavior( &m_FollowBehavior ); }
-	virtual void			StopFollowing( ) { m_FollowBehavior.SetFollowTarget( NULL ); DeferSchedulingToBehavior( NULL ); }
+//	virtual void			StartFollowing( CBaseEntity *pLeader ) { m_FollowBehavior.SetFollowTarget( pLeader ); DeferSchedulingToBehavior( &m_FollowBehavior ); }
+	virtual void			StartFollowing( CBaseEntity *pLeader );
+//	virtual void			StopFollowing( ) { m_FollowBehavior.SetFollowTarget( NULL ); DeferSchedulingToBehavior( NULL ); }
+	virtual void			StopFollowing( void );
 	CBaseEntity		*GetFollowTarget( void ) { return m_FollowBehavior.GetFollowTarget(); }
 
 	virtual void	OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  CAI_BehaviorBase *pNewBehavior );
@@ -121,7 +124,9 @@ public:
 	int				PlayScriptedSentence( const char *pszSentence, float delay, float volume, soundlevel_t soundlevel, bool bConcurrent, CBaseEntity *pListener );
 	virtual void 	FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void			Event_Killed( const CTakeDamageInfo &info );
+#ifdef HL1_DLL
 	int				OnTakeDamage_Alive( const CTakeDamageInfo &info );
+#endif
 
 	bool CreateBehaviors()
 	{
@@ -221,7 +226,7 @@ public:
 	void OnResumeMonolog() 		{	Speak( TLK_RESUME ); }
 	
 	int			m_nSpeak;						// number of times initiated talking
-	float		m_flNextIdleSpeechTime;
+//	float		m_flNextIdleSpeechTime;
 
 	static char *m_szFriends[TLK_CFRIENDS];		// array of friend names
 	CBaseEntity		*EnumFriends( CBaseEntity *pentPrevious, int listNumber, bool bTrace );

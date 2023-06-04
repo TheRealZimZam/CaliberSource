@@ -43,6 +43,8 @@ public:
 	void Event_Killed( const CTakeDamageInfo &info );
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
 	bool IsKnockedDown() { return m_bKnockedDown; }
+	
+	Activity NPC_TranslateActivity( Activity NewActivity );
 
 	// Various start tasks
 	virtual	void StartTaskRangeAttack1( const Task_t *pTask );

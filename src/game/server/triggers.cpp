@@ -4848,7 +4848,7 @@ void CServerRagdollTrigger::EndTouch(CBaseEntity *pOther)
 	}
 }
 
-#ifdef HL1_DLL
+
 //----------------------------------------------------------------------------------
 // func_friction
 //----------------------------------------------------------------------------------
@@ -4914,7 +4914,6 @@ void CFrictionModifier::EndTouch( CBaseEntity *pOther )
 	}
 }
 
-#endif //HL1_DLL
 
 bool IsTriggerClass( CBaseEntity *pEntity )
 {

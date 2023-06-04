@@ -1005,8 +1005,6 @@ bool CAI_Pathfinder::CanGiveWay( const Vector& vStart, const Vector& vEnd, CBase
 		{
 			return true;
 		}
-		
-		return false;
 
 		// FIXME: this is called in route creation, not navigation.  It shouldn't actually make
 		// anyone get out of their way, just see if they'll honor the request.
@@ -1014,18 +1012,18 @@ bool CAI_Pathfinder::CanGiveWay( const Vector& vStart, const Vector& vEnd, CBase
 		// things like breakables should know who is trying to break them, though a door hidden behind
 		// some boxes shouldn't be known to the AI even though a route should connect through them but
 		// be turned off.
-
 		/*
 		Vector moveDir	   = (vEnd - vStart).Normalize();
 		Vector blockerDir  = (pNPCBlocker->GetLocalOrigin()  - vStart);
 		float  blockerDist = DotProduct(moveDir,blockerDir);
 		Vector blockPos	   = vStart + (moveDir*blockerDist);
 
-		if (pNPCBlocker->RequestGiveWay ( m_owner->GetLocalOrigin(), blockPos, moveDir, m_owner->m_eHull))
+		if (pNPCBlocker->RequestGiveWay( m_owner->GetLocalOrigin(), blockPos, moveDir, m_owner->m_eHull))
 		{
 			return true;
 		}
 		*/
+		return false;
 	}
 	return false;
 }

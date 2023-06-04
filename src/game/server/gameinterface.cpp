@@ -754,6 +754,8 @@ void CServerGameDLL::DLLShutdown( void )
 		TheNavMesh = NULL;
 	}
 #endif
+	SteamClient()->ReleaseUser( GetHSteamPipe(), GetHSteamUser() );
+	SteamClient()->BReleaseSteamPipe( GetHSteamPipe() );
 
 	DisconnectTier3Libraries();
 	DisconnectTier2Libraries();

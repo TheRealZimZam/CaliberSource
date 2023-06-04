@@ -2497,13 +2497,14 @@ void CPhysicsProp::Spawn( )
 	}
 
 	//Episode 1 change:
+#if 0	//HL2_EPISODIC
 	//Hi, since we're trying to ship this game we'll just go ahead and make all these doors not fade out instead of changing all the levels.
 	if ( Q_strcmp( STRING( GetModelName() ), "models/props_c17/door01_left.mdl" ) == 0 )
 	{
 		SetFadeDistance( -1, 0 );
 		DisableAutoFade();
 	}
-	
+#endif
 }
 
 //-----------------------------------------------------------------------------

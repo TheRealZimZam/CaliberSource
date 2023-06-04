@@ -1,7 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ====
 //
-// A message forwarder. Fires an OnTrigger output when triggered, and can be
-// disabled to prevent forwarding outputs.
+// New version of multi_manager. Fires an OnTrigger output when triggered, and can be
+// disabled to prevent forwarding outputs multiple times.
 //
 // Useful as an intermediary between one entity and another for turning on or
 // off an I/O connection, or as a container for holding a set of outputs that
@@ -13,17 +13,46 @@
 #include "entityinput.h"
 #include "entityoutput.h"
 #include "eventqueue.h"
-#include "soundent.h"
-#include "logicrelay.h"
+//#include "soundent.h"
+//#include "logicrelay.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
+
+class CLogicRelay : public CLogicalEntity
+{
+public:
+	DECLARE_CLASS( CLogicRelay, CLogicalEntity );
+
+	CLogicRelay();
+
+	void Activate();
+	void Think();
+
+	// Input handlers
+	void InputEnable( inputdata_t &inputdata );
+	void InputEnableRefire( inputdata_t &inputdata );  // Private input handler, not in FGD
+	void InputDisable( inputdata_t &inputdata );
+	void InputToggle( inputdata_t &inputdata );
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void InputTrigger( inputdata_t &inputdata );
+	void InputCancelPending( inputdata_t &inputdata );
+
+	DECLARE_DATADESC();
+
+	// Outputs
+	COutputEvent m_OnTrigger;
+	COutputEvent m_OnSpawn;
+
+private:
+	bool m_bDisabled;
+	bool m_bWaitForRefire;			// Set to disallow a refire while we are waiting for our outputs to finish firing.
+};
 
 const int SF_REMOVE_ON_FIRE				= 0x001;	// Relay will remove itself after being triggered.
 const int SF_ALLOW_FAST_RETRIGGER		= 0x002;	// Unless set, relay will disable itself until the last output is sent.
 
 LINK_ENTITY_TO_CLASS(logic_relay, CLogicRelay);
-
 
 BEGIN_DATADESC( CLogicRelay )
 
@@ -143,7 +172,10 @@ void CLogicRelay::InputTrigger( inputdata_t &inputdata )
 	if ((!m_bDisabled) && (!m_bWaitForRefire))
 	{
 		m_OnTrigger.FireOutput( inputdata.pActivator, this );
-		
+#ifdef HL1_DLL
+		// If some nutter gave us a targetname instead of outputs, fire that too
+		FireTargets( STRING( m_target ), inputdata.pActivator, this, USE_ON, 0 );
+#endif
 		if (m_spawnflags & SF_REMOVE_ON_FIRE)
 		{
 			UTIL_Remove(this);
@@ -160,3 +192,9 @@ void CLogicRelay::InputTrigger( inputdata_t &inputdata )
 	}
 }
 
+void CLogicRelay::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	inputdata_t inputdata;
+	inputdata.pActivator = pActivator;
+	InputTrigger( inputdata );
+}

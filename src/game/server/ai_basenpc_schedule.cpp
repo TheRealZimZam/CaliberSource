@@ -3213,7 +3213,7 @@ void CAI_BaseNPC::RunDieTask()
 		else // !!!HACKHACK - put NPC in a thin, wide bounding box until we fix the solid type/bounding volume problem
 			UTIL_SetSize ( this, WorldAlignMins(), Vector ( WorldAlignMaxs().x, WorldAlignMaxs().y, WorldAlignMins().z + 1 ) );
 
-		if ( ShouldFadeOnDeath() )
+		if ( m_bFadeCorpse )
 		{
 			// this monster was created by a monstermaker... fade the corpse out.
 			SUB_StartFadeOut();
@@ -3221,7 +3221,7 @@ void CAI_BaseNPC::RunDieTask()
 		else
 		{
 			// body is gonna be around for a while... brutal
-			CSoundEnt::InsertSound(SOUND_CARCASS, GetAbsOrigin(), 384, 30 );
+			CSoundEnt::InsertSound(SMELL_CARCASS, GetAbsOrigin(), 384, 30 );
 		}
 	}
 }
@@ -4359,7 +4359,15 @@ void CAI_BaseNPC::TranslateNavGoal( CBaseEntity *pEnemy, Vector &chasePosition )
 		// UNDONE: Cache these per enemy instead?
 		Vector offset = pEnemy->EyePosition() - pEnemy->GetAbsOrigin();
 		chasePosition += offset;
+	//	tolerance = GetDefaultNavGoalTolerance();
 	}
+#if 0
+	else
+	{
+		// otherwise, leave chasePosition as is
+		tolerance = 0;
+	}
+#endif
 }
 
 

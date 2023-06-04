@@ -420,6 +420,23 @@ bool CWorld::KeyValue( const char *szKeyName, const char *szValue )
 		ConVarRef skyname( "sv_skyname" );
 		skyname.SetValue( szValue );
 	}
+/*
+	else if ( FStrEq(szKeyName, "sounds") )
+	{
+		gpGlobals->cdAudioTrack = atoi(szValue);
+	}
+*/
+	else if ( FStrEq(szKeyName, "WaveHeight") )
+	{
+		// Sent over net now.
+		m_flWaveHeight = atof(szValue) * (1.0/8.0);
+
+		ConVar *wateramp = ( ConVar * )cvar->FindVar( "sv_wateramp" );
+		if ( wateramp )
+		{
+			wateramp->SetValue( m_flWaveHeight );
+		}
+	}
 	else if ( FStrEq(szKeyName, "newunit") )
 	{
 		// Single player only.  Clear save directory if set
@@ -462,6 +479,7 @@ CWorld::CWorld( )
 	NetworkProp()->AttachEdict( INDEXENT(RequiredEdictIndex()) );
 	ActivityList_Init();
 	EventList_Init();
+//	NetworkStateManualMode( true );
 	
 	SetSolid( SOLID_BSP );
 	SetMoveType( MOVETYPE_NONE );

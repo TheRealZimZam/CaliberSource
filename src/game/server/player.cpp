@@ -2,7 +2,7 @@
 //
 // Purpose: Functions dealing with the player.
 //
-// Todo; Critical damage state, Kick/Desperate melee attack
+// Todo; Critical damage state
 //===========================================================================//
 
 #include "cbase.h"
@@ -801,7 +801,7 @@ void CBasePlayer::DeathSound( const CTakeDamageInfo &info )
 {
 	// Did we die from falling?
 	if ( m_bitsDamageType & DMG_FALL )
-		EmitSound( "Player.FallGib" );	// They died in the fall. Play a splat sound.
+		EmitSound( "Player.FallGib" );	// Play a splat sound.
 	else
 		EmitSound( "Player.Death" );
 
@@ -962,6 +962,7 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 		//Red damage indicator
 		UTIL_ScreenFade( this, red, 0.2f, 0.4f, FFADE_IN );
 		break;
+	case DMG_FREEZE:
 	case DMG_DROWN:
 		//Blue damage indicator
 		UTIL_ScreenFade( this, blue, 1.0f, 0.1f, FFADE_IN );
@@ -973,14 +974,12 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 	case DMG_PLASMA:
 		// Blue screen fade
 		UTIL_ScreenFade( this, blue, 0.2f, 0.4f, FFADE_MODULATE );
-		// Very small screen shake
-		UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 0.5, 1000, SHAKE_START, false );
 		// Burn sound 
 		EmitSound( "Player.PlasmaDamage" );
 		break;
 	case DMG_SHOCK:
-		// Blue indicator
-		UTIL_ScreenFade( this, blue, 0.2f, 0.2f, FFADE_IN );
+		// White indicator
+		UTIL_ScreenFade( this, white, 0.2f, 0.2f, FFADE_IN );
 		// Very small screen shake
 		UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 1.0, 1000, SHAKE_START, false );
 		break;
@@ -998,9 +997,10 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 		if ( flDamage > 1 )
 		{
 			UTIL_ScreenFade( this, white, 0.2f, 1.0f, FFADE_IN );
-			// Sonic damage sound
-			EmitSound( "Player.SonicDamage" );
-			if ( flDamage > 2 )
+			// Within blast radius, ring the ears
+			//!EmitSound( "Player.SonicDamage" );
+			// Directly in the center of the blast, make blind
+			if ( flDamage > 4 )
 			{
 				UTIL_ScreenFade( this, white, 0.2f, 5.0f, FFADE_IN );
 			}
@@ -1042,6 +1042,7 @@ void CBasePlayer::Cough( int CoughType )
 
 //------------------------------------------------------------------------------
 // Purpose : Toggle heartbeat sound for low health
+// TODO; This needs to be moved to the client
 //------------------------------------------------------------------------------
 void CBasePlayer::ToggleHeartbeat( void )
 {
@@ -1856,10 +1857,10 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 
 	Activity idealActivity = ACT_IDLE;
 
-	if ( m_lifeState != LIFE_DEAD )
+	if ( m_lifeState == LIFE_ALIVE )
 	{
 		// This could stand to be redone. Why is playerAnim abstracted from activity? (sjb)
-		// Because this should be a switch so we can save on those precious bytes (w.m)
+		// Because this should be a switch so we can save on those precious bytes (m)
 		switch (playerAnim) 
 		{
 			case PLAYER_JUMP:
@@ -1888,6 +1889,15 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 				{
 					idealActivity = m_Activity;
 				}
+				else if ( GetFlags() & FL_DUCKING )	// crouching
+				{
+					idealActivity = Weapon_TranslateActivity( ACT_CROUCHIDLE );
+					if ( speed > 1 )
+						idealActivity = Weapon_TranslateActivity( ACT_WALK_CROUCH );
+
+					if (idealActivity == ACT_INVALID)
+						idealActivity = ACT_CROUCHIDLE;
+				}
 				else if ( speed < 1 )	//Very slow move/being slightly pushed while idle
 				{
 					idealActivity = IsAiming() ? Weapon_TranslateActivity( ACT_IDLE_ANGRY ) : Weapon_TranslateActivity( ACT_IDLE );
@@ -1897,15 +1907,6 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 
 					if ( GetWaterLevel() > 1 || GetFlags() & FL_FLY )
 						idealActivity = ACT_HOVER;
-				}
-				else if ( GetFlags() & FL_DUCKING )	// crouching
-				{
-					idealActivity = Weapon_TranslateActivity( ACT_CROUCHIDLE );
-					if ( speed > 1 )
-						idealActivity = Weapon_TranslateActivity( ACT_WALK_CROUCH );
-
-					if (idealActivity == ACT_INVALID)
-						idealActivity = ACT_CROUCHIDLE;
 				}
 				else
 				{
@@ -2264,7 +2265,7 @@ void CBasePlayer::StartDeathCam( void )
 		return;
 	}
 
-#if 0
+#if 1
 	CBaseEntity *pSpot, *pNewSpot;
 	int iRand;
 
@@ -2288,15 +2289,20 @@ void CBasePlayer::StartDeathCam( void )
 		}
 
 		CreateCorpse();
-		StartObserverMode( pSpot->GetAbsOrigin(), pSpot->GetAbsAngles() );
+
+		// Now zip the player over to the intermission
+		SetAbsOrigin( pSpot->GetAbsOrigin() );
+		SetAbsAngles( pSpot->GetAbsAngles() );
+		StartObserverMode( OBS_MODE_FIXED );
 	}
 	else
 #endif
-
-	// no intermission spot. Push them up in the air, looking down at their corpse
-	CreateCorpse();
-	StartObserverMode( OBS_MODE_DEATHCAM );
-	return;
+	{
+		// no intermission spot. Push them up in the air, looking down at their corpse
+		CreateCorpse();
+		StartObserverMode( OBS_MODE_DEATHCAM );
+		return;
+	}
 }
 
 void CBasePlayer::StopObserverMode()
@@ -4347,6 +4353,7 @@ void CBasePlayer::SetSuitUpdate(char *name, int fgroup, int iNoRepeatTime)
 // UpdatePlayerSound - updates the position of the player's
 // reserved sound slot in the sound list.
 //=========================================================
+ConVar player_showsound( "player_showsound", "0", FCVAR_CHEAT, "Visualize the sound the player makes - for testing."  );
 void CBasePlayer::UpdatePlayerSound( void )
 {
 	int iBodyVolume;
@@ -4435,9 +4442,12 @@ void CBasePlayer::UpdatePlayerSound( void )
 
 	// Below are a couple of useful little bits that make it easier to visualize just how much noise the 
 	// player is making. 
-	//Vector forward = UTIL_YawToVector( pl.v_angle.y );
-	//UTIL_Sparks( GetAbsOrigin() + forward * iVolume );
-	//Msg( "%d/%d\n", iVolume, m_iTargetVolume );
+	if ( player_showsound.GetBool() )
+	{
+		Vector forward = UTIL_YawToVector( pl.v_angle.y );
+		UTIL_Smoke( GetAbsOrigin() + forward * iVolume, (iVolume*0.25), 15 );
+		DevMsg( "%d/%d\n", iVolume, m_iTargetVolume );
+	}
 }
 
 // This is a glorious hack to find free space when you've crouched into some solid space
@@ -4544,7 +4554,7 @@ void CBasePlayer::PostThink()
 			VPROF_SCOPE_BEGIN( "CBasePlayer::PostThink-Use" );
 			// Handle controlling an entity
 			if ( m_hUseEntity != NULL )
-			{ 
+			{
 				// if they've moved too far from the gun, or deployed another weapon, unuse the gun
 				if ( m_hUseEntity->OnControls( this ) && 
 					( !GetActiveWeapon() || GetActiveWeapon()->IsEffectActive( EF_NODRAW ) ||
@@ -5138,7 +5148,7 @@ void CBasePlayer::Precache( void )
 	PrecacheScriptSound( "Player.Jump" );
 	PrecacheScriptSound( "Player.BulletImpact" );
 	PrecacheScriptSound( "Player.PlasmaDamage" );
-	PrecacheScriptSound( "Player.SonicDamage" );
+	//!PrecacheScriptSound( "Player.SonicDamage" );
 	PrecacheScriptSound( "Player.Heartbeat" );
 	PrecacheScriptSound( "Player.DrownStart" );
 	PrecacheScriptSound( "Player.DrownContinue" );

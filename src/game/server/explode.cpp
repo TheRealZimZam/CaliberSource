@@ -2,7 +2,6 @@
 //
 // Purpose: Implements an explosion entity and a support spark shower entity.
 //
-// Todo; Radius override for dlights
 //=============================================================================//
 
 #include "cbase.h"
@@ -125,6 +124,8 @@ public:
 	EHANDLE m_hInflictor;
 	int m_iCustomDamageType;
 
+	float m_flFramerate;
+
 	// passed along to the RadiusDamage call
 	int m_iClassIgnore;
 	EHANDLE m_hEntityIgnore;
@@ -132,6 +133,7 @@ public:
 };
 
 LINK_ENTITY_TO_CLASS( env_explosion, CEnvExplosion );
+LINK_ENTITY_TO_CLASS( env_explode, CEnvExplosion );
 
 BEGIN_DATADESC( CEnvExplosion )
 
@@ -143,6 +145,7 @@ BEGIN_DATADESC( CEnvExplosion )
 	DEFINE_FIELD( m_sFireballSprite, FIELD_SHORT ),
 	DEFINE_FIELD( m_hInflictor, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_iCustomDamageType, FIELD_INTEGER ),
+	DEFINE_KEYFIELD( m_flFramerate, FIELD_FLOAT, "framerate" ),
 
 	DEFINE_FIELD( m_iClassIgnore, FIELD_INTEGER ),
 	DEFINE_KEYFIELD( m_hEntityIgnore, FIELD_EHANDLE, "ignoredEntity" ),
@@ -225,6 +228,14 @@ void CEnvExplosion::Spawn( void )
 
 	m_spriteScale = (int)flSpriteScale;
 	m_iCustomDamageType = -1;
+
+	if ( m_flFramerate == NULL )
+#ifdef HL1_DLL
+		m_flFramerate = 20;
+#else
+		m_flFramerate = 40;
+#endif
+
 }
 
 
@@ -312,8 +323,8 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 	te->Explosion( filter, 0.0,
 		&vecExplodeOrigin, 
 		( m_sFireballSprite < 1 ) ? g_sModelIndexFireball : m_sFireballSprite,
-		!( m_spawnflags & SF_ENVEXPLOSION_NOFIREBALL ) ? m_spriteScale : 0.0,
-		15,
+		m_spriteScale,
+		m_flFramerate,
 		nFlags,
 		iRadius,
 		m_iMagnitude );
@@ -367,7 +378,6 @@ void CEnvExplosion::InputExplode( inputdata_t &inputdata )
 			}
 		}
 	}
-
 }
 
 void CEnvExplosion::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
@@ -378,6 +388,29 @@ void CEnvExplosion::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE
 
 void CEnvExplosion::Smoke( void )
 {
+	if ( !( m_spawnflags & SF_ENVEXPLOSION_NOSMOKE ) )
+	{
+		// This is the old/proper way to do it, with a slightly modified custom sprite code
+		// It would send a message to the client (c_explode), but that doesnt exist...
+		Vector vecExplodeOrigin = GetAbsOrigin();
+#if 0
+		EntityMessageBegin( this, true );
+			WRITE_BYTE( TE_SMOKE );
+			WRITE_VEC3COORD( vecExplodeOrigin );
+			WRITE_SHORT( g_sModelIndexSmoke );
+			WRITE_BYTE( (BYTE)m_spriteScale ); // scale * 10
+			WRITE_BYTE( 12 ); // framerate
+		MessageEnd();
+#endif
+		CPVSFilter filter( vecExplodeOrigin );
+		te->Sprite( filter, 0.0,
+			&vecExplodeOrigin,
+			g_sModelIndexSmoke,
+			(m_spriteScale/2),
+			255, 
+			20 );
+	}
+
 	if ( !(m_spawnflags & SF_ENVEXPLOSION_REPEATABLE) )
 	{
 		UTIL_Remove( this );
@@ -424,6 +457,7 @@ void ExplosionCreate( const Vector &center, const QAngle &angles,
 	}
 	pExplosion->m_iClassIgnore = ignoredClass;
 
+	//pExplosion->Use( NULL, NULL, USE_TOGGLE, 0 );
 	pExplosion->AcceptInput( "Explode", NULL, NULL, emptyVariant, 0 );
 }
 

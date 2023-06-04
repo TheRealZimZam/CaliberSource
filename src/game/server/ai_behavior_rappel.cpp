@@ -89,7 +89,7 @@ void CRopeAnchor::FallThink()
 //---------------------------------------------------------
 void CRopeAnchor::RemoveThink()
 {
-	UTIL_Remove( m_hRope );	
+	UTIL_Remove( m_hRope );
 	SetThink( &CRopeAnchor::SUB_Remove );
 	SetNextThink( gpGlobals->curtime );
 }
@@ -128,8 +128,8 @@ void CAI_RappelBehavior::Precache()
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-#define RAPPEL_MAX_SPEED	600	// Go this fast if you're really high.
-#define RAPPEL_MIN_SPEED	60 // Go no slower than this.
+#define RAPPEL_MAX_SPEED	300	// Go this fast if you're really high.
+#define RAPPEL_MIN_SPEED	32 // Go no slower than this.
 #define RAPPEL_DECEL_DIST	(20.0f * 12.0f)	// Start slowing down when you're this close to the ground.
 void CAI_RappelBehavior::SetDescentSpeed()
 {

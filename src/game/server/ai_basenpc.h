@@ -1191,6 +1191,8 @@ public:
 	virtual void		AngrySound( void ) 							{ return; };	//I'm attacking somebody I dont like
 	virtual void		IdleSound( void )							{ return; };	//I'm not doing anything in particular
 	virtual void		PainSound( const CTakeDamageInfo &info )	{ return; };	//I just took damage
+	float				m_flNextPainSoundTime;										//Next time to make a yelp
+
 	virtual void		FearSound( void )				 			{ return; };	//I'm scared of something
 	virtual void		LostEnemySound( void ) 						{ return; };	//I have lost sight of my enemy
 	virtual void		FoundEnemySound( void ) 					{ return; };	//I just regained sight on a lost enemy

@@ -42,9 +42,6 @@ public:
 	void	HandleAnimEvent( animevent_t *pEvent );
 	int		GetSoundInterests ( void );
 
-	
-	void	TempGunEffect( void );
-
 	string_t			m_strHullName;
 
 	DECLARE_DATADESC();

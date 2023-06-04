@@ -97,6 +97,10 @@ BEGIN_DATADESC( CAI_ScriptedSequence )
 	DEFINE_INPUTFUNC( FIELD_VOID, "BeginSequence", InputBeginSequence ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "CancelSequence", InputCancelSequence ),
 
+	// scripted_schedule and scripted_sequence are used very interchangibly,
+	// so incase somebody forgot to update the inputs, let it work anyway.
+	DEFINE_INPUTFUNC( FIELD_VOID, "StartSchedule", InputBeginSequence ),
+
 	DEFINE_KEYFIELD( m_iPlayerDeathBehavior, FIELD_INTEGER, "onplayerdeath" ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "ScriptPlayerDeath", InputScriptPlayerDeath ),
 
@@ -279,6 +283,7 @@ bool CAI_ScriptedSequence::FCanOverrideState( void )
 void CAI_ScriptedSequence::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	inputdata_t inputdata;
+	inputdata.pActivator = pActivator;
 	InputMoveToPosition( inputdata );
 }
 

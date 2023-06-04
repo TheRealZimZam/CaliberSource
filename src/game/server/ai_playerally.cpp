@@ -657,14 +657,14 @@ bool CAI_PlayerAlly::SelectIdleSpeech( AISpeechSelection_t *pSelection )
 	if ( !IsOkToSpeak( SPEECH_IDLE ) )
 		return false;
 
+	// try to smell something
 	if ( GetBestScent() )
 	{
-		// Its a scent
 		switch( GetBestScent()->SoundTypeNoContext() )
 		{
-			case SOUND_CARCASS:
-			case SOUND_MEAT:
-			case SOUND_GARBAGE:
+			case SMELL_CARCASS:
+			case SMELL_MEAT:
+			case SMELL_GARBAGE:
 				if ( SpeakIfAllowed( TLK_SMELL ) )
 					return true;
 				break;
@@ -772,7 +772,6 @@ bool CAI_PlayerAlly::SelectInterjection()
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-
 bool CAI_PlayerAlly::SelectPlayerUseSpeech()
 {
 	if( IsOkToSpeakInResponseToPlayer() )
@@ -1205,6 +1204,31 @@ void CAI_PlayerAlly::TraceAttack( const CTakeDamageInfo &info, const Vector &vec
 {
 	const char *pszHitLocCriterion = NULL;
 
+#if 1
+	switch( ptr->hitgroup )
+	{
+		case HITGROUP_HEAD:
+			pszHitLocCriterion = "shotloc:head";
+		break;
+
+		case HITGROUP_LEFTLEG:
+		case HITGROUP_RIGHTLEG:
+			pszHitLocCriterion = "shotloc:leg";
+		break;
+
+		case HITGROUP_LEFTARM:
+		case HITGROUP_RIGHTARM:
+			pszHitLocCriterion = "shotloc:arm";
+		break;
+
+		case HITGROUP_STOMACH:
+			pszHitLocCriterion = "shotloc:gut";
+		break;
+
+		default:
+			break;
+	}
+#else
 	if ( ptr->hitgroup == HITGROUP_HEAD )
 	{
 		pszHitLocCriterion = "shotloc:head";
@@ -1221,9 +1245,10 @@ void CAI_PlayerAlly::TraceAttack( const CTakeDamageInfo &info, const Vector &vec
 	{
 		pszHitLocCriterion = "shotloc:gut";
 	}
+#endif
 
 	// set up the speech modifiers
-	CFmtStrN<128> modifiers( "%s,damageammo:%s", pszHitLocCriterion, info.GetAmmoName() );
+	CFmtStrN<128> modifiers( "%s,damageammo:%s,damage:%f", pszHitLocCriterion, info.GetAmmoName(), info.GetDamage() );
 
 	Speak( TLK_PAIN, modifiers );
 
@@ -1264,6 +1289,7 @@ int CAI_PlayerAlly::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		// its hopefully in good faith
 		if ( (jackAss && jackAss->IRelationType( this ) >= D_LI) )
 		{
+#ifdef ALLIES_CAN_BE_PROVOKED
 			if ( (info.GetAttacker()->GetFlags() & FL_CLIENT) )
 			{
 				// Player attacked me
@@ -1277,7 +1303,6 @@ int CAI_PlayerAlly::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 				if ( idiotDot > 0.97f )
 					bWasAccidental = false;
 
-#ifdef ALLIES_CAN_BE_PROVOKED
 				// I've already been attacked in bad faith, so it makes this easy
 				if (m_afMemory & bits_MEMORY_SUSPICIOUS)
 				{
@@ -1331,12 +1356,13 @@ int CAI_PlayerAlly::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 								Remember( bits_MEMORY_SUSPICIOUS );
 						}
 					}
-#endif
+
 					if (IsOkToSpeakInResponseToPlayer())
 						Speak( TLK_NOSHOOT );	//, modifiers
 				}
 			}
 			else
+#endif
 			{
 				if (IsOkToCombatSpeak())
 					Speak( TLK_NOSHOOT );

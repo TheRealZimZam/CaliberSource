@@ -680,6 +680,16 @@ void CBreakable::BreakTouch( CBaseEntity *pOther )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Break when triggered
+//-----------------------------------------------------------------------------
+void CBreakable::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	if ( !pActivator || pActivator->IsPlayer() )
+		return;
+
+	Break( pActivator );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Input handler for adding to the breakable's health.

@@ -109,9 +109,9 @@ bool CAI_BaseNPC::ScheduledMoveToGoalEntity( int scheduleType, CBaseEntity *pGoa
 	// HACKHACK: Call through TranslateNavGoal to fixup this goal position
 	// UNDONE: Remove this and have NPCs that need this functionality fix up paths in the 
 	// movement system instead of when they are specified.
-	AI_NavGoal_t goal(pGoalEntity->GetAbsOrigin(), movementActivity, AIN_DEF_TOLERANCE, AIN_YAW_TO_DEST);
+	AI_NavGoal_t goal(pGoalEntity->GetAbsOrigin(), movementActivity, 128/*AIN_DEF_TOLERANCE*/, AIN_YAW_TO_DEST);
 
-	TranslateNavGoal( pGoalEntity, goal.dest );
+	TranslateNavGoal( pGoalEntity, goal.dest/*, goal.tolerance*/ );
 	
 	return GetNavigator()->SetGoal( goal );
 }

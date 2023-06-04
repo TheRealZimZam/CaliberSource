@@ -400,7 +400,7 @@ void CGib::WaitTillLand ( void )
 			// ok, start stinkin!
 			// FIXME: It's too easy to fill up the sound queue with all these meat sounds
 			// Couldnt you just put a return here so it only plays once?
-			// CSoundEnt::InsertSound ( SOUND_MEAT, GetAbsOrigin(), 384, 25 );
+			// CSoundEnt::InsertSound ( SMELL_MEAT, GetAbsOrigin(), 384, 25 );
 			// return true;
 		}
 	}

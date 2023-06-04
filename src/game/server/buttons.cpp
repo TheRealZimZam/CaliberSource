@@ -791,12 +791,12 @@ void CBaseButton::ButtonBackHome( void )
 	}
 
 #ifdef HL1_DLL
-	if (!FStringNull(m_target))
+	if (STRING(m_target) != NULL)
 	{
 		edict_t* pentTarget	= NULL;
 		for (;;)
 		{
-			pentTarget = FIND_ENTITY_BY_TARGETNAME(pentTarget, STRING(pev->target));
+			pentTarget = gEntList.FindEntityByTarget(pentTarget, STRING(m_target));
 
 			if (FNullEnt(pentTarget))
 				break;

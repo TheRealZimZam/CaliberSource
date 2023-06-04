@@ -119,9 +119,11 @@ END_SEND_TABLE()
 void PlayLockSounds(CBaseEntity *pEdict, locksound_t *pls, int flocked, int fbutton)
 {
 	if ( pEdict->HasSpawnFlags( SF_DOOR_SILENT ) )
-	{
 		return;
-	}
+
+	if ( !pEdict->HasSpawnFlags( SF_DOOR_SILENT_TO_NPCS ) )
+		CSoundEnt::InsertSound( SOUND_PLAYER, pEdict->GetAbsOrigin(), 384, 0.5, pEdict );//<<TODO>>//magic number
+
 	float flsoundwait = ( fbutton ) ? BUTTON_SOUNDWAIT : DOOR_SOUNDWAIT;
 
 	if ( flocked )
@@ -220,13 +222,14 @@ void PlayLockSounds(CBaseEntity *pEdict, locksound_t *pls, int flocked, int fbut
 bool CBaseDoor::KeyValue( const char *szKeyName, const char *szValue )
 {
 	if (FStrEq(szKeyName, "locked_sentence"))
-	{
 		m_bLockedSentence = atof(szValue);
-	}
 	else if (FStrEq(szKeyName, "unlocked_sentence"))
-	{
 		m_bUnlockedSentence = atof(szValue);
-	}
+	// Old door, overwrite movesound
+	else if (FStrEq(szKeyName, "noise1"))
+		m_NoiseMoving = AllocPooledString(szValue);
+	else if (FStrEq(szKeyName, "noise2"))
+		m_NoiseArrived = AllocPooledString(szValue);
 	else
 		return BaseClass::KeyValue( szKeyName, szValue );
 
@@ -367,8 +370,10 @@ void CBaseDoor::StartMovingSound( void )
 {
 	MovingSoundThink();
 
-#ifdef CSTRIKE_DLL // this event is only used by CS:S bots
+	if ( !HasSpawnFlags( SF_DOOR_SILENT_TO_NPCS ) )
+		CSoundEnt::InsertSound( SOUND_WORLD, GetAbsOrigin(), 384, 0.5, this );//<<TODO>>//magic number
 
+#if defined( CSTRIKE_DLL ) // this event is only used by CS:S bots
 	CBasePlayer *player = ToBasePlayer(m_hActivator);
 	IGameEvent * event = gameeventmanager->CreateEvent( "door_moving" );
 	if( event )
@@ -377,8 +382,7 @@ void CBaseDoor::StartMovingSound( void )
 		event->SetInt( "userid", (player)?player->GetUserID():0 );
 		gameeventmanager->FireEvent( event );
 	}
-
-#endif
+#endif	//CSTRIKE_DLL
 }
 
 void CBaseDoor::StopMovingSound(void)
@@ -532,14 +536,12 @@ void CBaseDoor::Precache( void )
 	else
 	{
 		UTIL_ValidateSoundName( m_NoiseMoving,		"DoorSound.DefaultMove" );
-		UTIL_ValidateSoundName( m_NoiseArrived,		"DoorSound.DefaultArrive" );
-#ifndef HL1_DLL		
+		UTIL_ValidateSoundName( m_NoiseArrived,		"DoorSound.DefaultArrive" );	
 		UTIL_ValidateSoundName( m_ls.sLockedSound,	"DoorSound.DefaultLocked" );
-#endif
 		UTIL_ValidateSoundName( m_ls.sUnlockedSound,"DoorSound.Null" );
 	}
 
-#ifdef HL1_DLL
+//#ifdef HL1_DLL
 	if( m_ls.sLockedSound != NULL_STRING && strlen((char*)STRING(m_ls.sLockedSound)) < 4 )
 	{
 		// Too short to be ANYTHING ".wav", so it must be an old index into a long-lost
@@ -547,7 +549,7 @@ void CBaseDoor::Precache( void )
 		// original selection, but we don't get unresponsive doors.
 		m_ls.sLockedSound = AllocPooledString("buttons/button2.wav");
 	}
-#endif//HL1_DLL
+//#endif//HL1_DLL
 
 	//Precache them all
 	PrecacheScriptSound( (char *) STRING(m_NoiseMoving) );
@@ -630,7 +632,7 @@ void CBaseDoor::DoorTouch( CBaseEntity *pOther )
 
 			// Dont let dumb npcs like bugs and animals open doors
 			CAI_BaseNPC	*pNPC = pOther->MyNPCPointer();
-			if ( !(pNPC->CapabilitiesGet() & bits_CAP_AUTO_DOORS) )
+			if ( !(pNPC->CapabilitiesGet() & (bits_CAP_AUTO_DOORS)) )
 				return;
 		}
 		else
@@ -725,10 +727,20 @@ void CBaseDoor::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 		ChainUse();
 
 	// We can't +use this if it can't be +used
-	if ( m_hActivator != NULL && m_hActivator->IsPlayer() && HasSpawnFlags( SF_DOOR_PUSE ) == false )
+	if ( m_hActivator != NULL )
 	{
-		PlayLockSounds( this, &m_ls, TRUE, FALSE );
-		return;
+#if 0
+		if ( m_hActivator->IsPlayer() && HasSpawnFlags( SF_DOOR_PUSE ) == false )
+		{
+			PlayLockSounds( this, &m_ls, TRUE, FALSE );
+			return;
+		}
+#endif
+		if ( m_hActivator->IsNPC() )
+		{
+			if ( HasSpawnFlags(SF_DOOR_NONPCS) )
+				return;
+		}
 	}
 
 	bool bAllowUse = false;

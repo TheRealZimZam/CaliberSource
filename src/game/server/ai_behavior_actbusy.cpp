@@ -194,13 +194,13 @@ bool CActBusyAnimData::ParseActBusyFromKV( busyanim_t *pAnim, KeyValues *pSectio
 	{
 		pAnim->iBusyInterruptType = BA_INT_COMBAT;
 	}
-	else if ( !strcmp( sInterrupt, "BA_INT_ZOMBIESLUMP" ))
-	{
-		pAnim->iBusyInterruptType = BA_INT_ZOMBIESLUMP;
-	}
 	else if ( !strcmp( sInterrupt, "BA_INT_SIEGE_DEFENSE" ))
 	{
 		pAnim->iBusyInterruptType = BA_INT_SIEGE_DEFENSE;
+	}
+	else if ( !strcmp( sInterrupt, "BA_INT_ZOMBIESLUMP" ))
+	{
+		pAnim->iBusyInterruptType = BA_INT_ZOMBIESLUMP;
 	}
 	else
 	{
@@ -670,28 +670,29 @@ bool CAI_ActBusyBehavior::ShouldIgnoreSound( CSound *pSound )
 	if ( m_bBusy )
 	{
 		busyanim_t *pBusyAnim = g_ActBusyAnimDataSystem.GetBusyAnim( m_iCurrentBusyAnim );
-
-		if( pBusyAnim && pBusyAnim->iBusyInterruptType == BA_INT_ZOMBIESLUMP )
+		if ( pBusyAnim )
 		{
-			// Slumped zombies are deaf.
-			return true;
-		}
-
-		if ( pBusyAnim && ( pBusyAnim->iBusyInterruptType == BA_INT_AMBUSH ) || ( pBusyAnim->iBusyInterruptType == BA_INT_COMBAT ) )
-		{
-			/*
-			// Robin: First version ignored sounds in front of the NPC.
-			Vector vecToSound = (pSound->GetSoundReactOrigin() - GetAbsOrigin());
-			vecToSound.z = 0;
-			VectorNormalize( vecToSound );
-			Vector facingDir = GetOuter()->EyeDirection2D();
-			if ( DotProduct( vecToSound, facingDir ) > 0 )
+			if( pBusyAnim->iBusyInterruptType == BA_INT_ZOMBIESLUMP )
+			{
+				// Slumped zombies are deaf.
 				return true;
-			*/
-
-			// Ignore sounds that aren't visible
-			if ( !GetOuter()->FVisible( pSound->GetSoundReactOrigin() ) )
-				return true;
+			}
+			else if ( pBusyAnim->iBusyInterruptType == BA_INT_AMBUSH )
+			{
+				// Robin: First version ignored sounds in front of the NPC.
+				Vector vecToSound = (pSound->GetSoundReactOrigin() - GetAbsOrigin());
+				vecToSound.z = 0;
+				VectorNormalize( vecToSound );
+				Vector facingDir = GetOuter()->EyeDirection2D();
+				if ( DotProduct( vecToSound, facingDir ) > 0 )
+					return true;
+			}
+			else if ( pBusyAnim->iBusyInterruptType == BA_INT_COMBAT )
+			{
+				// Ignore sounds that aren't visible
+				if ( !GetOuter()->FVisible( pSound->GetSoundReactOrigin() ) )
+					return true;
+			}
 		}
 	}
 
@@ -1037,19 +1038,18 @@ void CAI_ActBusyBehavior::BuildScheduleTestBits( void )
 			break;
 
 			case BA_INT_AMBUSH:
+				GetOuter()->SetCustomInterruptCondition( COND_HEAR_BULLET_IMPACT );
+				// Fall through
 			case BA_INT_DANGER:
-			{
 				GetOuter()->SetCustomInterruptCondition( COND_LIGHT_DAMAGE );
 				GetOuter()->SetCustomInterruptCondition( COND_HEAVY_DAMAGE );
 				GetOuter()->SetCustomInterruptCondition( COND_HEAR_DANGER );
 				GetOuter()->SetCustomInterruptCondition( COND_HEAR_COMBAT );
-				GetOuter()->SetCustomInterruptCondition( COND_HEAR_BULLET_IMPACT );
 				GetOuter()->SetCustomInterruptCondition( COND_NEW_ENEMY );
 				GetOuter()->SetCustomInterruptCondition( COND_SEE_ENEMY );
 				GetOuter()->SetCustomInterruptCondition( COND_PLAYER_ADDED_TO_SQUAD );
 				GetOuter()->SetCustomInterruptCondition( COND_RECEIVED_ORDERS );
-				break;
-			}
+			break;
 
 			case BA_INT_PLAYER:
 			{
@@ -1064,16 +1064,16 @@ void CAI_ActBusyBehavior::BuildScheduleTestBits( void )
 
 				// The player can interrupt us
 				GetOuter()->SetCustomInterruptCondition( COND_SEE_PLAYER );
-				break;
 			}
+			break;
 
 			case BA_INT_COMBAT:
 			{
 				GetOuter()->SetCustomInterruptCondition( COND_LIGHT_DAMAGE );
 				GetOuter()->SetCustomInterruptCondition( COND_HEAVY_DAMAGE );
 				GetOuter()->SetCustomInterruptCondition( COND_HEAR_DANGER );
-				break;
 			}
+			break;
 
 			case BA_INT_NONE:
 				break;

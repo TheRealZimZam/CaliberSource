@@ -1123,7 +1123,7 @@ static ConCommand noclip("noclip", CC_Player_NoClip, "Toggle. Player becomes non
 //------------------------------------------------------------------------------
 // Sets client to godmode
 //------------------------------------------------------------------------------
-void CC_God_f (void)
+void CC_God_f(void)
 {
 	if ( !sv_cheats->GetBool() )
 		return;
@@ -1137,13 +1137,15 @@ void CC_God_f (void)
 
 	pPlayer->ToggleFlag( FL_GODMODE );
 	if (!(pPlayer->GetFlags() & FL_GODMODE ) )
-		ClientPrint( pPlayer, HUD_PRINTCONSOLE, "godmode OFF\n");
+		//ClientPrint( pPlayer, HUD_PRINTCONSOLE, "godmode OFF\n");
+		Msg("godmode OFF\n");
 	else
-		ClientPrint( pPlayer, HUD_PRINTCONSOLE, "godmode ON\n");
+		//ClientPrint( pPlayer, HUD_PRINTCONSOLE, "godmode ON\n");
+		Msg("godmode ON\n");
 }
 
 static ConCommand god("god", CC_God_f, "Toggle. Player becomes invulnerable.", FCVAR_CHEAT );
-
+static ConCommand iddqd("iddqd", CC_God_f, "Toggle. Player becomes invulnerable.", FCVAR_CHEAT );
 
 //------------------------------------------------------------------------------
 // Sets client to godmode

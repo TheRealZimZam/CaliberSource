@@ -49,10 +49,10 @@
 // Both shotguns use the same ammo, so average out their magazine size (better solution L8R)
 #define SIZE_AMMO_BUCKSHOT			5
 #define SIZE_AMMO_BUCKSHOT_MAG		7
-#define SIZE_AMMO_BUCKSHOT_LARGE	16	//Bigger box based on smaller box, for sweeper use clips
+#define SIZE_AMMO_BUCKSHOT_LARGE	20	//Bigger box based on smaller box, for sweeper use clips
 #define SIZE_AMMO_SLUG_MAG			7
 #define SIZE_AMMO_CROSSBOW			1
-#define SIZE_AMMO_FLAMER			100	// One tank
+#define SIZE_AMMO_FLAMETHROWER		100	// One tank
 #define SIZE_AMMO_PROJECTOR			200	// A full burst
 #define SIZE_AMMO_REVOLVER			6
 #endif

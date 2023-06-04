@@ -24,6 +24,7 @@ public:
 	void	Spawn( void );
 	void	Precache( void );
 	void	HurtThink( void );
+	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	// Input handlers
 	void InputTurnOn(inputdata_t &inputdata);
@@ -70,8 +71,7 @@ LINK_ENTITY_TO_CLASS( point_hurt, CPointHurt );
 void CPointHurt::Spawn(void)
 {
 	SetThink( NULL );
-	SetUse( NULL );
-		
+
 	m_pActivator = NULL;
 
 	if ( HasSpawnFlags( SF_PHURT_START_ON ) )
@@ -129,6 +129,20 @@ void CPointHurt::HurtThink( void )
 	}
 
 	SetNextThink( gpGlobals->curtime + m_flDelay );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CPointHurt::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// Toggle
+	m_pActivator = pActivator;
+
+	if ( m_pfnThink == (void (CBaseEntity::*)())&CPointHurt::HurtThink )
+		SetThink( NULL );
+	else
+		SetThink( &CPointHurt::HurtThink );
 }
 
 //-----------------------------------------------------------------------------

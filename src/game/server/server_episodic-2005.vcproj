@@ -166,7 +166,7 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				AdditionalIncludeDirectories="..\..\common;..\..\public;..\..\public\tier0;..\..\public\tier1;.\;..\..\game\shared;..\..\utils\common;..\..\game\shared\hl2;..\..\game\shared\episodic;.\hl2;.\episodic"
-				PreprocessorDefinitions="WIN32;_WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;GAME_DLL;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;fopen=dont_use_fopen;sprintf=use_Q_snprintf_instead_of_sprintf;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;HL2_DLL;HL2_EPISODIC;SP_SDK;USES_SAVERESTORE"
+				PreprocessorDefinitions="WIN32;_WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;GAME_DLL;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;fopen=dont_use_fopen;sprintf=use_Q_snprintf_instead_of_sprintf;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;_RETAIL;HL2_DLL;HL2_EPISODIC;SP_SDK;USES_SAVERESTORE"
 				StringPooling="true"
 				ExceptionHandling="0"
 				RuntimeLibrary="0"
@@ -1042,6 +1042,22 @@
 			</File>
 			<File
 				RelativePath=".\cbase.h"
+				>
+			</File>
+			<File
+				RelativePath=".\cbasehelicopter.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\cbasehelicopter.h"
+				>
+			</File>
+			<File
+				RelativePath=".\cbasespriteprojectile.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\cbasespriteprojectile.h"
 				>
 			</File>
 			<File
@@ -3684,22 +3700,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\cbasehelicopter.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\cbasehelicopter.h"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\cbasespriteprojectile.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\cbasespriteprojectile.h"
-					>
-				</File>
-				<File
 					RelativePath=".\hl2\citadel_effects.cpp"
 					>
 				</File>
@@ -4012,6 +4012,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\mortarfield.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\episodic\npc_advisor.cpp"
 					>
 				</File>
@@ -4049,6 +4053,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\npc_apcdriver.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\npc_ascanner.cpp"
 					>
 				</File>
 				<File
@@ -4173,10 +4181,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\npc_eli.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\npc_eli_test.cpp"
 					>
 				</File>
 				<File
@@ -4651,6 +4655,22 @@
 						>
 					</File>
 					<File
+						RelativePath=".\hl2\npc_bullsquid.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\hl2\npc_bullsquid.h"
+						>
+					</File>
+					<File
+						RelativePath=".\hl2\npc_houndeye.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\hl2\npc_houndeye.h"
+						>
+					</File>
+					<File
 						RelativePath=".\hl2\npc_missiledefense.cpp"
 						>
 					</File>
@@ -4682,11 +4702,39 @@
 						RelativePath=".\episodic\weapon_proto1.cpp"
 						>
 					</File>
+					<File
+						RelativePath=".\hl2\weapon_stickylauncher.cpp"
+						>
+					</File>
 				</Filter>
 			</Filter>
 			<Filter
 				Name="Multiplayer"
 				>
+			</Filter>
+			<Filter
+				Name="HL1 DLL"
+				>
+				<File
+					RelativePath=".\hl1\hl1_env_speaker.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_npc_barney.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_npc_barney.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_npc_scientist.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_npc_scientist.h"
+					>
+				</File>
 			</Filter>
 		</Filter>
 		<Filter
@@ -5174,10 +5222,6 @@
 			</File>
 			<File
 				RelativePath="..\..\public\tier0\l2cache.h"
-				>
-			</File>
-			<File
-				RelativePath=".\logicrelay.h"
 				>
 			</File>
 			<File

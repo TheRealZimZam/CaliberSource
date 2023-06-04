@@ -341,6 +341,7 @@ int			UTIL_EntityInSolid( CBaseEntity *ent );
 bool		UTIL_IsMasterTriggered	(string_t sMaster, CBaseEntity *pActivator);
 void		UTIL_BloodStream( const Vector &origin, const Vector &direction, int color, int amount );
 void		UTIL_BloodSpray( const Vector &pos, const Vector &dir, int color, int amount, int flags );
+void		UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, int amount );
 void		UTIL_GibSpray( const Vector &pos, const Vector &dir, int color, int amount );
 Vector		UTIL_RandomBloodVector( void );
 void		UTIL_ImpactTrace( trace_t *pTrace, int iDamageType, char *pCustomImpactName = NULL );
@@ -551,7 +552,11 @@ int SENTENCEG_Lookup(const char *sample);
 
 char TEXTURETYPE_Find( trace_t *ptr );
 
+void EMIT_SOUND_DYN(edict_t *entity, int channel, const char *sample, float volume, soundlevel_t attenuation,
+						   int flags, int pitch);
+
 void UTIL_EmitSoundSuit(edict_t *entity, const char *sample);
+#define EMIT_SOUND_SUIT UTIL_EmitSoundSuit
 int  UTIL_EmitGroupIDSuit(edict_t *entity, int isentenceg);
 int  UTIL_EmitGroupnameSuit(edict_t *entity, const char *groupname);
 void UTIL_RestartAmbientSounds( void );

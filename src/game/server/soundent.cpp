@@ -108,9 +108,9 @@ bool CSound::FIsScent( void )
 {
 	switch( m_iType )
 	{
-	case SOUND_CARCASS:
-	case SOUND_MEAT:
-	case SOUND_GARBAGE:
+	case SMELL_CARCASS:
+	case SMELL_MEAT:
+	case SMELL_GARBAGE:
 		return true;
 
 	default:

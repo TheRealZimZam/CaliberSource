@@ -6,6 +6,7 @@
 
 #include "cbase.h"
 #include "ai_basenpc.h"
+#include "baseanimating.h"
 #include "ai_motor.h"
 #include "basecombatweapon.h"
 #include "animation.h"
@@ -215,8 +216,103 @@ void CCycler::InputSetSequence( inputdata_t &inputdata )
 	}
 }
 
-// FIXME: this doesn't work anymore, and hasn't for a while now.
 
+//-----------------------------------------------------------------------------
+class CCyclerSprite : public CBaseAnimating
+{
+public:
+	DECLARE_CLASS( CCyclerSprite, CBaseAnimating );
+
+	void Spawn( void );
+	void Precache( void );
+	void Think( void );
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	virtual int	ObjectCaps( void ) { return (CBaseEntity :: ObjectCaps() | FCAP_DONT_SAVE | FCAP_IMPULSE_USE); }
+	int	OnTakeDamage( const CTakeDamageInfo &info );
+	void Animate( float frames );
+
+	DECLARE_DATADESC();
+
+	inline int		ShouldAnimate( void ) { return m_animate && m_maxFrame > 1.0; }
+	int			m_animate;
+	float		m_lastTime;
+	float		m_maxFrame;
+};
+
+BEGIN_DATADESC( CCyclerSprite )
+
+	// Fields
+	DEFINE_FIELD( m_animate, FIELD_INTEGER ),
+	DEFINE_FIELD( m_lastTime, FIELD_TIME ),
+	DEFINE_FIELD( m_maxFrame, FIELD_FLOAT ),
+
+END_DATADESC()
+
+LINK_ENTITY_TO_CLASS( cycler_sprite, CCyclerSprite );
+
+void CCyclerSprite::Spawn( void )
+{
+	Precache();
+
+	SetModel( STRING(GetModelName()) );
+
+	SetSolid( SOLID_NONE );
+	AddSolidFlags( FSOLID_NOT_SOLID );
+	SetMoveType( MOVETYPE_NONE );
+	m_takedamage		= DAMAGE_YES;
+
+	ResetSequenceInfo( );
+	SetCycle( 0 );
+	SetNextThink( gpGlobals->curtime + 1.0f );
+	m_animate			= 1;
+	m_lastTime			= gpGlobals->curtime;
+
+	m_maxFrame = (float)modelinfo->GetModelFrameCount( GetModel() ) - 1;
+}
+
+void CCyclerSprite::Precache()
+{
+	PrecacheModel( (const char *)STRING( GetModelName() ) );
+}
+
+void CCyclerSprite::Think( void )
+{
+	if ( ShouldAnimate() )
+		Animate( m_flPlaybackRate * (gpGlobals->curtime - m_lastTime) );
+
+	SetNextThink( gpGlobals->curtime + 0.2f );
+	m_lastTime = gpGlobals->curtime;
+}
+
+void CCyclerSprite::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	m_animate = !m_animate;
+	Warning( "Sprite: %s\n", STRING(GetModelName()) );
+}
+
+int	CCyclerSprite::OnTakeDamage( const CTakeDamageInfo &info )
+{
+	if (m_animate)
+	{
+		if ( m_maxFrame > 1.0 )
+		{
+			Animate( 1.0 );
+		}
+	}
+
+	return 0;
+}
+
+void CCyclerSprite::Animate( float frames )
+{ 
+	SetCycle( frames );
+	if ( m_maxFrame > 0 )
+		SetCycle(fmod( GetCycle(), m_maxFrame ));
+}
+
+
+//-----------------------------------------------------------------------------
+// FIXME: this doesn't work anymore, and hasn't for a while now.
 class CWeaponCycler : public CBaseCombatWeapon
 {
 	DECLARE_DATADESC();
@@ -265,8 +361,6 @@ void CWeaponCycler::Spawn( )
 	SetTouch( &CWeaponCycler::DefaultTouch );
 }
 
-
-
 bool CWeaponCycler::Deploy( )
 {
 	CBaseCombatCharacter *pOwner = GetOwner();
@@ -282,7 +376,6 @@ bool CWeaponCycler::Deploy( )
 	return false;
 }
 
-
 bool CWeaponCycler::Holster( CBaseCombatWeapon *pSwitchingTo )
 {
 	CBaseCombatCharacter *pOwner = GetOwner();
@@ -294,13 +387,11 @@ bool CWeaponCycler::Holster( CBaseCombatWeapon *pSwitchingTo )
 	return true;
 }
 
-
 void CWeaponCycler::PrimaryAttack()
 {
 	SendWeaponAnim( GetSequence() );
 	m_flNextPrimaryAttack = gpGlobals->curtime + 0.3;
 }
-
 
 void CWeaponCycler::SecondaryAttack( void )
 {
@@ -326,7 +417,7 @@ void CWeaponCycler::SecondaryAttack( void )
 }
 
 
-
+//-----------------------------------------------------------------------------
 // Flaming Wreakage
 class CWreckage : public CAI_BaseNPC
 {

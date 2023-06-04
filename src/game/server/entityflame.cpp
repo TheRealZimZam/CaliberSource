@@ -18,6 +18,15 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+extern ConVar fire_dmginterval;
+#define FLAME_DAMAGE_INTERVAL	fire_dmginterval.GetFloat()
+
+extern ConVar fire_dmgbase;
+#define FLAME_DAMAGE	fire_dmgbase.GetFloat()
+
+#define FLAME_DIRECT_DAMAGE ( FLAME_DIRECT_DAMAGE_PER_SEC * FLAME_DAMAGE_INTERVAL )
+#define FLAME_RADIUS_DAMAGE ( FLAME_DAMAGE * FLAME_DAMAGE_INTERVAL )
+
 BEGIN_DATADESC( CEntityFlame )
 
 	DEFINE_KEYFIELD( m_flLifetime, FIELD_FLOAT, "lifetime" ),
@@ -310,7 +319,7 @@ void CEntityFlame::FlameThink( void )
 		// Directly harm the entity I'm attached to. This is so we can precisely control how much damage the entity
 		// that is on fire takes without worrying about the flame's position relative to the bodytarget (which is the
 		// distance that the radius damage code uses to determine how much damage to inflict)
-		m_hEntAttached->TakeDamage( CTakeDamageInfo( this, this, FLAME_DIRECT_DAMAGE, DMG_BURN | DMG_DIRECT ) );
+		m_hEntAttached->TakeDamage( CTakeDamageInfo( this, this, FLAME_DAMAGE, DMG_BURN | DMG_DIRECT ) );
 
 		if( !m_hEntAttached->IsNPC() && hl2_episodic.GetBool() )
 		{

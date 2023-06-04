@@ -10,6 +10,7 @@
 #include "entitylist.h"
 #include "soundenvelope.h"
 #include "engine/IEngineSound.h"
+#include "eventqueue.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -41,20 +42,22 @@ class CFuncTankTrain : public CFuncTrackTrain
 {
 public:
 	DECLARE_CLASS( CFuncTankTrain, CFuncTrackTrain );
+	CFuncTankTrain( void );
 
 	void Spawn( void );
+	bool KeyValue( const char *szKeyName, const char *szValue );
 
 	// Filter out damage messages that don't contain blast damage (impervious to other forms of attack)
 	int	OnTakeDamage( const CTakeDamageInfo &info );
+	void InputMakeDead(inputdata_t &data);
 	void Event_Killed( const CTakeDamageInfo &info );
-	void Blocked( CBaseEntity *pOther )
-	{
-		// FIxme, set speed to zero?
-	}
+	void Blocked( CBaseEntity *pOther );
+
 	DECLARE_DATADESC();
 
 private:
-
+	bool		m_bRemoveOnDeath;
+	string_t	m_dietarget;	//Obsolete dietarget
 	COutputEvent m_OnDeath;
 };
 
@@ -62,16 +65,38 @@ LINK_ENTITY_TO_CLASS( func_tanktrain, CFuncTankTrain );
 
 BEGIN_DATADESC( CFuncTankTrain )
 
+	DEFINE_KEYFIELD( m_bRemoveOnDeath,	FIELD_BOOLEAN, "removeondeath" ),
+
+	// Inputs
+	DEFINE_INPUTFUNC( FIELD_VOID, "Destroy", InputMakeDead ),
+
 	// Outputs
 	DEFINE_OUTPUT(m_OnDeath, "OnDeath"),
 
 END_DATADESC()
 
+CFuncTankTrain::CFuncTankTrain(void)
+{
+	m_bRemoveOnDeath = false;
+}
 
 void CFuncTankTrain::Spawn( void )
 {
-	m_takedamage = true;
+	m_takedamage = DAMAGE_YES;	//true;
+	if ( m_iHealth <= 0 )
+		m_iHealth = 100;	//If health is not set, default to 100
+
 	BaseClass::Spawn();
+}
+
+bool CFuncTankTrain::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if (FStrEq(szKeyName, "dietarget"))
+		m_dietarget = AllocPooledString(szValue);
+	else
+		return BaseClass::KeyValue( szKeyName, szValue );
+
+	return true;
 }
 
 // Filter out damage messages that don't contain blast damage (impervious to other forms of attack)
@@ -80,9 +105,19 @@ int	CFuncTankTrain::OnTakeDamage( const CTakeDamageInfo &info )
 	if ( ! (info.GetDamageType() & DMG_BLAST) )
 		return 0;
 
+	if ( m_iHealth <= 0 )
+		Event_Killed( info );
+
 	return BaseClass::OnTakeDamage( info );
 }
 
+void CFuncTankTrain::InputMakeDead( inputdata_t &inputdata )
+{
+	CTakeDamageInfo info;
+	info.SetDamage( m_iHealth );
+	info.SetAttacker( inputdata.pActivator );
+	Event_Killed( info );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Called when the train is killed.
@@ -93,12 +128,41 @@ int	CFuncTankTrain::OnTakeDamage( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CFuncTankTrain::Event_Killed( const CTakeDamageInfo &info )
 {
-	m_takedamage = DAMAGE_NO;
-	m_lifeState = LIFE_DEAD;
+	Stop();
 
-	m_OnDeath.FireOutput( info.GetInflictor(), this );
+	m_takedamage = DAMAGE_NO;
+
+	if ( m_bRemoveOnDeath )
+		m_lifeState = LIFE_DEAD;	//Tanks usually dont 'die', they just stop working
+
+	// Tell my killer that he got me!
+	if( info.GetAttacker() )
+	{
+		info.GetAttacker()->Event_KilledOther(this, info);
+		g_EventQueue.AddEvent( info.GetAttacker(), "KilledNPC", 0.3, this, this );
+	}
+
+	if ( m_dietarget != NULL_STRING )
+		FireTargets( STRING( m_dietarget ), this, this, USE_ON, 0 );
+
+	m_OnDeath.FireOutput( info.GetAttacker(), this );
+
+	SetUse( NULL );
+	SetThink( NULL );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Handles a train being blocked by an entity.
+// Input  : pOther - What was hit.
+//-----------------------------------------------------------------------------
+void CFuncTankTrain::Blocked( CBaseEntity *pOther )
+{
+	// Lower speed 
+	SetSpeed( (m_flSpeed * 0.5) );
+	// TODO; Get the mass of the offending objekt
+
+	BaseClass::Blocked( pOther );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Changes the target entity for a func_tank or tanktrain_ai
@@ -127,7 +191,6 @@ BEGIN_DATADESC( CTankTargetChange )
 
 END_DATADESC()
 
-
 void CTankTargetChange::Precache( void )
 {
 	BaseClass::Precache();
@@ -150,7 +213,9 @@ void CTankTargetChange::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 }
 
 
+//-----------------------------------------------------------------------------
 // UNDONE: Should be just a logical entity, but we act as another static sound channel for the train
+//-----------------------------------------------------------------------------
 class CTankTrainAI : public CPointEntity
 {
 public:
@@ -176,7 +241,7 @@ public:
 	void InputTargetEntity( inputdata_t &inputdata );
 
 private:
-	CHandle<CFuncTrackTrain>	m_hTrain;
+	CHandle<CFuncTankTrain>	m_hTrain;
 	EHANDLE			m_hTargetEntity;
 	int				m_soundPlaying;
 
@@ -258,7 +323,7 @@ void CTankTrainAI::Precache( void )
 
 int CTankTrainAI::SoundEnginePitch( void )
 {
-	CFuncTrackTrain *pTrain = m_hTrain;
+	CFuncTankTrain *pTrain = m_hTrain;
 	
 	// we know this isn't NULL here
 	if ( pTrain->GetMaxSpeed() )
@@ -271,7 +336,7 @@ int CTankTrainAI::SoundEnginePitch( void )
 
 void CTankTrainAI::SoundEngineStart( void )
 {
-	CFuncTrackTrain *pTrain = m_hTrain;
+	CFuncTankTrain *pTrain = m_hTrain;
 
 	SoundEngineStop();
 	// play startup sound for train
@@ -360,14 +425,14 @@ void CTankTrainAI::Activate( void )
 	
 	CBaseEntity *pTarget = NULL;
 
-	CFuncTrackTrain *pTrain = NULL;
+	CFuncTankTrain *pTrain = NULL;
 
 	if ( m_target != NULL_STRING )
 	{
 		do
 		{
 			pTarget = gEntList.FindEntityByName( pTarget, m_target );
-			pTrain = dynamic_cast<CFuncTrackTrain *>(pTarget);
+			pTrain = dynamic_cast<CFuncTankTrain *>(pTarget);
 		} while (!pTrain && pTarget);
 	}
 
@@ -471,7 +536,7 @@ int PathFindDirection( CPathTrack *pStart, const Vector &startPosition, const Ve
 //-----------------------------------------------------------------------------
 void CTankTrainAI::Think( void )
 {
-	CFuncTrackTrain *pTrain = m_hTrain;
+	CFuncTankTrain *pTrain = m_hTrain;
 
 	if ( !pTrain || pTrain->m_lifeState != LIFE_ALIVE )
 	{
@@ -511,7 +576,8 @@ void CTankTrainAI::Think( void )
 	{
 		int wasMoving = (pTrain->m_flSpeed == 0) ? false : true;
 		// chaser wants train to move, send message
-		pTrain->SetSpeed( desired );
+		pTrain->SetSpeed( (desired*pTrain->GetMaxSpeed()), true );
+
 		int isMoving = (pTrain->m_flSpeed == 0) ? false : true;
 
 		if ( !isMoving && wasMoving )
@@ -529,6 +595,7 @@ void CTankTrainAI::Think( void )
 	else
 	{
 		SoundEngineStop();
+		pTrain->SetSpeed( desired );
 		// UNDONE: Align the think time with arrival, and bump this up to a few seconds
 		SetNextThink( gpGlobals->curtime + 1.0f );
 	}

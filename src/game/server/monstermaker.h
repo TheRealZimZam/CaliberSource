@@ -17,7 +17,8 @@
 // Spawnflags
 //-----------------------------------------------------------------------------
 #define	SF_NPCMAKER_START_ON		1	// start active ( if has targetname )
-#define SF_NPCMAKER_NPCCLIP			8	// Children are blocked by NPCclip
+#define	SF_NPCMAKER_CYCLIC			4	// drop one monster every time fired.
+#define SF_NPCMAKER_NPCCLIP			8	// Children are blocked by monsterclip
 #define SF_NPCMAKER_FADE			16	// Children's corpses fade
 #define SF_NPCMAKER_INF_CHILD		32	// Infinite number of children
 #define	SF_NPCMAKER_NO_DROP			64	// Do not adjust for the ground's position when checking for spawn
@@ -75,7 +76,8 @@ public:
 	void InputSetSpawnFrequency( inputdata_t &inputdata );
 
 	// State changers
-	void Toggle( void );
+	virtual void ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	virtual void CyclicUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	virtual void Enable( void );
 	virtual void Disable( void );
 

@@ -1373,6 +1373,78 @@ void UTIL_BloodStream( const Vector &origin, const Vector &direction, int color,
 	te->BloodStream( filter, 0.0, &origin, &direction, 247, 63, 14, 255, min( amount, 255 ) );
 }				
 
+void UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, int amount )
+{
+	if ( !UTIL_ShouldShowBlood( color ) )
+		return;
+
+	if ( color == DONT_BLEED || amount == 0 )
+		return;
+
+	if ( g_Language.GetInt() == LANGUAGE_GERMAN && color == BLOOD_COLOR_RED )
+		color = 0;
+
+	if ( g_pGameRules->IsMultiplayer() )
+	{
+		// scale up blood effect in multiplayer for better visibility
+		amount *= 4;
+	}
+
+	if ( amount > 255 )
+		amount = 255;
+
+	if (color == BLOOD_COLOR_MECH)
+	{
+		g_pEffects->Sparks(origin);
+		if (random->RandomFloat(0, 2) >= 1)
+		{
+			UTIL_Smoke(origin, random->RandomInt(10, 15), 10);
+		}
+	}
+	else
+	{
+		int	r, g, b;
+		switch ( color )
+		{
+		default:
+		case BLOOD_COLOR_RED:
+			if ( g_pGameRules->IsMultiplayer() )
+			{
+				r = 255;
+				g = 32;
+				b = 32;
+			}
+			else
+			{
+				r = 128;
+				g = 0;
+				b = 0;
+			}
+			break;
+
+		case BLOOD_COLOR_YELLOW:
+			r = 128;
+			g = 128;
+			b = 0;
+			break;
+
+		case BLOOD_COLOR_GREEN:
+			r = 32;
+			g = 128;
+			b = 0;
+			break;
+
+		case BLOOD_COLOR_BLUE:
+			r = 32;
+			g = 32;
+			b = 128;
+			break;
+		}
+
+		CPVSFilter filter( origin );
+		te->BloodSprite( filter, 0.0, &origin, &direction, r, g, b, 255, min( max( 3, amount / 10 ), 16 ) );
+	}
+}
 
 Vector UTIL_RandomBloodVector( void )
 {

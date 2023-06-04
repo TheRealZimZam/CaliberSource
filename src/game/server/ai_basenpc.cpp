@@ -3182,7 +3182,7 @@ void CAI_BaseNPC::UpdateEfficiency( bool bInPVS )
 
 	//---------------------------------
 
-	if ( !IsRetail() && ai_efficiency_override.GetInt() > AIE_NORMAL && ai_efficiency_override.GetInt() <= AIE_DORMANT )
+	if ( ai_efficiency_override.GetInt() > AIE_NORMAL && ai_efficiency_override.GetInt() <= AIE_DORMANT )
 	{
 		SetEfficiency( (AI_Efficiency_t)ai_efficiency_override.GetInt() );
 		return;
@@ -4618,7 +4618,7 @@ bool CAI_BaseNPC::CanFlinch( void )
 
 	if ( m_flNextFlinchTime >= gpGlobals->curtime )
 		return false;
-	
+
 	if ( IsActiveDynamicInteraction() )
 		return false;
 
@@ -6654,15 +6654,10 @@ void CAI_BaseNPC::SetupVPhysicsHull()
 	{
 		float mass = Studio_GetMass(GetModelPtr());
 		if ( mass > 0 )
-		{
 			pPhysObj->SetMass( mass );
-		}
-#if _DEBUG
 		else
-		{
 			DevMsg("Warning: %s has no physical mass\n", STRING(GetModelName()));
-		}
-#endif
+
 		IPhysicsShadowController *pController = pPhysObj->GetShadowController();
 		float avgsize = (WorldAlignSize().x + WorldAlignSize().y) * 0.5;
 		pController->SetTeleportDistance( avgsize * 0.5 );
@@ -7410,13 +7405,9 @@ void CAI_BaseNPC::StartNPC( void )
 		SetGoalEnt( gEntList.FindEntityByName( NULL, m_target ) );
 
 		if ( !GetGoalEnt() )
-		{
 			Warning( "ReadyNPC()--%s couldn't find target %s\n", GetClassname(), STRING(m_target));
-		}
 		else
-		{
 			StartTargetHandling( GetGoalEnt() );
-		}
 	}
 
 	//SetState ( m_IdealNPCState );
@@ -7491,13 +7482,31 @@ void CAI_BaseNPC::StartNPC( void )
 
 void CAI_BaseNPC::StartTargetHandling( CBaseEntity *pTargetEnt )
 {
+	// TODO; This is where we handle our target, for now its only path corner, but this could also be expanded
+	// for other things like doors and whatnot.
+	GoalType_t goaltype = GOALTYPE_PATHCORNER;
+
+	// JAY: How important is this error message?  Big Momma doesn't obey this rule, so I took it out for a nice dinner.
+	// At this point, we expect only a path_corner as initial goal, but if needed a npc can also run to an entity.
+	if (!FClassnameIs( pTargetEnt, "path*"))
+	{
+		DevWarning("ReadyNPC()--monster's initial goal %s is not a path, and thats okay (:\n", STRING(m_target));
+		// If its not a path, slam to targetent
+		goaltype = GOALTYPE_TARGETENT;
+#if 0
+		if (FClassnameIs( pTargetEnt, "func*"))
+		{
+			// We might also need to tell the npc to +USE this object
+		}
+#endif
+	}
+
 	// set the npc up to walk a path corner path.
 	// !!!BUGBUG - this is a minor bit of a hack.
 	// JAYJAY
-
 	// NPC will start turning towards his destination
 	bool bIsFlying = (GetMoveType() == MOVETYPE_FLY) || (GetMoveType() == MOVETYPE_FLYGRAVITY);
-	AI_NavGoal_t goal( GOALTYPE_PATHCORNER, pTargetEnt->GetAbsOrigin(),
+	AI_NavGoal_t goal( goaltype, pTargetEnt->GetAbsOrigin(),
 					   bIsFlying ? ACT_FLY : ACT_WALK,
 					   AIN_DEF_TOLERANCE, AIN_YAW_TO_DEST);
 
@@ -7505,9 +7514,7 @@ void CAI_BaseNPC::StartTargetHandling( CBaseEntity *pTargetEnt )
 	SetSchedule( SCHED_IDLE_WALK );
 
 	if ( !GetNavigator()->SetGoal( goal ) )
-	{
 		DevWarning( 2, "Can't Create Route!\n" );
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -10013,6 +10020,7 @@ CBaseEntity *CAI_BaseNPC::FindNamedEntity( const char *name, IEntityFindFilter *
 	{
 		// FIXME: look at CBaseEntity *CNPCSimpleTalker::FindNearestFriend(bool fPlayer)
 		// punt for now
+		//TODO; Search for nearest D_LI
 		return ( CBaseEntity * )AI_GetSinglePlayer();
 	}
 	else if (!stricmp( name, "self" ))
@@ -10503,7 +10511,7 @@ bool CAI_BaseNPC::ShouldFadeOnDeath( void )
 		return true;
 
 	// Running on DX8
-	if ( IsX360() )	//|| g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80
+	if ( IsConsole() )	//|| engine->GetDXSupportLevel() < 80
 		return true;
 
 	// if flagged to fade out
@@ -10534,7 +10542,7 @@ bool CAI_BaseNPC::ShouldPlayIdleSound( void )
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::MakeAIFootstepSound( float volume, float duration )
 {
-	CSoundEnt::InsertSound( SOUND_WORLD, EyePosition(), volume, duration, this, SOUNDENT_CHANNEL_NPC_FOOTSTEP );
+	CSoundEnt::InsertSound( SOUND_WORLD, EyePosition()/*What?? how about feet position?*/, volume, duration, this, SOUNDENT_CHANNEL_NPC_FOOTSTEP );
 }
 
 //-----------------------------------------------------------------------------
@@ -10702,6 +10710,7 @@ BEGIN_DATADESC( CAI_BaseNPC )
 	DEFINE_EMBEDDED( m_CommandMoveMonitor ),
 	DEFINE_FIELD( m_flSoundWaitTime,			FIELD_TIME ),
 	DEFINE_FIELD( m_nSoundPriority,				FIELD_INTEGER ),
+	DEFINE_FIELD( m_flNextPainSoundTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_flIgnoreDangerSoundsUntil,	FIELD_TIME ),
 	DEFINE_FIELD( m_afCapability,				FIELD_INTEGER ),
 	DEFINE_FIELD( m_flMoveWaitFinished,			FIELD_TIME ),
@@ -11332,6 +11341,12 @@ void CAI_BaseNPC::RestoreConditions( IRestore &restore, CAI_ScheduleBits *pCondi
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::KeyValue( const char *szKeyName, const char *szValue )
 {
+	if (FStrEq(szKeyName, "netname"))
+	{
+		Warning("Npc %s is using obsolete *netname*, use *squadname* instead!\n",GetClassname());
+		m_SquadName = AllocPooledString(szValue);
+	}
+
 	bool bResult = BaseClass::KeyValue( szKeyName, szValue );
 
 	if( !bResult )
@@ -11436,6 +11451,7 @@ CAI_BaseNPC::CAI_BaseNPC(void)
 	m_flLastDamageTime			= 0;
 	m_flLastAttackTime			= 0;
 	m_flSoundWaitTime			= 0;
+	m_flNextPainSoundTime		= 0;
 	m_flNextEyeLookTime			= 0;
 	m_flHeadYaw					= 0;
 	m_flHeadPitch				= 0;
@@ -12274,9 +12290,8 @@ bool CAI_BaseNPC::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal,
 	if ( pMoveGoal->maxDist < distClear )
 		return false;
 
-	// By default, NPCs don't know how to open doors
-	if ( pDoor->m_toggle_state ==  TS_AT_BOTTOM || pDoor->m_toggle_state == TS_GOING_DOWN )
-	{
+//!	if ( pDoor->m_toggle_state ==  TS_AT_BOTTOM || pDoor->m_toggle_state == TS_GOING_DOWN )
+//!	{
 		if ( distClear < 0.1 )
 		{
 			*pResult = AIMR_BLOCKED_ENTITY;
@@ -12285,10 +12300,26 @@ bool CAI_BaseNPC::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal,
 		{
 			pMoveGoal->maxDist = distClear;
 			*pResult = AIMR_OK;
+			return true;
 		}
 
-		return true;
-	}
+		if ( IsMoveBlocked( *pResult ) && pMoveGoal->directTrace.vHitNormal != vec3_origin )
+		{
+			if ( (CapabilitiesGet() & bits_CAP_DOORS_GROUP) )
+			{
+				//!if ( !pDoor->m_bLocked )
+				//!{
+					// Ask the door to open
+					pDoor->Use(this, this, USE_TOGGLE, 0 );
+					*pResult = AIMR_OK;
+					return true;
+				//!}
+			}
+		}
+
+//!		return false;
+//!	}
+//! Handled directly in the door +use code now
 
 	return false;
 }

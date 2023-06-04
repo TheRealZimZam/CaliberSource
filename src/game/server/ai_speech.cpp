@@ -899,12 +899,6 @@ void CAI_ExpresserHost_NPC_DoModifyOrAppendCriteria( CAI_BaseNPC *pSpeaker, AI_C
   		set.AppendCriteria( "activity", pActivityName );
 	}
 
-//	const char *pModelName = STRING(pSpeaker->GetModelName());
-//	if ( pModelName )
-//	{
-  		set.AppendCriteria( "model", STRING(pSpeaker->GetModelName()) );
-//	}
-
 	static const char *pStateNames[] = { "None", "Idle", "Alert", "Combat", "Scripted", "PlayDead", "Dead" };
 	if ( (int)pSpeaker->m_NPCState < ARRAYSIZE(pStateNames) )
 	{

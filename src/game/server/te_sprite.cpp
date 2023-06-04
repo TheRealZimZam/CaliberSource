@@ -38,6 +38,7 @@ public:
 	CNetworkVar( int, m_nModelIndex );
 	CNetworkVar( float, m_fScale );
 	CNetworkVar( int, m_nBrightness );
+	CNetworkVar( float, m_iFramerate );
 };
 
 //-----------------------------------------------------------------------------
@@ -51,6 +52,7 @@ CTESprite::CTESprite( const char *name ) :
 	m_nModelIndex = 0;
 	m_fScale = 0;
 	m_nBrightness = 0;
+	m_iFramerate = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -102,6 +104,7 @@ IMPLEMENT_SERVERCLASS_ST(CTESprite, DT_TESprite)
 	SendPropModelIndex( SENDINFO(m_nModelIndex) ),
 	SendPropFloat( SENDINFO(m_fScale ), 8, SPROP_ROUNDDOWN, 0.0, 25.6 ),
 	SendPropInt( SENDINFO(m_nBrightness), 8, SPROP_UNSIGNED ),
+	SendPropFloat( SENDINFO(m_iFramerate), 8, SPROP_UNSIGNED ),
 END_SEND_TABLE()
 
 
@@ -109,12 +112,13 @@ END_SEND_TABLE()
 static CTESprite g_TESprite( "Sprite" );
 
 void TE_Sprite( IRecipientFilter& filter, float delay,
-	const Vector *pos, int modelindex, float size, int brightness )
+	const Vector *pos, int modelindex, float size, int brightness, float framerate )
 {
 	g_TESprite.m_vecOrigin		= *pos;
 	g_TESprite.m_nModelIndex	= modelindex;	
 	g_TESprite.m_fScale			= size;
 	g_TESprite.m_nBrightness	= brightness;
+	g_TESprite.m_iFramerate	= framerate;
 
 	// Send it over the wire
 	g_TESprite.Create( filter, delay );

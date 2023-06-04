@@ -978,7 +978,7 @@ float CBaseAnimating::GetIdealAccel( ) const
 {
 	// return ideal max velocity change over 1 second.
 	// tuned for run-walk range of humans
-	return GetIdealSpeed() + 60;
+	return GetIdealSpeed() * 1.5;	//60
 }
 
 //-----------------------------------------------------------------------------
@@ -3238,9 +3238,14 @@ Activity CBaseAnimating::GetSequenceActivity( int iSequence )
 void CBaseAnimating::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 {
 	BaseClass::ModifyOrAppendCriteria( set );
-
 	// TODO
 	// Append any animation state parameters here
+#if 0
+	if ( IsOnFire() )
+		set.AppendCriteria( "onfire", "1" );
+	else
+		set.RemoveCriteria( "onfire" );
+#endif
 }
 
 

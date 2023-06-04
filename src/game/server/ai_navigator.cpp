@@ -29,6 +29,7 @@
 #include "ai_moveprobe.h"
 #include "ai_hint.h"
 #include "BasePropDoor.h"
+#include "doors.h"
 #include "props.h"
 #include "physics_npc_solver.h"
 
@@ -2154,19 +2155,19 @@ bool CAI_Navigator::OnMoveExecuteFailed( const AILocalMoveGoal_t &move, const AI
 
 bool CAI_Navigator::OnMoveBlocked( AIMoveResult_t *pResult )
 {
-	if ( *pResult == AIMR_BLOCKED_NPC && 
-		 GetPath()->GetCurWaypoint() &&
-		 ( GetPath()->GetCurWaypoint()->Flags() & bits_WP_TO_DOOR ) )
+	if ( *pResult == AIMR_BLOCKED_NPC && GetPath()->GetCurWaypoint() )
 	{
-		CBasePropDoor *pDoor = (CBasePropDoor *)(CBaseEntity *)GetPath()->GetCurWaypoint()->GetEHandleData();
-		if (pDoor != NULL)
+		if ( GetPath()->GetCurWaypoint()->Flags() & bits_WP_TO_DOOR )
 		{
-			GetOuter()->OpenPropDoorBegin( pDoor );
-			*pResult = AIMR_OK;
-			return true;
+			CBasePropDoor *pDoor = (CBasePropDoor *)(CBaseEntity *)GetPath()->GetCurWaypoint()->GetEHandleData();
+			if (pDoor != NULL)
+			{
+				GetOuter()->OpenPropDoorBegin( pDoor );
+				*pResult = AIMR_OK;
+				return true;
+			}
 		}
 	}
-
 
 	// Allow the NPC to override this behavior
 	if ( GetOuter()->OnMoveBlocked( pResult ))
@@ -2692,11 +2693,45 @@ void CAI_Navigator::AdvancePath()
 		CBasePropDoor *pDoor = (CBasePropDoor *)(CBaseEntity *)pCurWaypoint->GetEHandleData();
 		if (pDoor != NULL)
 		{
-			GetOuter()->OpenPropDoorBegin(pDoor);
+			GetOuter()->OpenPropDoorBegin( pDoor );
 		}
 		else
 		{
 			DevMsg("%s trying to open a door that has been deleted!\n", GetOuter()->GetDebugName());
+		}
+	}
+	// IF both waypoints are nodes, then check for a link for a door and operate it.
+	else if ( pCurWaypoint->Flags() & bits_WP_TO_NODE )
+	{
+		// Old code, we just want to touch it, dont bother actually using
+#if 0
+		int iSrcNode  = WorldGraph.FindNearestNode(m_Route[m_iRouteIndex].vecLocation, this );
+		int iDestNode = WorldGraph.FindNearestNode(m_Route[m_iRouteIndex+1].vecLocation, this );
+
+		int iLink;
+		WorldGraph.HashSearch(iSrcNode, iDestNode, iLink);
+
+		if ( iLink >= 0 && WorldGraph.m_pLinkPool[iLink].m_pLinkEnt != NULL )
+		{
+			//ALERT(at_aiconsole, "A link. ");
+			if ( WorldGraph.HandleLinkEnt ( iSrcNode, WorldGraph.m_pLinkPool[iLink].m_pLinkEnt, m_afCapability, CGraph::NODEGRAPH_DYNAMIC ) )
+			{
+				//ALERT(at_aiconsole, "usable.");
+				entvars_t *pevDoor = WorldGraph.m_pLinkPool[iLink].m_pLinkEnt;
+				if (pevDoor)
+				{
+					m_flMoveWaitFinished = OpenDoorAndWait( pevDoor );
+//					ALERT( at_aiconsole, "Wating for door %.2f\n", m_flMoveWaitFinished-gpGlobals->time );
+				}
+			}
+		}
+#endif
+		//TEMPTEMPTODO; Doesnt work, just here as an example
+		CBaseDoor *bDoor = (CBaseDoor *)(CBaseEntity *)pCurWaypoint->GetEHandleData();
+		if ( bDoor )
+		{
+			//GetOuter()->OpenDoorAndWait( bDoor );
+			bDoor->DoorTouch( GetOuter() );
 		}
 	}
 
@@ -3659,12 +3694,6 @@ bool CAI_Navigator::DoFindPathToPathcorner( CBaseEntity *pPathCorner )
 		}
 		else
 		{
-			Vector initPos = pPathCorner->GetLocalOrigin();
-
-			TranslateNavGoal( pPathCorner, initPos );
-
-			GetPath()->ResetGoalPosition( initPos );
-			
 			float tolerance = GetPath()->GetGoalTolerance();
 			float outerTolerance = GetOuter()->GetDefaultNavGoalTolerance();
 			if ( outerTolerance > tolerance )
@@ -3672,6 +3701,11 @@ bool CAI_Navigator::DoFindPathToPathcorner( CBaseEntity *pPathCorner )
 				GetPath()->SetGoalTolerance( outerTolerance );
 				tolerance = outerTolerance;
 			}
+
+			Vector initPos = pPathCorner->GetLocalOrigin();
+			TranslateNavGoal( pPathCorner, initPos );
+
+			GetPath()->ResetGoalPosition( initPos );
 
 			if ( ( returnCode = DoFindPathToPos() ) != false )
 			{

@@ -422,11 +422,14 @@ float CAI_Motor::GetIdealAccel() const
 
 //-----------------------------------------------------------------------------
 
+// how long does it take to get to full accell, decell
+#define ACCELTIME	0.5
+
 // how far will I go?
 float CAI_Motor::MinStoppingDist( float flMinResult )
 {
 	// FIXME: should this be a constant rate or a constant time like it is now?
-	float flDecelRate = GetIdealAccel();
+	float flDecelRate = GetIdealAccel();	//IdealVelocity()/ACCELTIME;
 
 	if (flDecelRate > 0.0)
 	{

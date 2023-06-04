@@ -491,3 +491,32 @@ void CAI_BaseHumanoid::RunTask( const Task_t *pTask )
 	}
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+Activity CAI_BaseHumanoid::NPC_TranslateActivity( Activity NewActivity )
+{
+	switch ( NewActivity )
+	{
+		case ACT_RUN:
+		case ACT_RUN_AIM:
+			if ( IsOnFire() && HaveSequenceForActivity( ACT_RUN_ON_FIRE ) )
+			{
+				// flail around!
+				return ACT_RUN_ON_FIRE;
+			}
+		break;
+
+		case ACT_WALK:
+		case ACT_WALK_AIM:
+			if ( IsOnFire() && HaveSequenceForActivity( ACT_WALK_ON_FIRE ) )
+			{
+				// flail around!
+				return ACT_WALK_ON_FIRE;
+			}
+		break;
+	}
+
+	return BaseClass::NPC_TranslateActivity( NewActivity );
+}

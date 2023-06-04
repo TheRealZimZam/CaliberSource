@@ -521,7 +521,7 @@ public:
 
 	virtual const char	*GetTracerType( void );
 
-	// returns a pointer to the entities edict, if it has one.  should be removed!
+	// returns a pointer to the entities edict, if it has one.  Used to be Pev in most cases
 	inline edict_t			*edict( void )			{ return NetworkProp()->edict(); }
 	inline const edict_t	*edict( void ) const	{ return NetworkProp()->edict(); }
 	inline int				entindex( ) const		{ return m_Network.entindex(); };
@@ -533,7 +533,7 @@ public:
 	bool IsFollowingEntity();
 	CBaseEntity *GetFollowedEntity();
 
-	// initialization
+	// initialization functions
 	virtual void Spawn( void );
 	virtual void Precache( void ) {}
 
@@ -1280,6 +1280,9 @@ public:
 
 	// Sets the local position from a transform
 	void					SetLocalTransform( const matrix3x4_t &localTransform );
+
+	// Relink into the spatial partition.
+	void					Relink();
 
 	// See CSoundEmitterSystem
 	void					EmitSound( const char *soundname, float soundtime = 0.0f, float *duration = NULL );  // Override for doing the general case of CPASAttenuationFilter filter( this ), and EmitSound( filter, entindex(), etc. );

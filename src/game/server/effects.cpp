@@ -449,7 +449,7 @@ void CGibShooter::Spawn( void )
 	m_nMaxGibModelFrame = modelinfo->GetModelFrameCount( modelinfo->GetModel( m_iGibModelIndex ) );
 }
 
-CGib *CGibShooter::CreateGib ( void )
+CGib *CGibShooter::CreateGib( void )
 {
 	ConVarRef violence_hgibs( "violence_hgibs" );
 	if ( violence_hgibs.IsValid() && !violence_hgibs.GetInt() )
@@ -607,7 +607,7 @@ CBaseEntity *CGibShooter::SpawnGib( const Vector &vecShootDir, float flSpeed )
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CGibShooter::ShootThink ( void )
+void CGibShooter::ShootThink( void )
 {
 	SetNextThink( gpGlobals->curtime + m_flDelay );
 
@@ -1408,25 +1408,30 @@ public:
 
 	void	Spawn( void );
 	void	Precache( void );
-	void	CanThink( void );
+	void	CanDrop( void );
+//	void	CanThink( void );
 	void	CanTouch( CBaseEntity *pOther );
 	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	DECLARE_DATADESC();
 
 //private:
-//	float	m_flCanLife;
+//	float	m_flCanWarmTime;
+//	bool	m_bWarm;
 
 };
 
+ConVar sk_soda( "sk_soda", "1" );
 
 BEGIN_DATADESC( CItemSoda )
 
 	// Function Pointers
-	DEFINE_FUNCTION( CanThink ),
+	DEFINE_FUNCTION( CanDrop ),
+//	DEFINE_FUNCTION( CanThink ),
 	DEFINE_FUNCTION( CanTouch ),
 	
-//	DEFINE_FIELD( m_flCanLife, FIELD_TIME ),
+//	DEFINE_FIELD( m_flCanWarmTime, FIELD_TIME ),
+//	DEFINE_FIELD( m_bWarm, FIELD_BOOLEAN ),
 
 END_DATADESC()
 
@@ -1449,13 +1454,14 @@ void CItemSoda::Spawn( void )
 	SetModel ( "models/can.mdl" );
 	UTIL_SetSize( this, Vector ( 0, 0, 0 ), Vector ( 0, 0, 0 ) );
 
-//	m_flCanLife = 60.0f;	//Stay alive for this long
+//	m_flCanWarmTime = gpGlobals->curtime + 60.0f;	//Gets warm and gross after this amount of time
+//	m_bWarm = false;
 
-	SetThink (&CItemSoda::CanThink);
+	SetThink (&CItemSoda::CanDrop);
 	SetNextThink( gpGlobals->curtime + 0.5f );
 }
 
-void CItemSoda::CanThink( void )
+void CItemSoda::CanDrop( void )
 {
 	EmitSound( "ItemSoda.Bounce" );
 
@@ -1463,10 +1469,25 @@ void CItemSoda::CanThink( void )
 	AddSolidFlags( FSOLID_TRIGGER );
 	UTIL_SetSize( this, Vector ( -8, -8, 0 ), Vector ( 8, 8, 8 ) );
 
-	SetThink( NULL );
+	SetThink( NULL );	//&CItemSoda::CanThink
 	SetTouch( &CItemSoda::CanTouch );
-//	SetUse( &CItemSoda::CanUse );
 }
+
+/*
+void CItemSoda::CanThink( void )
+{
+	if ( gpGlobals->curtime > m_flCanWarmTime )
+	{
+		m_bWarm = true;
+		SetThink( NULL );
+		SetNextThink( gpGlobals->curtime + 0.2f );
+	}
+	else
+	{
+		SetNextThink( gpGlobals->curtime + 0.5f );
+	}
+}
+*/
 
 void CItemSoda::CanTouch( CBaseEntity *pOther )
 {
@@ -1483,8 +1504,12 @@ void CItemSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 
 	// spoit sound here
 	CPASAttenuationFilter filter( pActivator, "Player.Drink" );
-	EmitSound( filter, pActivator->entindex(), "Player.Eat" );
-	pActivator->TakeHealth( 1, DMG_GENERIC );// a bit of health.
+	EmitSound( filter, pActivator->entindex(), "Player.Drink" );
+
+//	if ( !m_bWarm )
+		pActivator->TakeHealth( sk_soda.GetFloat(), DMG_GENERIC );	// awesome, cool, refreshing beverage - a bit of health
+//	else
+//		pActivator->TakeHealth( -1, DMG_POISON );	// warm tarty liquid of gross despair - almost no health
 
 	if ( GetOwnerEntity() )
 	{
@@ -1881,7 +1906,7 @@ LINK_ENTITY_TO_CLASS( env_physwire, CPhysicsWire );
 
 BEGIN_DATADESC( CPhysicsWire )
 
-	DEFINE_KEYFIELD( m_nDensity,	FIELD_INTEGER, "Density" ),
+	DEFINE_KEYFIELD( m_nDensity, FIELD_INTEGER, "Density" ),
 //	DEFINE_KEYFIELD( m_frequency, FIELD_INTEGER, "frequency" ),
 
 //	DEFINE_FIELD( m_flFoo, FIELD_FLOAT ),
@@ -1901,8 +1926,8 @@ void CPhysicsWire::Spawn( void )
 
 	Precache();
 
-//	if ( SetupPhysics() == false )
-//		return;
+	if ( SetupPhysics() == false )
+		return;
 }
 
 //-----------------------------------------------------------------------------
@@ -1914,20 +1939,18 @@ void CPhysicsWire::Precache( void )
 }
 
 class CPhysBallSocket;
-
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
 bool CPhysicsWire::SetupPhysics( void )
 {
-/*
 	CPointEntity	*anchorEnt, *freeEnt;
 	CPhysBallSocket *socket;
 
 	char	anchorName[256];
 	char	freeName[256];
 
-	int		iAnchorName, iFreeName;
+	//int		iAnchorName, iFreeName;
 
 	anchorEnt = (CPointEntity *) CreateEntityByName( "info_target" );
 
@@ -1941,13 +1964,13 @@ bool CPhysicsWire::SetupPhysics( void )
 		freeEnt = (CPointEntity *) CreateEntityByName( "info_target" );
 
 		// Create a ballsocket and attach the two
-		//socket = (CPhysBallSocket *) CreateEntityByName( "phys_ballsocket" );
+		socket = (CPhysBallSocket *) CreateEntityByName( "phys_ballsocket" );
 
 		Q_snprintf( anchorName,sizeof(anchorName), "__PWIREANCHOR%d", i );
 		Q_snprintf( freeName,sizeof(freeName), "__PWIREFREE%d", i+1 );
 
-		iAnchorName = MAKE_STRING( anchorName );
-		iFreeName	= MAKE_STRING( freeName );
+		//iAnchorName = MAKE_STRING( anchorName );
+		//iFreeName	= MAKE_STRING( freeName );
 
 		//Fake the names
 		//socket->m_nameAttach1 = anchorEnt->m_iGlobalname	= iAnchorName;
@@ -1958,7 +1981,6 @@ bool CPhysicsWire::SetupPhysics( void )
 		//The free ent is now the anchor for the next link
 		anchorEnt = freeEnt;
 	}
-*/
 
 	return true;
 }
@@ -1975,6 +1997,7 @@ public:
 	virtual void Spawn();
 
 	// Input handlers
+	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void	InputFire( inputdata_t &inputdata );
 
 	DECLARE_DATADESC();
@@ -2019,9 +2042,14 @@ void CEnvMuzzleFlash::Spawn()
 // Purpose:
 // Input  : &inputdata -
 //-----------------------------------------------------------------------------
-void CEnvMuzzleFlash::InputFire( inputdata_t &inputdata )
+void CEnvMuzzleFlash::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	g_pEffects->MuzzleFlash( GetAbsOrigin(), GetAbsAngles(), m_flScale, MUZZLEFLASH_TYPE_DEFAULT );
+}
+
+void CEnvMuzzleFlash::InputFire( inputdata_t &inputdata )
+{
+	Use( inputdata.pActivator, inputdata.pCaller, USE_ON, 0);
 }
 
 
@@ -2041,12 +2069,14 @@ public:
 protected:
 
 	float	m_flScale;
+	int		m_iSplashType;
 
 	DECLARE_DATADESC();
 };
 
 BEGIN_DATADESC( CEnvSplash )
 	DEFINE_KEYFIELD( m_flScale, FIELD_FLOAT, "scale" ),
+	DEFINE_KEYFIELD( m_iSplashType, FIELD_INTEGER, "splashtype" ),
 
 	DEFINE_INPUTFUNC( FIELD_VOID, "Splash", InputSplash ),
 END_DATADESC()
@@ -2114,7 +2144,20 @@ void CEnvSplash::InputSplash( inputdata_t &inputdata )
 	data.m_vNormal = Vector( 0, 0, 1 );
 	data.m_flScale = scale;
 
-	DispatchEffect( "watersplash", data );
+	switch( m_iSplashType )
+	{
+	case 1:
+		DispatchEffect( "waterfall", data );
+		break;
+	case 2:
+		DispatchEffect( "waterspray", data );
+		break;
+
+	case 0:
+	default:
+		DispatchEffect( "watersplash", data );
+		break;
+	}
 }
 
 
@@ -2142,6 +2185,7 @@ public:
 	void ShootThink();
 	void UpdateTarget();
 
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void InputEnable( inputdata_t &inputdata );
 	void InputDisable( inputdata_t &inputdata );
 
@@ -2351,6 +2395,25 @@ void CEnvGunfire::ShootThink()
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
+void CEnvGunfire::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	if ( !ShouldToggle( useType, m_bDisabled ) )
+		return;
+
+	if (m_bDisabled)
+	{
+		m_bDisabled = false;
+		StartShooting();
+	}
+	else
+	{
+		m_bDisabled = true;
+		StopShooting();
+	}
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 void CEnvGunfire::InputEnable( inputdata_t &inputdata )
 {
 	m_bDisabled = false;
@@ -2362,7 +2425,7 @@ void CEnvGunfire::InputEnable( inputdata_t &inputdata )
 void CEnvGunfire::InputDisable( inputdata_t &inputdata )
 {
 	m_bDisabled = true;
-	SetThink( NULL );
+	StopShooting();
 }
 
 //-----------------------------------------------------------------------------

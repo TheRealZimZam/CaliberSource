@@ -33,9 +33,9 @@ enum
 	SOUND_PLAYER			= 0x00000004, // Player footsteps
 	SOUND_DANGER			= 0x00000008, // Something dangerous (grenades, explosive wobjects, etc.)
 	SOUND_BULLET_IMPACT		= 0x00000010, // Bullet/weapon impact
-	SOUND_CARCASS			= 0x00000020, // Corpse
-	SOUND_MEAT				= 0x00000040,
-	SOUND_GARBAGE			= 0x00000080,
+	SMELL_CARCASS			= 0x00000020, // Smell
+	SMELL_MEAT				= 0x00000040, // Smell
+	SMELL_GARBAGE			= 0x00000080, // Smell
 	SOUND_THUMPER			= 0x00000100, // keeps certain creatures at bay
 	SOUND_BUGBAIT			= 0x00000200, // gets the antlion's attention
 	SOUND_PHYSICS_DANGER	= 0x00000400, // Dangerous prop
@@ -61,7 +61,7 @@ enum
 
 	ALL_CONTEXTS			= 0xFFF00000,
 
-	ALL_SCENTS				= SOUND_CARCASS | SOUND_MEAT | SOUND_GARBAGE,
+	ALL_SCENTS				= SMELL_CARCASS | SMELL_MEAT | SMELL_GARBAGE,
 
 	ALL_SOUNDS				= 0x000FFFFF & ~ALL_SCENTS,
 
@@ -87,10 +87,11 @@ enum
 	SOUNDLIST_EMPTY = -1
 };
 
-#define SOUNDENT_VOLUME_MACHINEGUN	1500.0
+#define SOUNDENT_VOLUME_MACHINEGUN	1400.0
 #define SOUNDENT_VOLUME_SHOTGUN		1500.0
 #define SOUNDENT_VOLUME_PISTOL		1250.0
-#define SOUNDENT_VOLUME_EMPTY		 500.0 // volume of the "CLICK" when you have no bullets
+#define SOUNDENT_VOLUME_SILENCED	600.0
+#define SOUNDENT_VOLUME_EMPTY		500.0	// volume of the "CLICK" when you have no bullets
 
 enum
 {

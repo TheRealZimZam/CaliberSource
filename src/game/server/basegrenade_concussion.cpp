@@ -64,7 +64,7 @@ void CBaseGrenadeConcussion::FallThink(void)
 		&pos,
 		m_nTrailSprite,
 		random->RandomFloat(0.5, 0.8),
-		200 );
+		200, 10 );
 }
 
 

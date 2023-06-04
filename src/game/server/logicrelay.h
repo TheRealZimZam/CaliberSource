@@ -28,6 +28,7 @@ public:
 	void InputEnableRefire( inputdata_t &inputdata );  // Private input handler, not in FGD
 	void InputDisable( inputdata_t &inputdata );
 	void InputToggle( inputdata_t &inputdata );
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void InputTrigger( inputdata_t &inputdata );
 	void InputCancelPending( inputdata_t &inputdata );
 
@@ -36,9 +37,8 @@ public:
 	// Outputs
 	COutputEvent m_OnTrigger;
 	COutputEvent m_OnSpawn;
-	
-private:
 
+private:
 	bool m_bDisabled;
 	bool m_bWaitForRefire;			// Set to disallow a refire while we are waiting for our outputs to finish firing.
 };

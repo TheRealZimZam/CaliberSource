@@ -1164,8 +1164,269 @@ bool CAmbientGeneric::KeyValue( const char *szKeyName, const char *szValue )
 
 
 // =================== ROOM SOUND FX ==========================================
+/*
+#include "igamesystem.h"
+#include <KeyValues.h>
+#include "filesystem.h"
+
+#define SOUNDSCAPE_MANIFEST_FILE				"scripts/soundscapes_manifest.txt"
+
+class CSoundscapeSystem : public CAutoGameSystem
+{
+public:
+	virtual void AddSoundScapeFile( const char *filename )
+	{
+		// Open the soundscape data file, and abort if we can't
+		KeyValues *pKeyValuesData = new KeyValues( filename );
+		if ( pKeyValuesData->LoadFromFile( filesystem, filename ) )
+		{
+			// parse out all of the top level sections and save their names
+			KeyValues *pKeys = pKeyValuesData;
+			while ( pKeys )
+			{
+				if ( pKeys->GetFirstSubKey() )
+				{
+					m_soundscapes.AddString( pKeys->GetName(), m_soundscapeCount );
+					m_soundscapeCount++;
+				}
+				pKeys = pKeys->GetNextKey();
+			}
+		}
+		pKeyValuesData->deleteThis();
+	}
+
+	virtual bool Init()
+	{
+		m_soundscapeCount = 0;
+
+		KeyValues *manifest = new KeyValues( SOUNDSCAPE_MANIFEST_FILE );
+		if ( manifest->LoadFromFile( filesystem, SOUNDSCAPE_MANIFEST_FILE, "GAME" ) )
+		{
+			for ( KeyValues *sub = manifest->GetFirstSubKey(); sub != NULL; sub = sub->GetNextKey() )
+			{
+				if ( !Q_stricmp( sub->GetName(), "file" ) )
+				{
+					// Add
+					AddSoundScapeFile( sub->GetString() );
+					continue;
+				}
+
+				Warning( "CSoundscapeSystem::Init:  Manifest '%s' with bogus file type '%s', expecting 'file'\n", 
+					SOUNDSCAPE_MANIFEST_FILE, sub->GetName() );
+			}
+		}
+		else
+		{
+			Error( "Unable to load manifest file '%s'\n", SOUNDSCAPE_MANIFEST_FILE );
+		}
+
+		return true;
+	}
+
+	int	GetSoundscapeIndex( const char *pName )
+	{
+		return m_soundscapes.GetStringID( pName );
+	}
+
+	bool IsValidIndex( int index )
+	{
+		if ( index >= 0 && index < m_soundscapeCount )
+			return true;
+		return false;
+	}
+
+private:
+	CStringRegistry		m_soundscapes;
+	int					m_soundscapeCount;
+};
+
+static CSoundscapeSystem g_SoundscapeSystem;
 
 
+LINK_ENTITY_TO_CLASS( env_soundscape, CEnvSoundscape );
+
+BEGIN_DATADESC( CEnvSoundscape )
+
+	DEFINE_KEYFIELD( CEnvSoundscape, m_flRadius, FIELD_FLOAT, "radius" ),
+	DEFINE_FIELD( CEnvSoundscape, m_flRange, FIELD_FLOAT ),
+	// don't save, recomputed on load
+	//DEFINE_FIELD( CEnvSoundscape, m_soundscapeIndex, FIELD_INTEGER ),
+	DEFINE_FIELD( CEnvSoundscape, m_soundscapeName, FIELD_STRING ),
+
+// Silence, Classcheck!
+//	DEFINE_ARRAY( CEnvSoundscape, m_positionNames, FIELD_STRING, 4 ),
+
+	DEFINE_KEYFIELD( CEnvSoundscape, m_positionNames[0], FIELD_STRING, "position0" ),
+	DEFINE_KEYFIELD( CEnvSoundscape, m_positionNames[1], FIELD_STRING, "position1" ),
+	DEFINE_KEYFIELD( CEnvSoundscape, m_positionNames[2], FIELD_STRING, "position2" ),
+	DEFINE_KEYFIELD( CEnvSoundscape, m_positionNames[3], FIELD_STRING, "position3" ),
+
+END_DATADESC()
+
+CEnvSoundscape::CEnvSoundscape()
+{
+	m_soundscapeIndex = -1;
+}
+
+bool CEnvSoundscape::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if (FStrEq(szKeyName, "soundscape"))
+	{
+		m_soundscapeName = AllocPooledString( szValue );
+	}
+	else
+		return BaseClass::KeyValue( szKeyName, szValue );
+
+	return true;
+}
+
+// returns true if the given sound entity is in range 
+// and can see the given player entity (pTarget)
+
+bool CEnvSoundscape::InRangeOfPlayer( CBasePlayer *pTarget ) 
+{
+	Vector vecSpot1 = EarPosition();
+	Vector vecSpot2 = pTarget->EarPosition();
+
+	// calc range from sound entity to player
+	Vector vecRange = vecSpot2 - vecSpot1;
+	float range = vecRange.Length();
+	if ( m_flRadius > range )
+	{
+		trace_t tr;
+
+		UTIL_TraceLine( vecSpot1, vecSpot2, MASK_SOLID_BRUSHONLY|MASK_WATER, pTarget, COLLISION_GROUP_NONE, &tr );
+
+		if ( tr.fraction == 1 && !tr.startsolid )
+		{
+			m_flRange = range;
+			return true;
+		}
+	}
+
+	m_flRange = 0;
+	return false;
+}
+
+
+void CEnvSoundscape::WriteAudioParamsTo( audioparams_t &audio )
+{
+	audio.ent.Set( this );
+	audio.soundscapeIndex = m_soundscapeIndex;
+	audio.localBits = 0;
+	for ( int i = 0; i < ARRAYSIZE(m_positionNames); i++ )
+	{
+		if ( m_positionNames[i] != NULL_STRING )
+		{
+			CBaseEntity *pEntity = gEntList.FindEntityByName( NULL, m_positionNames[i], this );
+			if ( pEntity )
+			{
+				audio.localBits |= 1<<i;
+				audio.localSound.Set( i, pEntity->GetAbsOrigin() );
+			}
+		}
+	}
+}
+
+//
+// A client that is visible and in range of a sound entity will
+// have its soundscape set by that sound entity.  If two or more
+// sound entities are contending for a client, then the nearest
+// sound entity to the client will set the client's soundscape.
+// A client's soundscape will remain set to its prior value until
+// a new in-range, visible sound entity resets a new soundscape.
+//
+
+// CONSIDER: if player in water state, autoset and underwater soundscape? 
+void CEnvSoundscape::Think( void )
+{
+	// get pointer to client if visible; UTIL_FindClientInPVS will
+	// cycle through visible clients on consecutive calls.
+
+	CBasePlayer *pPlayer = ToBasePlayer( GetContainingEntity( UTIL_FindClientInPVS(edict()) ) );
+	if ( !pPlayer )
+	{
+		SetNextThink( gpGlobals->curtime + 1.0f );
+		return;
+	}
+
+	SetNextThink( gpGlobals->curtime + 0.25 );
+	// check to see if this is the sound entity that is 
+	// currently affecting this player
+
+	audioparams_t &audio = pPlayer->GetAudioParams();
+
+	CEnvSoundscape *pCurrent = (CEnvSoundscape *)audio.ent.Get();
+	if ( pCurrent == this ) 
+	{
+		// this is the entity currently affecting player, check
+		// for validity
+
+		// we're looking at a valid sound entity affecting
+		// player, make sure it's still valid, update range
+		if ( !InRangeOfPlayer( pPlayer ) ) 
+		{
+			// current sound entity affecting player is no longer valid,
+			// flag this state by clearing range.
+			m_flRange = 0;
+			// think less often
+			SetNextThink( gpGlobals->curtime + 0.5f );
+		}
+	}
+	// if we got this far, we're looking at an entity that is contending
+	// for current player sound. the closest entity to player wins.
+	else if ( InRangeOfPlayer( pPlayer ) )
+	{
+		if ( !pCurrent || pCurrent->m_flRange == 0 || pCurrent->m_flRange > m_flRange ) 
+		{
+			// new entity is closer to player, so it wins.
+			WriteAudioParamsTo( audio );
+		}
+	} 
+}
+
+//
+// env_soundscape - spawn a sound entity that will set player soundscape
+// when player moves in range and sight.
+//
+//
+void CEnvSoundscape::Spawn( )
+{
+	Precache();
+	// spread think times
+	SetNextThink( gpGlobals->curtime + random->RandomFloat(0.0, 0.5) ); 
+
+	// Because the soundscape has no model, need to make sure it doesn't get culled from the PVS for this reason and therefore
+	//  never exist on the client, etc.
+	AddEFlags( EFL_FORCE_CHECK_TRANSMIT );
+}
+
+void CEnvSoundscape::Precache()
+{
+	m_soundscapeIndex = g_SoundscapeSystem.GetSoundscapeIndex( STRING(m_soundscapeName) );
+	if ( !g_SoundscapeSystem.IsValidIndex(m_soundscapeIndex) )
+	{
+		DevMsg("Can't find soundscape: %s\n", STRING(m_soundscapeName) );
+	}
+}
+
+void CEnvSoundscape::DrawDebugGeometryOverlays( void )
+{
+	if ( m_debugOverlays & (OVERLAY_BBOX_BIT|OVERLAY_PIVOT_BIT|OVERLAY_ABSBOX_BIT) )
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+		if ( pPlayer )
+		{
+			audioparams_t &audio = pPlayer->GetAudioParams();
+			if ( audio.ent.Get() == this )
+			{
+				NDebugOverlay::Line(GetAbsOrigin(), pPlayer->WorldSpaceCenter(), (m_flRange != 0) ? 255 : 0, 0, 255, false, 0 );
+			}
+		}
+	}
+	BaseClass::DrawDebugGeometryOverlays();
+}
+*/
 
 
 // ==================== SENTENCE GROUPS, UTILITY FUNCTIONS  ======================================
@@ -1277,7 +1538,6 @@ int SENTENCEG_PlayRndSz(edict_t *entity, const char *szgroupname,
 }
 
 // play sentences in sequential order from sentence group.  Reset after last sentence.
-
 int SENTENCEG_PlaySequentialSz(edict_t *entity, const char *szgroupname, 
 					  float volume, soundlevel_t soundlevel, int flags, int pitch, int ipick, int freset)
 {
@@ -1306,15 +1566,12 @@ int SENTENCEG_PlaySequentialSz(edict_t *entity, const char *szgroupname,
 	return -1;
 }
 
-
-#if 0
 // for this entity, for the given sentence within the sentence group, stop
 // the sentence.
-
 void SENTENCEG_Stop(edict_t *entity, int isentenceg, int ipick)
 {
 	char buffer[64];
-	char sznum[8];
+	//char sznum[8];
 	
 	if (!fSentencesInit)
 		return;
@@ -1324,9 +1581,8 @@ void SENTENCEG_Stop(edict_t *entity, int isentenceg, int ipick)
 
 	Q_snprintf(buffer,sizeof(buffer),"!%s%d", engine->SentenceGroupNameFromIndex( isentenceg ), ipick );
 
-	UTIL_StopSound(entity, CHAN_VOICE, buffer);
+//	UTIL_StopSound(entity, CHAN_VOICE, buffer);
 }
-#endif
 
 // open sentences.txt, scan for groups, build rgsentenceg
 // Should be called from world spawn, only works on the
@@ -1341,16 +1597,37 @@ void SENTENCEG_Init()
 }
 
 // convert sentence (sample) name to !sentencenum, return !sentencenum
-
 int SENTENCEG_Lookup(const char *sample)
 {
 	return engine->SentenceIndexFromName( sample + 1 );
 }
 
-
 int SENTENCEG_GetIndex(const char *szrootname)
 {
 	return engine->SentenceGroupIndexFromName( szrootname );
+}
+
+void EMIT_SOUND_DYN(edict_t *entity, int channel, const char *sample, float volume, soundlevel_t attenuation,
+						   int flags, int pitch)
+{
+	if (sample && *sample == '!')
+	{
+		CPASAttenuationFilter filter( GetContainingEntity( entity ) );
+		filter.MakeReliable();
+
+		EmitSound_t ep;
+		ep.m_nChannel = channel;
+		ep.m_pSoundName = sample;
+		ep.m_flVolume = volume;
+		ep.m_SoundLevel = attenuation;
+		ep.m_nPitch = pitch;
+
+		CBaseEntity::EmitSound( filter, ENTINDEX(entity), ep );
+	}
+	else
+	{
+		Warning( "Unable to find %s in sentences.txt\n", sample );
+	}
 }
 
 void UTIL_RestartAmbientSounds( void )
@@ -1371,7 +1648,6 @@ void UTIL_RestartAmbientSounds( void )
 
 
 // play a specific sentence over the HEV suit speaker - just pass player entity, and !sentencename
-
 void UTIL_EmitSoundSuit(edict_t *entity, const char *sample)
 {
 	float fvol;
@@ -1404,7 +1680,6 @@ void UTIL_EmitSoundSuit(edict_t *entity, const char *sample)
 }
 
 // play a sentence, randomly selected from the passed in group id, over the HEV suit speaker
-
 int UTIL_EmitGroupIDSuit(edict_t *entity, int isentenceg)
 {
 	float fvol;
@@ -1428,7 +1703,6 @@ int UTIL_EmitGroupIDSuit(edict_t *entity, int isentenceg)
 }
 
 // play a sentence, randomly selected from the passed in groupname
-
 int UTIL_EmitGroupnameSuit(edict_t *entity, const char *groupname)
 {
 	float fvol;

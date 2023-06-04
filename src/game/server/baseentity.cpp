@@ -3305,6 +3305,9 @@ void CBaseEntity::SetMoveType( MoveType_t val, MoveCollide_t moveCollide )
 
 void CBaseEntity::Spawn( void ) 
 {
+#ifdef HL1_DLL
+	AddEffects( EF_NOSHADOW );
+#endif
 }
 
 
@@ -5929,6 +5932,19 @@ void CBaseEntity::SetLocalTransform( const matrix3x4_t &localTransform )
 	SetLocalAngles( vecLocalAngles );
 }
 
+void CBaseEntity::Relink()
+{
+/*
+	if ( edict() )
+	{
+		engine->RelinkEntity( pev );
+	}
+	else
+	{
+		CalcAbsolutePosition();
+	}
+*/
+}
 
 //-----------------------------------------------------------------------------
 // Is the entity floating?
@@ -6081,6 +6097,12 @@ void CBaseEntity::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 	if( hl2_episodic.GetBool() )
 		set.AppendCriteria( "episodic", "1" );
 #endif
+
+//	const char *pModelName = STRING(pSpeaker->GetModelName());
+//	if ( pModelName )
+//	{
+  		set.AppendCriteria( "model", STRING(GetModelName()) );
+//	}
 
 	// Go through all the global states and append them
 	for ( int i = 0; i < GlobalEntity_GetNumGlobals(); i++ ) 

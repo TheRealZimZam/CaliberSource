@@ -225,7 +225,7 @@ void CPropCannon::Precache( void )
 	
 	PrecacheScriptSound( "HeadcrabCanister.LaunchSound" );
 	PrecacheScriptSound( "HeadcrabCanister.Explosion" );
-	PrecacheScriptSound( "Weapon_Mortar.Incomming" );
+	PrecacheScriptSound( "Weapon_Mortar.Incoming" );
 }
 
 
@@ -552,7 +552,7 @@ void CPropCannon::Think( void )
 				
 			EmitSound_t ep;
 			ep.m_nChannel = CHAN_STATIC;
-			ep.m_pSoundName = "Weapon_Mortar.Incomming";
+			ep.m_pSoundName = "Weapon_Mortar.Incoming";
 			ep.m_flVolume = 255;
 			ep.m_SoundLevel = SNDLVL_180dB;
 	

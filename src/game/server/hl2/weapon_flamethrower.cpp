@@ -78,7 +78,7 @@ CWeaponFlameThrower::CWeaponFlameThrower( )
 	m_fDrainRate		= FLAMETHROWER_DRAINRATE;
 	m_flNextPrimaryAttack = 0.2;
 
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		m_bCanJam			= true;
 	}

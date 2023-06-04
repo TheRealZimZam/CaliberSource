@@ -4,7 +4,7 @@
 //
 //			Primary attack: turn on/off light
 //			Secondary attack: quick smack
-// TODO's:  Actually code a clientside light
+// TODO's:  For npc's, just stick a env_beam on the end of the "muzzle"
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -20,6 +20,7 @@
 #include "game.h"
 #include "vstdlib/random.h"
 #include "gamestats.h"
+#include "beam_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -55,9 +56,11 @@ public:
 
 private:
 	bool	m_bLightOn;
+	CHandle<CBeam>	m_hFlashlightBeam;
 
 };
 
+ConVar	sk_dmg_flashlight_smack( "sk_dmg_flashlight_smack", "5" );	//Death by spoon
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponFlashlight, DT_WeaponFlashlight)
 END_SEND_TABLE()
@@ -102,6 +105,7 @@ CWeaponFlashlight::CWeaponFlashlight( void )
 	m_fMaxRange1		= 1024;
 
 	m_bLightOn			= false;
+	m_hFlashlightBeam	= NULL;
 	m_bFiresUnderwater	= true;
 }
 
@@ -111,6 +115,8 @@ CWeaponFlashlight::CWeaponFlashlight( void )
 void CWeaponFlashlight::Precache( void )
 {
 	BaseClass::Precache();
+
+	PrecacheModel( "sprites/glow_test01.vmt" );
 }
 
 //-----------------------------------------------------------------------------
@@ -124,7 +130,49 @@ void CWeaponFlashlight::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseComb
 	{
 		case EVENT_WEAPON_PISTOL_FIRE:
 		{
+			if ( m_bLightOn )
+				m_bLightOn = false;	// The light is off
+			else
+				m_bLightOn = true;	// The light is on
 
+			if ( m_bLightOn )
+			{
+				if (!pOperator->IsPlayer())
+				{
+					Vector vecShootOrigin, vecShootDir;
+					vecShootOrigin = pOperator->Weapon_ShootPosition();
+					CAI_BaseNPC *npc = pOperator->MyNPCPointer();
+					ASSERT( npc != NULL );
+					vecShootDir = npc->GetActualShootTrajectory( vecShootOrigin );
+
+					QAngle	angShootDir;
+					GetAttachment( LookupAttachment( "muzzle" ), vecShootOrigin, angShootDir );
+					AngleVectors( angShootDir, &vecShootDir );
+
+					//Create the beam
+		#if 1
+					m_hFlashlightBeam = CBeam::BeamCreate( "sprites/glow_test01.vmt", 32 );
+
+					// Set the temporary spawnflag on the beam so it doesn't save (we'll recreate it on restore)
+					m_hFlashlightBeam->AddSpawnFlags( SF_BEAM_TEMPORARY );
+					m_hFlashlightBeam->SetEndWidth(32);
+					m_hFlashlightBeam->SetFadeLength( 384 );
+					m_hFlashlightBeam->SetBeamFlags( (FBEAM_SHADEOUT|FBEAM_NOTILE) );
+					m_hFlashlightBeam->SetColor( 255, 255, 255 );
+					m_hFlashlightBeam->SetBrightness( 224 );
+					m_hFlashlightBeam->SetNoise( 0 );
+					//
+					m_hFlashlightBeam->HoseInit( vecShootOrigin, vecShootDir );
+		#endif
+				}
+			}
+			else if (m_hFlashlightBeam != NULL)
+			{
+				//Turn off the beam
+				UTIL_Remove(m_hFlashlightBeam);
+			}
+
+			WeaponSound( SINGLE_NPC );
 		}
 		break;
 		default:
@@ -172,7 +220,11 @@ void CWeaponFlashlight::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 void CWeaponFlashlight::SecondaryAttack( void )
 {
+	//TODO;
 	PrimaryAttack();
+
+	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
 }
 
 //-----------------------------------------------------------------------------
@@ -181,8 +233,10 @@ void CWeaponFlashlight::SecondaryAttack( void )
 void CWeaponFlashlight::ItemPostFrame( void )
 {
 	BaseClass::ItemPostFrame();
-	
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+
+#ifdef HL2_MP
+	CBaseCombatCharacter* pOwner = ToBaseCombatCharacter( GetOwner() );
+	// Turn off if the owner throws it away/dies
 	if ( pOwner == NULL )
 	{
 		if ( m_bLightOn )
@@ -190,11 +244,8 @@ void CWeaponFlashlight::ItemPostFrame( void )
 
 		return;
 	}
+#endif
 
-	if ( pOwner->m_afButtonPressed & IN_ATTACK )
-	{
-		PrimaryAttack();
-	}
 }
 
 //-----------------------------------------------------------------------------

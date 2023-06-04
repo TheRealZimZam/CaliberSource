@@ -126,7 +126,7 @@ CWeaponAR2::CWeaponAR2( )
 	m_fMinRange2	= 1024;
 	m_fMaxRange2	= 2048;
 
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		// Lose the entire clip when reloading
 		m_bReloadsFullClip	= true;

@@ -391,7 +391,7 @@ void CSatchelCharge::SatchelThink( void )
 	}
 	else if (GetWaterLevel() == 0)
 	{
-		SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
+		SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_SLIDE );
 	}
 	else
 	{

@@ -177,7 +177,8 @@ void CWeaponSuperShotgun::Precache( void )
 CWeaponSuperShotgun::CWeaponSuperShotgun( void )
 {
 	m_bReloadsSingly	= false;
-	if ( !sv_funmode.GetBool() )
+	m_bUsingSecondaryAmmo = false;
+	if ( sv_funmode.GetBool() )
 	{
 		m_bReloadsFullClip	= true;
 		m_bCanJam			= true;
@@ -361,7 +362,7 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
 
 	// Fire the bullets, and force the first shot to be perfectly accuracy
-	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 2, -1, -1, 0, NULL, true, true );
+	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, GetActiveAmmoType(), 2, -1, -1, 0, NULL, true, true );
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 
 	//Disorient the player
@@ -373,12 +374,11 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
 
-	if (!m_iClip1 && pPlayer->GetAmmoCount(m_iPrimaryAmmoType) <= 0)
+	if (!m_iClip1 && pPlayer->GetAmmoCount(GetActiveAmmoType()) <= 0)
 	{
 		// HEV suit - indicate out of ammo condition
 		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
 	}
-
 }
 
 //-----------------------------------------------------------------------------
@@ -410,7 +410,10 @@ void CWeaponSuperShotgun::SecondaryAttack( void )
 	if ( !pOwner )
 		return;
 
-	//!!!TODO; Basic stab - no need for complicated melee code here
+	pOwner->m_flNextAttack = gpGlobals->curtime + 1;
+	SwitchAmmoType();
+
+	m_iSecondaryAttacks++;
 }
 
 //-----------------------------------------------------------------------------

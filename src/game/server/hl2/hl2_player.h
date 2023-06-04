@@ -18,12 +18,11 @@
 #include "soundenvelope.h"
 
 // In HL2MP we need to inherit from  BaseMultiplayerPlayer!
-#if defined ( HL2MP )
+#if defined ( HL2_EPISODIC )	//HL2MP
 #include "basemultiplayerplayer.h"
 #endif
 
 class CAI_Squad;
-class CPropCombineBall;
 
 extern int TrainSpeed(int iSpeed, int iMax);
 extern void CopyToBodyQue( CBaseAnimating *pCorpse );
@@ -34,8 +33,8 @@ enum HL2PlayerPhysFlag_e
 {
 	// 1 -- 5 are used by enum PlayerPhysFlag_e in player.h
 
-	PFLAG_ONBARNACLE	= ( 1<<6 )		// player is hangning from the barnalce
-//	PFLAG_IMMOBILIZED = ( 1<<7 ) // player is immobilized
+	PFLAG_ONBARNACLE	= ( 1<<6 ),	// player is hangning from the barnalce
+	PFLAG_IMMOBILIZED	= ( 1<<7 )	// player is immobilized
 };
 
 class IPhysicsPlayerController;
@@ -85,14 +84,14 @@ public:
 // >> HL2_PLAYER
 //=============================================================================
 class CHL2_Player : public 
-#if defined ( HL2MP )
+#if defined ( HL2_EPISODIC )	//HL2MP
 	CBaseMultiplayerPlayer
 #else
 	CBasePlayer
 #endif
 {
 public:
-#if defined ( HL2MP )
+#if defined ( HL2_EPISODIC )	//HL2MP
 	DECLARE_CLASS( CHL2_Player, CBaseMultiplayerPlayer );
 #else
 	DECLARE_CLASS( CHL2_Player, CBasePlayer );
@@ -110,6 +109,7 @@ public:
 	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
 
+	void				DoAnimationEvent( int PlayerAnimEvent_t, int nData = 0 );
 	virtual void		CreateCorpse( void ) { CopyToBodyQue( this ); };
 
 	virtual void		Precache( void );
@@ -133,6 +133,7 @@ public:
 	virtual void		CommanderMode();
 
 	virtual bool		ClientCommand( const CCommand &args );
+	virtual bool		HandleCommand_JoinTeam( int team );
 
 	// from cbasecombatcharacter
 	void				InitVCollision( const Vector &vecAbsOrigin, const Vector &vecAbsVelocity );
@@ -140,10 +141,6 @@ public:
 
 	Class_T				Classify ( void );
 
-	
-//	void	CreateSounds( void );
-	
-	
 	// from CBasePlayer
 	virtual void		SetupVisibility( CBaseEntity *pViewEntity, unsigned char *pvs, int pvssize );
 
@@ -226,7 +223,7 @@ public:
 	virtual void		OnDamagedByExplosion( const CTakeDamageInfo &info );
 	bool				ShouldShootMissTarget( CBaseCombatCharacter *pAttacker );
 
-	void				CombineBallSocketed( CPropCombineBall *pCombineBall );
+	//void				CombineBallSocketed( CPropCombineBall *pCombineBall );
 
 	virtual void		Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo &info );
 
@@ -276,7 +273,7 @@ public:
 	void				NotifyScriptsOfDeath( void );
 
 	// override the test for getting hit
-	virtual bool		TestHitboxes( const Ray_t &ray, unsigned int fContentsMask, trace_t& tr );
+	//virtual bool		TestHitboxes( const Ray_t &ray, unsigned int fContentsMask, trace_t& tr );
 
 	LadderMove_t		*GetLadderMove() { return &m_HL2Local.m_LadderMove; }
 	virtual void		ExitLadder();
@@ -300,7 +297,7 @@ public:
 									   m_iArmorReductionFrom = ArmorValue(); 
 									 }
 
-	void MissedAR2AltFire();
+//	void MissedAR2AltFire();
 
 	inline void EnableCappedPhysicsDamage();
 	inline void DisableCappedPhysicsDamage();
@@ -311,23 +308,28 @@ public:
 	CSoundPatch *m_sndLeeches;
 	CSoundPatch *m_sndWaterSplashes;
 
+	// MP
+	virtual void ChangeTeam( int iTeamNum );
+	void SetPlayerModel( void );
+	void SetPlayerTeamModel( void );
+
+	float GetNextModelChangeTime( void ) { return m_flNextModelChangeTime; }
+	float GetNextTeamChangeTime( void ) { return m_flNextTeamChangeTime; }
+
 protected:
 	virtual void		PreThink( void );
 	virtual	void		PostThink( void );
 	virtual bool		HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* sourceEnt);
-
 	virtual void		UpdateWeaponPosture( void );
 
-	virtual void		ItemPostFrame();
-//	virtual void		SpecialSuitAbilityPostFrame();
-	virtual void		PlayUseDenySound();
-
 private:
-
-	// Copyed from EyeAngles() so we can send it to the client.
+	// Copied from EyeAngles() so we can send it to the client.
 	CNetworkQAngle( m_angEyeAngles );
+	CNetworkVar( int, m_iSpawnInterpCounter );
 
 	IPlayerAnimState	*m_PlayerAnimState;
+	float				m_flNextModelChangeTime;
+	float				m_flNextTeamChangeTime;
 
 	bool				CommanderExecuteOne( CAI_BaseNPC *pNpc, const commandgoal_t &goal, CAI_BaseNPC **Allies, int numAllies );
 
@@ -347,11 +349,7 @@ private:
 	CNetworkVar( bool, m_fIsSprinting );
 	CNetworkVarForDerived( bool, m_fIsWalking );
 
-protected:	// Jeep: Portal_Player needs access to this variable to overload PlayerUse for picking up objects through portals
-	bool				m_bPlayUseDenySound;		// Signaled by PlayerUse, but can be unset by HL2 ladder code...
-
 private:
-
 	CAI_Squad *			m_pPlayerAISquad;
 	CSimpleSimTimer		m_CommanderUpdateTimer;
 	float				m_RealTimeLastSquadCommand;
@@ -366,7 +364,7 @@ private:
 	// Suit power fields
 	float				m_flSuitPowerLoad;	// net suit power drain (total of all device's drainrates)
 	float				m_flAdmireGlovesAnimTime;
-
+	float				m_flNextPlayerTalk;
 	float				m_flNextFlashlightCheckTime;
 	float				m_flFlashlightPowerDrainScale;
 

@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Wasteland Launcher
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -207,7 +207,7 @@ void CNPC_Launcher::Precache( void )
 void CNPC_Launcher::LauncherTurnOn(void)
 {
 	SetThink(&CNPC_Launcher::LauncherThink);
-	SetNextThink( gpGlobals->curtime );
+	SetNextThink( gpGlobals->curtime + 0.1f );
 	m_flNextAttack = 0;
 }
 
@@ -308,7 +308,6 @@ void CNPC_Launcher::LaunchGrenade( CBaseEntity* pEnemy )
 		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(20,30), random->RandomInt(10,15));
 	}
 	m_flNextAttack = gpGlobals->curtime + LAUNCHER_REST_TIME;
-
 }
 
 //------------------------------------------------------------------------------

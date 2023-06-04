@@ -35,7 +35,7 @@ public:
 	CNPC_CScanner();
 
 	int				GetSoundInterests( void ) { return (SOUND_WORLD|SOUND_COMBAT|SOUND_PLAYER|SOUND_DANGER); }
-	int				OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	int				OnTakeDamage( const CTakeDamageInfo &info );
 
 	bool			FValidateHintType(CAI_Hint *pHint);
 

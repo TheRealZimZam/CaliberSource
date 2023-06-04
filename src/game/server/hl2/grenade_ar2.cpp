@@ -67,12 +67,15 @@ END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( grenade_ar2, CGrenadeAR2 );
 
+int CGrenadeAR2::m_nAirburstSprite = 0;
+
 void CGrenadeAR2::Precache( void )
 {
 	PrecacheModel("models/Weapons/ar2_grenade.mdl");
 #ifndef OLD_SMOKE_TRAIL
 	PrecacheModel( "sprites/smoke1.vmt" );
 #endif
+	m_nAirburstSprite = PrecacheModel("sprites/fexplo1.vmt");
 
 	PrecacheScriptSound( "BaseGrenade.BounceSound" );
 }
@@ -285,7 +288,7 @@ void CGrenadeAR2::Detonate(void)
 		&GetAbsOrigin(), 
 		g_sModelIndexFireball,
 		m_DmgRadius * .02, 
-		15,
+		40,
 		TE_EXPLFLAG_NOFIREBALLSMOKE,
 		m_DmgRadius,
 		m_flDamage );
@@ -401,10 +404,16 @@ void CGrenadeAR2Airburst::Detonate(void)
 		&GetAbsOrigin(), 
 		g_sModelIndexFireball,
 		m_DmgRadius * .02, 
-		15,
-		TE_EXPLFLAG_NONE,
+		40,
+		TE_EXPLFLAG_NOFIREBALL,
 		m_DmgRadius,
 		m_flDamage );
+
+	te->Sprite( filter, 0.0,
+		&GetAbsOrigin(),
+		m_nAirburstSprite,
+		(0.5 + m_DmgRadius * .01),
+		255, 40 );
 
 	// TODO; vecforward needs to be fixed here
 	Vector vecForward = GetAbsVelocity();

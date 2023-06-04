@@ -525,6 +525,8 @@ void CNPC_Citizen::Spawn()
 	m_bRPGAvoidPlayer = false;
 	m_bShouldPatrol = false;
 	m_bCanPanic = true;
+	if ( g_pGameRules->IsSkillLevel( SKILL_HARD ) && random->RandomInt( 0, 3 ) == 3 )
+		m_bCanPanic = false;
 
 	// Rebel citizens (anybody who picks up a decent weapon, or is flagged as one in hammer) have more health
 	if( HasSpawnFlags( SF_CITIZEN_UPGRADED ) || m_Type == CT_REBEL )
@@ -1902,19 +1904,29 @@ Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 				activity = ACT_WALK_AIM_RIFLE;
 			break;
 
-			case ACT_MELEE_ATTACK_STAB:
+			case ACT_MELEE_ATTACK_STAB:	//Absolutly dreadful
 				activity = ACT_MELEE_ATTACK_SWING;
 			break;
 
-			case ACT_RELOAD_SHOTGUN_LOW:
+			case ACT_RELOAD_SHOTGUN_LOW:	//Raw
 				activity = ACT_RELOAD_SMG1_LOW;
 			break;
 
-			case ACT_IDLE_SCARED:
+			case ACT_IDLE_SCARED:	//RAW
 				activity = ACT_COWER;
 			break;
-			case ACT_RUN_SCARED:
+			case ACT_RUN_SCARED:	//SHIT
 				activity = ACT_RUN_PROTECTED;
+			break;
+
+			case ACT_GESTURE_FLINCH_HEAD:	//FUCKIN SHITE
+			case ACT_GESTURE_FLINCH_CHEST:
+			case ACT_GESTURE_FLINCH_STOMACH:
+			case ACT_GESTURE_FLINCH_LEFTARM:
+			case ACT_GESTURE_FLINCH_RIGHTARM:
+			case ACT_GESTURE_FLINCH_LEFTLEG:
+			case ACT_GESTURE_FLINCH_RIGHTLEG:
+				activity = ACT_GESTURE_FLINCH_BLAST;
 			break;
 		}
 	}
@@ -2132,23 +2144,23 @@ void CNPC_Citizen::SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE
 
 //-----------------------------------------------------------------------------
 // Purpose: Check if we want to throw something
+// TODO; This could also be patched for alt-fire of weapons, but thats a whole
+// different can of beans
 //-----------------------------------------------------------------------------
 /*
 int CNPC_Citizen::RangeAttack2Conditions( float flDot, float flDist )
 {
+	if ( g_pGameRules->IsSkillLevel( SKILL_EASY ) )
+		return COND_NONE;
+
 	if ( m_iNumThrowables < 1 )	// Out of throwables!
 		return COND_NONE;
 
 	if (!GetEnemy())
 		return COND_NONE;
 
-	// If I can see the enemy and its not my nemesis, or im not annoyed/desperate, dont bother with non-scripted grenades
-	if ( !m_bAnnoyed || HasCondition(COND_SEE_ENEMY) && !HasCondition(COND_SEE_NEMESIS) )
-		return COND_NONE;
-
 	// So we do want to consider throwing or shooting something, pass the rest onto the weapon itself
-	BaseCombatWeapon *pWeapon = GetActiveWeapon();
-	return pWeapon()->WeaponRangeAttack1Condition(flDot, flDist);
+	return GetActiveWeapon()->WeaponRangeAttack2Condition(flDot, flDist);
 }
 */
 
@@ -2365,7 +2377,7 @@ int CNPC_Citizen::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 	CTakeDamageInfo newInfo = info;
 
-	if( IsInSquad() && (info.GetDamageType() & DMG_BLAST) && info.GetInflictor() )
+	if( InSquad() && (info.GetDamageType() & DMG_BLAST) && info.GetInflictor() )
 	{
 		if( npc_citizen_explosive_resist.GetBool() )
 		{
@@ -3313,7 +3325,7 @@ void CNPC_Citizen::UpdateFollowCommandPoint()
 			{
 				pFollowTarget = pCommandPoint;
 				m_FollowBehavior.SetFollowTarget( pFollowTarget );
-				if ( m_NPCState != NPC_STATE_IDLE && HasCondition( COND_SEE_ENEMY ) && !m_bIsUpgraded )
+				if ( m_NPCState == NPC_STATE_COMBAT && HasCondition( COND_SEE_ENEMY ) )
 				{
 					m_FollowBehavior.SetParameters( AIF_WIDE );
 				}
@@ -3998,7 +4010,7 @@ void CNPC_Citizen::DeathSound( const CTakeDamageInfo &info )
 	else
 	{
 		// If im falling, or a blast hasnt gibbed me, make the looney tunes
-		if ( info.GetDamageType() & (DMG_FALL|DMG_BLAST) )
+		if ( info.GetDamageType() & (DMG_FALL) )//TODO; || info.GetDamageType() & (DMG_BLAST) && somethingtodowithvelocity()
 			pDeathsoundName = "NPC_Citizen.DieFall";
 
 		if( ( this->LastHitGroup() == HITGROUP_HEAD ) && ( info.GetDamageType() & DMG_BULLET ) )

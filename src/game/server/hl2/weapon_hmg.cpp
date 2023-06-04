@@ -108,7 +108,7 @@ CWeaponHMG1::CWeaponHMG1( )
 //	m_flHeat			= 0;
 //	m_bOverheating		= true;
 
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		m_bCanJam			= true;
 	}

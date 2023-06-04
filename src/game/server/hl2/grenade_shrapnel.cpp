@@ -197,7 +197,7 @@ void CGrenadeShrapnel::Detonate(void)
 		&GetAbsOrigin(), 
 		g_sModelIndexFireball,
 		3, 
-		15,
+		40,
 		TE_EXPLFLAG_NOSOUND | TE_EXPLFLAG_NOFIREBALL | TE_EXPLFLAG_NOFIREBALLSMOKE,
 		0,
 		0 );

@@ -223,7 +223,11 @@ void CClassicZombie::Precache( void )
 {
 	BaseClass::Precache();
 
-	PrecacheModel( "models/zombie/classic.mdl" );
+	// For wasteland zombies
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/zombie/classic.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
 	PrecacheModel( "models/zombie/classic_torso.mdl" );
 	PrecacheModel( "models/zombie/classic_legs.mdl" );
 	PrecacheModel( "models/headcrabclassic.mdl" );
@@ -389,7 +393,7 @@ void CClassicZombie::SetZombieModel( void )
 	}
 	else
 	{
-		SetModel( "models/zombie/classic.mdl" );
+		SetModel( STRING( GetModelName() ) );
 		SetHullType( HULL_HUMAN );
 	}
 

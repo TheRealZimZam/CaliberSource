@@ -162,7 +162,7 @@ CWeapon357::CWeapon357( void )
 	m_fMinRange1		= 16;
 	m_fMaxRange1		= 1500;
 
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		m_bCanJam			= true;
 	}

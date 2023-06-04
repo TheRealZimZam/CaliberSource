@@ -74,32 +74,11 @@ public:
 	// -----------------------------
 };
 
-//-----------------------------------------------------------------------------
-// Purpose: Rat. Roach with a different model.
-//-----------------------------------------------------------------------------
-class CNPC_Rat : public CNPC_Insect
-{
-	DECLARE_CLASS( CNPC_Rat, CNPC_Insect );
-
-public:
-	void Precache( void );
-	void Spawn( void )
-	{
-		BaseClass::Spawn();
-
-		SetModelName( AllocPooledString("models/rat.mdl") );
-		SetBloodColor( BLOOD_COLOR_RED );
-	}
-
-	void Event_Killed( const CTakeDamageInfo &info );
-};
-
 LINK_ENTITY_TO_CLASS( npc_cockroach, CNPC_Insect );
 #ifndef HL1_DLL
 LINK_ENTITY_TO_CLASS( monster_cockroach, CNPC_Insect );
 #endif
 LINK_ENTITY_TO_CLASS( npc_roach, CNPC_Insect );
-LINK_ENTITY_TO_CLASS( npc_rat, CNPC_Rat );
 
 //BEGIN_DATADESC( CNPC_Insect )
 
@@ -138,7 +117,7 @@ void CNPC_Insect::Spawn()
 
 	SetViewOffset ( Vector ( 0, 0, 1 ) );// position of the eyes relative to monster's origin.
 	m_takedamage		= DAMAGE_YES;
-	m_fLightHacked		= FALSE;
+	m_fLightHacked		= false;
 	m_flLastLightLevel	= -1;
 	m_iMode				= ROACH_IDLE;
 	m_flNextSmellTime	= gpGlobals->curtime;
@@ -197,7 +176,7 @@ void CNPC_Insect::NPCThink( void )
 		// if light value hasn't been collection for the first time yet, 
 		// suspend the creature for a second so the world finishes spawning, then we'll collect the light level.
 		SetNextThink( gpGlobals->curtime + 1 );
-		m_fLightHacked = TRUE;
+		m_fLightHacked = true;
 		return;
 	}
 	else if ( m_flLastLightLevel < 0 )
@@ -486,14 +465,36 @@ void CNPC_Insect::Event_Killed( const CTakeDamageInfo &info )
 
 int CNPC_Insect::GetSoundInterests ( void) 
 {
-	return	SOUND_CARCASS	|
-			SOUND_MEAT;
+	return	SMELL_CARCASS	|
+			SMELL_MEAT;
 }
 
 
 //-----------------------------------------------------------------------------
 // Purpose: Rat. Roach with a different model.
 //-----------------------------------------------------------------------------
+class CNPC_Rat : public CNPC_Insect
+{
+	DECLARE_CLASS( CNPC_Rat, CNPC_Insect );
+
+public:
+	void Precache( void );
+	void Spawn( void )
+	{
+		BaseClass::Spawn();
+
+		SetModelName( AllocPooledString("models/rat.mdl") );
+		SetBloodColor( BLOOD_COLOR_RED );
+	}
+
+	void Event_Killed( const CTakeDamageInfo &info );
+};
+
+LINK_ENTITY_TO_CLASS( npc_rat, CNPC_Rat );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_rat, CNPC_Rat );
+#endif
+
 void CNPC_Rat::Precache()
 {
 	engine->PrecacheModel("models/rat.mdl");
@@ -509,7 +510,7 @@ void CNPC_Rat::Event_Killed( const CTakeDamageInfo &info )
 	CPASAttenuationFilter filter( this );
 	
 	EmitSound( "npc_rat.die" );
-	CSoundEnt::InsertSound ( SOUND_WORLD, GetAbsOrigin(), 128, 1 );
+	CSoundEnt::InsertSound( SOUND_WORLD, GetAbsOrigin(), 128, 1 );
 
 	//TODO; spawn dead model
 	UTIL_Remove( this );

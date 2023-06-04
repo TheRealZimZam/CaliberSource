@@ -60,12 +60,14 @@ void CNPC_CombineE::Spawn( void )
 	SetHealth( sk_combine_e_health.GetFloat() );
 	SetMaxHealth( sk_combine_e_health.GetFloat() );
 	SetKickDamage( sk_combine_e_kick.GetFloat() );
-	m_flFieldOfView			= 0.2;	//*150
+	m_flFieldOfView = 0.2;	//*150
+	if (!IsElite())
+		m_sType = ELITE;	//Override - we dont care if its set otherwise, this classname must be this type
 
 	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
 	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 	// Sniper elites dont use grenades
-	if ( !FClassnameIs( this, "npc_sniper" ))
+	if (!Weapon_OwnsThisType( "weapon_sniperrifle" ))
 	{
 		CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
 	}
@@ -77,8 +79,6 @@ void CNPC_CombineE::Spawn( void )
 	}
 
 	BaseClass::Spawn();
-
-	m_MoveAndShootOverlay.SetInitialDelay( 0.25 );
 }
 
 
@@ -89,17 +89,17 @@ void CNPC_CombineE::Spawn( void )
 //-----------------------------------------------------------------------------
 void CNPC_CombineE::Precache()
 {
-	m_fIsElite = true;
-
 	if( !GetModelName() )
-	{
 		SetModelName( MAKE_STRING( "models/combine_elite.mdl" ) );
-	}
 
 	PrecacheModel( STRING( GetModelName() ) );
 
+	PrecacheScriptSound( "NPC_CombineE.FootstepLeft" );
+	PrecacheScriptSound( "NPC_CombineE.FootstepRight" );
+
 //	PrecacheScriptSound( "NPC_Combine.Die" );
 	PrecacheScriptSound( "NPC_Combine.DieIWHBYD" );
+	enginesound->PrecacheSentenceGroup( "COMBINE_ELITE" );
 
 	UTIL_PrecacheOther( "item_healthvial" );
 	UTIL_PrecacheOther( "weapon_frag" );

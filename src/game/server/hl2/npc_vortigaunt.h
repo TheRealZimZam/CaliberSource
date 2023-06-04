@@ -190,7 +190,6 @@ private:
 	// -----------------
 	bool			IsStompable(CBaseEntity *pEntity);
 
-	float			m_painTime;
 	float			m_nextLineFireTime;
 	bool			m_bInBarnacleMouth;
 	bool			m_bArmorRechargeEnabled;

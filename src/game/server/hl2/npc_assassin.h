@@ -45,7 +45,7 @@ public:
 	CNPC_Assassin( void );
 	
 	Class_T		Classify( void )			{ return CLASS_STALKER;	}
-	int			GetSoundInterests( void )	{ return (SOUND_WORLD|SOUND_COMBAT|SOUND_PLAYER|SOUND_DANGER|SOUND_BULLET_IMPACT|SOUND_MOVE_AWAY);	}
+	int			GetSoundInterests( void )	{ return (SOUND_WORLD|SOUND_COMBAT|SOUND_PLAYER|SOUND_DANGER|SOUND_BULLET_IMPACT|SOUND_MOVE_AWAY|SOUND_VEHICLE|SOUND_WEAPON);	}
 	virtual float	GetJumpGravity() const		{ return 1.8f; }
 	
 	void		Precache( void );

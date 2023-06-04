@@ -1,8 +1,27 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Attack Drone
+// Purpose: Lil' Firebee/Chinese Predator - Hosptials beware
 //
+//
+// TODO; Code this thing!
+// Note; "Pods" refer to disposable missile pods, like manhacks for cops
 //=============================================================================//
+
+//-----------------------------------------------------------------------------
+// Heres a rundown - 
+// Big ol' flying attack bot, thrice as large as the wscanner, twice of the
+// cscanner, strafes enemies like a monoplane on the attack, hovers around when idle.
+// Usually paried with a launcher to keep the player in the map.
+// A good amount of health and high speed makes it a real threat when alone, 
+// an absolute monster when paired with grunts or other deadly distractions.
+// Has three attacks;
+// 1. Shoot short-range lasers, its "melee" attack.
+// 2. Launched homing grenades - they go up abit then come back down on
+// the unfortunate basterds head.
+// 3. If specified, can be given disposable missile pods for a longer range,
+// direct-fire attack, rather than the slow, easily dodgable homer grenades
+//
+//-----------------------------------------------------------------------------
 
 #include "cbase.h"
 #include "npcevent.h"
@@ -13,1380 +32,1007 @@
 #include "beam_shared.h"
 #include "globalstate.h"
 #include "soundent.h"
-#include "npc_citizen17.h"
-#include "steamjet.h"
+#include "npc_basescanner.h"
 #include "gib.h"
+#include "explode.h"
 #include "spotlightend.h"
 #include "IEffects.h"
 #include "items.h"
 #include "ai_route.h"
 #include "player_pickup.h"
-#include "weapon_physcannon.h"
 #include "hl2_player.h"
-#include "npc_scanner.h"
-#include "materialsystem/imaterialsystemhardwareconfig.h"
+#include "grenade_homer.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 //-----------------------------------------------------------------------------
-// Singleton interfaces
+// Spawnflags
 //-----------------------------------------------------------------------------
-extern IMaterialSystemHardwareConfig *g_pMaterialSystemHardwareConfig;
+#define	ASCANNER_NUM_BEAMS				4
+#define	ASCANNER_NUM_GLOWS				3
+
+#define	ASCANNER_MAX_SPEED			400
+#define ASCANNER_MIN_GROUND_DIST	96
+#define ASCANNER_HOVER_NEAR_DIST	400		//At this distance use laserbeam
+#define ASCANNER_HOVER_FAR_DIST		750		//At this distance use grenades
+#define	ASCANNER_BANK_RATE	35
+
+#define	ASCANNER_MAX_ATTACK_RADIUS	5000	//Dont engage targets further than this, just observe
+#define ASCANNER_TARGET_TIME  1			//How long an enemy must be our target before allowed to engage
+#define ASCANNER_LASER_WARMUP_TIME  1	//Delay before laser fires
+#define ASCANNER_LASER_BURST_SIZE  3
+#define ASCANNER_ROCKET_WARMUP_TIME  2	//Delay before rocket pods can fire
+
+//Scannerstate, used to control flight type
+enum AScannerState_t
+{
+	ASCANNER_STATE_NORMAL,	//Normal idle/Combat
+	ASCANNER_STATE_STRAFE,	//Aiming state - When firing grenades/rockets, go into this state for X seconds
+	ASCANNER_STATE_EVASION,	//Dodging away, siren sounding, alert friends
+};
+
+class CSprite;
+class CBeam;
 
 //-----------------------------------------------------------------------------
-// Parameters for how the scanner relates to citizens.
+// WScanner 
 //-----------------------------------------------------------------------------
-#define SCANNER_CIT_INSPECT_DELAY		10		// Check for citizens this often
-#define	SCANNER_CIT_INSPECT_GROUND_DIST	500		// How far to look for citizens to inspect
-#define	SCANNER_CIT_INSPECT_FLY_DIST	1500	// How far to look for citizens to inspect
+class CNPC_ADrone : public CNPC_BaseScanner
+{
+	DECLARE_CLASS( CNPC_ADrone, CNPC_BaseScanner );
 
-#define SCANNER_CIT_INSPECT_LENGTH		5		// How long does the inspection last
-#define SCANNER_HINT_INSPECT_LENGTH		5		// How long does the inspection last
-#define SCANNER_SOUND_INSPECT_LENGTH	5		// How long does the inspection last
+public:
+	CNPC_ADrone();
 
-#define SCANNER_HINT_INSPECT_DELAY		15		// Check for hint nodes this often
+	Class_T			Classify(void);
+
+	void			Event_Killed( const CTakeDamageInfo &info );
+	int				OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	virtual bool	ShouldGib( const CTakeDamageInfo &info );
+
+	void			HandleAnimEvent( animevent_t *pEvent );
+
+ 	virtual int		SelectSchedule(void);
+	virtual int		TranslateSchedule( int scheduleType );
+
+	bool			FValidateHintType(CAI_Hint *pHint);
+
+	virtual Vector	BodyTarget( const Vector &posSrc, bool bNoisy = true ) { return WorldSpaceCenter(); }
+
+	void			SetAScannerState(AScannerState_t pNewState);
+	Vector			PodPos(int nPos);
+	void			DropPod(int nPod);
+	void			StartAimBeam(void);
+
+	bool			OverrideMove(float flInterval);
+	bool 			OverridePathMove(float flInterval);
 	
-#define	SPOTLIGHT_WIDTH					32
+	void			MoveToTarget(float flInterval, const Vector &MoveTarget);
+	void			MoveToAttack(float flInterval);
+	Vector			MoveToEvade(CBaseCombatCharacter *pEnemy);
+	void			MoveExecute_Alive(float flInterval);
+	float			MinGroundDist(void);
+	void			SetBanking(float flInterval);
 
-#define SCANNER_SPOTLIGHT_NEAR_DIST		64
-#define SCANNER_SPOTLIGHT_FAR_DIST		256
-#define SCANNER_SPOTLIGHT_FLY_HEIGHT	72
-#define SCANNER_NOSPOTLIGHT_FLY_HEIGHT	72
+	void			PlayAlarmSound(void);
+	void			AdjustAntenna(float flInterval);
+	virtual void	StopLoopingSounds(void);
 
-#define SCANNER_GAS_DAMAGE_DIST			500
-#define SCANNER_FLASH_MIN_DIST			900		// How far does flash effect enemy
-#define SCANNER_FLASH_MAX_DIST			1200	// How far does flash effect enemy
-#define	SCANNER_FLASH_MAX_VALUE			240		// How bright is maximum flash
+	char *GetScannerSoundPrefix( void )
+	{
+		return "NPC_AScanner";
+	}
+	char			*GetEngineSound( void );
 
-#define SCANNER_PHOTO_NEAR_DIST			64
-#define SCANNER_PHOTO_FAR_DIST			128
+	void			Precache(void);
+	void			RunTask( const Task_t *pTask );
+	void			Spawn(void);
+	void			StartTask( const Task_t *pTask );
 
-#define	SCANNER_FOLLOW_DIST				128
+	bool			IsValidEnemy(CBaseEntity *pEnemy);
 
-#define	SCANNER_NUM_GIBS				6		// Number of gibs in gib file
+	int				DrawDebugTextOverlays(void);
+	void			OnScheduleChange();
 
-// Strider Scout Scanners
-#define SCANNER_SCOUT_MAX_SPEED			150
+	DEFINE_CUSTOM_AI;
 
-ConVar	sk_scanner_health( "sk_scanner_health","0");
-ConVar	sk_scanner_dmg_gas( "sk_scanner_dmg_gas","0");
-ConVar	g_debug_cscanner( "g_debug_cscanner", "0" );
+	DECLARE_DATADESC();
+
+	~CNPC_ADrone(void);
+
+protected:
+	int				m_nPods;
+	AScannerState_t	m_nAScannerState;
+
+	// ==================
+	// Attack 
+	// ==================
+	CBeam*			m_pBeam[ASCANNER_NUM_BEAMS];
+	CSprite*		m_pLaserGlow[ASCANNER_NUM_GLOWS];
+	bool			m_bBankFace;
+	float			m_fNextGrenadeTime;
+	float			m_fNextLaserTime;
+	void			LaserWarmup(void);
+	void			LaserShoot(void);
+	void			LaserKill(void);
+	void			TossGrenade( bool bFireGrenade = false );
+	float			m_fSwitchToHelpTime;
+
+	// ==================
+	// Movement variables.
+	// ==================
+	float			m_fNextMoveEvadeTime;
+	float			m_fNextAlarmSoundTime;
+	float			m_fNextFlySoundTime;
+	float			m_fTargetTime;
+	
+	float			m_fAntennaPos;
+	float			m_fAntennaTarget;
+
+	CSprite*		m_pLightGlow;
+};
+
+ConVar	sk_ascanner_health( "sk_ascanner_health","0");
+ConVar	sk_ascanner_missile_dmg( "sk_ascanner_missile_dmg","0");	//Long-range missile
+ConVar	sk_ascanner_grenade_dmg( "sk_ascanner_grenade_dmg","0");	//Mid-range homer grenade
+ConVar	sk_ascanner_laser_dmg( "sk_ascanner_laser_dmg","0");	//Close-range laser
 
 //-----------------------------------------------------------------------------
 // Private activities.
 //-----------------------------------------------------------------------------
-static int ACT_SCANNER_SMALL_FLINCH_ALERT = 0;
-static int ACT_SCANNER_SMALL_FLINCH_COMBAT = 0;
-static int ACT_SCANNER_INSPECT = 0;
-static int ACT_SCANNER_WALK_ALERT = 0;
-static int ACT_SCANNER_WALK_COMBAT = 0;
-static int ACT_SCANNER_FLARE = 0;
-static int ACT_SCANNER_RETRACT = 0;
-static int ACT_SCANNER_FLARE_PRONGS = 0;
-static int ACT_SCANNER_RETRACT_PRONGS = 0;
-static int ACT_SCANNER_FLARE_START = 0;
+static int ACT_ASCANNER_DROP = 0;
+static int ACT_ASCANNER_FLINCH_BACK = 0;
+static int ACT_ASCANNER_FLINCH_FRONT = 0;
+static int ACT_ASCANNER_FLINCH_LEFT = 0;
+static int ACT_ASCANNER_FLINCH_RIGHT = 0;
 
 //-----------------------------------------------------------------------------
 // Interactions
 //-----------------------------------------------------------------------------
-int	g_interactionScannerInspect				= 0;
-int	g_interactionScannerInspectBegin		= 0;
-int g_interactionScannerInspectHandsUp		= 0;
-int g_interactionScannerInspectShowArmband	= 0;//<<TEMP>>still to be completed
-int	g_interactionScannerInspectDone			= 0;
-int g_interactionScannerSupportEntity		= 0;
-int g_interactionScannerSupportPosition		= 0;
+int	g_interactionWScannerBomb		= 0;
+
+//-----------------------------------------------------------------------------
+// AScanner schedules.
+//-----------------------------------------------------------------------------
+enum WScannerSchedules
+{
+	SCHED_ASCANNER_ATTACK_HOVER = LAST_SHARED_SCHEDULE,
+	SCHED_ASCANNER_PATROL,
+	SCHED_ASCANNER_GET_HELP,
+	SCHED_ASCANNER_CHASE_ENEMY,
+	SCHED_ASCANNER_SHOOT_LASER,
+};
+
+//-----------------------------------------------------------------------------
+// AScanner tasks.
+//-----------------------------------------------------------------------------
+enum AScannerTasks
+{
+	TASK_LASER_WARMUP	= LAST_SHARED_TASK,
+	TASK_LASER_SHOOT,
+	TASK_RAISE_ANTENNA,
+	TASK_AIM_ROCKETS,
+	TASK_FIRE_ROCKETS,
+};
 
 //-----------------------------------------------------------------------------
 // Animation events
 //------------------------------------------------------------------------
-int AE_SCANNER_CLOSED;
+int AE_ASCANNER_SHOOT;
 
 //-----------------------------------------------------------------------------
 // Attachment points
 //-----------------------------------------------------------------------------
-#define SCANNER_ATTACHMENT_LIGHT	"light"
-#define SCANNER_ATTACHMENT_FLASH	1
-#define SCANNER_ATTACHMENT_LPRONG	2
-#define SCANNER_ATTACHMENT_RPRONG	3
+#define ASCANNER_ATTACHMENT_LIGHT	"light"
+#define ASCANNER_ATTACHMENT_SHOOT		1
+#define ASCANNER_ATTACHMENT_POD_RIGHT	1
+#define ASCANNER_ATTACHMENT_POD_LEFT	2
+#define ASCANNER_ATTACHMENT_POD_BOTTOM		3
 
-//-----------------------------------------------------------------------------
-// Other defines.
-//-----------------------------------------------------------------------------
-#define SCANNER_MAX_BEAMS		4
+BEGIN_DATADESC( CNPC_ADrone )
+	DEFINE_KEYFIELD( m_nPods,			FIELD_INTEGER, "NumberOfPods" ),
 
-BEGIN_DATADESC( CNPC_AScanner )
+	DEFINE_FIELD( m_nAScannerState,			FIELD_INTEGER),
+	DEFINE_ARRAY( m_pBeam,					FIELD_CLASSPTR, ASCANNER_NUM_BEAMS ),
+	DEFINE_ARRAY( m_pLaserGlow,				FIELD_CLASSPTR, ASCANNER_NUM_GLOWS ),
+	DEFINE_FIELD( m_bBankFace,				FIELD_BOOLEAN),
+	DEFINE_FIELD( m_fNextGrenadeTime,		FIELD_TIME),
+	DEFINE_FIELD( m_fNextLaserTime,			FIELD_TIME),
 
-	DEFINE_SOUNDPATCH( m_pEngineSound ),
+	DEFINE_FIELD( m_fNextMoveEvadeTime,		FIELD_TIME),
+	DEFINE_FIELD( m_fNextAlarmSoundTime,	FIELD_TIME),
+	DEFINE_FIELD( m_fNextFlySoundTime,		FIELD_TIME),
+	DEFINE_FIELD( m_fTargetTime,			FIELD_TIME),
+	DEFINE_FIELD( m_fSwitchToHelpTime,		FIELD_TIME),
 
-	DEFINE_EMBEDDED( m_KilledInfo ),
-	DEFINE_FIELD( m_flGoalOverrideDistance,	FIELD_FLOAT ),
-	DEFINE_FIELD( m_bPhotoTaken,			FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_vInspectPos,			FIELD_VECTOR ),
-	DEFINE_FIELD( m_fInspectEndTime,		FIELD_TIME ),
-	DEFINE_FIELD( m_fCheckCitizenTime,		FIELD_TIME ),
-	DEFINE_FIELD( m_fCheckHintTime,			FIELD_TIME ),
-	DEFINE_KEYFIELD( m_bShouldInspect,		FIELD_BOOLEAN,	"ShouldInspect" ),
-	DEFINE_KEYFIELD( m_bOnlyInspectPlayers, FIELD_BOOLEAN,  "OnlyInspectPlayers" ),
-	DEFINE_KEYFIELD( m_bNeverInspectPlayers,FIELD_BOOLEAN,  "NeverInspectPlayers" ),
-	DEFINE_FIELD( m_fNextPhotographTime,	FIELD_TIME ),
-//	DEFINE_FIELD( m_pEyeFlash,				FIELD_CLASSPTR ),
-	DEFINE_FIELD( m_vSpotlightTargetPos,	FIELD_POSITION_VECTOR ),
-	DEFINE_FIELD( m_vSpotlightCurrentPos,	FIELD_POSITION_VECTOR ),
-// don't save (recreated after restore/transition)
-//	DEFINE_FIELD( m_hSpotlight,				FIELD_EHANDLE ),
-//	DEFINE_FIELD( m_hSpotlightTarget,		FIELD_EHANDLE ),
-	DEFINE_FIELD( m_vSpotlightDir,			FIELD_VECTOR ),
-	DEFINE_FIELD( m_vSpotlightAngVelocity,	FIELD_VECTOR ),
-	DEFINE_FIELD( m_flSpotlightCurLength,	FIELD_FLOAT ),
-	DEFINE_FIELD( m_fNextSpotlightTime,		FIELD_TIME ),
-	DEFINE_FIELD( m_nHaloSprite,			FIELD_INTEGER ),
-	DEFINE_FIELD( m_fNextFlySoundTime,		FIELD_TIME ),
-	DEFINE_FIELD( m_nFlyMode,				FIELD_INTEGER ),
-	DEFINE_FIELD( m_nPoseTail,				FIELD_INTEGER ),
-	DEFINE_FIELD( m_nPoseDynamo,			FIELD_INTEGER ),
-	DEFINE_FIELD( m_nPoseFlare,				FIELD_INTEGER ),
-	DEFINE_FIELD( m_nPoseFaceVert,			FIELD_INTEGER ),
-	DEFINE_FIELD( m_nPoseFaceHoriz,			FIELD_INTEGER ),
+	DEFINE_FIELD( m_fAntennaPos,			FIELD_FLOAT),
+	DEFINE_FIELD( m_fAntennaTarget,			FIELD_FLOAT),
 
-	DEFINE_FIELD( m_bIsClawScanner,			FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_bIsOpen,				FIELD_BOOLEAN ),
-
-	// DEFINE_FIELD( m_bHasSpoken,			FIELD_BOOLEAN ),
-
-	DEFINE_FIELD( m_pSmokeTrail,			FIELD_CLASSPTR ),
-	DEFINE_FIELD( m_flFlyNoiseBase,			FIELD_FLOAT ),
-	DEFINE_FIELD( m_flEngineStallTime,		FIELD_TIME ),
-
-	DEFINE_FIELD( m_vGasDirection,			FIELD_VECTOR ),
-
-	DEFINE_FIELD( m_vecDiveBombDirection,	FIELD_VECTOR ),
-	DEFINE_FIELD( m_flDiveBombRollForce,	FIELD_FLOAT ),
-
-	DEFINE_KEYFIELD( m_flSpotlightMaxLength,	FIELD_FLOAT,	"SpotlightLength"),
-	DEFINE_KEYFIELD( m_flSpotlightGoalWidth,	FIELD_FLOAT,	"SpotlightWidth"),
-
-	// Physics Influence
-	DEFINE_FIELD( m_hPhysicsAttacker, FIELD_EHANDLE ),
-	DEFINE_FIELD( m_flLastPhysicsInfluenceTime, FIELD_TIME ),
-
-	DEFINE_KEYFIELD( m_bNoLight, FIELD_BOOLEAN, "SpotlightDisabled" ),
-
-	DEFINE_INPUTFUNC( FIELD_VOID, "DisableSpotlight", InputDisableSpotlight ),
-	DEFINE_INPUTFUNC( FIELD_STRING, "InspectTargetPhoto", InputInspectTargetPhoto ),
-	DEFINE_INPUTFUNC( FIELD_STRING, "InspectTargetSpotlight", InputInspectTargetSpotlight ),
-	DEFINE_INPUTFUNC( FIELD_INTEGER, "InputShouldInspect", InputShouldInspect ),
-	DEFINE_INPUTFUNC( FIELD_STRING, "SetFollowTarget", InputSetFollowTarget ),
-	DEFINE_INPUTFUNC( FIELD_VOID, "ClearFollowTarget", InputClearFollowTarget ),
-
-	DEFINE_INPUTFUNC( FIELD_STRING, "DeployMine", InputDeployMine ),
-	DEFINE_INPUTFUNC( FIELD_STRING, "EquipMine", InputEquipMine ),
-
-	DEFINE_OUTPUT( m_OnPhotographPlayer, "OnPhotographPlayer" ),
-	DEFINE_OUTPUT( m_OnPhotographNPC, "OnPhotographNPC" ),
+	DEFINE_FIELD( m_pLightGlow,				FIELD_CLASSPTR),
 
 END_DATADESC()
 
 
-LINK_ENTITY_TO_CLASS(npc_cscanner, CNPC_AScanner);
+LINK_ENTITY_TO_CLASS( npc_ascanner, CNPC_ADrone );
+IMPLEMENT_CUSTOM_AI( npc_ascanner, CNPC_ADrone );
 
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-CNPC_AScanner::CNPC_AScanner()
+CNPC_ADrone::CNPC_ADrone()
 {
 #ifdef _DEBUG
-	m_vInspectPos.Init();
-	m_vSpotlightTargetPos.Init();
-	m_vSpotlightCurrentPos.Init();
-	m_vSpotlightDir.Init();
-	m_vSpotlightAngVelocity.Init();
-	m_vGasDirection.Init();
+	m_vCurrentBanking.Init();
 #endif
-	m_bShouldInspect = true;
-	m_bOnlyInspectPlayers = false;
-	m_bNeverInspectPlayers = false;
+}
+//-----------------------------------------------------------------------------
+// Purpose: Initialize the custom schedules
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::InitCustomSchedules(void) 
+{
+	INIT_CUSTOM_AI(CNPC_ADrone);
 
-	char szMapName[256];
-	Q_strncpy(szMapName, STRING(gpGlobals->mapname), sizeof(szMapName) );
-	Q_strlower(szMapName);
+	ADD_CUSTOM_TASK(CNPC_ADrone,	TASK_LASER_WARMUP);
+	ADD_CUSTOM_TASK(CNPC_ADrone,	TASK_LASER_SHOOT);
+	ADD_CUSTOM_TASK(CNPC_ADrone,	TASK_RAISE_ANTENNA);
+	ADD_CUSTOM_TASK(CNPC_ADrone,	TASK_AIM_ROCKETS);
+	ADD_CUSTOM_TASK(CNPC_ADrone,	TASK_FIRE_ROCKETS);
 
-	if( !Q_strnicmp( szMapName, "d3_c17", 6 ) )
-	{
-		// Streetwar scanners are claw scanners
-		m_bIsClawScanner = true;
-	}
+	ADD_CUSTOM_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_ATTACK_HOVER);
+	ADD_CUSTOM_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_PATROL);
+	ADD_CUSTOM_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_GET_HELP);
+	ADD_CUSTOM_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_CHASE_ENEMY);
+	ADD_CUSTOM_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_SHOOT_LASER);
+
+	ADD_CUSTOM_ACTIVITY(CNPC_ADrone,	ACT_ASCANNER_DROP);
+	ADD_CUSTOM_ACTIVITY(CNPC_ADrone,	ACT_ASCANNER_FLINCH_BACK);
+	ADD_CUSTOM_ACTIVITY(CNPC_ADrone,	ACT_ASCANNER_FLINCH_FRONT);
+	ADD_CUSTOM_ACTIVITY(CNPC_ADrone,	ACT_ASCANNER_FLINCH_LEFT);
+	ADD_CUSTOM_ACTIVITY(CNPC_ADrone,	ACT_ASCANNER_FLINCH_RIGHT);
+
+	g_interactionWScannerBomb = CBaseCombatCharacter::GetInteractionID();
+
+	AI_LOAD_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_ATTACK_HOVER);
+	AI_LOAD_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_PATROL);
+	AI_LOAD_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_GET_HELP);
+	AI_LOAD_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_CHASE_ENEMY);
+	AI_LOAD_SCHEDULE(CNPC_ADrone,	SCHED_ASCANNER_SHOOT_LASER);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Indicates this NPC's place in the relationship table.
+//-----------------------------------------------------------------------------
+Class_T	CNPC_ADrone::Classify(void)
+{
+	return (CLASS_SCANNER);
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::StopLoopingSounds(void)
+{
+	StopSound(entindex(), "NPC_AScanner.HoverAlarm" );
+	StopSound(entindex(), "NPC_AScanner.Hover" );
+	StopSound(entindex(), "NPC_AScanner.Alarm" );
+	StopSound(entindex(), "NPC_AScanner.LaserAim" );
+	BaseClass::StopLoopingSounds();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+char *CNPC_ADrone::GetEngineSound( void )
+{
+	if ( m_nAScannerState == ASCANNER_STATE_EVASION )
+		return( "NPC_AScanner.HoverAlarm" );
 	else
-	{
-		m_bIsClawScanner = false;
-	}
+		return( "NPC_AScanner.Hover" );
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CNPC_AScanner::Spawn(void)
+void CNPC_ADrone::Precache(void)
 {
-	// Check for user error
-	if (m_flSpotlightMaxLength <= 0)
-	{
-		DevMsg("CNPC_AScanner::Spawn: Invalid spotlight length <= 0, setting to 500\n");
-		m_flSpotlightMaxLength = 500;
-	}
+	//
+	// Model
+	//
+	engine->PrecacheModel("models/ascanner.mdl");
+	engine->PrecacheModel("models/ascanner_pod.mdl");
+	engine->PrecacheModel("models/Weapons/wscanner_grenade.mdl"); 
 	
-	if (m_flSpotlightGoalWidth <= 0)
-	{
-		DevMsg("CNPC_AScanner::Spawn: Invalid spotlight width <= 0, setting to 100\n");
-		m_flSpotlightGoalWidth = 100;
-	}
+	engine->PrecacheModel("sprites/lgtning.vmt");	
+	engine->PrecacheModel("sprites/glow01.vmt");
 
-	if (m_flSpotlightGoalWidth > MAX_BEAM_WIDTH )
-	{
-		DevMsg("CNPC_AScanner::Spawn: Invalid spotlight width %.1f (max %.1f).\n", m_flSpotlightGoalWidth, MAX_BEAM_WIDTH );
-		m_flSpotlightGoalWidth = MAX_BEAM_WIDTH; 
-	}
+	UTIL_PrecacheOther("grenade_homer");
 
+	//
+	// Sounds
+	//
+	PrecacheScriptSound( "NPC_AScanner.Hover");
+	PrecacheScriptSound( "NPC_AScanner.HoverAlarm");
+	PrecacheScriptSound( "NPC_AScanner.Alarm");
+	PrecacheScriptSound( "NPC_AScanner.DropPod");
+	PrecacheScriptSound( "NPC_AScanner.LaserAim");
+	PrecacheScriptSound( "NPC_AScanner.LaserShoot");
+	PrecacheScriptSound( "NPC_AScanner.GrenadeShoot");
+	PrecacheScriptSound( "NPC_AScanner.RocketAim");
+	PrecacheScriptSound( "NPC_AScanner.RocketShoot");
+
+	BaseClass::Precache();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::Spawn(void)
+{
 	Precache();
 
-	if( m_bIsClawScanner )
+	SetModel( "models/ascanner.mdl" );
+
+	m_nAScannerState = ASCANNER_STATE_NORMAL;
+
+	if (m_nPods != 0)
 	{
-		SetModel( "models/shield_scanner.mdl");
-	}
-	else
-	{
-		SetModel( "models/combine_scanner.mdl");
+		// Cap at 3 (wings, belly)
+		if (m_nPods > 3)
+			m_nPods = 3;
+
+		SetBodygroup( m_nPods, true );
 	}
 
-	m_iHealth				= sk_scanner_health.GetFloat();
+	SetHullType( HULL_SMALL_CENTERED ); 
+	SetHullSizeNormal();
+
+	SetSolid( SOLID_BBOX );
+	AddSolidFlags( FSOLID_NOT_STANDABLE );
+
+	SetMoveType( MOVETYPE_FLY );	//STEP??
+	SetGravity(0.001);
+
+	m_iHealth = sk_ascanner_health.GetFloat();
 	m_iMaxHealth = m_iHealth;
+	SetViewOffset( Vector(0, 0, 10) );		// Position of the eyes relative to NPC's origin.
+	m_flFieldOfView		= VIEW_FIELD_FULL;	// Gimble cam, no hiding unless completely out of sight
+	m_NPCState			= NPC_STATE_NONE;
+	SetBloodColor( DONT_BLEED );
+	SetCurrentVelocity( vec3_origin );
+	m_vCurrentBanking	= vec3_origin;
+	SetNavType( NAV_FLY );
+	AddFlag( FL_FLY );
 
-	// ------------------------------------
-	//	Init all class vars 
-	// ------------------------------------
-	m_vInspectPos			= vec3_origin;
-	m_fInspectEndTime		= 0;
-	m_fCheckCitizenTime		= gpGlobals->curtime + SCANNER_CIT_INSPECT_DELAY;
-	m_fCheckHintTime		= gpGlobals->curtime + SCANNER_HINT_INSPECT_DELAY;
-	m_fNextPhotographTime	= 0;
+	CapabilitiesAdd( bits_CAP_MOVE_FLY );
+	CapabilitiesAdd( bits_CAP_SQUAD );
+//	CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK1 );
 
-	m_vSpotlightTargetPos	= vec3_origin;
-	m_vSpotlightCurrentPos	= vec3_origin;
+	m_bBankFace					= false;
 
-	m_hSpotlight			= NULL;
-	m_hSpotlightTarget		= NULL;
+	m_vLastPatrolDir			= vec3_origin;
+	m_fTargetTime				= ASCANNER_TARGET_TIME;
+	m_fNextGrenadeTime			= 0;
+	m_fNextLaserTime			= 0;
+	m_fNextMoveEvadeTime		= 0;
+	m_fNextAlarmSoundTime		= 0;
+	m_fNextFlySoundTime			= 0;
+	m_fSwitchToHelpTime			= 0;
 
-	AngleVectors( GetLocalAngles(), &m_vSpotlightDir );
-	m_vSpotlightAngVelocity = vec3_origin;
-
-	m_pEyeFlash				= 0;
-	m_fNextSpotlightTime	= 0;
-	m_nFlyMode				= SCANNER_FLY_PATROL;
-	m_vCurrentBanking		= m_vSpotlightDir;
-	m_vGasDirection			= m_vSpotlightDir;
-	m_flSpotlightCurLength	= m_flSpotlightMaxLength;
-
-	m_nPoseTail = LookupPoseParameter( "tail_control" );
-	m_nPoseDynamo = LookupPoseParameter( "dynamo_wheel" );
-	m_nPoseFlare = LookupPoseParameter( "alert_control" );
-	m_nPoseFaceVert = LookupPoseParameter( "flex_vert" );
-	m_nPoseFaceHoriz = LookupPoseParameter( "flex_horz" );
-
-	// --------------------------------------------
-
-	CapabilitiesAdd( bits_CAP_INNATE_MELEE_ATTACK1 );
-
-	m_bPhotoTaken = false;
-
-	BaseClass::Spawn();
-
-	// Watch for this error state
-	if ( m_bOnlyInspectPlayers && m_bNeverInspectPlayers )
+	int i;
+	for (i=0;i<ASCANNER_NUM_BEAMS;i++)
 	{
-		Assert( 0 );
-		Warning( "ERROR: Scanner set to never and always inspect players!\n" );
+		m_pBeam[i] = NULL;
 	}
-}
-
-
-//-----------------------------------------------------------------------------
-//
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::Activate()
-{
-	BaseClass::Activate();
-
-	// Have to do this here because sprites do not go across level transitions
-	m_pEyeFlash = CSprite::SpriteCreate( "sprites/blueflare1.vmt", GetLocalOrigin(), FALSE );
-	m_pEyeFlash->SetTransparency( kRenderGlow, 255, 255, 255, 0, kRenderFxNoDissipation );
-	m_pEyeFlash->SetAttachment( this, LookupAttachment( SCANNER_ATTACHMENT_LIGHT ) );
-	m_pEyeFlash->SetBrightness( 0 );
-	m_pEyeFlash->SetScale( 1.4 );
-}
-
-//------------------------------------------------------------------------------
-// Purpose: Override to split in two when attacked
-//------------------------------------------------------------------------------
-int CNPC_AScanner::OnTakeDamage_Alive( const CTakeDamageInfo &info )
-{
-	// Turn off my spotlight when shot
-	SpotlightDestroy();
-	m_fNextSpotlightTime = gpGlobals->curtime + 2.0f;
-
-	return (BaseClass::OnTakeDamage_Alive( info ));
-}
-	
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::Gib( void )
-{
-	if ( IsMarkedForDeletion() )
-		return;
-
-	// Spawn all gibs
-	if( m_bIsClawScanner )
+	for (i=0;i<ASCANNER_NUM_GLOWS;i++)
 	{
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/Shield_Scanner_Gib1.mdl");
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/Shield_Scanner_Gib2.mdl");
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/Shield_Scanner_Gib3.mdl");
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/Shield_Scanner_Gib4.mdl");
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/Shield_Scanner_Gib5.mdl");
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/Shield_Scanner_Gib6.mdl");
-	}
-	else
-	{
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/scanner_gib01.mdl" );
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/scanner_gib02.mdl" );
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/scanner_gib04.mdl" );
-		CGib::SpawnSpecificGibs( this, 1, 500, 250, "models/gibs/scanner_gib05.mdl" );
+		m_pLaserGlow[i] = NULL;
 	}
 
-	// Add a random chance of spawning a battery...
-	if ( !HasSpawnFlags(SF_NPC_NO_WEAPON_DROP) && random->RandomFloat( 0.0f, 1.0f) < 0.4f )
-	{
-		CItem *pBattery = (CItem*)CreateEntityByName("item_battery");
-		if ( pBattery )
-		{
-			pBattery->SetAbsOrigin( GetAbsOrigin() );
-			pBattery->SetAbsVelocity( GetAbsVelocity() );
-			pBattery->SetLocalAngularVelocity( GetLocalAngularVelocity() );
-			pBattery->ActivateWhenAtRest();
-			pBattery->Spawn();
-		}
-	}
+	SetNoiseMod( 2, 2, 2 );
 
-	DeployMine();
+	m_fHeadYaw			= 0;
+	m_fAntennaPos		= 0;
+	m_fAntennaTarget	= 0;
 
-	BaseClass::Gib();
+	NPCInit();
+
+	// Let this guy look far
+	m_flDistTooFar = 99999999.0;
+	SetDistLook( 4000.0 );
+	m_flSpeed = ASCANNER_MAX_SPEED;
+
+	// Keep track of the number of live WScanners
+//	CNPC_ADrone::m_nNumAttackers++;
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : pInflictor - 
-//			pAttacker - 
-//			flDamage - 
-//			bitsDamageType - 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::Event_Killed( const CTakeDamageInfo &info )
-{
-	// Copy off the takedamage info that killed me, since we're not going to call
-	// up into the base class's Event_Killed() until we gib. (gibbing is ultimate death)
-	m_KilledInfo = info;	
-
-	DeployMine();
-
-	ClearInspectTarget();
-
-	// Interrupt whatever schedule I'm on
-	SetCondition(COND_SCHEDULE_DONE);
-
-	// Remove spotlight
-	SpotlightDestroy();
-
-	// Remove sprite
-	UTIL_Remove(m_pEyeFlash);
-	m_pEyeFlash = NULL;
-
-	// If I have an enemy and I'm up high, do a dive bomb (unless dissolved)
-	if ( !m_bIsClawScanner && GetEnemy() != NULL && (info.GetDamageType() & DMG_DISSOLVE) == false )
-	{
-		Vector vecDelta = GetLocalOrigin() - GetEnemy()->GetLocalOrigin();
-		if ( ( vecDelta.z > 120 ) && ( vecDelta.Length() > 360 ) )
-		{	
-			// If I'm divebombing, don't take any more damage. It will make Event_Killed() be called again.
-			// This is especially bad if someone machineguns the divebombing scanner. 
-			AttackDivebomb();
-			return;
-		}
-	}
-
-	Gib();
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: Tells use whether or not the NPC cares about a given type of hint node.
-// Input  : sHint - 
-// Output : TRUE if the NPC is interested in this hint type, FALSE if not.
-//-----------------------------------------------------------------------------
-bool CNPC_AScanner::FValidateHintType(CAI_Hint *pHint)
-{
-	return( pHint->HintType() == HINT_WORLD_WINDOW );
-}
-
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : Type - 
 //-----------------------------------------------------------------------------
-int CNPC_AScanner::TranslateSchedule( int scheduleType ) 
+int CNPC_ADrone::TranslateSchedule( int scheduleType ) 
 {
-	switch ( scheduleType )
-	{
-		case SCHED_IDLE_STAND:
-		{
-			return SCHED_SCANNER_PATROL;
-		}
-
-		case SCHED_SCANNER_PATROL:
-			return SCHED_CSCANNER_PATROL;
-	}
 	return BaseClass::TranslateSchedule(scheduleType);
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : idealActivity - 
-//			*pIdealWeaponActivity - 
-// Output : int
-//-----------------------------------------------------------------------------
-Activity CNPC_AScanner::NPC_TranslateActivity( Activity eNewActivity )
+void CNPC_ADrone::OnScheduleChange()
 {
-	if( !m_bIsClawScanner )
-	{
-		return BaseClass::NPC_TranslateActivity( eNewActivity );
-	}
+	m_flSpeed = ASCANNER_MAX_SPEED;
 
-	// The claw scanner came along a little late and doesn't have the activities
-	// of the city scanner. So Just pick between these three
-	if( eNewActivity == ACT_DISARM )
-	{
-		// Closing up.
-		return eNewActivity;
-	}
-
-	if( m_bIsOpen )
-	{
-		return ACT_IDLE_ANGRY;
-	}
-	else
-	{
-		return ACT_IDLE;
-	}
+	BaseClass::OnScheduleChange();
 }
 
 //-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::HandleAnimEvent( animevent_t *pEvent )
+bool CNPC_ADrone::ShouldGib( const CTakeDamageInfo &info )
 {
-	if( pEvent->event == AE_SCANNER_CLOSED )
+	if ( info.GetDamageType() & (DMG_NEVERGIB|DMG_DISSOLVE) )
+		return false;
+
+	if ( ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) && m_iHealth < GIB_HEALTH_VALUE ) || ( info.GetDamageType() & DMG_ALWAYSGIB ) )
+		 return true;
+
+	return false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::Event_Killed( const CTakeDamageInfo &info )
+{
+	LaserKill();
+
+	// If im really, really dead, explode, otherwise just fall to the ground
+	if ( ShouldGib( info ) )
 	{
-		m_bIsOpen = false;
-		SetActivity( ACT_IDLE );
+		Gib();
 		return;
 	}
-
-	BaseClass::HandleAnimEvent( pEvent );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-char *CNPC_AScanner::GetEngineSound( void )
-{
-	return "NPC_AScanner.FlyLoop";
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Plays the engine sound.
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::NPCThink(void)
-{
-	if (!IsAlive())
+#if 1
+	else
 	{
-		SetActivity((Activity)ACT_SCANNER_RETRACT_PRONGS);
-		StudioFrameAdvance( );
-		SetNextThink( gpGlobals->curtime + 0.1f );
+		//TODO; convert to physobject, a really heavy one that crushes things
+		ExplosionCreate(GetLocalOrigin(), GetLocalAngles(), this, random->RandomInt(5, 10), 64, true);
+		UTIL_Remove(this);
+	}
+#else
+	BaseClass::Event_Killed( info );
+#endif
+}
+
+//------------------------------------------------------------------------------
+// Purpose: Override to split in two when attacked
+//------------------------------------------------------------------------------
+int CNPC_ADrone::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
+{
+	CTakeDamageInfo info = inputInfo;
+
+	// -------------------------------------
+	//  If hit by stalker beam, blow up
+	// -------------------------------------
+	if (info.GetAttacker()->Classify() == CLASS_STALKER)
+	{
+		info.SetDamage( m_iHealth+1 );
+	}
+
+	// Flinch in the direction of the attack
+	float vAttackYaw = VecToYaw(g_vecAttackDir);
+
+	float vAngleDiff = UTIL_AngleDiff( vAttackYaw, m_fHeadYaw );
+
+	if (vAngleDiff > -45 && vAngleDiff < 45)
+	{
+		SetActivity((Activity)ACT_ASCANNER_FLINCH_BACK);
+	}
+	else if (vAngleDiff < -45 && vAngleDiff > -135)
+	{
+		SetActivity((Activity)ACT_ASCANNER_FLINCH_LEFT);
+	}
+	else if (vAngleDiff >  45 && vAngleDiff <  135)
+	{
+		SetActivity((Activity)ACT_ASCANNER_FLINCH_RIGHT);
 	}
 	else
 	{
-		BaseClass::NPCThink();
-		SpotlightUpdate();
+		SetActivity((Activity)ACT_ASCANNER_FLINCH_FRONT);
 	}
-}
 
+	return BaseClass::OnTakeDamage_Alive( info );
+}
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Handles movement towards the last move target.
+// Input  : flInterval - 
 //-----------------------------------------------------------------------------
-void CNPC_AScanner::Precache(void)
+bool CNPC_ADrone::OverridePathMove( float flInterval )
 {
-	// Model
-	if( m_bIsClawScanner )
+	CBaseEntity *pMoveTarget = GetEnemy();
+
+	Vector waypointDir = GetNavigator()->GetCurWaypointPos() - GetLocalOrigin();
+	float flWaypointDist = VectorNormalize(waypointDir);
+
+	// -----------------------------------------------------------------
+	// Check route is blocked
+	// ------------------------------------------------------------------
+	Vector checkPos = GetLocalOrigin() + (waypointDir * (m_flSpeed * flInterval));
+
+	AIMoveTrace_t moveTrace;
+	GetMoveProbe()->MoveLimit( NAV_FLY, GetLocalOrigin(), checkPos, MASK_NPCSOLID|CONTENTS_WATER, pMoveTarget, &moveTrace);
+	if (IsMoveBlocked(moveTrace))
 	{
-		PrecacheModel("models/shield_scanner.mdl");
-
-		PrecacheModel("models/gibs/Shield_Scanner_Gib1.mdl");
-		PrecacheModel("models/gibs/Shield_Scanner_Gib2.mdl");
-		PrecacheModel("models/gibs/Shield_Scanner_Gib3.mdl");
-		PrecacheModel("models/gibs/Shield_Scanner_Gib4.mdl");
-		PrecacheModel("models/gibs/Shield_Scanner_Gib5.mdl");
-		PrecacheModel("models/gibs/Shield_Scanner_Gib6.mdl");
-
-		PrecacheScriptSound( "NPC_SScanner.Shoot");
-		PrecacheScriptSound( "NPC_SScanner.Alert" );
-		PrecacheScriptSound( "NPC_SScanner.Die" );
-		PrecacheScriptSound( "NPC_SScanner.Combat" );
-		PrecacheScriptSound( "NPC_SScanner.Idle" );
-		PrecacheScriptSound( "NPC_SScanner.Pain" );
-		PrecacheScriptSound( "NPC_SScanner.TakePhoto" );
-		PrecacheScriptSound( "NPC_SScanner.AttackFlash" );
-		PrecacheScriptSound( "NPC_SScanner.AttackGas" );
-		PrecacheScriptSound( "NPC_SScanner.DiveBombFlyby" );
-		PrecacheScriptSound( "NPC_SScanner.DiveBomb" );
-		PrecacheScriptSound( "NPC_SScanner.DeployMine" );
-
-		PrecacheScriptSound( "NPC_SScanner.FlyLoop" );
-		UTIL_PrecacheOther( "combine_mine" );
-	}
-	else
-	{
-		PrecacheModel("models/combine_scanner.mdl");
-
-		PrecacheModel("models/gibs/scanner_gib01.mdl" );
-		PrecacheModel("models/gibs/scanner_gib02.mdl" );	
-		PrecacheModel("models/gibs/scanner_gib02.mdl" );
-		PrecacheModel("models/gibs/scanner_gib04.mdl" );
-		PrecacheModel("models/gibs/scanner_gib05.mdl" );
-
-		PrecacheScriptSound( "NPC_CScanner.Shoot");
-		PrecacheScriptSound( "NPC_CScanner.Alert" );
-		PrecacheScriptSound( "NPC_CScanner.Die" );
-		PrecacheScriptSound( "NPC_CScanner.Combat" );
-		PrecacheScriptSound( "NPC_CScanner.Idle" );
-		PrecacheScriptSound( "NPC_CScanner.Pain" );
-		PrecacheScriptSound( "NPC_CScanner.TakePhoto" );
-		PrecacheScriptSound( "NPC_CScanner.AttackFlash" );
-		PrecacheScriptSound( "NPC_CScanner.AttackGas" );
-		PrecacheScriptSound( "NPC_CScanner.DiveBombFlyby" );
-		PrecacheScriptSound( "NPC_CScanner.DiveBomb" );
-		PrecacheScriptSound( "NPC_CScanner.Illuminate" );
-		PrecacheScriptSound( "NPC_CScanner.DeployMine" );
-
-		PrecacheScriptSound( "NPC_CScanner.FlyLoop" );
+		TaskFail(FAIL_NO_ROUTE);
+		GetNavigator()->ClearGoal();
+		return true;
 	}
 
-	// Sprites
-	m_nHaloSprite = PrecacheModel("sprites/light_glow03.vmt");
-	PrecacheModel( "sprites/glow_test02.vmt" );
+	// --------------------------------------------------
+	
+	if (GetNavigator()->CurWaypointIsGoal() && 
+	    IsCurSchedule(SCHED_ASCANNER_GET_HELP) && 
+	    flWaypointDist < 100)
+	{
+		// If I'm geting help allow a wide berth
+		TaskMovementComplete();
+		return true;
+	}
 
-	BaseClass::Precache();
+	// --------------------------------------------------
+	//  Check if I've reached my goal
+	// --------------------------------------------------
+	
+	Vector lastPatrolDir = GetNavigator()->GetCurWaypointPos() - GetLocalOrigin();
+	
+	if ( ProgressFlyPath( flInterval, GetEnemy(), MASK_NPCSOLID|CONTENTS_WATER,
+						  !IsCurSchedule( SCHED_ASCANNER_PATROL ) ) == AINPP_COMPLETE )
+	{
+		if (IsCurSchedule( SCHED_ASCANNER_PATROL ))
+		{
+			m_vLastPatrolDir = lastPatrolDir;
+			VectorNormalize(m_vLastPatrolDir);
+		}
+		return true;
+	}
+	return false;
 }
 
-//------------------------------------------------------------------------------
-// Purpose: Request help inspecting from other squad members
-//------------------------------------------------------------------------------
-void CNPC_AScanner::RequestInspectSupport(void)
+//-----------------------------------------------------------------------------
+bool CNPC_ADrone::OverrideMove(float flInterval)
 {
-	if (m_pSquad)
+	// -----------------------------------------------------------------
+	// If I have a route, keep it updated and move toward target
+	// ------------------------------------------------------------------
+	if (GetNavigator()->IsGoalActive())
 	{
-		AISquadIter_t iter;
-		for (CAI_BaseNPC *pSquadMember = m_pSquad->GetFirstMember( &iter ); pSquadMember; pSquadMember = m_pSquad->GetNextMember( &iter ) )
-		{
-			if (pSquadMember != this)
-			{
-				if (GetTarget())
-				{
-					pSquadMember->DispatchInteraction(g_interactionScannerSupportEntity,((void *)((CBaseEntity*)GetTarget())),this);
-				}
-				else
-				{
-					pSquadMember->DispatchInteraction(g_interactionScannerSupportPosition,((void *)m_vInspectPos.Base()),this);
-				}
-			}
-		}
-	}
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-bool CNPC_AScanner::IsValidInspectTarget(CBaseEntity *pEntity)
-{
-	// If a citizen, make sure he can be inspected again
-	if (pEntity->Classify() == CLASS_CITIZEN_PASSIVE)
-	{
-		if (((CNPC_Citizen*)pEntity)->GetNextScannerInspectTime() > gpGlobals->curtime)
-		{
-			return false;
-		}
+		if ( OverridePathMove( flInterval ) )
+			return true;
 	}
 
-	// Make sure no other squad member has already chosen to 
-	// inspect this entity
-	if (m_pSquad)
+	// ----------------------------------------------
+	//	If attacking 
+	// ----------------------------------------------
+	else if (	GetEnemy()			!= NULL && 
+				m_nAScannerState	!= ASCANNER_STATE_EVASION)
 	{
-		AISquadIter_t iter;
-		for (CAI_BaseNPC *pSquadMember = m_pSquad->GetFirstMember( &iter ); pSquadMember; pSquadMember = m_pSquad->GetNextMember( &iter ) )
+		MoveToAttack(flInterval);
+	}
+	// -----------------------------------------------------------------
+	// If I don't have a route, just decelerate
+	// -----------------------------------------------------------------
+	else if (!GetNavigator()->IsGoalActive())
+	{
+		float	myDecay	 = 9.5;
+		Decelerate( flInterval, myDecay );
+		// -------------------------------------
+		// If I have an enemy turn to face him
+		// -------------------------------------
+		if (GetEnemy())
 		{
-			if (pSquadMember->GetTarget() == pEntity)
-			{
-				return false;
-			}
+			TurnHeadToTarget(flInterval, GetEnemy()->GetLocalOrigin() );
 		}
 	}
-
-	// Do not inspect friendly targets
-	if ( IRelationType( pEntity ) == D_LI )
-		return false;
+	MoveExecute_Alive(flInterval);
 
 	return true;
 }
 
-
-//------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Purpose:
-//------------------------------------------------------------------------------
-CBaseEntity* CNPC_AScanner::BestInspectTarget(void)
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::MoveToTarget(float flInterval, const Vector &MoveTarget)
 {
-	if ( !m_bShouldInspect )
-		return NULL;
+	// -------------------------------------
+	// Move towards are target
+	// -------------------------------------
+	Vector targetDir = MoveTarget - GetLocalOrigin();
+	VectorNormalize(targetDir);
 
-	CBaseEntity*	pBestEntity = NULL;
-	float			fBestDist	= MAX_COORD_RANGE;
-	float			fTestDist;
-
-	CBaseEntity *pEntity = NULL;
-
-	// If I have a spotlight, search from the spotlight position
-	// otherwise search from my position
-	Vector	vSearchOrigin;
-	float	fSearchDist;
-	if (m_hSpotlightTarget != NULL)
+	// ---------------------------------------
+	//  If I have an enemy attempt to evade it
+	// ---------------------------------------
+	CBaseCombatCharacter *pEnemy  = GetEnemyCombatCharacterPointer();
+	if (pEnemy)
 	{
-		vSearchOrigin	= m_hSpotlightTarget->GetAbsOrigin();
-		fSearchDist		= SCANNER_CIT_INSPECT_GROUND_DIST;
-	}
-	else
-	{
-		vSearchOrigin	= WorldSpaceCenter();
-		fSearchDist		= SCANNER_CIT_INSPECT_FLY_DIST;
+		targetDir = targetDir + 0.2 * MoveToEvade(pEnemy);
 	}
 
-	if ( m_bOnlyInspectPlayers )
+	const float	myAccel	 = 300.0;
+	const float	myDecay	 = 0.35; // decay to 35% in 1 second
+	TurnHeadToTarget( flInterval, MoveTarget );
+	MoveInDirection(flInterval, targetDir, myAccel, (2 * myAccel), myDecay);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+Vector CNPC_ADrone::MoveToEvade(CBaseCombatCharacter *pEnemy)
+{
+	// Don't evade if I just shot a grenade
+	if (gpGlobals->curtime < m_fNextMoveEvadeTime)
 	{
-		CBasePlayer *pPlayer = AI_GetSinglePlayer();
-		if ( !pPlayer )
-			return NULL;
-
-		if ( !pPlayer->IsAlive() || (pPlayer->GetFlags() & FL_NOTARGET) )
-			return NULL;
-
-		return WorldSpaceCenter().DistToSqr( pPlayer->EyePosition() ) <= (fSearchDist * fSearchDist) ? pPlayer : NULL;
+		return vec3_origin;
 	}
+	// -----------------------------------------
+	//  Keep out of enemy's shooting position
+	// -----------------------------------------
+	Vector vEnemyFacing = pEnemy->BodyDirection2D( );
+	Vector	vEnemyDir   = pEnemy->EyePosition() - GetLocalOrigin();
+	VectorNormalize(vEnemyDir);
+	float  fDotPr		= DotProduct(vEnemyFacing,vEnemyDir);
 
-	CUtlVector<CBaseEntity *> candidates;
-	float fSearchDistSq = fSearchDist * fSearchDist;
-	int i;
-
-	// Inspect players unless told otherwise
-	if ( m_bNeverInspectPlayers == false )
+	if (fDotPr < -0.95)
 	{
-		// Players
-		for ( i = 1; i <= gpGlobals->maxClients; i++ )
+		Vector vDirUp(0,0,1);
+		Vector vDir;
+		CrossProduct( vEnemyFacing, vDirUp, vDir);
+
+		Vector crossProduct;
+		CrossProduct(vEnemyFacing, vEnemyDir, crossProduct);
+		if (crossProduct.y < 0)
 		{
-			CBaseEntity *pPlayer = UTIL_PlayerByIndex( i );
+			vDir = vDir * -1;
+		}
+		return (2*vDir);
+	}
+	else if (fDotPr < -0.9)
+	{
+		Vector vDirUp(0,0,1);
+		Vector vDir;
+		CrossProduct( vEnemyFacing, vDirUp, vDir);
 
-			if ( pPlayer )
-			{
-				if ( vSearchOrigin.DistToSqr(pPlayer->GetAbsOrigin()) < fSearchDistSq )
-				{
-					candidates.AddToTail( pPlayer );
-				}
-			}
+		Vector crossProduct;
+		CrossProduct(vEnemyFacing, vEnemyDir, crossProduct);
+		if (crossProduct.y < 0)
+		{
+			vDir = vDir * -1;
+		}
+		return (vDir);
+	}
+	else if (fDotPr < -0.85)
+	{
+		Vector vDirUp(0,0,1);
+		Vector vDir;
+		CrossProduct( vEnemyFacing, vDirUp, vDir);
+
+		Vector crossProduct;
+		CrossProduct(vEnemyFacing, vEnemyDir, crossProduct);
+		if (random->RandomInt(0,1))
+		{
+			vDir = vDir * -1;
+		}
+		return (vDir);
+	}
+	return vec3_origin;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::MoveToAttack(float flInterval)
+{
+	CBaseCombatCharacter* pEnemy  = GetEnemyCombatCharacterPointer();
+
+	if (!pEnemy)
+	{
+		return;
+	}
+
+	Vector vFlyDirection = vec3_origin;
+
+	// -----------------------------------------
+	//  Keep within range of enemy
+	// -----------------------------------------
+	Vector	vEnemyDir  = pEnemy->EyePosition() - GetLocalOrigin();
+	float	fEnemyDist = VectorNormalize(vEnemyDir);
+	if (fEnemyDist < ASCANNER_HOVER_NEAR_DIST)
+	{
+		vFlyDirection = -vEnemyDir;
+	}
+	else if (fEnemyDist > ASCANNER_HOVER_FAR_DIST)
+	{
+		vFlyDirection = vEnemyDir;
+	}
+	else if (gpGlobals->curtime > m_fNextGrenadeTime)
+	{
+		if ( m_nAScannerState != ASCANNER_STATE_STRAFE )
+		{
+			TossGrenade();
 		}
 	}
-	
-	// NPCs
-	CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
-	
-	for ( i = 0; i < g_AI_Manager.NumAIs(); i++ )
-	{
-		if ( ppAIs[i] != this && vSearchOrigin.DistToSqr(ppAIs[i]->GetAbsOrigin()) < fSearchDistSq )
-		{
-			candidates.AddToTail( ppAIs[i] );
-		}
-	}
 
-	for ( i = 0; i < candidates.Count(); i++ )
-	{
-		pEntity = candidates[i];
-		Assert( pEntity != this && (pEntity->MyNPCPointer() || pEntity->IsPlayer() ) );
+	// -------------------------------------
+	//	Add some evasion
+	// -------------------------------------
+	vFlyDirection = vFlyDirection + MoveToEvade(pEnemy);
 
-		CAI_BaseNPC *pNPC = pEntity->MyNPCPointer();
-		if ( ( pNPC && pNPC->Classify() == CLASS_CITIZEN_PASSIVE ) || pEntity->IsPlayer() )
-		{
-			if ( pEntity->GetFlags() & FL_NOTARGET )
-				continue;
-
-			if ( pEntity->IsAlive() == false )
-				continue;
-
-			// Ensure it's within line of sight
-			if ( !FVisible( pEntity ) )
-				continue;
-
-			fTestDist = ( GetAbsOrigin() - pEntity->EyePosition() ).Length();
-			if ( fTestDist < fBestDist )
-			{
-				if ( IsValidInspectTarget( pEntity ) )
-				{
-					fBestDist	= fTestDist;
-					pBestEntity	= pEntity; 
-				}
-			}
-		}
-	}
-	return pBestEntity;
+	// -------------------------------------
+	// Set net velocity 
+	// -------------------------------------
+	float myAccel = 300.0;
+	float myDecay = 0.35; // decay to 35% in 1 second
+	MoveInDirection( flInterval, vFlyDirection, myAccel, 2 * myAccel, myDecay);
+		
+	TurnHeadToTarget( flInterval, GetEnemy()->GetLocalOrigin() );
 }
 
 
-//------------------------------------------------------------------------------
-// Purpose: Clears any previous inspect target and set inspect target to
-//			 the given entity and set the durection of the inspection
-//------------------------------------------------------------------------------
-void CNPC_AScanner::SetInspectTargetToEnt(CBaseEntity *pEntity, float fInspectDuration)
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::PlayAlarmSound(void)
 {
-	ClearInspectTarget();
-	SetTarget(pEntity);
-	
-	m_fInspectEndTime = gpGlobals->curtime + fInspectDuration;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose: Clears any previous inspect target and set inspect target to
-//			 the given hint node and set the durection of the inspection
-//------------------------------------------------------------------------------
-void CNPC_AScanner::SetInspectTargetToHint(CAI_Hint *pHint, float fInspectDuration)
-{
-	ClearInspectTarget();
-
-	float yaw = pHint->Yaw();
-	// --------------------------------------------
-	// Figure out the location that the hint hits
-	// --------------------------------------------
-	Vector vHintDir	= UTIL_YawToVector( yaw );
-
-	Vector vHintOrigin;
-	pHint->GetPosition( this, &vHintOrigin );
-
-	Vector vHintEnd	= vHintOrigin + (vHintDir * 512);
-	
-	trace_t tr;
-	AI_TraceLine ( vHintOrigin, vHintEnd, MASK_BLOCKLOS, this, COLLISION_GROUP_NONE, &tr);
-	
-	if ( g_debug_cscanner.GetBool() )
+	if (gpGlobals->curtime > m_fNextAlarmSoundTime)
 	{
-		NDebugOverlay::Line( vHintOrigin, tr.endpos, 255, 0, 0, true, 4.0f );
-		NDebugOverlay::Cross3D( tr.endpos, -Vector(8,8,8), Vector(8,8,8), 255, 0, 0, true, 4.0f );
-	}
+//		if (!GetHintNode())
+//			return;
 
-	if (tr.fraction == 1.0f )
-	{
-		DevMsg("ERROR: Scanner hint node not facing a surface!\n");
-	}
-	else
-	{
-		SetHintNode( pHint );
-		m_vInspectPos = tr.endpos;
-		pHint->Lock( this );
+		m_pLightGlow = CSprite::SpriteCreate( "sprites/glow01.vmt", GetLocalOrigin(), FALSE );
+		m_pLightGlow->SetTransparency( kRenderGlow, 255, 200, 200, 0, kRenderFxNoDissipation );
+		m_pLightGlow->SetAttachment( this, 2 );
+		m_pLightGlow->SetBrightness( 255 );
+		m_pLightGlow->SetColor(255,0,0);
+		m_pLightGlow->SetScale( 0.7 );
+		m_pLightGlow->Expand( 0, 10 );
+		m_pLightGlow->AnimateForTime( 1, 0.2 );
+		m_pLightGlow = NULL;
 
-		m_fInspectEndTime = gpGlobals->curtime + fInspectDuration;
+		EmitSound( "NPC_AScanner.Alarm" );
+
+		// Alarm sound and light frequency more often as wscanner nears join point
+		Vector vHintPos;
+		GetHintNode()->GetPosition(this,&vHintPos);
+
+		float fHintDist		= (vHintPos - GetLocalOrigin()).Length();
+		float fDelayTime	= fHintDist/2500;
+
+		if (fDelayTime > 3.0) fDelayTime = 3.0;
+		if (fDelayTime < 1.0) fDelayTime = 1.0;
+		m_fNextAlarmSoundTime	= gpGlobals->curtime + fDelayTime;
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::AdjustAntenna(float flInterval)
+{	
+	if (m_fAntennaPos != m_fAntennaTarget)
+	{
+		// Make frame rate independent
+		float timeToUse = flInterval;
+		float iRate	= 0.8;
+		while (timeToUse > 0)
+		{
+			m_fAntennaPos = (iRate * m_fAntennaPos) + (1-iRate)*m_fAntennaTarget;
+			timeToUse =- 0.1;
+		}
+		SetBoneController( 1, m_fAntennaPos );
+	}
+}
 
 //------------------------------------------------------------------------------
-// Purpose: Clears any previous inspect target and set inspect target to
-//			 the given position and set the durection of the inspection
+// Purpose :
 // Input   :
 // Output  :
 //------------------------------------------------------------------------------
-void CNPC_AScanner::SetInspectTargetToPos(const Vector &vInspectPos, float fInspectDuration)
+float CNPC_ADrone::MinGroundDist(void)
 {
-	ClearInspectTarget();
-	m_vInspectPos		= vInspectPos;
-
-	m_fInspectEndTime	= gpGlobals->curtime + fInspectDuration;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose: Clears out any previous inspection targets
-//------------------------------------------------------------------------------
-void CNPC_AScanner::ClearInspectTarget(void)
-{
-	if ( GetIdealState() != NPC_STATE_SCRIPT )
-	{
-		SetTarget( NULL );
-	}
-
-	ClearHintNode( SCANNER_HINT_INSPECT_LENGTH );
-	m_vInspectPos	= vec3_origin;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose: Returns true if there is a position to be inspected.
-//------------------------------------------------------------------------------
-bool CNPC_AScanner::HaveInspectTarget( void )
-{
-	if ( GetTarget() != NULL )
-		return true;
-
-	if ( m_vInspectPos != vec3_origin )
-		return true;
-
-	return false;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose: 
-//------------------------------------------------------------------------------
-Vector CNPC_AScanner::InspectTargetPosition(void)
-{
-	// If we have a target, return an adjust position
-	if ( GetTarget() != NULL )
-	{
-		Vector	vEyePos = GetTarget()->EyePosition();
-
-		// If in spotlight mode, aim for ground below target unless is client
-		if ( m_nFlyMode == SCANNER_FLY_SPOT && !(GetTarget()->GetFlags() & FL_CLIENT) )
-		{
-			Vector vInspectPos;
-			vInspectPos.x	= vEyePos.x;
-			vInspectPos.y	= vEyePos.y;
-			vInspectPos.z	= GetFloorZ( vEyePos );
-
-			// Let's take three-quarters between eyes and ground
-			vInspectPos.z	+= ( vEyePos.z - vInspectPos.z ) * 0.75f;
-
-			return vInspectPos;
-		}
-		else
-		{
-			// Otherwise aim for eyes
-			return vEyePos;
-		}
-	}
-	else if ( m_vInspectPos != vec3_origin )
-	{
-		return m_vInspectPos;
-	}
-	else
-	{
-		DevMsg("InspectTargetPosition called with no target!\n");
-		
-		return m_vInspectPos;
-	}
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputShouldInspect( inputdata_t &inputdata )
-{
-	m_bShouldInspect = ( inputdata.value.Int() != 0 );
-	
-	if ( !m_bShouldInspect )
-	{
-		if ( GetEnemy() == GetTarget() )
-			SetEnemy(NULL);
-		ClearInspectTarget();
-		SetTarget(NULL);
-		SpotlightDestroy();
-	}
-}
-
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::DeployMine()
-{
-	CBaseEntity *child;
-	// iterate through all children
-	for ( child = FirstMoveChild(); child != NULL; child = child->NextMovePeer() )
-	{
-		if( FClassnameIs( child, "combine_mine" ) )
-		{
-			child->SetParent( NULL );
-			child->SetAbsVelocity( GetAbsVelocity() );
-			child->SetOwnerEntity( this );
-
-			ScannerEmitSound( "DeployMine" );
-
-			IPhysicsObject *pPhysObj = child->VPhysicsGetObject();
-			if( pPhysObj )
-			{
-				// Make sure the mine's awake
-				pPhysObj->Wake();
-			}
-
-			if( m_bIsClawScanner )
-			{
-				// Fold up.
-				SetActivity( ACT_DISARM );
-			}
-
-			return;
-		}
-	}
+	return ASCANNER_MIN_GROUND_DIST;
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-float CNPC_AScanner::GetMaxSpeed()
-{
-	if( IsStriderScout() )
-	{
-		return SCANNER_SCOUT_MAX_SPEED;
-	}
-
-	return BaseClass::GetMaxSpeed();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputDeployMine(inputdata_t &inputdata)
-{
-	DeployMine();
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputEquipMine(inputdata_t &inputdata)
-{
-	CBaseEntity *child;
-	// iterate through all children
-	for ( child = FirstMoveChild(); child != NULL; child = child->NextMovePeer() )
-	{
-		if( FClassnameIs( child, "combine_mine" ) )
-		{
-			// Already have a mine!
-			return;
-		}
-	}
-
-	CBaseEntity *pEnt;
-
-	pEnt = CreateEntityByName( "combine_mine" );
-	bool bPlacedMine = false;
-
-	if( m_bIsClawScanner )
-	{
-		Vector	vecOrigin;
-		QAngle	angles;
-		int		attachment;
-
-		attachment = LookupAttachment( "claw" );
-
-		if( attachment > -1 )
-		{
-			GetAttachment( attachment, vecOrigin, angles );
-			
-			pEnt->SetAbsOrigin( vecOrigin );
-			pEnt->SetAbsAngles( angles );
-			pEnt->SetOwnerEntity( this );
-			pEnt->SetParent( this, attachment );
-
-			m_bIsOpen = true;
-			SetActivity( ACT_IDLE_ANGRY );
-			bPlacedMine = true;
-		}
-	}
-
-
-	if( !bPlacedMine )
-	{
-		Vector vecMineLocation = GetAbsOrigin();
-		vecMineLocation.z -= 32.0;
-
-		pEnt->SetAbsOrigin( vecMineLocation );
-		pEnt->SetAbsAngles( GetAbsAngles() );
-		pEnt->SetOwnerEntity( this );
-		pEnt->SetParent( this );
-	}
-
-	pEnt->Spawn();
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: Tells the scanner to go photograph an entity.
-// Input  : String name or classname of the entity to inspect.
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputInspectTargetPhoto(inputdata_t &inputdata)
-{
-	m_vLastPatrolDir = vec3_origin;
-	m_bPhotoTaken = false;
-	InspectTarget( inputdata, SCANNER_FLY_PHOTO );
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: Tells the scanner to go spotlight an entity.
-// Input  : String name or classname of the entity to inspect.
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputInspectTargetSpotlight(inputdata_t &inputdata)
-{
-	InspectTarget( inputdata, SCANNER_FLY_SPOT );
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: Tells the scanner to go photo or spotlight an entity.
-// Input  : String name or classname of the entity to inspect.
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InspectTarget( inputdata_t &inputdata, ScannerFlyMode_t eFlyMode )
-{
-	CBaseEntity *pEnt = gEntList.FindEntityGeneric( NULL, inputdata.value.String(), this, inputdata.pActivator );
-	
-	if ( pEnt != NULL )
-	{
-		// Set and begin to inspect our target
-		SetInspectTargetToEnt( pEnt, SCANNER_CIT_INSPECT_LENGTH );
-		
-		m_nFlyMode = eFlyMode;
-		SetCondition( COND_CSCANNER_HAVE_INSPECT_TARGET );
-		
-		// Stop us from any other navigation we were doing
-		GetNavigator()->ClearGoal();
-	}
-	else
-	{
-		DevMsg( "InspectTarget: target %s not found!\n", inputdata.value.String() );
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Output : Returns true on success, false on failure.
-//-----------------------------------------------------------------------------
-bool CNPC_AScanner::MovingToInspectTarget( void )
-{
-	// If we're flying to a photograph target and the photo isn't yet taken, we're still moving to it
-	if ( m_nFlyMode == SCANNER_FLY_PHOTO && m_bPhotoTaken == false )
-		return true;
-
-	// If we're still on a path, then we're still moving
-	if ( HaveInspectTarget() && GetNavigator()->IsGoalActive() )
-		return true;
-
-	return false;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::GatherConditions( void )
-{
-	BaseClass::GatherConditions();
-
-	// Clear out our old conditions
-	ClearCondition( COND_CSCANNER_INSPECT_DONE );
-	ClearCondition( COND_CSCANNER_HAVE_INSPECT_TARGET );
-	ClearCondition( COND_CSCANNER_SPOT_ON_TARGET );
-	ClearCondition( COND_CSCANNER_CAN_PHOTOGRAPH );
-
-	// We don't do any of these checks if we have an enemy
-	if ( GetEnemy() )
-		return;
-
-	// --------------------------------------
-	//  COND_CSCANNER_INSPECT_DONE
-	//
-	// If my inspection over 
-	// ---------------------------------------------------------
-
-	// Refresh our timing if we're still moving to our inspection target
-	if ( MovingToInspectTarget() )
-	{
-		m_fInspectEndTime = gpGlobals->curtime + SCANNER_CIT_INSPECT_LENGTH;
-	}
-
-	// Update our follow times
-	if ( HaveInspectTarget() && gpGlobals->curtime > m_fInspectEndTime && m_nFlyMode != SCANNER_FLY_FOLLOW )
-	{
-		SetCondition ( COND_CSCANNER_INSPECT_DONE );
-
-		m_fCheckCitizenTime	= gpGlobals->curtime + SCANNER_CIT_INSPECT_DELAY;
-		m_fCheckHintTime	= gpGlobals->curtime + SCANNER_HINT_INSPECT_DELAY;
-		ClearInspectTarget();
-	}
-
-	// ----------------------------------------------------------
-	//  If I heard a sound and I don't have an enemy, inspect it
-	// ----------------------------------------------------------
-	if ( ( HasCondition( COND_HEAR_COMBAT ) || HasCondition( COND_HEAR_DANGER ) ) && m_nFlyMode != SCANNER_FLY_FOLLOW )
-	{
-		CSound *pSound = GetBestSound();
-		
-		if ( pSound )
-		{
-			// Chase an owner if we can
-			if ( pSound->m_hOwner != NULL )
-			{
-				// Don't inspect sounds of things we like
-				if ( IRelationType( pSound->m_hOwner ) != D_LI )
-				{
-					// Only bother if we can see it
-					if ( FVisible( pSound->m_hOwner ) )
-					{
-						SetInspectTargetToEnt( pSound->m_hOwner, SCANNER_SOUND_INSPECT_LENGTH );
-					}
-				}
-			}
-			else
-			{
-				// Otherwise chase the specific sound
-				Vector vSoundPos = pSound->GetSoundOrigin();
-				SetInspectTargetToPos( vSoundPos, SCANNER_SOUND_INSPECT_LENGTH );
-			}
-
-			m_nFlyMode = (random->RandomInt(0,2)==0) ? SCANNER_FLY_SPOT : SCANNER_FLY_PHOTO;
-		}
-	}
-
-	// --------------------------------------
-	//  COND_CSCANNER_HAVE_INSPECT_TARGET
-	//
-	// Look for a nearby citizen or player to hassle. 
-	// ---------------------------------------------------------
-
-	// Check for citizens to inspect
-	if ( gpGlobals->curtime	> m_fCheckCitizenTime && HaveInspectTarget() == false )
-	{
-		CBaseEntity *pBestEntity = BestInspectTarget();
-		
-		if ( pBestEntity != NULL )
-		{
-			SetInspectTargetToEnt( pBestEntity, SCANNER_CIT_INSPECT_LENGTH );
-			m_nFlyMode = (random->RandomInt(0,3)==0) ? SCANNER_FLY_SPOT : SCANNER_FLY_PHOTO;
-			SetCondition ( COND_CSCANNER_HAVE_INSPECT_TARGET );
-		}
-	}
-
-	// Check for hints to inspect
-	if ( gpGlobals->curtime > m_fCheckHintTime && HaveInspectTarget() == false )
-	{
-		SetHintNode( CAI_HintManager::FindHint( this, HINT_WORLD_WINDOW, 0, SCANNER_CIT_INSPECT_FLY_DIST ) );
-
-		if ( GetHintNode() )
-		{
-			m_fCheckHintTime = gpGlobals->curtime + SCANNER_HINT_INSPECT_DELAY;
-
-			m_nFlyMode = (random->RandomInt(0,2)==0) ? SCANNER_FLY_SPOT : SCANNER_FLY_PHOTO;
-
-			SetInspectTargetToHint( GetHintNode(), SCANNER_HINT_INSPECT_LENGTH );
-
-			SetCondition ( COND_CSCANNER_HAVE_INSPECT_TARGET );
-		}
-	}
-
-	// --------------------------------------
-	//  COND_CSCANNER_SPOT_ON_TARGET
-	//
-	//  True when spotlight is on target ent
-	// --------------------------------------
-
-	if ( m_hSpotlightTarget != NULL	&& HaveInspectTarget() && m_hSpotlightTarget->GetSmoothedVelocity().Length() < 25 )
-	{
-		// If I have a target entity, check my spotlight against the
-		// actual position of the entity
-		if (GetTarget())
-		{
-			float fInspectDist = (m_vSpotlightTargetPos - m_vSpotlightCurrentPos).Length();
-			if ( fInspectDist < 100 )
-			{
-				SetCondition( COND_CSCANNER_SPOT_ON_TARGET );
-			}
-		}
-		// Otherwise just check by beam direction
-		else
-		{
-			Vector vTargetDir = SpotlightTargetPos() - GetLocalOrigin();
-			VectorNormalize(vTargetDir);
-			float dotpr = DotProduct(vTargetDir, m_vSpotlightDir);
-			if (dotpr > 0.95)
-			{
-				SetCondition( COND_CSCANNER_SPOT_ON_TARGET );
-			}
-		}
-	}
-
-	// --------------------------------------------
-	//  COND_CSCANNER_CAN_PHOTOGRAPH
-	//
-	//  True when can photograph target ent
-	// --------------------------------------------
-
-	ClearCondition( COND_CSCANNER_CAN_PHOTOGRAPH );
-
-	if ( m_nFlyMode == SCANNER_FLY_PHOTO )
-	{
-		// Make sure I have something to photograph and I'm ready to photograph and I'm not moving to fast
-		if ( gpGlobals->curtime > m_fNextPhotographTime && HaveInspectTarget() && GetCurrentVelocity().LengthSqr() < (64*64) )
-		{
-			// Check that I'm in the right distance range
-			float  fInspectDist = (InspectTargetPosition() - GetAbsOrigin()).Length2D();
-			
-			// See if we're within range
-			if ( fInspectDist > SCANNER_PHOTO_NEAR_DIST && fInspectDist < SCANNER_PHOTO_FAR_DIST )
-			{
-				// Make sure we're looking at the target
-				if ( UTIL_AngleDiff( GetAbsAngles().y, VecToYaw( InspectTargetPosition() - GetAbsOrigin() ) ) < 4.0f )
-				{
-					trace_t tr;
-					AI_TraceLine ( GetAbsOrigin(), InspectTargetPosition(), MASK_BLOCKLOS, GetTarget(), COLLISION_GROUP_NONE, &tr);
-					
-					if ( tr.fraction == 1.0f )
-					{
-						SetCondition( COND_CSCANNER_CAN_PHOTOGRAPH );
-					}
-				}
-			}
-		}
-	}
-}
-
-//------------------------------------------------------------------------------
 // Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::PrescheduleThink(void)
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::SetBanking(float flInterval)
 {
-	BaseClass::PrescheduleThink();
-
-	// Go back to idling if we're done
-	if ( GetIdealActivity() == ACT_SCANNER_FLARE_START )
+	// Make frame rate independent
+	float iRate = 0.5;
+	float timeToUse = flInterval;
+	while (timeToUse > 0)
 	{
-		if ( IsSequenceFinished() )
+		Vector vFlyDirection	= GetCurrentVelocity();
+		VectorNormalize(vFlyDirection);
+		
+		// If I'm shooting a grenade don't bank
+		if (GetActivity() == ACT_RANGE_ATTACK1)
+			vFlyDirection		= vec3_origin;
+		else
+			vFlyDirection		= vFlyDirection * ASCANNER_BANK_RATE;
+
+		Vector vBankDir;
+		if (m_bBankFace && GetEnemy()!=NULL)
 		{
-			SetIdealActivity( (Activity) ACT_IDLE );
+			// Bank to face enemy
+			Vector vRawDir = GetEnemy()->EyePosition() - GetLocalOrigin();
+			VectorNormalize( vRawDir );
+			vRawDir *= 50; 
+
+			// Account for head rotation
+			vBankDir.x = vRawDir.z * -cos(m_fHeadYaw*M_PI/180);
+			vBankDir.z = vRawDir.z *  sin(m_fHeadYaw*M_PI/180);
 		}
+		else
+		{
+			// Bank based on fly direction
+			vBankDir = vFlyDirection;
+		}
+
+		m_vCurrentBanking.x		= (iRate * m_vCurrentBanking.x) + (1 - iRate)*(vBankDir.x);
+		m_vCurrentBanking.z		= (iRate * m_vCurrentBanking.z) + (1 - iRate)*(vBankDir.z);
+		timeToUse =- 0.1;
 	}
+	SetLocalAngles( QAngle( m_vCurrentBanking.x, 0, m_vCurrentBanking.z ) );
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Overridden because if the player is a criminal, we hate them.
-// Input  : pTarget - Entity with which to determine relationship.
-// Output : Returns relationship value.
+// Purpose:
+// Input  :
+// Output :
 //-----------------------------------------------------------------------------
-Disposition_t CNPC_AScanner::IRelationType(CBaseEntity *pTarget)
+void CNPC_ADrone::MoveExecute_Alive(float flInterval)
 {
-	// If it's the player and they are a criminal, we hates them
-	if ( pTarget->Classify() == CLASS_PLAYER )
+	// -------------------------------------------
+	//  Avoid obstacles
+	// -------------------------------------------
+	SetCurrentVelocity( GetCurrentVelocity() + VelocityToAvoidObstacles(flInterval) );
+
+	// ----------------------------------------------------------------------------------------
+	// Add time-coherent noise to the current velocity so that it never looks bolted in place.
+	// ----------------------------------------------------------------------------------------
+	float noiseScale = 7.0;
+	if ((CBaseEntity*)GetEnemy() && (GetLocalOrigin() - GetEnemy()->GetLocalOrigin()).Length2D() < 80.0) 
 	{
-		if ( GlobalEntity_GetState("gordon_precriminal") == GLOBAL_ON )
-			return D_NU;
+		// Less noise when I'm close to enemy (attacking)
+		noiseScale = 2.0;
 	}
 
-	return BaseClass::IRelationType( pTarget );
+	AddNoiseToVelocity( noiseScale );
+	
+	// ---------------------
+	//  Limit overall speed
+	// ---------------------
+	LimitSpeed( 300 );
+
+	SetBanking(flInterval);
+
+	// -------------------------------------------------------
+	// If travelling on a path and getting help play an alarm
+	// -------------------------------------------------------
+	if (m_nAScannerState == ASCANNER_STATE_EVASION &&
+		GetNavigator()->IsGoalActive()			)
+	{
+		PlayAlarmSound();
+	}
+	PlayFlySound();
+	AdjustAntenna(flInterval);
+	FlyMove( GetCurrentVelocity() * flInterval, MASK_NPCSOLID );
 }
+
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : *pTask - 
 //-----------------------------------------------------------------------------
-void CNPC_AScanner::RunTask( const Task_t *pTask )
+void CNPC_ADrone::RunTask( const Task_t *pTask )
 {
 	switch ( pTask->iTask )
 	{
-		case TASK_CSCANNER_PHOTOGRAPH:
+		case TASK_LASER_WARMUP:
 		{
-			if ( IsWaitFinished() )
-			{	
-				// If light was on turn it off
-				if ( m_pEyeFlash->GetBrightness() > 0 )
+			// -------------------
+			//  Adjust beams
+			// -------------------
+			int i;
+			float fScale = (1-(m_flWaitFinished - gpGlobals->curtime)/ASCANNER_LASER_WARMUP_TIME);
+			for (i=0;i<ASCANNER_NUM_BEAMS-1;i++)
+			{
+				if (m_pBeam[i])
 				{
-					m_pEyeFlash->SetBrightness( 0 );
-
-					// I'm done with this target
-					if ( gpGlobals->curtime > m_fInspectEndTime )
-					{
-						ClearInspectTarget();
-						TaskComplete();
-					}
-					// Otherwise take another picture
-					else
-					{
-						SetWait( 5.0f, 10.0f );
-					}
-				}
-				// If light was off, take another picture
-				else
-				{
-					TakePhoto();
-					SetWait( 0.1f );
+					m_pBeam[i]->SetBrightness(255*fScale);
+					m_pBeam[i]->SetColor( 255, 255*fScale, 255*fScale );
 				}
 			}
-			break;
-		}
-		case TASK_CSCANNER_ATTACK_PRE_FLASH:
-		{
-			AttackPreFlash();
-			
-			if ( IsWaitFinished() )
-			{
-				TaskComplete();
-			}
-			break;
-		}
-		case TASK_CSCANNER_ATTACK_FLASH:
-		{
-			if (IsWaitFinished())
-			{
-				AttackFlashBlind();
-				TaskComplete();
-			}
-			break;
-		}
-		case TASK_CSCANNER_ATTACK_PRE_GAS:
-		{
-			AttackPreGas();
 
-			if (IsWaitFinished())
+			// -------------------
+			//  Adjust glow
+			// -------------------
+			for (i=0;i<ASCANNER_NUM_GLOWS-1;i++)
+			{
+				if (m_pLaserGlow[i])
+				{
+					m_pLaserGlow[i]->SetColor( 255, 255*fScale, 255*fScale );
+					m_pLaserGlow[i]->SetBrightness( 100 + (155*fScale) );
+				}
+			}
+
+			if ( gpGlobals->curtime >= m_flWaitFinished )
 			{
 				TaskComplete();
 			}
 			break;
 		}
-		case TASK_CSCANNER_ATTACK_GAS:
+		case TASK_AIM_ROCKETS:
 		{
-			if (IsWaitFinished())
+			if ( GetActivity() != ACT_ASCANNER_DROP )
 			{
-				AttackGasDamage();
+				SetAScannerState(ASCANNER_STATE_STRAFE);
 				TaskComplete();
 			}
+			else
+			{
+				// Set lasersight and start beeping
+
+			}
+			break;
+		}
+		// If my enemy has moved significantly, update my path
+		case TASK_WAIT_FOR_MOVEMENT:
+		{
+			CBaseEntity *pEnemy = GetEnemy();
+			if (pEnemy														 &&
+				IsCurSchedule(SCHED_ASCANNER_CHASE_ENEMY) && 
+				GetNavigator()->IsGoalActive()												 )
+			{
+				Vector flEnemyLKP = GetEnemyLKP();
+				if ((GetNavigator()->GetGoalPos() - pEnemy->EyePosition()).Length() > 40 )
+				{
+					GetNavigator()->UpdateGoalPos(pEnemy->EyePosition());
+				}
+				// If final position is enemy, exit my schedule (will go to attack hover)
+				if (GetNavigator()->IsGoalActive() && 
+					GetNavigator()->GetCurWaypointPos() == pEnemy->EyePosition())
+				{
+					TaskComplete();
+					GetNavigator()->ClearGoal();		// Stop moving
+					break;
+				}
+			}				
+			else if (IsCurSchedule(SCHED_ASCANNER_GET_HELP) && GetHintNode())
+			{
+				Vector vHintPos;
+				GetHintNode()->GetPosition(this,&vHintPos);
+
+				float fHintDist = (vHintPos - GetLocalOrigin()).Length();
+				if (fHintDist < 100)
+				{
+					TaskComplete();
+					GetNavigator()->ClearGoal();		// Stop moving
+					break;
+				}
+			}
+			BaseClass::RunTask(pTask);
 			break;
 		}
 		default:
@@ -1396,684 +1042,19 @@ void CNPC_AScanner::RunTask( const Task_t *pTask )
 	}
 }
 
-
-//-----------------------------------------------------------------------------
-// Purpose: Gets the appropriate next schedule based on current condition
-//			bits.
-//-----------------------------------------------------------------------------
-int CNPC_AScanner::SelectSchedule(void)
+//------------------------------------------------------------------------------
+bool CNPC_ADrone::IsValidEnemy( CBaseEntity *pEnemy )
 {
-	// Turn our flash off in case we were interrupted while it was on.
-	if ( m_pEyeFlash )
-	{
-		m_pEyeFlash->SetBrightness( 0 );
-	}
-
-	// ----------------------------------------------------
-	//  If I'm dead, go into a dive bomb
-	// ----------------------------------------------------
-	if ( m_iHealth <= 0 )
-	{
-		m_flSpeed = SCANNER_MAX_DIVE_BOMB_SPEED;
-		return SCHED_SCANNER_ATTACK_DIVEBOMB;
-	}
-
-	// -------------------------------
-	// If I'm in a script sequence
-	// -------------------------------
-	if ( m_NPCState == NPC_STATE_SCRIPT )
-		return(BaseClass::SelectSchedule());
-
-	// -------------------------------
-	// Flinch
-	// -------------------------------
-	if ( HasCondition(COND_LIGHT_DAMAGE) || HasCondition(COND_HEAVY_DAMAGE) )
-	{
-		if ( IsHeldByPhyscannon( ) ) 
- 			return SCHED_SMALL_FLINCH;
-
-		if ( m_NPCState == NPC_STATE_IDLE )
-			return SCHED_SMALL_FLINCH;
-
-		if ( m_NPCState == NPC_STATE_ALERT )
-		{
-			if ( m_iHealth < ( 3 * sk_scanner_health.GetFloat() / 4 ))
-				return SCHED_TAKE_COVER_FROM_ORIGIN;
-
-			if ( SelectWeightedSequence( ACT_SMALL_FLINCH ) != -1 )
-				return SCHED_SMALL_FLINCH;
-		}
-		else
-		{
-			if ( random->RandomInt( 0, 10 ) < 4 )
-				return SCHED_SMALL_FLINCH;
-		}
-	}
-
-	// I'm being held by the physcannon... struggle!
-	if ( IsHeldByPhyscannon( ) )
-		return SCHED_SCANNER_HELD_BY_PHYSCANNON;
-
-	// ----------------------------------------------------------
-	//  If I have an enemy
-	// ----------------------------------------------------------
-	if ( GetEnemy() != NULL && GetEnemy()->IsAlive() )	//&& m_bShouldInspect
-	{
-		// Always chase the enemy
-		SetInspectTargetToEnt( GetEnemy(), 9999 );
-
-		// Patrol if the enemy has vanished
-		if ( HasCondition( COND_LOST_ENEMY ) )
-			return SCHED_SCANNER_PATROL;
-
-		// Chase via route if we're directly blocked
-		if ( HasCondition( COND_SCANNER_FLY_BLOCKED ) )
-			return SCHED_SCANNER_CHASE_ENEMY;
-		
-		// Attack if it's time
-		if ( gpGlobals->curtime < m_flNextAttack )
-			return SCHED_CSCANNER_SPOTLIGHT_HOVER;
-
-		// Melee attack if possible
-		if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
-		{
-			//TODO; If the player is being swarmed by 2+ scanners, try to dish out each attack
-			// role evenly
-			if ( random->RandomInt(0,1) )
-			{
-				return SCHED_CSCANNER_ATTACK_FLASH;
-			}
-			else
-			{
-				return SCHED_CSCANNER_ATTACK_GAS;
-			}
-			// TODO: a schedule where he makes an alarm sound?
-			return SCHED_SCANNER_CHASE_ENEMY;
-		}
-		else
-		{
-			// If I'm far from the enemy, stay up high and approach in spotlight mode
-			float fAttack2DDist = ( GetEnemyLKP() - GetAbsOrigin() ).Length2D();
-
-			if ( fAttack2DDist > SCANNER_ATTACK_FAR_DIST )
-				return SCHED_CSCANNER_SPOTLIGHT_HOVER;
-
-			// Otherwise fly in low for attack
-			return SCHED_SCANNER_ATTACK_HOVER;
-		}
-	}
-
-	// ----------------------------------------------------------
-	//  If I have something to inspect
-	// ----------------------------------------------------------
-	if ( HaveInspectTarget() )
-	{
-		// Pathfind to our goal
-		if ( HasCondition( COND_SCANNER_FLY_BLOCKED ) )
-			return SCHED_CSCANNER_MOVE_TO_INSPECT;
-
-		// If I was chasing, pick with photographing or spotlighting 
-		if ( m_nFlyMode == SCANNER_FLY_CHASE )
-		{
-			m_nFlyMode = (random->RandomInt(0,1)==0) ? SCANNER_FLY_SPOT : SCANNER_FLY_PHOTO;
-		}
-
-		// Handle spotlight
-		if ( m_nFlyMode == SCANNER_FLY_SPOT )
-		{
-			if (HasCondition( COND_CSCANNER_SPOT_ON_TARGET ))
-			{
-				if (GetTarget())
-				{
-					RequestInspectSupport();
-
-					CAI_BaseNPC *pNPC = GetTarget()->MyNPCPointer();
-					// If I'm leading the inspection, so verbal inspection
-					if (pNPC && pNPC->GetTarget() == this)
-					{
-						return SCHED_CSCANNER_SPOTLIGHT_INSPECT_CIT;
-					}
-
-					return SCHED_CSCANNER_SPOTLIGHT_HOVER;
-				}
-
-				return SCHED_CSCANNER_SPOTLIGHT_INSPECT_POS;
-			}
-
-			return SCHED_CSCANNER_SPOTLIGHT_HOVER;
-		}
-		
-		// Handle photographing
-		if ( m_nFlyMode == SCANNER_FLY_PHOTO )
-		{
-			if ( HasCondition( COND_CSCANNER_CAN_PHOTOGRAPH ))
-				return SCHED_CSCANNER_PHOTOGRAPH;
-
-			return SCHED_CSCANNER_PHOTOGRAPH_HOVER;
-		}
-		
-		// Handle following after a target
-		if ( m_nFlyMode == SCANNER_FLY_FOLLOW )
-		{
-			//TODO: Randomly make noise, photograph, etc
-			return SCHED_SCANNER_FOLLOW_HOVER;
-		}
-
-		// Handle patrolling
-		if ( ( m_nFlyMode == SCANNER_FLY_PATROL ) || ( m_nFlyMode == SCANNER_FLY_FAST ) )
-			return SCHED_SCANNER_PATROL;
-	}
-
-	// Default to patrolling around
-	return SCHED_SCANNER_PATROL;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::SpotlightDestroy(void)
-{
-	if ( m_hSpotlight )
-	{
-		UTIL_Remove(m_hSpotlight);
-		m_hSpotlight = NULL;
-		
-		UTIL_Remove(m_hSpotlightTarget);
-		m_hSpotlightTarget = NULL;
-	}
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::SpotlightCreate(void)
-{
-	// Make sure we don't already have one
-	if ( m_hSpotlight != NULL )
-		return;
-
-	// Can we create a spotlight yet?
-	if ( gpGlobals->curtime < m_fNextSpotlightTime )
-		return;
-
-	// If I have an enemy, start spotlight on my enemy
-	if (GetEnemy() != NULL)
-	{
-		Vector vEnemyPos	= GetEnemyLKP();
-		Vector vTargetPos	= vEnemyPos;
-		vTargetPos.z		= GetFloorZ(vEnemyPos);
-		m_vSpotlightDir = vTargetPos - GetLocalOrigin();
-		VectorNormalize(m_vSpotlightDir);
-	}
-	// If I have an target, start spotlight on my target
-	else if (GetTarget() != NULL)
-	{
-		Vector vTargetPos	= GetTarget()->GetLocalOrigin();
-		vTargetPos.z		= GetFloorZ(GetTarget()->GetLocalOrigin());
-		m_vSpotlightDir = vTargetPos - GetLocalOrigin();
-		VectorNormalize(m_vSpotlightDir);
-	}
-	// Other wise just start looking down
-	else
-	{
-		m_vSpotlightDir	= Vector(0,0,-1); 
-	}
-
-	trace_t tr;
-	AI_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + m_vSpotlightDir * 2024, MASK_OPAQUE, this, COLLISION_GROUP_NONE, &tr );
-
-	m_hSpotlightTarget = (CSpotlightEnd*)CreateEntityByName( "spotlight_end" );
-	m_hSpotlightTarget->Spawn();
-	m_hSpotlightTarget->SetLocalOrigin( tr.endpos );
-	m_hSpotlightTarget->SetOwnerEntity( this );
-	// YWB:  Because the scanner only moves the target during think, make sure we interpolate over 0.1 sec instead of every tick!!!
-	m_hSpotlightTarget->SetSimulatedEveryTick( false );
-
-	// Using the same color as the beam...
-	m_hSpotlightTarget->SetRenderColor( 255, 255, 255 );
-	m_hSpotlightTarget->m_Radius = m_flSpotlightMaxLength;
-
-	m_hSpotlight = CBeam::BeamCreate( "sprites/glow_test02.vmt", SPOTLIGHT_WIDTH );
-	// Set the temporary spawnflag on the beam so it doesn't save (we'll recreate it on restore)
-	m_hSpotlight->AddSpawnFlags( SF_BEAM_TEMPORARY );
-	m_hSpotlight->SetColor( 255, 255, 255 ); 
-	m_hSpotlight->SetHaloTexture( m_nHaloSprite );
-	m_hSpotlight->SetHaloScale( 32 );
-	m_hSpotlight->SetEndWidth( m_hSpotlight->GetWidth() );
-	m_hSpotlight->SetBeamFlags( (FBEAM_SHADEOUT|FBEAM_NOTILE) );
-	m_hSpotlight->SetBrightness( 32 );
-	m_hSpotlight->SetNoise( 0 );
-	m_hSpotlight->EntsInit( this, m_hSpotlightTarget );
-	m_hSpotlight->SetHDRColorScale( 0.75f );	// Scale this back a bit on HDR maps
-	// attach to light
-	m_hSpotlight->SetStartAttachment( LookupAttachment( SCANNER_ATTACHMENT_LIGHT ) );
-
-	m_vSpotlightAngVelocity = vec3_origin;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-Vector CNPC_AScanner::SpotlightTargetPos(void)
-{
-	// ----------------------------------------------
-	//  If I have an enemy 
-	// ----------------------------------------------
-	if (GetEnemy() != NULL)
-	{
-		// If I can see my enemy aim for him
-		if (HasCondition(COND_SEE_ENEMY))
-		{
-			// If its client aim for his eyes
-			if (GetEnemy()->GetFlags() & FL_CLIENT)
-			{
-				m_vSpotlightTargetPos = GetEnemy()->EyePosition();
-			}
-			// Otherwise same for his feet
-			else
-			{
-				m_vSpotlightTargetPos	= GetEnemy()->GetLocalOrigin();
-				m_vSpotlightTargetPos.z	= GetFloorZ(GetEnemy()->GetLocalOrigin());
-			}
-		}
-		// Otherwise aim for last known position if I can see LKP
-		else
-		{
-			Vector vLKP				= GetEnemyLKP();
-			m_vSpotlightTargetPos.x	= vLKP.x;
-			m_vSpotlightTargetPos.y	= vLKP.y;
-			m_vSpotlightTargetPos.z	= GetFloorZ(vLKP);
-		}
-	}
-	// ----------------------------------------------
-	//  If I have an inspect target
-	// ----------------------------------------------
-	else if (HaveInspectTarget())
-	{
-		m_vSpotlightTargetPos = InspectTargetPosition();
-	}
-	else
-	{
-		// This creates a nice patrol spotlight sweep
-		// in the direction that I'm travelling
-		m_vSpotlightTargetPos	= GetCurrentVelocity();
-		m_vSpotlightTargetPos.z = 0;
-		VectorNormalize( m_vSpotlightTargetPos );
-		m_vSpotlightTargetPos   *= 5;
-
-		float noiseScale = 2.5;
-		const Vector &noiseMod = GetNoiseMod();
-		m_vSpotlightTargetPos.x += noiseScale*sin(noiseMod.x * gpGlobals->curtime + noiseMod.x);
-		m_vSpotlightTargetPos.y += noiseScale*cos(noiseMod.y* gpGlobals->curtime + noiseMod.y);
-		m_vSpotlightTargetPos.z -= fabs(noiseScale*cos(noiseMod.z* gpGlobals->curtime + noiseMod.z) );
-		m_vSpotlightTargetPos   = GetLocalOrigin()+m_vSpotlightTargetPos * 2024;
-	}
-
-	return m_vSpotlightTargetPos;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-Vector CNPC_AScanner::SpotlightCurrentPos(void)
-{
-	Vector vTargetDir		= SpotlightTargetPos() - GetLocalOrigin();
-	VectorNormalize(vTargetDir);
-
-	if (!m_hSpotlight)
-	{
-		DevMsg("Spotlight pos. called w/o spotlight!\n");
-		return vec3_origin;
-	}
-	// -------------------------------------------------
-	//  Beam has momentum relative to it's ground speed
-	//  so sclae the turn rate based on its distance
-	//  from the beam source
-	// -------------------------------------------------
-	float	fBeamDist		= (m_hSpotlightTarget->GetLocalOrigin() - GetLocalOrigin()).Length();
-
-	float	fBeamTurnRate	= atan(50/fBeamDist);
-	Vector  vNewAngVelocity = fBeamTurnRate * (vTargetDir - m_vSpotlightDir);
-
-	float	myDecay	 = 0.4;
-	m_vSpotlightAngVelocity = (myDecay * m_vSpotlightAngVelocity + (1-myDecay) * vNewAngVelocity);
-
-	// ------------------------------
-	//  Limit overall angular speed
-	// -----------------------------
-	if (m_vSpotlightAngVelocity.Length() > 1)
-	{
-
-		Vector velDir = m_vSpotlightAngVelocity;
-		VectorNormalize(velDir);
-		m_vSpotlightAngVelocity = velDir * 1;
-	}
-
-	// ------------------------------
-	//  Calculate new beam direction
-	// ------------------------------
-	m_vSpotlightDir = m_vSpotlightDir + m_vSpotlightAngVelocity;
-	m_vSpotlightDir = m_vSpotlightDir;
-	VectorNormalize(m_vSpotlightDir);
-
-
-	// ---------------------------------------------
-	//	Get beam end point.  Only collide with
-	//  solid objects, not npcs
-	// ---------------------------------------------
-	trace_t tr;
-	Vector vTraceEnd = GetAbsOrigin() + (m_vSpotlightDir * 2 * m_flSpotlightMaxLength);
-	AI_TraceLine ( GetAbsOrigin(), vTraceEnd, MASK_OPAQUE, this, COLLISION_GROUP_NONE, &tr);
-
-	return (tr.endpos);
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose: Update the direction and position of my spotlight
-//------------------------------------------------------------------------------
-void CNPC_AScanner::SpotlightUpdate(void)
-{
-	//FIXME: JDW - E3 Hack
-	if ( m_bNoLight )
-	{
-		if ( m_hSpotlight )
-		{
-			SpotlightDestroy();
-		}
-
-		return;
-	}
-
-	if ((m_nFlyMode != SCANNER_FLY_SPOT) &&
-		(m_nFlyMode != SCANNER_FLY_PATROL) && 
-		(m_nFlyMode != SCANNER_FLY_FAST))
-	{
-		if ( m_hSpotlight )
-		{	
-			SpotlightDestroy();
-		}
-		return;
-	}
-	
-	// If I don't have a spotlight attempt to create one
-
-	if ( m_hSpotlight == NULL )
-	{
-		SpotlightCreate();
-		
-		if ( m_hSpotlight== NULL )
-			return;
-	}
-
-	// Calculate the new homing target position
-	m_vSpotlightCurrentPos = SpotlightCurrentPos();
-
-	// ------------------------------------------------------------------
-	//  If I'm not facing the spotlight turn it off 
-	// ------------------------------------------------------------------
-	Vector vSpotDir = m_vSpotlightCurrentPos - GetAbsOrigin();
-	VectorNormalize(vSpotDir);
-	
-	Vector	vForward;
-	AngleVectors( GetAbsAngles(), &vForward );
-
-	float dotpr = DotProduct( vForward, vSpotDir );
-	
-	if ( dotpr < 0.0 )
-	{
-		// Leave spotlight off for a while
-		m_fNextSpotlightTime = gpGlobals->curtime + 3.0f;
-
-		SpotlightDestroy();
-		return;
-	}
-
-	// --------------------------------------------------------------
-	//  Update spotlight target velocity
-	// --------------------------------------------------------------
-	Vector vTargetDir  = (m_vSpotlightCurrentPos - m_hSpotlightTarget->GetLocalOrigin());
-	float  vTargetDist = vTargetDir.Length();
-
-	Vector vecNewVelocity = vTargetDir;
-	VectorNormalize(vecNewVelocity);
-	vecNewVelocity *= (10 * vTargetDist);
-
-	// If a large move is requested, just jump to final spot as we
-	// probably hit a discontinuity
-	if (vecNewVelocity.Length() > 200)
-	{
-		VectorNormalize(vecNewVelocity);
-		vecNewVelocity *= 200;
-		m_hSpotlightTarget->SetLocalOrigin( m_vSpotlightCurrentPos );
-	}
-	m_hSpotlightTarget->SetAbsVelocity( vecNewVelocity );
-
-	m_hSpotlightTarget->m_vSpotlightOrg = GetAbsOrigin();
-
-	// Avoid sudden change in where beam fades out when cross disconinuities
-	m_hSpotlightTarget->m_vSpotlightDir = m_hSpotlightTarget->GetLocalOrigin() - m_hSpotlightTarget->m_vSpotlightOrg;
-	float flBeamLength	= VectorNormalize( m_hSpotlightTarget->m_vSpotlightDir );
-	m_flSpotlightCurLength = (0.80*m_flSpotlightCurLength) + (0.2*flBeamLength);
-
-	// Fade out spotlight end if past max length.  
-	if (m_flSpotlightCurLength > 2*m_flSpotlightMaxLength)
-	{
-		m_hSpotlightTarget->SetRenderColorA( 0 );
-		m_hSpotlight->SetFadeLength(m_flSpotlightMaxLength);
-	}
-	else if (m_flSpotlightCurLength > m_flSpotlightMaxLength)		
-	{
-		m_hSpotlightTarget->SetRenderColorA( (1-((m_flSpotlightCurLength-m_flSpotlightMaxLength)/m_flSpotlightMaxLength)) );
-		m_hSpotlight->SetFadeLength(m_flSpotlightMaxLength);
-	}
-	else
-	{
-		m_hSpotlightTarget->SetRenderColorA( 1.0 );
-		m_hSpotlight->SetFadeLength(m_flSpotlightCurLength);
-	}
-
-	// Adjust end width to keep beam width constant
-	float flNewWidth = SPOTLIGHT_WIDTH * ( flBeamLength/m_flSpotlightMaxLength);
-	
-	m_hSpotlight->SetWidth(flNewWidth);
-	m_hSpotlight->SetEndWidth(flNewWidth);
-
-	m_hSpotlightTarget->m_flLightScale = 0.0;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Called just before we are deleted.
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::UpdateOnRemove( void )
-{
-	SpotlightDestroy();
-	BaseClass::UpdateOnRemove();
-}
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::TakePhoto(void)
-{
-	ScannerEmitSound( "TakePhoto" );
-	
-	m_pEyeFlash->SetScale( 1.4 );
-	m_pEyeFlash->SetBrightness( 255 );
-	m_pEyeFlash->SetColor(255,255,255);
-
-	Vector vRawPos		= InspectTargetPosition();
-	Vector vLightPos	= vRawPos;
-
-	// If taking picture of entity, aim at feet
-	if ( GetTarget() )
-	{
-		if ( GetTarget()->IsPlayer() )
-		{
-			m_OnPhotographPlayer.FireOutput( GetTarget(), this );
-			BlindFlashTarget( GetTarget() );
-		}
-		
-		if ( GetTarget()->MyNPCPointer() != NULL )
-		{
-			m_OnPhotographNPC.FireOutput( GetTarget(), this );
-			GetTarget()->MyNPCPointer()->DispatchInteraction( g_interactionScannerInspectBegin, NULL, this );
-		}
-	}
-
-	SetIdealActivity( (Activity) ACT_SCANNER_FLARE_START );
-
-	m_bPhotoTaken = true;
-}
-
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::AttackPreFlash(void)
-{
-	ScannerEmitSound( "TakePhoto" );
-
-	// If off turn on, if on turn off
-	if (m_pEyeFlash->GetBrightness() == 0)
-	{
-		m_pEyeFlash->SetScale( 0.5 );
-		m_pEyeFlash->SetBrightness( 255 );
-		m_pEyeFlash->SetColor(255,0,0);
-	}
-	else
-	{
-		m_pEyeFlash->SetBrightness( 0 );
-	}
-}
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::AttackPreGas(void)
-{
-	ScannerEmitSound( "TakePhoto" );
-
-	// If off turn on, if on turn off
-	if (m_pEyeFlash->GetBrightness() == 0)
-	{
-		m_pEyeFlash->SetScale( 0.5 );
-		m_pEyeFlash->SetBrightness( 255 );
-		m_pEyeFlash->SetColor(234,191,17);
-	}
-	else
-	{
-		m_pEyeFlash->SetBrightness( 0 );
-	}
-}
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::AttackFlash(void)
-{
-	ScannerEmitSound( "AttackFlash" );
-	m_pEyeFlash->SetScale( 1.8 );
-	m_pEyeFlash->SetBrightness( 255 );
-	m_pEyeFlash->SetColor(255,255,255);
-
-	if (GetEnemy() != NULL)
-	{
-		Vector pos = GetEnemyLKP();
-		CBroadcastRecipientFilter filter;
-		te->DynamicLight( filter, 0.0, &pos, 200, 200, 255, 0, 300, 0.2, 50 );
-
-		if (GetEnemy()->IsPlayer())
-		{
-			m_OnPhotographPlayer.FireOutput(GetTarget(), this);
-		}
-		else if( GetEnemy()->MyNPCPointer() )
-		{
-			m_OnPhotographNPC.FireOutput(GetTarget(), this);
-		}
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : *pTarget - 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::BlindFlashTarget( CBaseEntity *pTarget )
-{
-	// Tell all the striders this person is here!
-	CAI_BaseNPC **	ppAIs 	= g_AI_Manager.AccessAIs();
-	int 			nAIs 	= g_AI_Manager.NumAIs();
-	
-	if( IsStriderScout() )
-	{
-		for ( int i = 0; i < nAIs; i++ )
-		{
-			if( FClassnameIs( ppAIs[ i ], "npc_strider" ) )
-			{
-				ppAIs[ i ]->UpdateEnemyMemory( pTarget, pTarget->GetAbsOrigin(), this );
-			}
-		}
-	}
-
-	// Only bother with player
-	if ( pTarget->IsPlayer() == false )
-		return;
-
-	// Scale the flash value by how closely the player is looking at me
-	Vector vFlashDir = GetAbsOrigin() - pTarget->EyePosition();
-	VectorNormalize(vFlashDir);
-	
-	Vector vFacing;
-	AngleVectors( pTarget->EyeAngles(), &vFacing );
-
-	float dotPr	= DotProduct( vFlashDir, vFacing );
-
-	// Not if behind us
-	if ( dotPr > 0.5f )
-	{
-		// Make sure nothing in the way
-		trace_t tr;
-		AI_TraceLine ( GetAbsOrigin(), pTarget->EyePosition(), MASK_OPAQUE, this, COLLISION_GROUP_NONE, &tr );
-
-		if ( tr.startsolid == false && tr.fraction == 1.0)
-		{
-			color32 white = { 255, 255, 255, SCANNER_FLASH_MAX_VALUE * dotPr };
-
-			if ( ( g_pMaterialSystemHardwareConfig != NULL ) && ( g_pMaterialSystemHardwareConfig->GetHDRType() != HDR_TYPE_NONE ) )
-			{
-				white.a = ( byte )( ( float )white.a * 0.9f );
-			}
-
-			float flFadeTime = ( IsX360() ) ? 0.5f : 3.0f;
-			UTIL_ScreenFade( pTarget, white, flFadeTime, 0.5, FFADE_IN );
-		}
-	}
-}
-
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::AttackFlashBlind(void)
-{
-	if( GetEnemy() )
-	{
-		BlindFlashTarget( GetEnemy() );
-	}
-
-	m_pEyeFlash->SetBrightness( 0 );
-
-	float fAttackDelay = random->RandomFloat(SCANNER_ATTACK_MIN_DELAY,SCANNER_ATTACK_MAX_DELAY);
-	if( IsStriderScout() )
-	{
-		// Make strider scouts more snappy.
-		fAttackDelay *= 0.5;
-	}
-	m_flNextAttack	= gpGlobals->curtime + fAttackDelay;
-	m_fNextSpotlightTime = gpGlobals->curtime + 1.0f;
+	// AScanner can see forever, so in order to be fair,
+	// enemies must be seen for a certain amount of time before
+	// we can engage/let our squadmates know
+	if ( gpGlobals->curtime < m_fTargetTime )
+		return false;
+
+	if ((GetAbsOrigin() - pEnemy->GetAbsOrigin()).Length() > ASCANNER_MAX_ATTACK_RADIUS)
+		return false;
+
+	return BaseClass::IsValidEnemy(pEnemy);
 }
 
 //------------------------------------------------------------------------------
@@ -2081,92 +1062,164 @@ void CNPC_AScanner::AttackFlashBlind(void)
 // Input   :
 // Output  :
 //------------------------------------------------------------------------------
-void CNPC_AScanner::AttackGas(void)
+void CNPC_ADrone::SetAScannerState(AScannerState_t pNewState)
 {
-	if ( GetEnemy() )
+	m_nAScannerState = pNewState;
+}
+
+//------------------------------------------------------------------------------
+// Purpose : Get pod split positions
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+Vector CNPC_ADrone::PodPos(int nPos)
+{
+	// Only 4 attachment points are available, so use shooting attachment 
+	// points to determine split position and offset from model center
+	if (m_nPods == 3)
 	{
-		ScannerEmitSound( "AttackGas" );
-
-		CSteamJet *pJet= (CSteamJet *)CreateEntityByName("env_steamjet");
-		pJet->Spawn();
-		pJet->SetLocalOrigin( GetLocalOrigin() );
-		pJet->m_bEmit		= true;
-		pJet->m_SpreadSpeed	= 30;
-		pJet->m_Speed		= 400;
-		pJet->m_StartSize	= 5;
-		pJet->m_EndSize		= 100;
-		pJet->m_JetLength	= 700;
-		//pJet->m_Color		= Vector(110/255.0,82/255.0,9/255.0); // Mustard gas orange
-		pJet->SetRenderColor( 110, 82, 9, 255 );
-		//NOTENOTE: Set pJet->m_clrRender->a here for translucency
-
-		pJet->SetParent(this);
-		pJet->SetLifetime(1.0);
-
-		Vector	vEnemyPos	= GetEnemy()->EyePosition() + GetEnemy()->GetAbsVelocity();
-		m_vGasDirection		= GetLocalOrigin() - vEnemyPos;
-
-		QAngle angles;
-		VectorAngles(m_vGasDirection, angles );
-		angles.y += 90;
-
-		pJet->SetLocalAngles( angles );
-
-		float fAttackDelay = random->RandomFloat(SCANNER_ATTACK_MIN_DELAY,SCANNER_ATTACK_MAX_DELAY);
-		if( IsStriderScout() )
+		Vector vAttachPos;
+		QAngle vAttachAng;
+		GetAttachment( nPos, vAttachPos, vAttachAng );
+		Vector vDir			= 2*(vAttachPos - GetLocalOrigin());
+		vAttachPos			= GetLocalOrigin() + vDir;
+		return vAttachPos;
+	}
+	else
+	{
+		Vector vForward,vRight,vUp;
+		AngleVectors( GetLocalAngles(), &vForward, &vRight, &vUp );
+		if (nPos == ASCANNER_ATTACHMENT_POD_RIGHT)
 		{
-			// Make strider scouts more snappy.
-			fAttackDelay *= 0.5;
+			return GetLocalOrigin() - vRight * 35;
 		}
-		m_flNextAttack = gpGlobals->curtime + fAttackDelay;
-		m_fNextSpotlightTime = gpGlobals->curtime + 1.0f;
+		else if (nPos == ASCANNER_ATTACHMENT_POD_LEFT)
+		{
+			return GetLocalOrigin() + vRight * 35;
+		}
+		else
+		{
+			return GetLocalOrigin() + vUp * 35;
+		}
 	}
 }
 
 //------------------------------------------------------------------------------
-// Purpose:
+// Purpose : Drop missile pod
+// Input   :
+// Output  :
 //------------------------------------------------------------------------------
-void CNPC_AScanner::AttackGasDamage(void)
+void CNPC_ADrone::DropPod( int nPod )
 {
-	// Note: Don't use CheckTraceHullAttack as other scanners can get in the way
-	if (GetEnemy() == NULL)
-	{
-		return;
-	}
+	Vector vLeftAttach  = PodPos(ASCANNER_ATTACHMENT_POD_LEFT);
+	Vector vRightAttach	= PodPos(ASCANNER_ATTACHMENT_POD_RIGHT);
+	Vector vTopAttach	= PodPos(ASCANNER_ATTACHMENT_POD_BOTTOM);
 
-	float fEnemyDist = (GetEnemy()->GetLocalOrigin() - GetLocalOrigin()).Length();
-	if (fEnemyDist > SCANNER_GAS_DAMAGE_DIST)
-	{
-		return;
-	}
+	//TODO;
 
-	Vector	vEnemyDir	= GetLocalOrigin() - GetEnemy()->GetLocalOrigin();
-	Vector gasDir = m_vGasDirection;
-	VectorNormalize(vEnemyDir);
-	VectorNormalize(gasDir);
-	float	dotPr		= DotProduct(vEnemyDir,gasDir);
-	if (dotPr > 0.90)
-	{
-		GetEnemy()->TakeDamage( CTakeDamageInfo( this, this, sk_scanner_dmg_gas.GetFloat(), DMG_NERVEGAS ) );
-	}
-
-	if (GetEnemy()->GetFlags() & FL_CLIENT)
-	{
-		GetEnemy()->ViewPunch(QAngle(random->RandomInt(-10,10), 0, random->RandomInt(-10,10)));
-	}
+	EmitSound( "NPC_AScanner.DropPod" );
 }
 
-//------------------------------------------------------------------------------
-// Purpose:
-//------------------------------------------------------------------------------
-void CNPC_AScanner::AttackDivebomb( void )
+//-----------------------------------------------------------------------------
+// Purpose: Gets the appropriate next schedule based on current condition
+//			bits.
+//-----------------------------------------------------------------------------
+int CNPC_ADrone::SelectSchedule(void)
 {
-	if (m_hSpotlight)
-	{
-		SpotlightDestroy();
-	}
+	// Kill laser if its still on
+	LaserKill();
+	m_fAntennaTarget = 0;
 
-	BaseClass::AttackDivebomb();
+	switch ( m_NPCState )
+	{
+		case NPC_STATE_IDLE:
+		{
+			//Fly around
+			return SCHED_ASCANNER_PATROL;
+			break;
+		}
+		case NPC_STATE_DEAD:
+		case NPC_STATE_SCRIPT:
+		{
+			return BaseClass::SelectSchedule();
+			break;
+		}
+		default:
+		{
+			// ------------------------------------------------
+			//  If I'm locking on:
+			// ------------------------------------------------
+			if (m_nAScannerState == ASCANNER_STATE_STRAFE)
+			{
+				// ----------------------------------------------------------
+				//  If I have an enemy
+				// ----------------------------------------------------------
+				if ( m_nPods > 1 && GetEnemy() != NULL && GetEnemy()->IsAlive() )
+				{
+					// --------------------------------------------
+					//  Track the enemy
+					// --------------------------------------------
+					//!!TODO;
+				}
+				//!else
+				//!{
+					SetAScannerState(ASCANNER_STATE_NORMAL);
+					return SCHED_ASCANNER_PATROL;
+				//!}
+			}
+			// --------------------------------------------------
+			//  If I'm getting help
+			// --------------------------------------------------
+			else if (m_nAScannerState == ASCANNER_STATE_EVASION)
+			{
+				// If enemy is dead, go back to patrol
+				if ( GetEnemy() == NULL		|| 
+					!GetEnemy()->IsAlive()	)
+				{
+					SetAScannerState(ASCANNER_STATE_NORMAL);
+					return SCHED_ASCANNER_PATROL;
+				}
+				return SCHED_ASCANNER_GET_HELP;
+			}
+			// --------------------------------------------------
+			//  If I'm attacking		
+			// --------------------------------------------------
+			else
+			{
+				// --------------------------------------------------
+				//  Otherwise hover and attack
+				// --------------------------------------------------
+				if (GetEnemy() != NULL )
+				{
+					if (HasCondition(COND_SEE_ENEMY))
+					{
+						// --------------------------------------------
+						//  Attack attack attack!
+						// --------------------------------------------
+						float fEnemyDist = (GetEnemy()->EyePosition() - GetLocalOrigin()).Length();
+						if (gpGlobals->curtime > m_fNextLaserTime && fEnemyDist < 1000)
+						{
+							return SCHED_ASCANNER_SHOOT_LASER;
+						}
+						else
+						{
+							return SCHED_ASCANNER_ATTACK_HOVER;
+						}
+					}
+					else
+					{
+						return SCHED_ASCANNER_CHASE_ENEMY;
+					}
+				}
+				else
+				{
+					return SCHED_ASCANNER_PATROL;
+				}
+			}
+			return SCHED_FAIL;
+			break;
+		}
+	}
 }
 
 
@@ -2174,1022 +1227,528 @@ void CNPC_AScanner::AttackDivebomb( void )
 // Purpose: 
 // Input  : pTask - 
 //-----------------------------------------------------------------------------
-void CNPC_AScanner::StartTask( const Task_t *pTask )
+void CNPC_ADrone::StartTask( const Task_t *pTask )
 {
 	switch (pTask->iTask)
 	{
-	case TASK_CSCANNER_GET_PATH_TO_INSPECT_TARGET:
+		// Create
+		case TASK_LASER_WARMUP:
 		{
-			// Must have somewhere to fly to
-			if ( HaveInspectTarget() == false )
-			{
-				TaskFail( "No inspection target to fly to!\n" );
-				return;
-			}
-
-			if ( GetTarget() )
-			{	
-				//FIXME: Tweak
-				//Vector idealPos = IdealGoalForMovement( InspectTargetPosition(), GetAbsOrigin(), 128.0f, 128.0f );
-				
-				AI_NavGoal_t goal( GOALTYPE_TARGETENT, vec3_origin );
-			
-				if ( GetNavigator()->SetGoal( goal ) )
-				{
-					TaskComplete();
-					return;
-				}
-			}
-			else
-			{
-				AI_NavGoal_t goal( GOALTYPE_LOCATION, InspectTargetPosition() );
-			
-				if ( GetNavigator()->SetGoal( goal ) )
-				{
-					TaskComplete();
-					return;
-				}
-			}
-
-			// Don't try and inspect this target again for a few seconds
-			CNPC_Citizen *pCitizen = dynamic_cast<CNPC_Citizen *>( GetTarget() );
-			if ( pCitizen )
-			{
-				pCitizen->SetNextScannerInspectTime( gpGlobals->curtime + 5.0 );
-			}
-
-			TaskFail("No route to inspection target!\n");
+			LaserWarmup();
+			// set a future time that tells us when the warmup is over.
+			m_flWaitFinished = gpGlobals->curtime + ASCANNER_LASER_WARMUP_TIME;
+			break;
 		}
-		break;
-
-	case TASK_CSCANNER_SPOT_INSPECT_ON:
-	{
-		if (GetTarget() == NULL)
+		case TASK_LASER_SHOOT:
 		{
-			TaskFail(FAIL_NO_TARGET);
-		}
-		else
-		{
-			CAI_BaseNPC* pNPC = GetTarget()->MyNPCPointer();
-			if (!pNPC)
-			{
-				TaskFail(FAIL_NO_TARGET);
-			}
-			else
-			{
-				pNPC->DispatchInteraction(g_interactionScannerInspectBegin,NULL,this);
-				
-				// Now we need some time to inspect
-				m_fInspectEndTime = gpGlobals->curtime + SCANNER_CIT_INSPECT_LENGTH;
-				TaskComplete();
-			}
-		}
-		break;
-	}
-	case TASK_CSCANNER_SPOT_INSPECT_WAIT:
-	{
-		if (GetTarget() == NULL)
-		{
-			TaskFail(FAIL_NO_TARGET);
-		}
-		else
-		{
-			CAI_BaseNPC* pNPC = GetTarget()->MyNPCPointer();
-			if (!pNPC)
-			{
-				SetTarget( NULL );
-				TaskFail(FAIL_NO_TARGET);
-			}
-			else
-			{
-				//<<TEMP>>//<<TEMP>> armband too!
-				pNPC->DispatchInteraction(g_interactionScannerInspectHandsUp,NULL,this);
-			}
+			LaserShoot();
 			TaskComplete();
+			break;
 		}
-		break;
-	}
-	case TASK_CSCANNER_SPOT_INSPECT_OFF:
-	{
-		if (GetTarget() == NULL)
+		case TASK_AIM_ROCKETS:
 		{
-			TaskFail(FAIL_NO_TARGET);
+			// Start beams a-going
+			StartAimBeam();
+			// set a future time that tells us when the warmup is over.
+			m_flWaitFinished = gpGlobals->curtime + ASCANNER_ROCKET_WARMUP_TIME;
+			break;
 		}
-		else
+		case TASK_FIRE_ROCKETS:
 		{
-			CAI_BaseNPC* pNPC = GetTarget()->MyNPCPointer();
-			if (!pNPC)
+			// Change my model
+			SetBodygroup( m_nPods, true );
+			SetHullSizeNormal();
+
+			// Play drop activity
+			SetActivity((Activity)ACT_ASCANNER_DROP);
+			DropPod( m_nPods );
+			TaskComplete();
+			break;
+		}
+		case TASK_RAISE_ANTENNA:
+		{
+			m_fAntennaTarget = 24;
+			TaskComplete();
+			break;
+		}
+		// Override so can find hint nodes that are much further away
+		case TASK_FIND_HINTNODE:
+		{
+			if (!GetHintNode())
 			{
-				TaskFail(FAIL_NO_TARGET);
+				SetHintNode( CAI_HintManager::FindHint( this, HINT_NONE, pTask->flTaskData, 5000 ) );
+			}
+			if ( GetHintNode() )
+			{
+				TaskComplete();
 			}
 			else
 			{
-				pNPC->DispatchInteraction(g_interactionScannerInspectDone,NULL,this);
+				// No hint node run from enemy
+				SetSchedule( SCHED_RUN_FROM_ENEMY );
+			}
+			break;
+		}
+		default:
+		{
+				
+			BaseClass::StartTask(pTask);
+		}
+	}
+}
 
-				// Clear target entity and don't inspect again for a while
-				SetTarget( NULL );
-				m_fCheckCitizenTime = gpGlobals->curtime + SCANNER_CIT_INSPECT_DELAY;
-				TaskComplete();
+//------------------------------------------------------------------------------
+// Purpose : Beam that slowly homes in on enemy position
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void CNPC_ADrone::StartAimBeam(void)
+{
+	// --------------------------
+	//  Blue beams between pods
+	// --------------------------
+	if (m_nPods == 3)
+	{
+		m_pBeam[0] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[0]->SetColor( 50, 50, 255 ); 
+		m_pBeam[0]->SetBrightness( 0 );
+		m_pBeam[0]->SetNoise( 100 );
+		m_pBeam[0]->SetWidth( 3.0 );
+		m_pBeam[0]->EntsInit( this, this );
+		m_pBeam[0]->SetStartAttachment( 1 );
+		m_pBeam[0]->SetEndAttachment( 2 );	
+
+		m_pBeam[1] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[1]->SetColor( 50, 50, 255 ); 
+		m_pBeam[1]->SetBrightness( 0 );
+		m_pBeam[1]->SetNoise( 16 );
+		m_pBeam[1]->SetWidth( 3.0 );
+		m_pBeam[1]->EntsInit( this, this );
+		m_pBeam[1]->SetStartAttachment( 2 );
+		m_pBeam[1]->SetEndAttachment( 3 );
+
+		m_pBeam[2] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[2]->SetColor( 50, 50, 255 ); 
+		m_pBeam[2]->SetBrightness( 0 );
+		m_pBeam[2]->SetNoise( 16 );
+		m_pBeam[2]->SetWidth( 3.0 );
+		m_pBeam[2]->EntsInit( this, this );
+		m_pBeam[2]->SetStartAttachment( 1 );
+		m_pBeam[2]->SetEndAttachment( 2 );	
+
+		m_pBeam[3] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[3]->SetColor( 50, 50, 255 ); 
+		m_pBeam[3]->SetBrightness( 0 );
+		m_pBeam[3]->SetWidth( 3.0 );
+		m_pBeam[3]->SetNoise( 16 );
+		m_pBeam[3]->EntsInit( this, this );
+		m_pBeam[3]->SetStartAttachment( 2 );
+		m_pBeam[3]->SetEndAttachment( 3 );
+	}
+	else	
+	{
+		m_pBeam[0] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[0]->SetColor( 50, 50, 255 ); 
+		m_pBeam[0]->SetBrightness( 0 );
+		m_pBeam[0]->SetNoise( 100 );
+		m_pBeam[0]->SetWidth( 3.0 );
+		m_pBeam[0]->EntsInit( this, this );
+		m_pBeam[0]->SetStartAttachment( 2 );
+		m_pBeam[0]->SetEndAttachment( 3 );
+
+		m_pBeam[1] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[1]->SetColor( 50, 50, 255 ); 
+		m_pBeam[1]->SetBrightness( 0 );
+		m_pBeam[1]->SetNoise( 16 );
+		m_pBeam[1]->SetWidth( 3.0 );
+		m_pBeam[1]->EntsInit( this, this );
+		m_pBeam[1]->SetStartAttachment( 2 );
+		m_pBeam[1]->SetEndAttachment( 3 );
+	}
+
+	EmitSound( "NPC_AScanner.LaserAim" );
+}
+
+//------------------------------------------------------------------------------
+// Purpose :
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void CNPC_ADrone::LaserWarmup(void)
+{
+	// -------------------
+	//  Converging beams
+	// -------------------
+	int i;
+	for (i=0;i<ASCANNER_NUM_BEAMS-1;i++)
+	{
+		m_pBeam[i] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[i]->SetColor( 255, 0, 0 ); 
+		m_pBeam[i]->SetBrightness( 100 );
+		m_pBeam[i]->SetNoise( 8 );
+		m_pBeam[i]->EntsInit( this, this );
+		m_pBeam[i]->SetStartAttachment( i+1 );
+		m_pBeam[i]->SetEndAttachment( 4 );
+	}
+
+	// -------------
+	//  Glow
+	// -------------
+	for (i=0;i<ASCANNER_NUM_GLOWS-1;i++)
+	{
+		m_pLaserGlow[i] = CSprite::SpriteCreate( "sprites/glow01.vmt", GetLocalOrigin(), FALSE );
+		m_pLaserGlow[i]->SetAttachment( this, 4 );
+		m_pLaserGlow[i]->SetTransparency( kRenderGlow, 255, 255, 255, 0, kRenderFxNoDissipation );
+		m_pLaserGlow[i]->SetBrightness( 100 );
+		m_pLaserGlow[i]->SetScale( 0.3 );
+	}
+
+	EmitSound( "NPC_AScanner.LaserWarmUp" );
+
+	// Bank to face player
+	m_bBankFace = true;
+
+	// Don't shoot laser again for a while
+	m_fNextLaserTime = gpGlobals->curtime + 10;
+
+	// After firing sit still for a second to make easier to hit
+	SetCurrentVelocity( vec3_origin );
+	m_fNextMoveEvadeTime = gpGlobals->curtime + ASCANNER_LASER_WARMUP_TIME;
+
+}
+
+//------------------------------------------------------------------------------
+// Purpose :
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void CNPC_ADrone::LaserShoot(void)
+{
+	if (GetEnemy() != NULL)
+	{
+		Vector shootPos = Weapon_ShootPosition();
+		Vector vTargetDir = (GetEnemy()->EyePosition() - shootPos);
+		vTargetDir.z -= 12;  // A little below the eyes
+
+		trace_t tr;
+		AI_TraceLine ( shootPos, vTargetDir * 2048, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr);
+
+		CBaseEntity *pEntity = tr.m_pEnt;
+		if (pEntity != NULL && m_takedamage)
+		{
+			ClearMultiDamage();
+			CTakeDamageInfo info( this, this, sk_ascanner_laser_dmg.GetFloat(), DMG_SHOCK );
+			CalculateMeleeDamageForce( &info, vTargetDir, tr.endpos );
+			pEntity->DispatchTraceAttack( info, vTargetDir, &tr );
+			ApplyMultiDamage();
+		}
+
+		// -------------
+		//  Shoot beam
+		// -------------
+		int nBeamNum = ASCANNER_NUM_BEAMS-1;
+		m_pBeam[nBeamNum] = CBeam::BeamCreate( "sprites/lgtning.vmt", 2.0 );
+		m_pBeam[nBeamNum]->SetColor( 255, 255, 255 );
+		m_pBeam[nBeamNum]->PointEntInit( tr.endpos, this );
+		m_pBeam[nBeamNum]->SetEndAttachment( 4 );  
+		m_pBeam[nBeamNum]->SetBrightness( 255 );
+		m_pBeam[nBeamNum]->SetNoise( 0 );
+		
+
+		// -------------
+		//  Impact Glow
+		// -------------
+		if (pEntity && pEntity->IsPlayer())
+		{
+			int nGlowNum = ASCANNER_NUM_GLOWS-1;
+			m_pLaserGlow[nGlowNum] = CSprite::SpriteCreate( "sprites/glow01.vmt", tr.endpos, true );
+			m_pLaserGlow[nGlowNum]->SetTransparency( kRenderGlow, 255, 200, 200, 0, kRenderFxNoDissipation );
+			m_pLaserGlow[nGlowNum]->SetBrightness( 255 );
+			m_pLaserGlow[nGlowNum]->SetScale( 0.8 );
+			m_pLaserGlow[nGlowNum]->Expand( 10, 100 );
+			m_pLaserGlow[nGlowNum] = NULL;
+		}
+
+		EmitSound( "NPC_AScanner.LaserShoot" );
+	}
+
+	for (int i=0;i<ASCANNER_NUM_BEAMS;i++)
+	{
+		if (m_pBeam[i])
+		{
+			// Let beam kill itself
+			m_pBeam[i]->LiveForTime(0.2);
+			m_pBeam[i] = NULL;
+		}
+	}
+}
+
+//------------------------------------------------------------------------------
+// Purpose :
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void CNPC_ADrone::LaserKill(void)
+{
+	// -------------------------------
+	//  Kill beams if not set to die
+	// ------------------------------
+	int i;
+	for (i=0;i<ASCANNER_NUM_BEAMS;i++)
+	{
+		if (m_pBeam[i])
+		{
+			UTIL_Remove(m_pBeam[i]);
+			m_pBeam[i] = NULL;
+		}
+	}
+
+	// ---------------------
+	//  Kill laser
+	// ---------------------
+	for (i=0;i<ASCANNER_NUM_GLOWS;i++)
+	{
+		if (m_pLaserGlow[i])
+		{
+			UTIL_Remove( m_pLaserGlow[i] );
+			m_pLaserGlow[i] = NULL;
+		}
+	}
+
+	// No longer bank to face player
+	m_bBankFace = false;
+ 
+	// Kill charge sound in case still going
+	StopSound(entindex(), "NPC_AScanner.LaserWarmUp" );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Catches the monster-specific messages that occur when tagged
+//			animation frames are played.
+// Input  : *pEvent - 
+//-----------------------------------------------------------------------------
+void CNPC_ADrone::HandleAnimEvent( animevent_t *pEvent )
+{
+	if( pEvent->event == AE_ASCANNER_SHOOT )
+	{
+		// Just callback to toss grenade
+		TossGrenade( true );
+	}
+
+	BaseClass::HandleAnimEvent( pEvent );
+}
+
+//------------------------------------------------------------------------------
+// Purpose :
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void CNPC_ADrone::TossGrenade( bool bFireGrenade )
+{
+	if ( bFireGrenade )
+	{
+		if (GetEnemy())
+		{
+			Vector vShootPos;
+			QAngle vShootAng;
+			GetAttachment( ASCANNER_ATTACHMENT_SHOOT, vShootPos, vShootAng );
+				
+			EmitSound( "NPC_AScanner.GrenadeShoot" );
+
+			CGrenadeHomer *pGrenade = CGrenadeHomer::CreateGrenadeHomer( MAKE_STRING("models/Weapons/wscanner_grenade.mdl"), MAKE_STRING(""),  GetAbsOrigin(), vec3_angle, edict() );
+			pGrenade->Spawn();
+			pGrenade->SetSpin(1,10);
+			pGrenade->SetHoming(0.05,1,0.5,1,0.5);
+			pGrenade->SetDamage(sk_ascanner_grenade_dmg.GetFloat());
+			pGrenade->SetDamageRadius(200);
+			pGrenade->Launch(this,GetEnemy(),800,600,GetGravity(),2);
+
+			if (GetEnemy()->GetFlags() & FL_NPC)
+			{
+				GetEnemy()->MyNPCPointer()->HandleInteraction( g_interactionWScannerBomb, pGrenade, this );
 			}
 		}
-		break;
 	}
-	case TASK_CSCANNER_CLEAR_INSPECT_TARGET:
+	else
 	{
-		ClearInspectTarget();
+		// Play grenate toss activity (event launches actual grenade)
+		SetActivity((Activity)ACT_RANGE_ATTACK1);
 
-		TaskComplete();
-		break;
+		m_fNextGrenadeTime = gpGlobals->curtime + random->RandomFloat(1.8,2.2); 
+
+		// After firing sit still for a second to make easier to hit
+		SetCurrentVelocity( vec3_origin );
+		m_fNextMoveEvadeTime = gpGlobals->curtime + 1.2;
 	}
+}
 
-	case TASK_CSCANNER_SET_FLY_SPOT:
+//-----------------------------------------------------------------------------
+// Purpose: Tells use whether or not the NPC cares about a given type of hint node.
+// Input  : sHint - 
+// Output : TRUE if the NPC is interested in this hint type, FALSE if not.
+//-----------------------------------------------------------------------------
+bool CNPC_ADrone::FValidateHintType(CAI_Hint *pHint)
+{
+//	return(pHint->HintType() == (HINT_WASTE_SCANNER_SPAWN);
+
+	// Waste scanner spawn isnt used right now, so we gotta be compatible
+	// with what the other scanners use
+	switch( pHint->HintType() )
 	{
-		m_nFlyMode = SCANNER_FLY_SPOT;
-		TaskComplete();
+	case HINT_WASTE_SCANNER_SPAWN:
+	case HINT_WORLD_WINDOW:
+	case HINT_ROLLER_PATROL_POINT:
+		return true;
 		break;
-	}
 
-	case TASK_CSCANNER_SET_FLY_PHOTO:
-	{
-		m_nFlyMode = SCANNER_FLY_PHOTO;
-		m_bPhotoTaken = false;
-
-		// Leave spotlight off for a while
-		m_fNextSpotlightTime = gpGlobals->curtime + 2.0;
-
-		TaskComplete();
-		break;
-	}
-
-	case TASK_CSCANNER_PHOTOGRAPH:
-	{
-		TakePhoto();
-		SetWait( 0.1 );
-		break;
-	}
-
-	case TASK_CSCANNER_ATTACK_PRE_FLASH:
-	{
-		if( IsStriderScout() )
-		{
-			Vector vecScare = GetEnemy()->EarPosition();
-			Vector vecDir = WorldSpaceCenter() - vecScare;
-			VectorNormalize( vecDir );
-			vecScare += vecDir * 64.0f;
-
-			CSoundEnt::InsertSound( SOUND_DANGER, vecScare, 256, 1.0, this );
-		}
-
-		if (m_pEyeFlash)
-		{
-			AttackPreFlash();
-			// Flash red for a while
-			SetWait( 1.0f );
-		}
-		else
-		{
-			TaskFail("No Flash");
-		}
-		break;
-	}
-
-	case TASK_CSCANNER_ATTACK_FLASH:
-	{
-		AttackFlash();
-		// Blinding occurs slightly later
-		SetWait( 0.05 );
-		break;
-	}
-
-	case TASK_CSCANNER_ATTACK_PRE_GAS:
-	{
-		if (m_pEyeFlash)
-		{
-			AttackPreGas();
-			// Flash red for a while
-			SetWait( 0.5f );
-		}
-		else
-		{
-			TaskFail("No Flash");
-		}
-		break;
-	}
-
-	case TASK_CSCANNER_ATTACK_GAS:
-	{
-		AttackGas();
-		// Damage occurs slightly later, so player can avoid it
-		SetWait( 0.25 );
-		break;
-	}
-
-	// Override to go to inspect target position whether or not is an entity
-	case TASK_GET_PATH_TO_TARGET:
-	{
-		if (!HaveInspectTarget())
-		{
-			TaskFail(FAIL_NO_TARGET);
-		}
-		else if (GetHintNode())
-		{
-			Vector vNodePos;
-			GetHintNode()->GetPosition(this,&vNodePos);
-
-			GetNavigator()->SetGoal( vNodePos );
-		}
-		else 
-		{
-			AI_NavGoal_t goal( (const Vector &)InspectTargetPosition() );
-			goal.pTarget = GetTarget();
-			GetNavigator()->SetGoal( goal );
-		}
-		break;
-	}
 	default:
-		BaseClass::StartTask(pTask);
+		return false;
 		break;
 	}
 }
 
+
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Draw any debug text overlays
+// Input  :
+// Output : Current text offset from the top
 //-----------------------------------------------------------------------------
-char *CNPC_AScanner::GetScannerSoundPrefix( void )
+int CNPC_ADrone::DrawDebugTextOverlays(void) 
 {
-	return "NPC_AScanner";
+	int text_offset = BaseClass::DrawDebugTextOverlays();
+
+	if (m_debugOverlays & OVERLAY_TEXT_BIT) 
+	{
+		// Print state
+		char tempstr[512];
+		Q_snprintf(tempstr,sizeof(tempstr),"WS State: ");
+		switch (m_nAScannerState)
+		{
+			case ASCANNER_STATE_NORMAL:				strcat(tempstr,"Normal");		break;
+			case ASCANNER_STATE_STRAFE:				strcat(tempstr,"Strafing");		break;
+			case ASCANNER_STATE_EVASION:		strcat(tempstr,"Evading");	break;
+		}
+		NDebugOverlay::EntityText(entindex(),text_offset,tempstr,0);
+		text_offset++;
+	}
+	return text_offset;
 }
 
 //------------------------------------------------------------------------------
-// Purpose:
+// Purpose :
+// Input   :
+// Output  :
 //------------------------------------------------------------------------------
-float CNPC_AScanner::MinGroundDist( void )
+CNPC_ADrone::~CNPC_ADrone(void)
 {
-	if ( m_nFlyMode == SCANNER_FLY_SPOT && !GetHintNode() )
-	{
-		return SCANNER_SPOTLIGHT_FLY_HEIGHT;
-	}
-
-	return SCANNER_NOSPOTLIGHT_FLY_HEIGHT;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::AdjustScannerVelocity( void )
-{
-	if ( m_bIsClawScanner )
-	{
-		m_vCurrentVelocity *= ( 1 + sin( ( gpGlobals->curtime + m_flFlyNoiseBase ) * 2.5f ) * .1 );
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : flInterval - 
-// Output : Returns true on success, false on failure.
-//-----------------------------------------------------------------------------
-bool CNPC_AScanner::OverrideMove( float flInterval )
-{
-	// ----------------------------------------------
-	//	If dive bombing
-	// ----------------------------------------------
-	if (m_nFlyMode == SCANNER_FLY_DIVE)
-	{
-		MoveToDivebomb( flInterval );
-	}
-	else
-	{
-		Vector vMoveTargetPos(0,0,0);
-		CBaseEntity *pMoveTarget = NULL;
-		
-		if ( !GetNavigator()->IsGoalActive() || ( GetNavigator()->GetCurWaypointFlags() | bits_WP_TO_PATHCORNER ) )
-		{
-			// Select move target 
-			if ( GetTarget() != NULL )
-			{
-				pMoveTarget = GetTarget();
-			}
-			else if ( GetEnemy() != NULL )
-			{
-				pMoveTarget = GetEnemy();
-			}
-			
-			// Select move target position 
-			if ( HaveInspectTarget() )
-			{
-				vMoveTargetPos = InspectTargetPosition(); 
-			}
-			else if ( GetEnemy() != NULL )
-			{
-				vMoveTargetPos = GetEnemy()->GetAbsOrigin();
-			}
-		}
-		else
-		{
-			vMoveTargetPos = GetNavigator()->GetCurWaypointPos();
-		}
-
-		ClearCondition( COND_SCANNER_FLY_CLEAR );
-		ClearCondition( COND_SCANNER_FLY_BLOCKED );
-
-		// See if we can fly there directly
-		if ( pMoveTarget || HaveInspectTarget() )
-		{
-			trace_t tr;
-			AI_TraceHull( GetAbsOrigin(), vMoveTargetPos, GetHullMins(), GetHullMaxs(), MASK_NPCSOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
-
-			float fTargetDist = (1.0f-tr.fraction)*(GetAbsOrigin() - vMoveTargetPos).Length();
-			
-			if ( ( tr.m_pEnt == pMoveTarget ) || ( fTargetDist < 50 ) )
-			{
-				if ( g_debug_cscanner.GetBool() )
-				{
-					NDebugOverlay::Line(GetLocalOrigin(), vMoveTargetPos, 0,255,0, true, 0);
-					NDebugOverlay::Cross3D(tr.endpos,Vector(-5,-5,-5),Vector(5,5,5),0,255,0,true,0.1);
-				}
-
-				SetCondition( COND_SCANNER_FLY_CLEAR );
-			}
-			else		
-			{
-				//HANDY DEBUG TOOL	
-				if ( g_debug_cscanner.GetBool() )
-				{
-					NDebugOverlay::Line(GetLocalOrigin(), vMoveTargetPos, 255,0,0, true, 0);
-					NDebugOverlay::Cross3D(tr.endpos,Vector(-5,-5,-5),Vector(5,5,5),255,0,0,true,0.1);
-				}
-
-				SetCondition( COND_SCANNER_FLY_BLOCKED );
-			}
-		}
-
-		// If I have a route, keep it updated and move toward target
-		if ( GetNavigator()->IsGoalActive() )
-		{
-			if ( OverridePathMove( pMoveTarget, flInterval ) )
-			{
-				BlendPhyscannonLaunchSpeed();
-				return true;
-			}
-		}	
-		else if (m_nFlyMode == SCANNER_FLY_SPOT)
-		{
-			MoveToSpotlight( flInterval );
-		}
-		// If photographing
-		else if ( m_nFlyMode == SCANNER_FLY_PHOTO )
-		{
-			MoveToPhotograph( flInterval );
-		}
-		else if ( m_nFlyMode == SCANNER_FLY_FOLLOW )
-		{
-			MoveToSpotlight( flInterval );
-		}
-		// ----------------------------------------------
-		//	If attacking
-		// ----------------------------------------------
-		else if (m_nFlyMode == SCANNER_FLY_ATTACK)
-		{
-			if ( m_hSpotlight )
-			{
-				SpotlightDestroy();
-			}
-			
-			MoveToAttack( flInterval );
-		}
-		// -----------------------------------------------------------------
-		// If I don't have a route, just decelerate
-		// -----------------------------------------------------------------
-		else if (!GetNavigator()->IsGoalActive())
-		{
-			float	myDecay	 = 9.5;
-			Decelerate( flInterval, myDecay);
-		}
-	}
-		
-	MoveExecute_Alive( flInterval );
-
-	return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Accelerates toward a given position.
-// Input  : flInterval - Time interval over which to move.
-//			vecMoveTarget - Position to move toward.
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::MoveToTarget( float flInterval, const Vector &vecMoveTarget )
-{
-	// Don't move if stalling
-	if ( m_flEngineStallTime > gpGlobals->curtime )
-		return;
-	
-	// Look at our inspection target if we have one
-	if ( GetEnemy() != NULL )
-	{
-		// Otherwise at our enemy
-		TurnHeadToTarget( flInterval, GetEnemy()->EyePosition() );
-	}
-	else if ( HaveInspectTarget() )
-	{
-		TurnHeadToTarget( flInterval, InspectTargetPosition() );
-	}
-	else
-	{
-		// Otherwise face our motion direction
-		TurnHeadToTarget( flInterval, vecMoveTarget );
-	}
-
-	// -------------------------------------
-	// Move towards our target
-	// -------------------------------------
-	float myAccel;
-	float myZAccel = 400.0f;
-	float myDecay  = 0.15f;
-
-	Vector vecCurrentDir;
-
-	// Get the relationship between my current velocity and the way I want to be going.
-	vecCurrentDir = GetCurrentVelocity();
-	VectorNormalize( vecCurrentDir );
-
-	Vector targetDir = vecMoveTarget - GetAbsOrigin();
-	float flDist = VectorNormalize(targetDir);
-
-	float flDot;
-	flDot = DotProduct( targetDir, vecCurrentDir );
-
-	if( flDot > 0.25 )
-	{
-		// If my target is in front of me, my flight model is a bit more accurate.
-		myAccel = 250;
-	}
-	else
-	{
-		// Have a harder time correcting my course if I'm currently flying away from my target.
-		myAccel = 128;
-	}
-
-	if ( myAccel > flDist / flInterval )
-	{
-		myAccel = flDist / flInterval;
-	}
-
-	if ( myZAccel > flDist / flInterval )
-	{
-		myZAccel = flDist / flInterval;
-	}
-
-	MoveInDirection( flInterval, targetDir, myAccel, myZAccel, myDecay );
-
-	// calc relative banking targets
-	Vector forward, right, up;
-	GetVectors( &forward, &right, &up );
-
-	m_vCurrentBanking.x	= targetDir.x;
-	m_vCurrentBanking.z	= 120.0f * DotProduct( right, targetDir );
-	m_vCurrentBanking.y	= 0;
-
-	float speedPerc = SimpleSplineRemapVal( GetCurrentVelocity().Length(), 0.0f, GetMaxSpeed(), 0.0f, 1.0f );
-
-	speedPerc = clamp( speedPerc, 0.0f, 1.0f );
-
-	m_vCurrentBanking *= speedPerc;
+	// Decrease count of scanners that are on the attack
+//	CNPC_ADrone::m_nNumAttackers--;
 }
 
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : flInterval - 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::MoveToSpotlight( float flInterval )
-{
-	if ( flInterval <= 0 )
-		return;
-
-	Vector vTargetPos;
-
-	if ( HaveInspectTarget() )
-	{
-		vTargetPos = InspectTargetPosition();
-	}
-	else if ( GetEnemy() != NULL )
-	{
-		vTargetPos = GetEnemyLKP();
-	}
-	else
-	{
-		return;
-	}
-
-	//float flDesiredDist = SCANNER_SPOTLIGHT_NEAR_DIST + ( ( SCANNER_SPOTLIGHT_FAR_DIST - SCANNER_SPOTLIGHT_NEAR_DIST ) / 2 );
-	
-	float flIdealHeightDiff = SCANNER_SPOTLIGHT_NEAR_DIST;
-	if( IsEnemyPlayerInSuit() )
-	{
-		flIdealHeightDiff *= 0.5;
-	}
-
-	Vector idealPos = IdealGoalForMovement( vTargetPos, GetAbsOrigin(), GetGoalDistance(), flIdealHeightDiff );
-
-	MoveToTarget( flInterval, idealPos );
-
-	//TODO: Re-implement?
-
-	/*
-	// ------------------------------------------------
-	//  Also keep my distance from other squad members
-	//  unless I'm inspecting
-	// ------------------------------------------------
-	if (m_pSquad &&
-		gpGlobals->curtime > m_fInspectEndTime)
-	{
-		CBaseEntity*	pNearest	= m_pSquad->NearestSquadMember(this);
-		if (pNearest)
-		{
-			Vector			vNearestDir = (pNearest->GetLocalOrigin() - GetLocalOrigin());
-			if (vNearestDir.Length() < SCANNER_SQUAD_FLY_DIST) 
-			{
-				vNearestDir		= pNearest->GetLocalOrigin() - GetLocalOrigin();
-				VectorNormalize(vNearestDir);
-				vFlyDirection  -= 0.5*vNearestDir;
-			}
-		}
-	}
-
-	// ---------------------------------------------------------
-	//  Add evasion if I have taken damage recently
-	// ---------------------------------------------------------
-	if ((m_flLastDamageTime + SCANNER_EVADE_TIME) > gpGlobals->curtime)
-	{
-		vFlyDirection = vFlyDirection + VelocityToEvade(GetEnemyCombatCharacterPointer());
-	}
-	*/
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Output : float
-//-----------------------------------------------------------------------------
-float CNPC_AScanner::GetGoalDistance( void )
-{
-	if ( m_flGoalOverrideDistance != 0.0f )
-		return m_flGoalOverrideDistance;
-
-	switch ( m_nFlyMode )
-	{
-	case SCANNER_FLY_PHOTO:
-		return ( SCANNER_PHOTO_NEAR_DIST + ( ( SCANNER_PHOTO_FAR_DIST - SCANNER_PHOTO_NEAR_DIST ) / 2 ) );
-		break;
-
-	case SCANNER_FLY_SPOT:
-		{
-			float goalDist = ( SCANNER_SPOTLIGHT_NEAR_DIST + ( ( SCANNER_SPOTLIGHT_FAR_DIST - SCANNER_SPOTLIGHT_NEAR_DIST ) / 2 ) );
-			if( IsEnemyPlayerInSuit() )
-			{
-				goalDist *= 0.5;
-			}
-			return goalDist;
-		}
-		break;
-	
-	case SCANNER_FLY_FOLLOW:
-		return ( SCANNER_FOLLOW_DIST );
-		break;
-	}
-
-	return BaseClass::GetGoalDistance();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::MoveToPhotograph(float flInterval)
-{
-	if ( HaveInspectTarget() == false )
-		return;
-
-	//float flDesiredDist = SCANNER_PHOTO_NEAR_DIST + ( ( SCANNER_PHOTO_FAR_DIST - SCANNER_PHOTO_NEAR_DIST ) / 2 );
-	
-	Vector idealPos = IdealGoalForMovement( InspectTargetPosition(), GetAbsOrigin(), GetGoalDistance(), 32.0f );
-
-	MoveToTarget( flInterval, idealPos );
-
-	//FIXME: Re-implement?
-
-	/*
-	// ------------------------------------------------
-	//  Also keep my distance from other squad members
-	//  unless I'm inspecting
-	// ------------------------------------------------
-	if (m_pSquad &&
-		gpGlobals->curtime > m_fInspectEndTime)
-	{
-		CBaseEntity*	pNearest	= m_pSquad->NearestSquadMember(this);
-		if (pNearest)
-		{
-			Vector			vNearestDir = (pNearest->GetLocalOrigin() - GetLocalOrigin());
-			if (vNearestDir.Length() < SCANNER_SQUAD_FLY_DIST) 
-			{
-				vNearestDir		= pNearest->GetLocalOrigin() - GetLocalOrigin();
-				VectorNormalize(vNearestDir);
-				vFlyDirection  -= 0.5*vNearestDir;
-			}
-		}
-	}
-	*/
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose:  This is a generic function (to be implemented by sub-classes) to
-//			 handle specific interactions between different types of characters
-//			 (For example the barnacle grabbing an NPC)
-// Input  :  Constant for the type of interaction
-// Output :	 true  - if sub-class has a response for the interaction
-//			 false - if sub-class has no response
-//-----------------------------------------------------------------------------
-bool CNPC_AScanner::HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* pSourceEnt)
-{
-	//	TODO:: - doing this by just an interrupt contition would be a lot better!
-	if (interactionType ==	g_interactionScannerSupportEntity)
-	{
-		// Only accept help request if I'm not already busy
-		if (GetEnemy() == NULL && !HaveInspectTarget())
-		{
-			// Only accept if target is a reasonable distance away
-			CBaseEntity* pTarget = (CBaseEntity*)data;
-			float fTargetDist = (pTarget->GetLocalOrigin() - GetLocalOrigin()).Length();
-
-			if (fTargetDist < SCANNER_SQUAD_HELP_DIST)
-			{
-				float fInspectTime = (((CNPC_AScanner*)pSourceEnt)->m_fInspectEndTime - gpGlobals->curtime);
-				SetInspectTargetToEnt(pTarget,fInspectTime);
-
-				if (random->RandomInt(0,2)==0)
-				{
-					SetSchedule(SCHED_CSCANNER_PHOTOGRAPH_HOVER);
-				}
-				else
-				{
-					SetSchedule(SCHED_CSCANNER_SPOTLIGHT_HOVER);
-				}
-				return true;
-			}
-		}
-	}
-	else if (interactionType ==	g_interactionScannerSupportPosition)
-	{
-		// Only accept help request if I'm not already busy
-		if (GetEnemy() == NULL && !HaveInspectTarget())
-		{
-			// Only accept if target is a reasonable distance away
-			Vector vInspectPos;
-			vInspectPos.x = ((Vector *)data)->x;
-			vInspectPos.y = ((Vector *)data)->y;
-			vInspectPos.z = ((Vector *)data)->z;
-
-			float fTargetDist = (vInspectPos - GetLocalOrigin()).Length();
-
-			if (fTargetDist < SCANNER_SQUAD_HELP_DIST)
-			{
-				float fInspectTime = (((CNPC_AScanner*)pSourceEnt)->m_fInspectEndTime - gpGlobals->curtime);
-				SetInspectTargetToPos(vInspectPos,fInspectTime);
-
-				if (random->RandomInt(0,2)==0)
-				{
-					SetSchedule(SCHED_CSCANNER_PHOTOGRAPH_HOVER);
-				}
-				else
-				{
-					SetSchedule(SCHED_CSCANNER_SPOTLIGHT_HOVER);
-				}
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : &inputdata - 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputDisableSpotlight( inputdata_t &inputdata )
-{
-	m_bNoLight = true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Output : float
-//-----------------------------------------------------------------------------
-float CNPC_AScanner::GetHeadTurnRate( void ) 
-{ 
-	if ( GetEnemy() )
-		return 800.0f;
-
-	if ( HaveInspectTarget() )
-		return 500.0f;
-
-	return BaseClass::GetHeadTurnRate();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : &inputdata - 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputSetFollowTarget( inputdata_t &inputdata )
-{
-	InspectTarget( inputdata, SCANNER_FLY_FOLLOW );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : &inputdata - 
-//-----------------------------------------------------------------------------
-void CNPC_AScanner::InputClearFollowTarget( inputdata_t &inputdata )
-{
-	SetInspectTargetToEnt( NULL, 0 );
-	
-	m_nFlyMode = SCANNER_FLY_PATROL;
-}
-
-//-----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 //
 // Schedules
 //
-//-----------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
-AI_BEGIN_CUSTOM_NPC( npc_cscanner, CNPC_AScanner )
-	DECLARE_TASK(TASK_CSCANNER_SET_FLY_PHOTO)
-	DECLARE_TASK(TASK_CSCANNER_SET_FLY_SPOT)
-	DECLARE_TASK(TASK_CSCANNER_PHOTOGRAPH)
-	DECLARE_TASK(TASK_CSCANNER_ATTACK_PRE_FLASH)
-	DECLARE_TASK(TASK_CSCANNER_ATTACK_FLASH)
-	DECLARE_TASK(TASK_CSCANNER_SPOT_INSPECT_ON)
-	DECLARE_TASK(TASK_CSCANNER_SPOT_INSPECT_WAIT)
-	DECLARE_TASK(TASK_CSCANNER_SPOT_INSPECT_OFF)
-	DECLARE_TASK(TASK_CSCANNER_CLEAR_INSPECT_TARGET)
-	DECLARE_TASK(TASK_CSCANNER_GET_PATH_TO_INSPECT_TARGET)
+//=========================================================
+// > SCHED_ASCANNER_ATTACK_HOVER
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_ASCANNER_ATTACK_HOVER,
 
-	DECLARE_CONDITION(COND_CSCANNER_HAVE_INSPECT_TARGET)
-	DECLARE_CONDITION(COND_CSCANNER_INSPECT_DONE)
-	DECLARE_CONDITION(COND_CSCANNER_CAN_PHOTOGRAPH)
-	DECLARE_CONDITION(COND_CSCANNER_SPOT_ON_TARGET)
+	"	Tasks"
+	"		TASK_WAIT				5"
+	""
+	"	Interrupts"
+	"		COND_NEW_ENEMY"
+);
 
-	DECLARE_ACTIVITY(ACT_SCANNER_SMALL_FLINCH_ALERT)
-	DECLARE_ACTIVITY(ACT_SCANNER_SMALL_FLINCH_COMBAT)
-	DECLARE_ACTIVITY(ACT_SCANNER_INSPECT)
-	DECLARE_ACTIVITY(ACT_SCANNER_WALK_ALERT)
-	DECLARE_ACTIVITY(ACT_SCANNER_WALK_COMBAT)
-	DECLARE_ACTIVITY(ACT_SCANNER_FLARE)
-	DECLARE_ACTIVITY(ACT_SCANNER_RETRACT)
-	DECLARE_ACTIVITY(ACT_SCANNER_FLARE_PRONGS)
-	DECLARE_ACTIVITY(ACT_SCANNER_RETRACT_PRONGS)
-	DECLARE_ACTIVITY(ACT_SCANNER_FLARE_START)
+//=========================================================
+// > SCHED_ASCANNER_SHOOT_LASER
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_ASCANNER_SHOOT_LASER,
 
-	DECLARE_ANIMEVENT( AE_SCANNER_CLOSED )
+	"	Tasks"
+	"		TASK_LASER_WARMUP		0"
+	"		TASK_LASER_SHOOT		0"
+	""
+	"	Interrupts"
+	"		COND_ENEMY_DEAD"
+);
 
-	DECLARE_INTERACTION(g_interactionScannerInspect)
-	DECLARE_INTERACTION(g_interactionScannerInspectBegin)
-	DECLARE_INTERACTION(g_interactionScannerInspectDone)
-	DECLARE_INTERACTION(g_interactionScannerInspectHandsUp)
-	DECLARE_INTERACTION(g_interactionScannerInspectShowArmband)
-	DECLARE_INTERACTION(g_interactionScannerSupportEntity)
-	DECLARE_INTERACTION(g_interactionScannerSupportPosition)
+//=========================================================
+// > SCHED_ASCANNER_PATROL
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_ASCANNER_PATROL,
 
-	//=========================================================
-	// > SCHED_CSCANNER_PATROL
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_PATROL,
+	"	Tasks"
+	"		TASK_SET_TOLERANCE_DISTANCE		48"
+	"		TASK_SET_ROUTE_SEARCH_TIME		5"	// Spend 5 seconds trying to build a path if stuck
+	"		TASK_GET_PATH_TO_RANDOM_NODE	2000"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	""
+	"	Interrupts"
+	"		COND_GIVE_WAY"
+	"		COND_NEW_ENEMY"
+	"		COND_SEE_ENEMY"
+	"		COND_SEE_FEAR"
+	"		COND_HEAR_COMBAT"
+	"		COND_HEAR_DANGER"
+	"		COND_HEAR_PLAYER"
+	"		COND_LIGHT_DAMAGE"
+	"		COND_HEAVY_DAMAGE"
+	"		COND_PROVOKED"
+);
 
-		"	Tasks"
-		"		TASK_CSCANNER_CLEAR_INSPECT_TARGET	0"
-		"		TASK_SCANNER_SET_FLY_PATROL			0"
-		"		TASK_SET_TOLERANCE_DISTANCE			32"
-		"		TASK_SET_ROUTE_SEARCH_TIME			5"	// Spend 5 seconds trying to build a path if stuck
-		"		TASK_GET_PATH_TO_RANDOM_NODE		2000"
-		"		TASK_RUN_PATH						0"
-		"		TASK_WAIT_FOR_MOVEMENT				0"
-		""
-		"	Interrupts"
-		"		COND_GIVE_WAY"
-		"		COND_NEW_ENEMY"
-		"		COND_SEE_ENEMY"
-		"		COND_SEE_FEAR"
-		"		COND_HEAR_COMBAT"
-		"		COND_HEAR_DANGER"
-		"		COND_HEAR_PLAYER"
-		"		COND_LIGHT_DAMAGE"
-		"		COND_HEAVY_DAMAGE"
-		"		COND_PROVOKED"
-		"		COND_CSCANNER_HAVE_INSPECT_TARGET"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	//=========================================================
-	// > SCHED_CSCANNER_SPOTLIGHT_HOVER
-	//
-	// Hover above target entity, trying to get spotlight
-	// on my target
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_SPOTLIGHT_HOVER,
-
-		"	Tasks"
-		"		TASK_CSCANNER_SET_FLY_SPOT			0"
-		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_WALK  "
-		"		TASK_WAIT							1"
-		""
-		"	Interrupts"
-		"		COND_CSCANNER_SPOT_ON_TARGET"
-		"		COND_CSCANNER_INSPECT_DONE"
-		"		COND_SCANNER_FLY_BLOCKED"
-		"		COND_NEW_ENEMY"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	//=========================================================
-	// > SCHED_CSCANNER_SPOTLIGHT_INSPECT_POS
-	//
-	// Inspect a position once spotlight is on it
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_SPOTLIGHT_INSPECT_POS,
-
-		"	Tasks"
-		"		TASK_CSCANNER_SET_FLY_SPOT			0"
-		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_SCANNER_INSPECT"
-		"		TASK_SPEAK_SENTENCE					3"	// Curious sound
-		"		TASK_WAIT							5"
-		"		TASK_CSCANNER_CLEAR_INSPECT_TARGET	0"
-		""
-		"	Interrupts"
-		"		COND_CSCANNER_INSPECT_DONE"
-		"		COND_HEAR_DANGER"
-		"		COND_HEAR_COMBAT"
-		"		COND_NEW_ENEMY"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	//=========================================================
-	// > SCHED_CSCANNER_SPOTLIGHT_INSPECT_CIT
-	//
-	// Inspect a citizen once spotlight is on it
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_SPOTLIGHT_INSPECT_CIT,
-
-		"	Tasks"
-		"		TASK_CSCANNER_SET_FLY_SPOT			0"
-		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_SCANNER_INSPECT"
-		"		TASK_SPEAK_SENTENCE					0"	// Stop!
-		"		TASK_WAIT							1"
-		"		TASK_CSCANNER_SPOT_INSPECT_ON		0"
-		"		TASK_WAIT							2"
-		"		TASK_SPEAK_SENTENCE					1"	// Hands on head or Show Armband!
-		"		TASK_WAIT							1"
-		"		TASK_CSCANNER_SPOT_INSPECT_WAIT		0"
-		"		TASK_WAIT							5"
-		"		TASK_SPEAK_SENTENCE					2"	// Free to go!
-		"		TASK_WAIT							1"
-		"		TASK_CSCANNER_SPOT_INSPECT_OFF		0"
-		"		TASK_CSCANNER_CLEAR_INSPECT_TARGET	0"
-		""
-		"	Interrupts"
-		"		COND_NEW_ENEMY"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	//=========================================================
-	// > SCHED_CSCANNER_PHOTOGRAPH_HOVER
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_PHOTOGRAPH_HOVER,
-
-		"	Tasks"
-		"		TASK_CSCANNER_SET_FLY_PHOTO			0"
-		"		TASK_WAIT							2"
-		""
-		"	Interrupts"
-		"		COND_CSCANNER_INSPECT_DONE"
-		"		COND_CSCANNER_CAN_PHOTOGRAPH"
-		"		COND_SCANNER_FLY_BLOCKED"
-		"		COND_NEW_ENEMY"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	//=========================================================
-	// > SCHED_CSCANNER_PHOTOGRAPH
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_PHOTOGRAPH,
-
-		"	Tasks"
-		"		TASK_CSCANNER_SET_FLY_PHOTO			0"
-		"		TASK_CSCANNER_PHOTOGRAPH				0"
-		""
-		"	Interrupts"
-		"		COND_CSCANNER_INSPECT_DONE"
-		"		COND_NEW_ENEMY"
-		"		COND_ENEMY_DEAD"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	//=========================================================
-	// > SCHED_CSCANNER_ATTACK_FLASH
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_ATTACK_FLASH,
-
-		"	Tasks"
-		"		TASK_SCANNER_SET_FLY_ATTACK			0"
-		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
-		"		TASK_CSCANNER_ATTACK_PRE_FLASH		0"
-		"		TASK_CSCANNER_ATTACK_FLASH			0"
-		"		TASK_WAIT							0.5"
-		""
-		"	Interrupts"
-		"		COND_NEW_ENEMY"
-		"		COND_ENEMY_DEAD"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	// > SCHED_CSCANNER_ATTACK_GAS
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_ATTACK_GAS,
-
-		"	Tasks"
-		"		TASK_SCANNER_SET_FLY_ATTACK			0"
-		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
-		"		TASK_CSCANNER_ATTACK_PRE_GAS		0"
-		"		TASK_CSCANNER_ATTACK_GAS			0"
-		"		TASK_WAIT							0.5"
-		""
-		"	Interrupts"
-		"		COND_NEW_ENEMY"
-		"		COND_ENEMY_DEAD"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-
-	//=========================================================
-	// > SCHED_CSCANNER_MOVE_TO_INSPECT
-	//=========================================================
-	DEFINE_SCHEDULE
-	(
-		SCHED_CSCANNER_MOVE_TO_INSPECT,
-
-		"	Tasks"
-		"		 TASK_SET_FAIL_SCHEDULE						SCHEDULE:SCHED_SCANNER_PATROL"
-		"		 TASK_SET_TOLERANCE_DISTANCE				128"
-		"		 TASK_CSCANNER_GET_PATH_TO_INSPECT_TARGET	0"
-		"		 TASK_RUN_PATH								0"
-		"		 TASK_WAIT_FOR_MOVEMENT						0"
-		""
-		"	Interrupts"
-		"		COND_SCANNER_FLY_CLEAR"
-		"		COND_NEW_ENEMY"
-		"		COND_SCANNER_GRABBED_BY_PHYSCANNON"
-	)
-	
-AI_END_CUSTOM_NPC()
-
-//-----------------------------------------------------------------------------
-// Claw Scanner
+//=========================================================
+// > SCHED_ASCANNER_CHASE_ENEMY
 //
-// Scanner that always spawns as a claw scanner
-//-----------------------------------------------------------------------------
-	
-class CNPC_ClawScanner : public CNPC_AScanner
-{
-DECLARE_CLASS( CNPC_ClawScanner, CNPC_AScanner );
+//  Different interrupts than normal chase enemy.  
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_ASCANNER_CHASE_ENEMY,
 
-public:
-	CNPC_ClawScanner();
-	DECLARE_DATADESC();
-};
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_ASCANNER_PATROL"
+	"		TASK_SET_TOLERANCE_DISTANCE			120"
+	"		TASK_GET_PATH_TO_ENEMY				0"
+	"		TASK_RUN_PATH						0"
+	"		TASK_WAIT_FOR_MOVEMENT				0"
+	""
+	"	Interrupts"
+	"		COND_ENEMY_DEAD"
+//	"		COND_CAN_RANGE_ATTACK1"
+);
 
-BEGIN_DATADESC( CNPC_ClawScanner )
-END_DATADESC()
+//=========================================================
+// > SCHED_ASCANNER_GET_HELP
+//
+// Fly towards nearest hint OR ally
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_ASCANNER_GET_HELP,
 
-
-LINK_ENTITY_TO_CLASS(npc_clawscanner, CNPC_ClawScanner);
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-CNPC_ClawScanner::CNPC_ClawScanner()
-{
-	// override our superclass's setting
-	BecomeClawScanner();
-}
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_ASCANNER_GET_HELP"
+	"		TASK_WAIT_PVS					0"
+	"		TASK_FIND_HINTNODE				0"
+	"		TASK_GET_PATH_TO_HINTNODE		0"
+	"		TASK_SET_TOLERANCE_DISTANCE		0"
+	"		TASK_RAISE_ANTENNA				0"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_STOP_MOVING				0"
+	""
+	"	Interrupts"
+	"		COND_ENEMY_DEAD"
+);

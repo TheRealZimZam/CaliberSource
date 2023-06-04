@@ -573,12 +573,14 @@ void CPropCombineBall::InputSocketed( inputdata_t &inputdata )
 		SetOwnerEntity( NULL );
 	}
 
+#if 0
 	// if our owner is a player, tell them we were socketed
 	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>( pOwner );
 	if ( pPlayer )
 	{
 		pPlayer->CombineBallSocketed( this );
 	}
+#endif
 
 	UTIL_Remove( this );
 
@@ -1127,7 +1129,7 @@ void CPropCombineBall::DoExplosion( )
 
 	m_bEmit = false;
 
-	
+#if 0	//HL2_EPISODIC
 	if( !m_bStruckEntity && hl2_episodic.GetBool() && GetOwnerEntity() != NULL )
 	{
 		// Notify the player proxy that this combine ball missed so that it can fire an output.
@@ -1137,6 +1139,7 @@ void CPropCombineBall::DoExplosion( )
 			pPlayer->MissedAR2AltFire();
 		}
 	}
+#endif
 
 	SetContextThink( &CPropCombineBall::SUB_Remove, gpGlobals->curtime + 0.5f, s_pRemoveContext );
 	StopLoopingSounds();

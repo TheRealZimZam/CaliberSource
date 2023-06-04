@@ -394,7 +394,7 @@ void CNPC_BaseScanner::StartTask( const Task_t *pTask )
 //------------------------------------------------------------------------------
 // Purpose: Override to split in two when attacked
 //------------------------------------------------------------------------------
-int CNPC_BaseScanner::OnTakeDamage_Alive( const CTakeDamageInfo &info )
+int CNPC_BaseScanner::OnTakeDamage( const CTakeDamageInfo &info )
 {
 	// Start smoking when we're nearly dead
 	if ( m_iHealth < ( m_iMaxHealth - ( m_iMaxHealth / 4 ) ) )
@@ -403,7 +403,18 @@ int CNPC_BaseScanner::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		UTIL_Smoke( info.GetDamagePosition(), random->RandomInt( 10, 15 ), 10 );
 	}
 
-	return (BaseClass::OnTakeDamage_Alive( info ));
+	// Poison, nervegas, etc. dont do anything to me
+	CTakeDamageInfo newInfo = info;
+	if ( info.GetDamageType() & (DMG_TIMEBASED) )
+	{
+		newInfo.ScaleDamage( 0 );
+	}
+	else if ( info.GetDamageType() & (DMG_SONIC|DMG_ENERGYBEAM) )
+	{
+		newInfo.ScaleDamage( 1.5 );
+	}
+
+	return (BaseClass::OnTakeDamage( newInfo ));
 }
 
 //------------------------------------------------------------------------------
@@ -447,7 +458,7 @@ float CNPC_BaseScanner::GetHitgroupDamageMultiplier( int iHitGroup, const CTakeD
 	case HITGROUP_RIGHTARM:
 	case HITGROUP_LEFTLEG:
 	case HITGROUP_RIGHTLEG:
-		if ( info.GetDamageType() & (DMG_BULLET | DMG_SLASH) )
+		if ( info.GetDamageType() & (DMG_BULLET|DMG_SLASH) )
 		{
 			return sk_scanner_dmg_deflect.GetFloat();
 		}
@@ -1749,7 +1760,11 @@ void CNPC_BaseScanner::IdleSound(void)
 //-----------------------------------------------------------------------------
 void CNPC_BaseScanner::PainSound( const CTakeDamageInfo &info )
 {
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
+
 	ScannerEmitSound( "Pain" );
+	m_flNextPainSoundTime = gpGlobals->curtime + 1;
 }
 
 //-----------------------------------------------------------------------------

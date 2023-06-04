@@ -1306,7 +1306,11 @@ void CNPC_Crow::PainSound( const CTakeDamageInfo &info )
 	if ( m_iBirdType != BIRDTYPE_CROW )
 		 return;
 
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
+
 	EmitSound( "NPC_Crow.Pain" );
+	m_flNextPainSoundTime = gpGlobals->curtime + 1;
 }
 
 

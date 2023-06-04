@@ -1,8 +1,17 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:	Player for HL2.
-// TODO's: Sprinting reduces received accuracy, critical damage state
-//
+// Purpose:	Player for HL2SP/Caliber
+// TODO's: Commander mode fx, red for attack orders, yellow for follow, green for defend
+/*
+	CEffectData data;
+
+	data.m_vOrigin = GetAbsOrigin();
+	data.m_vNormal = vec3_origin;
+	data.m_vAngles = vec3_angle;
+	data.m_nColor = COMMAND_POINT_RED;
+
+	DispatchEffect( "CommandPointer", data );
+*/
 //=============================================================================//
 
 #include "cbase.h"
@@ -41,12 +50,12 @@
 #include "entitylist.h"
 #include "env_zoom.h"
 #include "hl2_gamerules.h"
-#include "prop_combine_ball.h"
 #include "datacache/imdlcache.h"
 #include "eventqueue.h"
 #include "GameStats.h"
 #include "filters.h"
 #include "tier0/icommandline.h"
+#include "team.h"
 
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
@@ -75,26 +84,28 @@ ConVar hl2_single_primary_weapon_mode( "hl2_single_primary_weapon_mode", "0" );
 // 1-weapon limit for each slot -- FIXME; Grenades/anything in bucket 5 shouldnt count
 ConVar hl2_single_weapon_slot( "hl2_single_weapon_slot", "0" );
 
+#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
+
+//-------------------------
+//NOTE; Right now, playertalk just plays sentences like its hl1 - however, since we changed our inheritance
+// to basemultiplayer, the response system can now be used - if its ever done properly it should definitely
+// be done through that system - its a whole lot more powerful.
+ConVar hl2_playertalk( "hl2_playertalk", "0", FCVAR_ARCHIVE, "Enable Dick Kickem Mode (requires map restart)" );
+#define PLAYER_TALK_DELAY				random->RandomFloat( 5.0, 15.0 )
+//-------------------------
+
 #define TIME_IGNORE_FALL_DAMAGE 10.0
 
 extern int gEvilImpulse101;
 
 ConVar sv_autojump( "sv_autojump", "0" );
 
-ConVar hl2_walkspeed( "player_walkspeed", "120" );
-ConVar hl2_jogspeed( "player_jogspeed", "170" );
-ConVar hl2_runspeed( "player_runspeed", "240" );
-ConVar hl2_sprintspeed( "player_sprintspeed", "300" );
+ConVar hl2_walkspeed( "player_walkspeed", "120", FCVAR_REPLICATED );
+ConVar hl2_jogspeed( "player_jogspeed", "170", FCVAR_REPLICATED );
+ConVar hl2_runspeed( "player_runspeed", "240", FCVAR_REPLICATED );
+ConVar hl2_sprintspeed( "player_sprintspeed", "300", FCVAR_REPLICATED );
 
 ConVar hl2_darkness_flashlight_factor( "hl2_darkness_flashlight_factor", "1" );
-
-#define	HL2MP_WALK_SPEED 100
-#define	HL2MP_JOG_SPEED 140
-#define	HL2MP_RUN_SPEED 200
-#define	HL2MP_SPRINT_SPEED 320
-#define	HL2MP_ACCELERATION 1
-#define	HL2MP_DECELERATION 1
-#define SINGLEPLAYER_ANIMSTATE 1
 
 #define	HL2_WALK_SPEED hl2_walkspeed.GetFloat()
 #define	HL2_JOG_SPEED hl2_jogspeed.GetFloat()
@@ -102,7 +113,6 @@ ConVar hl2_darkness_flashlight_factor( "hl2_darkness_flashlight_factor", "1" );
 #define	HL2_SPRINT_SPEED hl2_sprintspeed.GetFloat()
 #define	HL2_ACCELERATION 1
 #define	HL2_DECELERATION 1
-
 
 ConVar player_showpredictedposition( "player_showpredictedposition", "0" );
 ConVar player_showpredictedposition_timestep( "player_showpredictedposition_timestep", "1.0" );
@@ -122,6 +132,53 @@ ConVar hl2_flashlight_charge_time( "hl2_flashlight_charge_time", "50" );	// 100 
 #define	FLASH_DRAIN_TIME	 hl2_flashlight_drain_time.GetFloat()
 #define	FLASH_CHARGE_TIME	 hl2_flashlight_charge_time.GetFloat()
 
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+class CTEPlayerAnimEvent : public CBaseTempEntity
+{
+public:
+	DECLARE_CLASS( CTEPlayerAnimEvent, CBaseTempEntity );
+	DECLARE_SERVERCLASS();
+
+					CTEPlayerAnimEvent( const char *name ) : CBaseTempEntity( name )
+					{
+					}
+
+	CNetworkHandle( CBasePlayer, m_hPlayer );
+	CNetworkVar( int, m_iEvent );
+	CNetworkVar( int, m_nData );
+};
+
+IMPLEMENT_SERVERCLASS_ST_NOBASE( CTEPlayerAnimEvent, DT_TEPlayerAnimEvent )
+	SendPropEHandle( SENDINFO( m_hPlayer ) ),
+	SendPropInt( SENDINFO( m_iEvent ), Q_log2( PLAYERANIM_COUNT ) + 1, SPROP_UNSIGNED ),
+	SendPropInt( SENDINFO( m_nData ), 32 )
+END_SEND_TABLE()
+
+static CTEPlayerAnimEvent g_TEPlayerAnimEvent( "PlayerAnimEvent" );
+
+void TE_PlayerAnimEvent( CBasePlayer *pPlayer, int nPlayerAnimEvent, int nData )
+{
+	CPVSFilter filter( pPlayer->EyePosition() );
+	
+	// The player himself doesn't need to be sent his animation events 
+	// unless cs_showanimstate wants to show them.
+#if 0
+	if ( /*!ToolsEnabled() &&*/ ( cl_showanimstate.GetInt() == pPlayer->entindex() ) )
+	{
+		filter.RemoveRecipient( pPlayer );
+	}
+#endif
+
+	g_TEPlayerAnimEvent.m_hPlayer = pPlayer;
+	g_TEPlayerAnimEvent.m_iEvent = nPlayerAnimEvent;
+	g_TEPlayerAnimEvent.m_nData = nData;
+	g_TEPlayerAnimEvent.Create( filter, 0 );
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 //==============================================================================================
 // CAPPED PLAYER PHYSICS DAMAGE TABLE
@@ -187,45 +244,6 @@ bool Flashlight_UseLegacyVersion( void )
 	// Return the results
 	return g_bUseLegacyFlashlight;
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: Used to relay outputs/inputs from the player to the world and viceversa
-//-----------------------------------------------------------------------------
-class CLogicPlayerProxy : public CLogicalEntity
-{
-	DECLARE_CLASS( CLogicPlayerProxy, CLogicalEntity );
-
-private:
-
-	DECLARE_DATADESC();
-
-public:
-
-	COutputEvent m_OnFlashlightOn;
-	COutputEvent m_OnFlashlightOff;
-	COutputEvent m_PlayerHasAmmo;
-	COutputEvent m_PlayerHasNoAmmo;
-	COutputEvent m_PlayerDied;
-	COutputEvent m_PlayerMissedAR2AltFire; // Player fired a combine ball which did not dissolve any enemies. 
-
-	COutputInt m_RequestedPlayerHealth;
-
-	void InputRequestPlayerHealth( inputdata_t &inputdata );
-	void InputSetFlashlightSlowDrain( inputdata_t &inputdata );
-	void InputSetFlashlightNormalDrain( inputdata_t &inputdata );
-	void InputSetPlayerHealth( inputdata_t &inputdata );
-	void InputRequestAmmoState( inputdata_t &inputdata );
-	void InputLowerWeapon( inputdata_t &inputdata );
-	void InputEnableCappedPhysicsDamage( inputdata_t &inputdata );
-	void InputDisableCappedPhysicsDamage( inputdata_t &inputdata );
-	void InputSetLocatorTargetEntity( inputdata_t &inputdata );
-
-	void Activate ( void );
-
-	bool PassesDamageFilter( const CTakeDamageInfo &info );
-
-	EHANDLE m_hPlayer;
-};
 
 
 //------------------------------------------------------------------------------
@@ -361,6 +379,7 @@ BEGIN_DATADESC( CHL2_Player )
 //!	DEFINE_FIELD( m_bHasLongJump, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_flAdmireGlovesAnimTime, FIELD_TIME ),
+	DEFINE_FIELD( m_flNextPlayerTalk, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextFlashlightCheckTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flFlashlightPowerDrainScale, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bFlashlightDisabled, FIELD_BOOLEAN ),
@@ -395,24 +414,42 @@ BEGIN_DATADESC( CHL2_Player )
 
 END_DATADESC()
 
+int gPrecachedSpeech = 0;
+
+void cc_CreatePredictionError_f()
+{
+	CBaseEntity *pEnt = CBaseEntity::Instance( 1 );
+	pEnt->SetAbsOrigin( pEnt->GetAbsOrigin() + Vector( 63, 0, 0 ) );
+}
+
+ConCommand cc_CreatePredictionError( "CreatePredictionError", cc_CreatePredictionError_f, "Create a prediction error", FCVAR_CHEAT );
+
+static const char * s_szModelPath = "models/player/";
+
 CHL2_Player::CHL2_Player()
 {
-#ifdef SINGLEPLAYER_ANIMSTATE
-// Base animstate
+#if SINGLEPLAYER_ANIMSTATE
+	// SP animstate
+	UseClientSideAnimation();
 	m_PlayerAnimState = CreatePlayerAnimState( this );
 #else
-	// Setup the movement data.
-	MultiPlayerMovementData_t movementData;
-	movementData.m_flBodyYawRate = 720.0f;
-	movementData.m_flRunSpeed = HL2MP_RUN_SPEED;
-	movementData.m_flWalkSpeed = HL2MP_WALK_SPEED;
-	movementData.m_flSprintSpeed = -1.0f;
+	// FIXME; MP state is extremely broken and WIP, rn it just crashes anyway
+	// Probably not going to spend time fixing because the few additional
+	// features arent really worth it - we only need animations so the player
+	// can admire himself in the mirror anyway.
+/*
+		UseClientSideAnimation();
+		// Setup the movement data.
+		MultiPlayerMovementData_t movementData;
+		movementData.m_flRunSpeed = HL2_RUN_SPEED;
+		movementData.m_flWalkSpeed = HL2_WALK_SPEED;
+		movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
 
-	// Create animation state for this player.
-	CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
-	m_PlayerAnimState->Init( this, movementData );
+		// Create animation state for this player.
+		CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
+		m_PlayerAnimState->Init( this, movementData );
+*/
 #endif
-	UseClientSideAnimation();
 	m_angEyeAngles.Init();
 
 	m_nNumMissPositions	= 0;
@@ -421,6 +458,11 @@ CHL2_Player::CHL2_Player()
 
 	m_flArmorReductionTime = 0.0f;
 	m_iArmorReductionFrom = 0;
+
+	m_iSpawnInterpCounter = 0;	
+	m_flNextModelChangeTime = 0;
+	m_flNextTeamChangeTime = 0;
+	BaseClass::ChangeTeam( 0 );
 }
 
 //
@@ -452,6 +494,8 @@ IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
 	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
 	
+	SendPropInt( SENDINFO( m_iSpawnInterpCounter), 4 ),
+	
 	SendPropExclude( "DT_BaseAnimating", "m_flPlaybackRate" ),
 END_SEND_TABLE()
 
@@ -473,6 +517,11 @@ void CHL2_Player::Precache( void )
 	PrecacheScriptSound( "HL2Player.TrainUse" );
 	PrecacheScriptSound( "HL2Player.Use" );
 	PrecacheScriptSound( "HL2Player.BurnPain" );
+	if ( hl2_playertalk.GetBool() )
+	{
+		enginesound->PrecacheSentenceGroup( "PLAYER" );
+		gPrecachedSpeech = 1;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -949,14 +998,61 @@ void CHL2_Player::PostThink( void )
 	{
 		 HandleAdmireGlovesAnimation();
 	}
-	
-	QAngle angles = GetLocalAngles();
-	angles[PITCH] = 0;
-	SetLocalAngles( angles );
-	
+
 	// Store the eye angles pitch so the client can compute its animation state correctly.
 	m_angEyeAngles = EyeAngles();
-	m_PlayerAnimState->Update( m_angEyeAngles[YAW], m_angEyeAngles[PITCH] );
+
+	if ( m_PlayerAnimState )
+	{
+		m_PlayerAnimState->Update( m_angEyeAngles[YAW], m_angEyeAngles[PITCH] );
+	}
+	// Dont even bother compiling this if we're using a animstate
+#ifndef SINGLEPLAYER_ANIMSTATE
+	else
+	{
+		// Rudimentary pitch/yaw
+		// NOTE; This way is expensive, but since we have changable playermodels we need to check it
+		// every time, trying to set a parameter on a non-supported model prints errors out the wazoo
+		// Since its (presumably) only one entity calling this every frame it shouldnt hit perf
+		// too badly.
+		//
+		// TODO; Will be improved if needed, but by the time mp is functional the animstate should
+		// be up to snuff anyway
+		if ( LookupPoseParameter( GetModelPtr(), "aim_pitch" ) )
+			SetPoseParameter( GetModelPtr(), "aim_pitch", AngleNormalize(m_angEyeAngles[PITCH]) );
+
+		if ( LookupPoseParameter( GetModelPtr(), "move_yaw" ) )
+		{
+			// Copied from animstate
+			// view direction relative to movement
+			float ang = AngleNormalize(m_angEyeAngles[YAW]);
+			if ( ang > 180.0f )
+				ang -= 360.0f;
+			else if ( ang < -180.0f )
+				ang += 360.0f;
+
+			// calc side to side turning
+			Vector est_velocity = GetAbsVelocity();
+			float flGaitYaw;
+			flGaitYaw = atan2( est_velocity[1], est_velocity[0] );
+			flGaitYaw = RAD2DEG( flGaitYaw );
+			flGaitYaw = AngleNormalize( flGaitYaw );
+
+			float flYaw;
+			flYaw = ang - flGaitYaw;
+			// Invert for mapping into 8way blend
+			flYaw = -flYaw;
+			flYaw = flYaw - (int)(flYaw / 360) * 360;
+
+			if (flYaw < -180)
+				flYaw = flYaw + 360;
+			else if (flYaw > 180)
+				flYaw = flYaw - 360;
+
+			SetPoseParameter( GetModelPtr(), "move_yaw", flYaw );
+		}
+	}
+#endif
 }
 
 void CHL2_Player::StartAdmireGlovesAnimation( void )
@@ -1163,9 +1259,15 @@ void CHL2_Player::PlayerRunCommand(CUserCmd *ucmd, IMoveHelper *moveHelper)
 //-----------------------------------------------------------------------------
 void CHL2_Player::Spawn(void)
 {
-#ifndef HL2MP
-	SetModel( PLAYER_MODEL );
+#ifndef HL2_DLL
+	// if no model, force one
+	if ( !GetModelPtr() )
+		SetModel( PLAYER_MODEL );
+#else
+	SetPlayerModel();
 #endif
+	m_flNextModelChangeTime = 0;
+	m_flNextTeamChangeTime = 0;
 
 	BaseClass::Spawn();
 
@@ -1179,8 +1281,9 @@ void CHL2_Player::Spawn(void)
 
 	SuitPower_SetCharge( 100 );
 
+#ifndef HL2_EPISODIC
 	m_Local.m_iHideHUD |= HIDEHUD_CHAT;
-
+#endif
 	m_pPlayerAISquad = g_AI_SquadManager.FindCreateSquad(AllocPooledString(PLAYER_SQUADNAME));
 
 	// Setup our flashlight values
@@ -1191,6 +1294,11 @@ void CHL2_Player::Spawn(void)
 	GetPlayerProxy();
 
 	SetFlashlightPowerDrainScale( 1.0f );
+
+	m_flNextPlayerTalk = gpGlobals->curtime;
+	m_iSpawnInterpCounter = (m_iSpawnInterpCounter + 1) % 8;
+
+	DoAnimationEvent( PLAYER_SPAWN );
 }
 
 //-----------------------------------------------------------------------------
@@ -1205,49 +1313,36 @@ void CHL2_Player::UpdateLocatorPosition( const Vector &vecPosition )
 //-----------------------------------------------------------------------------
 // Purpose: Set the activity based on an event or current state
 //-----------------------------------------------------------------------------
+void CHL2_Player::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
+{
+	if ( m_PlayerAnimState )
+	{
+		m_PlayerAnimState->DoAnimationEvent( PlayerAnimEvent_t, nData );
+		TE_PlayerAnimEvent( this, PlayerAnimEvent_t, nData );	// Send to any clients who can see this guy.
+	}
+}
+
 void CHL2_Player::SetAnimation( PLAYER_ANIM playerAnim )
 {
-//! Are all TODO's
-	switch ( playerAnim )
+	// Use the old system to get dead anims
+	if ( m_PlayerAnimState == NULL )
 	{
-		case PLAYER_JUMP:
+		switch (playerAnim) 
 		{
-//!			DoAnimationEvent( PLAYERANIMEVENT_JUMP );
+			case PLAYER_ATTACK1:
+				RestartGesture( Weapon_TranslateActivity( ACT_RANGE_ATTACK1 ) );
+			break;
+
+			case PLAYER_RELOAD:
+				RestartGesture( Weapon_TranslateActivity( ACT_RELOAD ) );
 			break;
 		}
-		case PLAYER_SUPERJUMP:
-		{
-//!			DoAnimationEvent( PLAYERANIMEVENT_DOUBLEJUMP );
-			break;
-		}
-		case PLAYER_DIE:
-		{
-			if ( m_lifeState == LIFE_ALIVE )
-			{
-//!				DoAnimationEvent( PLAYERANIMEVENT_DIE );
-			}
-			break;
-		}
-		case PLAYER_ATTACK1:
-		{
-			RestartGesture( Weapon_TranslateActivity( ACT_GESTURE_RANGE_ATTACK1 ));
-//!			DoAnimationEvent( PLAYERANIMEVENT_PRIMARY_ATTACK );
-			break;
-		}
-		case PLAYER_RELOAD:
-		{
-			RestartGesture( Weapon_TranslateActivity( ACT_GESTURE_RELOAD ));
-//!			DoAnimationEvent( PLAYERANIMEVENT_RELOAD );
-			break;
-		}
+
+		BaseClass::SetAnimation( playerAnim );
+		return;
 	}
 
-#if 0
-	if ( !m_PlayerAnimState )
-	{
-		BaseClass::SetAnimation( playerAnim );
-	}
-#endif
+	DoAnimationEvent( playerAnim );
 }
 
 //-----------------------------------------------------------------------------
@@ -2151,10 +2246,6 @@ void CHL2_Player::FlashlightTurnOn( void )
 		if( !SuitPower_AddDevice( SuitDeviceFlashlight ) )
 			return;
 	}
-#if 0
-	if( !IsSuitEquipped() && !Weapon_OwnsThisType( "weapon_flashlight" ) )
-		return;
-#endif	//HL2_DLL
 
 	AddEffects( EF_DIMLIGHT );
 	EmitSound( "HL2Player.FlashLightOn" );
@@ -2544,6 +2635,7 @@ bool CHL2_Player::ShouldShootMissTarget( CBaseCombatCharacter *pAttacker )
 // Purpose: Notifies Alyx that player has put a combine ball into a socket so she can comment on it.
 // Input  : pCombineBall - ball the was socketed
 //-----------------------------------------------------------------------------
+#if 0
 void CHL2_Player::CombineBallSocketed( CPropCombineBall *pCombineBall )
 {
 #ifdef HL2_EPISODIC
@@ -2554,6 +2646,7 @@ void CHL2_Player::CombineBallSocketed( CPropCombineBall *pCombineBall )
 	}
 #endif
 }
+#endif
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -2562,9 +2655,7 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 	BaseClass::Event_KilledOther( pVictim, info );
 
 #ifdef HL2_EPISODIC
-
 	CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
-
 	for ( int i = 0; i < g_AI_Manager.NumAIs(); i++ )
 	{
 		if ( ppAIs[i] && ppAIs[i]->IRelationType(this) == D_LI )
@@ -2572,7 +2663,73 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 			ppAIs[i]->OnPlayerKilledOther( pVictim, info );
 		}
 	}
+#endif
 
+// Playertalk prototype
+#if 1
+	if ( hl2_playertalk.GetBool() )
+	{
+		if ( !gPrecachedSpeech )
+		{
+			Msg( "You must now restart to use dick-kickem mode.\n");
+		}
+		else
+		{
+			#define PLAYER_BRAG_CHANCE	65
+			if ( random->RandomInt(0, 100) < PLAYER_BRAG_CHANCE )
+			{
+				#define	PLAYER_SENTENCE_VOLUME			1.0
+				#define PLAYER_ATTN						SNDLVL_TALKING
+				#define PLAYER_PITCH					100
+				const char *pSentenceName = "PLAYER_FRAG";
+				switch ( info.GetDamageType() )
+				{
+					case DMG_BUCKSHOT:
+						pSentenceName = "PLAYER_FRAG_SHOTGUN";
+						break;
+
+					case DMG_BURN:
+					case DMG_PLASMA:
+						pSentenceName = "PLAYER_FRAG_BURN";
+						if ( pVictim->Classify() == CLASS_ZOMBIE )
+							pSentenceName = "PLAYER_FRAG_BURN_ZOMBIE";
+						break;
+
+					case DMG_BLAST:
+					case DMG_ALWAYSGIB:
+						pSentenceName = "PLAYER_FRAG_EXPLOSIVE";
+						break;
+
+					case DMG_CLUB:
+					case DMG_SLASH:
+						pSentenceName = "PLAYER_FRAG_MELEE";
+						break;
+
+					case DMG_SNIPER:
+						pSentenceName = "PLAYER_FRAG_SNIPER";
+						break;
+				}
+
+				if(info.GetDamageType() & DMG_BULLET)
+				{
+					CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>(GetActiveWeapon());
+					if( FClassnameIs( pWeapon, "weapon_sniperrifle" ))
+						pSentenceName = "PLAYER_FRAG_SNIPER";
+					else if( FClassnameIs( pWeapon, "weapon_shotgun" ))
+						pSentenceName = "PLAYER_FRAG_SHOTGUN";
+				}
+
+				//TODO; Dominations
+
+				//Send it
+				if( m_flNextPlayerTalk <= gpGlobals->curtime )
+				{
+					m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
+					SENTENCEG_PlayRndSz( edict(), pSentenceName, PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
+				}
+			}
+		}
+	}
 #endif
 }
 
@@ -2580,6 +2737,13 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 //-----------------------------------------------------------------------------
 void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 {
+	// Dead SP players use the old system for death
+	if ( m_PlayerAnimState )
+	{
+		m_PlayerAnimState->Release();
+		m_PlayerAnimState = NULL;
+	}
+
 	BaseClass::Event_Killed( info );
 
 	FirePlayerProxyOutput( "PlayerDied", variant_t(), this, this );
@@ -2934,6 +3098,39 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 		}
 	}
 
+	if ( FStrEq( args[0], "spectate" ) )
+	{
+		if ( ShouldRunRateLimitedCommand( args ) )
+		{
+			// instantly join spectators
+			HandleCommand_JoinTeam( TEAM_SPECTATOR );	
+		}
+		return true;
+	}
+	else if ( FStrEq( args[0], "jointeam" ) ) 
+	{
+		if ( args.ArgC() < 2 )
+		{
+			Warning( "Player sent bad jointeam syntax\n" );
+		}
+
+		if ( ShouldRunRateLimitedCommand( args ) )
+		{
+			int iTeam = atoi( args[1] );
+			HandleCommand_JoinTeam( iTeam );
+		}
+		return true;
+	}
+
+	if ( FStrEq( args[0], "refreshplayermodel" ) )
+	{
+		if ( ShouldRunRateLimitedCommand( args ) )
+		{
+			SetPlayerModel();
+		}
+		return true;
+	}
+
 	if ( !Q_stricmp( args[0], "emit" ) )
 	{
 		CSingleUserRecipientFilter filter( this );
@@ -2949,6 +3146,49 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	}
 
 	return BaseClass::ClientCommand( args );
+}
+
+extern ConVar mp_allowspectators;
+bool CHL2_Player::HandleCommand_JoinTeam( int team )
+{
+	if ( !GetGlobalTeam( team ) || team == 0 )
+	{
+		Warning( "HandleCommand_JoinTeam( %d ) - invalid team index.\n", team );
+		return false;
+	}
+
+	if ( team == TEAM_SPECTATOR )
+	{
+		// Prevent this is the cvar is set
+		if ( !mp_allowspectators.GetInt() )
+		{
+			ClientPrint( this, HUD_PRINTCENTER, "#Cannot_Be_Spectator" );
+			return false;
+		}
+
+		if ( GetTeamNumber() != TEAM_UNASSIGNED && !IsDead() )
+		{
+			m_fNextSuicideTime = gpGlobals->curtime;	// allow the suicide to work
+
+			CommitSuicide();
+
+			// add 1 to frags to balance out the 1 subtracted for killing yourself
+			IncrementFragCount( 1 );
+		}
+
+		ChangeTeam( TEAM_SPECTATOR );
+
+		return true;
+	}
+	else
+	{
+		StopObserverMode();
+	}
+
+	// Switch their actual team...
+	ChangeTeam( team );
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -3019,9 +3259,10 @@ void CHL2_Player::PlayerUse( void )
 		{
 			// Robin: Don't play sounds for NPCs, because NPCs will allow respond with speech.
 			if ( !pUseEntity->MyNPCPointer() )
-			{
 				EmitSound( "HL2Player.Use" );
-			}
+			//TEST
+//			else
+//				SENTENCEG_PlayRndSz( edict(), "PLAYER_USE_NPC", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
 		}
 
 		if ( ( (m_nButtons & IN_USE) && (caps & FCAP_CONTINUOUS_USE) ) ||
@@ -3070,10 +3311,7 @@ void CHL2_Player::PlayerUse( void )
 	}
 	else if ( m_afButtonPressed & IN_USE )
 	{
-		// Signal that we want to play the deny sound, unless the user is +USEing on a ladder!
-		// The sound is emitted in ItemPostFrame, since that occurs after GameMovement::ProcessMove which
-		// lets the ladder code unset this flag.
-		m_bPlayUseDenySound = true;
+		EmitSound( "HL2Player.UseDeny" );
 	}
 
 	// Debounce the use key
@@ -3081,6 +3319,17 @@ void CHL2_Player::PlayerUse( void )
 	{
 		m_Local.m_nOldButtons |= IN_USE;
 		m_afButtonPressed &= ~IN_USE;
+
+		//CBaseViewModel *vm = GetViewModel( 0 );
+		CBaseCombatWeapon *vm = dynamic_cast<CBaseCombatWeapon *>(GetActiveWeapon());
+		if ( vm )
+		{
+			if ( vm->SelectWeightedSequence( ACT_VM_USE ) >= 0 )
+			{
+				ShowViewModel( true );
+				vm->SendViewModelAnim( ACT_VM_USE );
+			}
+		}
 	}
 }
 
@@ -3091,6 +3340,7 @@ ConVar	sv_show_crosshair_target( "sv_show_crosshair_target", "0" );
 //-----------------------------------------------------------------------------
 void CHL2_Player::UpdateWeaponPosture( void )
 {
+//FIXME: Reimplement this when movements blends are working again
 #if 0
 	//Setup our viewmodel's movement speed
 	CBaseViewModel *pVM = GetViewModel();
@@ -3108,11 +3358,11 @@ void CHL2_Player::UpdateWeaponPosture( void )
 
 	if ( pWeapon && m_LowerWeaponTimer.Expired() && pWeapon->CanLower() )
 	{
-		m_LowerWeaponTimer.Set( .3 );
+		m_LowerWeaponTimer.Set( .6 );
 		VPROF( "CHL2_Player::UpdateWeaponPosture-CheckLower" );
 		Vector vecAim = BaseClass::GetAutoaimVector( AUTOAIM_SCALE_DIRECT_ONLY );
 
-		const float CHECK_FRIENDLY_RANGE = 50 * 12;
+		const float CHECK_FRIENDLY_RANGE = 600;
 		trace_t	tr;
 		UTIL_TraceLine( EyePosition(), EyePosition() + vecAim * CHECK_FRIENDLY_RANGE, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
 
@@ -3171,16 +3421,15 @@ void CHL2_Player::UpdateWeaponPosture( void )
 
 					return;
 				}
-//				else if ( dis == D_HT )
-//				{
-//					if ( Weapon_Ready() == false )
-//					{
-//						//FIXME: We couldn't raise our weapon!
-//					}
-//				}
+				else if ( dis == D_HT )
+				{
+					if ( Weapon_Ready() == false )
+					{
+						//FIXME: We couldn't raise our weapon!
+					}
+				}
 			}
 		}
-
 		if ( Weapon_Ready() == false )
 		{
 			//FIXME: We couldn't raise our weapon!
@@ -3561,7 +3810,7 @@ WeaponProficiency_t CHL2_Player::CalcWeaponProficiency( CBaseCombatWeapon *pWeap
 //-----------------------------------------------------------------------------
 // Purpose: override how single player rays hit the player
 //-----------------------------------------------------------------------------
-
+#if 0
 bool LineCircleIntersection(
 	const Vector2D &center,
 	const float radius,
@@ -3694,8 +3943,9 @@ bool IntersectRayWithAACylinder( const Ray_t &ray,
 
 	return true;
 }
+#endif
 
-
+/*
 bool CHL2_Player::TestHitboxes( const Ray_t &ray, unsigned int fContentsMask, trace_t& tr )
 {
 	if( g_pGameRules->IsMultiplayer() )
@@ -3732,6 +3982,7 @@ bool CHL2_Player::TestHitboxes( const Ray_t &ray, unsigned int fContentsMask, tr
 		return true;
 	}
 }
+*/
 
 //---------------------------------------------------------
 // Show the player's scaled down bbox that we use for
@@ -3788,27 +4039,6 @@ surfacedata_t *CHL2_Player::GetLadderSurface( const Vector &origin )
 	return BaseClass::GetLadderSurface(origin);
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: Queues up a use deny sound, played in ItemPostFrame.
-//-----------------------------------------------------------------------------
-void CHL2_Player::PlayUseDenySound()
-{
-	m_bPlayUseDenySound = true;
-}
-
-
-void CHL2_Player::ItemPostFrame()
-{
-	BaseClass::ItemPostFrame();
-
-	if ( m_bPlayUseDenySound )
-	{
-		m_bPlayUseDenySound = false;
-		EmitSound( "HL2Player.UseDeny" );
-	}
-}
-
-
 void CHL2_Player::StartWaterDeathSounds( void )
 {
 	CPASAttenuationFilter filter( this );
@@ -3852,6 +4082,7 @@ void CHL2_Player::StopWaterDeathSounds( void )
 //-----------------------------------------------------------------------------
 // 
 //-----------------------------------------------------------------------------
+#if 0
 void CHL2_Player::MissedAR2AltFire()
 {
 	if( GetPlayerProxy() != NULL )
@@ -3859,6 +4090,7 @@ void CHL2_Player::MissedAR2AltFire()
 		GetPlayerProxy()->m_PlayerMissedAR2AltFire.FireOutput( this, this );
 	}
 }
+#endif
 
 //-----------------------------------------------------------------------------
 //
@@ -3950,6 +4182,44 @@ void CHL2_Player::Splash( void )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Used to relay outputs/inputs from the player to the world and viceversa
+//-----------------------------------------------------------------------------
+class CLogicPlayerProxy : public CLogicalEntity
+{
+	DECLARE_CLASS( CLogicPlayerProxy, CLogicalEntity );
+
+private:
+
+	DECLARE_DATADESC();
+
+public:
+
+	COutputEvent m_OnFlashlightOn;
+	COutputEvent m_OnFlashlightOff;
+	COutputEvent m_PlayerHasAmmo;
+	COutputEvent m_PlayerHasNoAmmo;
+	COutputEvent m_PlayerDied;
+
+	COutputInt m_RequestedPlayerHealth;
+
+	void InputRequestPlayerHealth( inputdata_t &inputdata );
+	void InputSetFlashlightSlowDrain( inputdata_t &inputdata );
+	void InputSetFlashlightNormalDrain( inputdata_t &inputdata );
+	void InputSetPlayerHealth( inputdata_t &inputdata );
+	void InputRequestAmmoState( inputdata_t &inputdata );
+	void InputLowerWeapon( inputdata_t &inputdata );
+	void InputEnableCappedPhysicsDamage( inputdata_t &inputdata );
+	void InputDisableCappedPhysicsDamage( inputdata_t &inputdata );
+	void InputSetLocatorTargetEntity( inputdata_t &inputdata );
+
+	void Activate ( void );
+
+	bool PassesDamageFilter( const CTakeDamageInfo &info );
+
+	EHANDLE m_hPlayer;
+};
+
 CLogicPlayerProxy *CHL2_Player::GetPlayerProxy( void )
 {
 	CLogicPlayerProxy *pProxy = dynamic_cast< CLogicPlayerProxy* > ( m_hPlayerProxy.Get() );
@@ -3985,7 +4255,7 @@ BEGIN_DATADESC( CLogicPlayerProxy )
 	DEFINE_OUTPUT( m_PlayerHasAmmo, "PlayerHasAmmo" ),
 	DEFINE_OUTPUT( m_PlayerHasNoAmmo, "PlayerHasNoAmmo" ),
 	DEFINE_OUTPUT( m_PlayerDied,	"PlayerDied" ),
-	DEFINE_OUTPUT( m_PlayerMissedAR2AltFire, "PlayerMissedAR2AltFire" ),
+//	DEFINE_OUTPUT( m_PlayerMissedAR2AltFire, "PlayerMissedAR2AltFire" ),
 	DEFINE_INPUTFUNC( FIELD_VOID,	"RequestPlayerHealth",	InputRequestPlayerHealth ),
 	DEFINE_INPUTFUNC( FIELD_VOID,	"SetFlashlightSlowDrain",	InputSetFlashlightSlowDrain ),
 	DEFINE_INPUTFUNC( FIELD_VOID,	"SetFlashlightNormalDrain",	InputSetFlashlightNormalDrain ),
@@ -4125,5 +4395,115 @@ void CLogicPlayerProxy::InputSetLocatorTargetEntity( inputdata_t &inputdata )
 
 	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
 	pPlayer->SetLocatorTargetEntity(pTarget);
+}
+
+//-----------------------------------------------------------------------------
+// MP Stuff
+//-----------------------------------------------------------------------------
+void CHL2_Player::ChangeTeam( int iTeamNum )
+{
+	bool bKill = false;
+
+	if ( g_pGameRules->IsTeamplay() != true && iTeamNum != TEAM_SPECTATOR )
+	{
+		//don't let them try to join combine or rebels during deathmatch.
+		iTeamNum = TEAM_UNASSIGNED;
+	}
+
+	if ( g_pGameRules->IsTeamplay() == true )
+	{
+		if ( iTeamNum != GetTeamNumber() && GetTeamNumber() != TEAM_UNASSIGNED )
+		{
+			bKill = true;
+		}
+	}
+
+	BaseClass::ChangeTeam( iTeamNum );
+
+	m_flNextTeamChangeTime = gpGlobals->curtime + 5;
+
+	if ( g_pGameRules->IsTeamplay() == true )
+	{
+		SetPlayerTeamModel();
+	}
+	else
+	{
+		SetPlayerModel();
+	}
+
+	if ( iTeamNum == TEAM_SPECTATOR )
+	{
+		RemoveAllItems( true );
+	}
+
+	if ( bKill == true )
+	{
+		CommitSuicide();
+	}
+}
+
+const char *g_ppszRandomPlayerModels[] = 
+{
+	"models/player/joe/joe.mdl",
+	"models/player/paddy/paddy.mdl",
+	"models/player/dixie/dixie.mdl",
+	"models/player/ridley/ridley.mdl",
+};
+
+void CHL2_Player::SetPlayerTeamModel( void )
+{
+	int iTeamNum = GetTeamNumber();
+
+	if ( iTeamNum <= TEAM_SPECTATOR )
+		return;
+
+	CTeam * pTeam = GetGlobalTeam( iTeamNum );
+
+	char szModelName[256];
+	Q_snprintf( szModelName, 256, "%s%s/%s.mdl", s_szModelPath, pTeam->GetName(), pTeam->GetName() );
+	PrecacheModel( szModelName );
+
+    // Check to see if the model was properly precached, do not error out if not.
+    int i = modelinfo->GetModelIndex( szModelName );
+    if ( i == -1 )
+    {
+        Warning("Model %s does not exist.\n", szModelName );
+        return;
+    }
+
+	SetModel( szModelName );
+	m_flNextModelChangeTime = gpGlobals->curtime + 5;
+}
+
+void CHL2_Player::SetPlayerModel( void )
+{
+	const char *szModelName = NULL;
+	szModelName = engine->GetClientConVarValue( engine->IndexOfEdict( edict() ), "cl_playermodel" );
+
+//	char szBaseName[128];
+//	Q_FileBase( engine->GetClientConVarValue( engine->IndexOfEdict( edict() ), "cl_playermodel" ), szBaseName, 128 );
+	
+	// Don't let it be 'none'; use the default list
+	if ( Q_strlen( szModelName ) == 0 ) 
+	{
+		szModelName = g_ppszRandomPlayerModels[random->RandomInt( 0, ARRAYSIZE(g_ppszRandomPlayerModels))];
+	}
+
+	//Q_snprintf( szModelName, 256, "%s%s/%s.mdl", s_szModelPath, szBaseName, szBaseName );
+	PrecacheModel( szModelName );
+
+    // Check to see if the model was properly precached, do not error out if not.
+    int modelIndex = modelinfo->GetModelIndex( szModelName );
+    if ( modelIndex == -1 )
+    {
+		szModelName = PLAYER_MODEL;
+		char szReturnString[256];
+		Q_snprintf( szReturnString, sizeof (szReturnString ), "cl_playermodel %s\n", szModelName );
+		engine->ClientCommand( edict(), szReturnString );
+    }
+
+	SetModel( szModelName );
+
+	m_flNextModelChangeTime = gpGlobals->curtime + 5;
 }
 

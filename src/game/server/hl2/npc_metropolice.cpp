@@ -107,7 +107,7 @@ ConVar  metropolice_move_and_melee("metropolice_move_and_melee", "1" );
 ConVar  metropolice_charge("metropolice_charge", "0" );
 
 // How many clips of pistol ammo a metropolice carries.
-#define METROPOLICE_NUM_CLIPS			8	// 8+1 in gun
+#define METROPOLICE_NUM_CLIPS			9	// 9+1 in gun
 #define METROPOLICE_BURST_RELOAD_COUNT	12
 
 int AE_METROPOLICE_BATON_ON;
@@ -155,7 +155,7 @@ BEGIN_DATADESC( CNPC_MetroPolice )
 //	DEFINE_EMBEDDED( m_LeapfrogTimer ),
 	DEFINE_FIELD( m_flBatonDebounceTime, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bShouldActivateBaton, FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_iPistolClips, FIELD_INTEGER ),
+//	DEFINE_FIELD( m_iPistolClips, FIELD_INTEGER ),
 	DEFINE_KEYFIELD( m_fWeaponDrawn, FIELD_BOOLEAN, "weapondrawn" ),
 	DEFINE_FIELD( m_fCanPoint, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_LastShootSlot, FIELD_INTEGER ),
@@ -175,7 +175,6 @@ BEGIN_DATADESC( CNPC_MetroPolice )
 	DEFINE_FIELD( m_nRecentDamage, FIELD_INTEGER ),
 	DEFINE_FIELD( m_flRecentDamageTime, FIELD_TIME ),
 
-	DEFINE_FIELD( m_flNextPainSoundTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextLostSoundTime, FIELD_TIME ),
 	DEFINE_FIELD( m_nIdleChatterType, FIELD_INTEGER ),
 
@@ -537,23 +536,21 @@ bool CNPC_MetroPolice::OverrideMoveFacing( const AILocalMoveGoal_t &move, float 
 	return BaseClass::OverrideMoveFacing( move, flInterval );
 }
 
+#define POLICE_MODEL "models/police.mdl"
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CNPC_MetroPolice::Precache( void )
 {
 	if ( HasSpawnFlags( SF_NPC_START_EFFICIENT ) )
-	{
 		SetModelName( AllocPooledString("models/police_cheaple.mdl" ) );
-	}
-	else
-	{
-		SetModelName( AllocPooledString("models/police.mdl") );
-	}
+	else if( !GetModelName() )
+		SetModelName( AllocPooledString(POLICE_MODEL) );
 
 	PrecacheModel( STRING( GetModelName() ) );
 
 	UTIL_PrecacheOther( "npc_manhack" );
+	UTIL_PrecacheOther( "weapon_emp" );
 
 	PrecacheScriptSound( "NPC_MetroPolice.OnFireScream" );
 	PrecacheScriptSound( "NPC_Metropolice.Shove" );
@@ -600,11 +597,6 @@ void CNPC_MetroPolice::Spawn( void )
 	SetMoveType( MOVETYPE_STEP );
 	SetBloodColor( BLOOD_COLOR_RED );
 
-	// Set squad-leader model, AI is taken care of real-time
-//!	if ( m_pSquad && m_pSquad->IsLeader( this ) )
-//!	{
-//!	
-//!	}
 	SetModel( STRING( GetModelName() ) );
 
 	m_nIdleChatterType = METROPOLICE_CHATTER_ASK_QUESTION; 
@@ -655,7 +647,7 @@ void CNPC_MetroPolice::Spawn( void )
 
 	m_HackedGunPos = Vector ( 0, 0, 55 );
 
-	m_iPistolClips = METROPOLICE_NUM_CLIPS;
+	//m_iPistolClips = METROPOLICE_NUM_CLIPS;
 
 	NPCInit();
 
@@ -1334,7 +1326,7 @@ void CNPC_MetroPolice::IdleSound( void )
 				break;
 
 			int nQuestionType = random->RandomInt( 0, METROPOLICE_CHATTER_RESPONSE_TYPE_COUNT );
-			if ( !IsInSquad() || ( nQuestionType == METROPOLICE_CHATTER_RESPONSE_TYPE_COUNT ) )
+			if ( !InSquad() || ( nQuestionType == METROPOLICE_CHATTER_RESPONSE_TYPE_COUNT ) )
 			{
 				m_Sentences.Speak( bIsCriminal ? "METROPOLICE_IDLE_CR" : "METROPOLICE_IDLE" );
 				break;
@@ -1901,7 +1893,7 @@ int CNPC_MetroPolice::SquadArrestCount()
 //-----------------------------------------------------------------------------
 int CNPC_MetroPolice::SelectScheduleArrestEnemy()
 {
-	if ( !HasSpawnFlags( SF_METROPOLICE_ARREST_ENEMY ) || !IsInSquad() )
+	if ( !HasSpawnFlags( SF_METROPOLICE_ARREST_ENEMY ) || !InSquad() )
 		return SCHED_NONE;
 
 	if ( !HasCondition( COND_SEE_ENEMY ) )
@@ -2718,6 +2710,7 @@ int CNPC_MetroPolice::SelectSchedule( void )
 		// ---------------------
 		if ( HasCondition( COND_NO_PRIMARY_AMMO ) )
 		{
+			//m_iPistolClips--;
 			return SCHED_RELOAD;
 		}
 
@@ -2871,6 +2864,16 @@ int CNPC_MetroPolice::TranslateSchedule( int scheduleType )
 		}
 		AnnounceOutOfAmmo();
 		break;
+
+#if 0
+	case SCHED_RELOAD:
+		m_iPistolClips--;
+		if ( Weapon_OwnsThisType( "weapon_pistol" ) && m_iPistolClips == 0 )
+		{
+			//TODO; Put the pistol away, bring the baton out.
+		}
+		break;
+#endif
 
 	case SCHED_FAIL_TAKE_COVER:
 		if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )

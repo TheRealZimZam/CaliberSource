@@ -2964,11 +2964,15 @@ void CNPC_Strider::AlertSound()
 //---------------------------------------------------------
 void CNPC_Strider::PainSound( const CTakeDamageInfo &info )
 {
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
+
 	// This means that we've exploded into pieces and have no way to whimper
 	if ( ShouldExplodeFromDamage( info ) )
 		return;
 
 	EmitSound( "NPC_Strider.Pain" );
+	m_flNextPainSoundTime = gpGlobals->curtime + 2;
 }
 
 //---------------------------------------------------------

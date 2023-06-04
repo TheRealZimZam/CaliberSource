@@ -42,7 +42,8 @@ public:
 
 private:
 	string_t	m_sFlySound;
-	float		m_flNextFlySoundTime;
+//	float		m_flNextFlySoundTime;
+	float		m_flNextWarnTime;
 
 	// Input Parameters
 	float		m_flHomingStrength;
@@ -74,7 +75,7 @@ private:
 	int			OnTakeDamage( const CTakeDamageInfo &info );
 
 public:
-	void EXPORT				Detonate(void);
+	void EXPORT				Detonate( bool bToSpace = false );
 	CGrenadeHomer(void);
 
 	DECLARE_DATADESC();

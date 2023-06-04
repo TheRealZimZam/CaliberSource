@@ -748,10 +748,9 @@ void CFlaregun::PrimaryAttack( void )
 		//pOwner->RemoveAmmo( 1, m_iSecondaryAmmoType );
 
 		pOwner->ViewPunch( QAngle( -(NumPellets/2), random->RandomFloat( -(5), (5) ), 0 ) );
-		if ( !sv_funmode.GetBool() && pOwner->GetHealth() > 2 )
-		{
+		// We're in realism, give the player a hairline fracture
+		if ( sv_funmode.GetBool() && pOwner->GetHealth() > 2 )
 			pOwner->TakeDamage( CTakeDamageInfo( this, this, 1, DMG_CLUB ) );
-		}
 
 		WeaponSound( WPN_DOUBLE );
 		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );

@@ -42,6 +42,7 @@ public:
 	virtual bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
 
 	virtual	int			WeaponRangeAttack1Condition( float flDot, float flDist );
+	virtual	int			WeaponRangeAttack2Condition( float flDot, float flDist ) { return WeaponRangeAttack1Condition(flDot,flDist); }
 	virtual	bool		WeaponLOSCondition(const Vector &ownerPos, const Vector &targetPos, bool bSetConditions);
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 	

@@ -295,6 +295,7 @@ private:
 
 	string_t				m_iszMaster;	// Master entity (game_team_master or multisource)
 
+	string_t				m_soundFire;
 	string_t				m_soundUse;
 	string_t				m_soundStartRotate;
 	string_t				m_soundStopRotate;

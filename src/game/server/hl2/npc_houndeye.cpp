@@ -159,6 +159,9 @@ void CNPC_Houndeye::InitCustomSchedules(void)
 
 LINK_ENTITY_TO_CLASS( npc_houndeye, CNPC_Houndeye );
 IMPLEMENT_CUSTOM_AI( npc_houndeye, CNPC_Houndeye );
+#ifndef HL1_DLL
+LINK_ENTITY_TO_CLASS( monster_houndeye, CNPC_Houndeye );
+#endif
 
 BEGIN_DATADESC( CNPC_Houndeye )
 
@@ -405,7 +408,7 @@ void CNPC_Houndeye::Spawn()
 {
 	Precache( );
 
-	SetModel("models/houndeye.mdl");
+	SetModel( STRING( GetModelName() ) );
 	SetHullType(HULL_WIDE_SHORT);
 	SetHullSizeNormal();
 
@@ -439,7 +442,10 @@ void CNPC_Houndeye::Spawn()
 //=========================================================
 void CNPC_Houndeye::Precache()
 {
-	PrecacheModel("models/houndeye.mdl");
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/houndeye.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
 
 	PrecacheScriptSound( "NPC_Houndeye.Anger1" );
 	PrecacheScriptSound( "NPC_Houndeye.Anger2" );
@@ -521,7 +527,7 @@ void CNPC_Houndeye::AlertSound ( void )
 //=========================================================
 // DeathSound 
 //=========================================================
-void CNPC_Houndeye::DeathSound ( void )
+void CNPC_Houndeye::DeathSound( const CTakeDamageInfo &info )
 {
 	EmitSound( "NPC_Houndeye.Die" );
 }
@@ -529,7 +535,7 @@ void CNPC_Houndeye::DeathSound ( void )
 //=========================================================
 // PainSound 
 //=========================================================
-void CNPC_Houndeye::PainSound ( void )
+void CNPC_Houndeye::PainSound( const CTakeDamageInfo &info )
 {
 	EmitSound( "NPC_Houndeye.Pain" );
 }
@@ -802,7 +808,7 @@ void CNPC_Houndeye::StartTask( const Task_t *pTask )
 			Vector vTargetPos = GetEnemyLKP();
 			vTargetPos.z	= GetFloorZ(vTargetPos);
 
-			if (GetNavigator()->SetRadialGoal(vTargetPos, random->RandomInt(50,500), 90, 175, m_bLoopClockwise))
+			if (GetNavigator()->SetRadialGoal(vTargetPos, random->RandomInt(50,500), 90, 175, 64.0f, m_bLoopClockwise))
 			{
 				TaskComplete();
 				return;

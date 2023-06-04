@@ -5,6 +5,7 @@
 //			Primary attack: fire missile
 //			Secondary attack: toggle guidance
 // TODO; Attach the rocketflare [CTempEnts::RocketFlare( const Vector& pos )]
+// Maybe move the rocket class out
 //=============================================================================//
 
 #include "cbase.h"
@@ -283,8 +284,8 @@ void CMissile::AccelerateThink( void )
 
 	if ( m_hRocketFlare != NULL )
 		AddEffects( EF_BRIGHTLIGHT );
-//!	else
-//!		AddEffects( EF_DIMLIGHT );
+	else
+		AddEffects( EF_DIMLIGHT );
 
 	AngleVectors( GetLocalAngles(), &vecForward );
 	SetAbsVelocity( vecForward * RPG_SPEED );
@@ -673,7 +674,7 @@ void CMissile::SeekThink( void )
 			}
 		}
 
-		//UNDONE; Nobody is gonna notice a little laser dot in the thick - w.m
+		//UNDONE; Nobody is gonna notice a little laser dot in the thick - m.m
 #if 0
 		if( hl2_episodic.GetBool() )
 		{
@@ -707,7 +708,7 @@ void CMissile::SeekThink( void )
 		VectorSubtract( targetPos, GetAbsOrigin(), vTargetDir );
 		float flDist = VectorNormalize( vTargetDir );
 
-		if( pLaserDot->GetTargetEntity() != NULL && flDist <= 240.0f && hl2_episodic.GetBool() )
+		if( pLaserDot->GetTargetEntity() != NULL && flDist <= 240.0f )
 		{
 			// Prevent the missile circling the Strider like a Halo in ep1_c17_06. If the missile gets within 20
 			// feet of a Strider, tighten up the turn speed of the missile so it can break the halo and strike. (sjb 4/27/2006)

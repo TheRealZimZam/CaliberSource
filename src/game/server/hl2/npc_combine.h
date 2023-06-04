@@ -23,6 +23,7 @@
 #include "ai_baseactor.h"
 
 // Used when only what combine to react to what the spotlight sees
+#define SF_COMBINE_AUTOSQUAD ( 1 << 15 )
 #define SF_COMBINE_NO_LOOK	(1 << 16)
 #define SF_COMBINE_NO_GRENADEDROP ( 1 << 17 )
 #define SF_COMBINE_NO_AR2DROP ( 1 << 18 )
@@ -30,6 +31,15 @@
 //=========================================================
 //	>> CNPC_Combine
 //=========================================================
+enum SoldierType_t
+{
+	REGULAR,
+	DEMOLITIONS,
+	SHOCK,
+	FLAMETHROWER,
+	ELITE,
+};
+
 class CNPC_Combine : public CAI_BaseActor
 {
 	DECLARE_DATADESC();
@@ -45,6 +55,7 @@ public:
 	void			Spawn( void );
 	void			Precache( void );
 	void			Activate();
+	bool			KeyValue( const char *szKeyName, const char *szValue );
 
 	int				GetGrenadeConditions( float flDot, float flDist, const Vector &vecTarget );
 	int				CheckCanThrowGrenade( const Vector &vecTarget );
@@ -62,7 +73,7 @@ public:
 
 	void Event_Killed( const CTakeDamageInfo &info );
 	int OnTakeDamage_Alive( const CTakeDamageInfo &info );
-
+	virtual void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 
 	void SetActivity( Activity NewActivity );
 	NPC_STATE		SelectIdealState( void );
@@ -81,8 +92,10 @@ public:
 	bool			UpdateEnemyMemory( CBaseEntity *pEnemy, const Vector &position, CBaseEntity *pInformer = NULL );
 
 	Class_T			Classify( void );
-	bool			IsDemolition() { return m_fIsDemolition; }
-	bool			IsElite() { return m_fIsElite; }
+	bool			IsDemolition() { return m_sType == DEMOLITIONS; }
+	bool			IsShock() { return m_sType == SHOCK; }
+	bool			IsFlamethrower() { return m_sType == FLAMETHROWER; }
+	bool			IsElite() { return m_sType == ELITE; }
 	void			DelayAltFireAttack( float flDelay );
 	void			DelaySquadAltFireAttack( float flDelay );
 	float			MaxYawSpeed( void );
@@ -117,6 +130,7 @@ public:
 	bool			HasShotgun();
 	bool			ActiveWeaponIsFullyLoaded();
 	bool			CanDoSignal();
+	void			DetatchHelmet();
 
 	bool			HandleInteraction(int interactionType, void *data, CBaseCombatCharacter *sourceEnt);
 	const char*		GetSquadSlotDebugName( int iSquadSlot );
@@ -146,7 +160,7 @@ public:
 	virtual bool	QueryHearSound( CSound *pSound );
 
 	// Speaking
-	virtual char	*GetSentencePrefix( const char *pszSoundName );
+	//virtual char	*GetSentencePrefix( const char *pszSoundName );
 	void			SpeakSentence( int sentType );
 
 	virtual int		TranslateSchedule( int scheduleType );
@@ -292,9 +306,11 @@ private:
 	int				m_lastGrenadeCondition;
 	Vector			m_vecTossVelocity;
 	EHANDLE			m_hForcedGrenadeTarget;
+	bool			m_bShouldAutosquad;	//If not in a squad, should i try to join one?
 	bool			m_bShouldPatrol;
-//	bool			m_bFirstEncounter;// only put on the handsign show in the squad's first encounter.
-//	float			flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
+	bool			m_bHelmet;	// Is the helmet still on after a headshot?
+
+//	float			m_flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
 
 	CAI_Sentence< CNPC_Combine > m_Sentences;
 
@@ -308,8 +324,7 @@ private:
 
 public:
 	int				m_iLastAnimEventHandled;
-	bool			m_fIsDemolition;
-	bool			m_fIsElite;
+	SoldierType_t	m_sType;
 	Vector			m_vecAltFireTarget;
 
 	int				m_iTacticalVariant;

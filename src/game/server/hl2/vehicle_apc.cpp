@@ -25,6 +25,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+// Spawn Flags
+#define SF_APC_DRONE	1
 
 #define ROCKET_ATTACK_RANGE_MAX 5500.0f
 #define ROCKET_ATTACK_RANGE_MIN 1250.0f
@@ -49,6 +51,8 @@
 #define DEATH_VOLLEY_ROCKET_COUNT		4
 #define DEATH_VOLLEY_MIN_FIRE_TIME		0.333
 #define DEATH_VOLLEY_MAX_FIRE_TIME		0.166
+
+#define	COVER_TIME		( 15.0 )
 
 extern short g_sModelIndexFireball; // Echh...
 
@@ -82,6 +86,7 @@ LINK_ENTITY_TO_CLASS( prop_vehicle_apc, CPropAPC );
 BEGIN_DATADESC( CPropAPC )
 
 	DEFINE_FIELD( m_flDangerSoundTime,	FIELD_TIME ),
+	DEFINE_FIELD( m_flCoverTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_flHandbrakeTime,	FIELD_TIME ),
 	DEFINE_FIELD( m_bInitialHandbrake,	FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_nSmokeTrailCount,	FIELD_INTEGER ),
@@ -91,8 +96,10 @@ BEGIN_DATADESC( CPropAPC )
 //	DEFINE_FIELD( m_nMachineGunBaseAttachment,	FIELD_INTEGER ),
 //	DEFINE_FIELD( m_vecBarrelPos,		FIELD_VECTOR ),
 	DEFINE_FIELD( m_bInFiringCone,		FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bLeftBarrel,		FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bCoverBlown,		FIELD_BOOLEAN ),
 //	DEFINE_FIELD( m_hLaserDot,			FIELD_EHANDLE ),
-	DEFINE_FIELD( m_hRocketTarget,			FIELD_EHANDLE ),
+	DEFINE_FIELD( m_vecGrenadeTarget,			FIELD_EHANDLE ),
 	DEFINE_FIELD( m_iRocketSalvoLeft,	FIELD_INTEGER ),
 	DEFINE_FIELD( m_flRocketTime,		FIELD_TIME ),
 //	DEFINE_FIELD( m_nRocketAttachment,	FIELD_INTEGER ),
@@ -242,9 +249,27 @@ void CPropAPC::CreateServerVehicle( void )
 //-----------------------------------------------------------------------------
 Class_T	CPropAPC::ClassifyPassenger( CBaseCombatCharacter *pPassenger, Class_T defaultClassification )
 { 
-	return CLASS_COMBINE;	
+	return CLASS_COMBINE;
+	// indicate we're a combine if the global says to be stealth and we have not been aggressive (shot)
+	if ( ( GlobalEntity_GetState("player_stealth") == GLOBAL_ON) &&
+		!m_bCoverBlown )
+		return CLASS_COMBINE;	
+	else
+		return defaultClassification; 
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: check to see if player can use this vehicle or if it's been disabled
+//-----------------------------------------------------------------------------
+bool CPropAPC::CanControlVehicle( void )
+{
+	// Is this a drone or dead vehicle? don't allow control then
+	return (m_spawnflags & SF_APC_DRONE || m_iHealth != 0 );
+//	if ( m_spawnflags & SF_APC_DRONE || m_APCHealth == 0 )
+//		return false;
+//	else
+//		return true;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Damage events as modified for the passenger of the APC, not the APC itself
@@ -343,7 +368,6 @@ void CPropAPC::AddSmokeTrail( const Vector &vecPos )
 	pSmokeTrail->SetMoveType( MOVETYPE_NONE );
 }
 
-
 //------------------------------------------------------------------------------
 // Pow!
 //------------------------------------------------------------------------------
@@ -400,7 +424,6 @@ void CPropAPC::ExplodeAndThrowChunk( const Vector &vecExplosionPos )
 	}
 }
 
-
 //-----------------------------------------------------------------------------
 // Should we trigger a damage effect?
 //-----------------------------------------------------------------------------
@@ -433,7 +456,7 @@ void CPropAPC::Event_Killed( const CTakeDamageInfo &info )
 		CollisionProp()->RandomPointInBounds( vecNormalizedMins, vecNormalizedMaxs, &vecAbsPoint );
 		te->Explosion( filter, random->RandomFloat( 0.0, 1.0 ),	&vecAbsPoint, 
 			g_sModelIndexFireball, random->RandomInt( 4, 10 ), 
-			random->RandomInt( 8, 15 ), 
+			random->RandomInt( 30, 40 ), 
 			( i < 2 ) ? TE_EXPLFLAG_NODLIGHTS : TE_EXPLFLAG_NOPARTICLES | TE_EXPLFLAG_NOFIREBALLSMOKE | TE_EXPLFLAG_NODLIGHTS,
 			100, 0 );
 	}
@@ -505,8 +528,9 @@ void CPropAPC::Event_Killed( const CTakeDamageInfo &info )
 	// Spawn a lesser amount if the player is close
 	m_iRocketSalvoLeft = DEATH_VOLLEY_ROCKET_COUNT;
 	m_flRocketTime = gpGlobals->curtime;
-}
 
+	SetUse( NULL );
+}
 
 
 //-----------------------------------------------------------------------------
@@ -652,6 +676,21 @@ void CPropAPC::Think( void )
 
 	if ( IsSequenceFinished() )
 	{
+		if ( m_bExitAnimOn )
+		{
+			CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+			if ( pPlayer )
+			{
+				pPlayer->LeaveVehicle();		// now that sequence is finished, leave car
+				Vector vecEyes;
+				QAngle vecEyeAng;
+				GetAttachment( "vehicle_driver_eyes", vecEyes, vecEyeAng );
+				vecEyeAng.x = 0;
+				vecEyeAng.z = 0;
+				pPlayer->SnapEyeAngles( vecEyeAng );			
+			}
+			m_bExitAnimOn = false;
+		}
 		int iSequence = SelectWeightedSequence( ACT_IDLE );
 		if ( iSequence > ACTIVITY_NOT_AVAILABLE )
 		{
@@ -675,19 +714,16 @@ void CPropAPC::Think( void )
 //-----------------------------------------------------------------------------
 // Aims the secondary weapon at a target 
 //-----------------------------------------------------------------------------
-void CPropAPC::AimSecondaryWeaponAt( CBaseEntity *pTarget )
+void CPropAPC::AimSecondaryWeaponAt( Vector vecTarget )
 {
-	m_hRocketTarget = pTarget;
+	m_vecGrenadeTarget = vecTarget;
 
 	// Update the rocket target
 	CreateAPCLaserDot();
+	m_hLaserDot->SetAbsOrigin( m_vecGrenadeTarget );
 
-	if ( m_hRocketTarget )
-	{
-		m_hLaserDot->SetAbsOrigin( m_hRocketTarget->BodyTarget( WorldSpaceCenter(), false ) );
-	}
-	SetLaserDotTarget( m_hLaserDot, m_hRocketTarget );
-	EnableLaserDot( m_hLaserDot, m_hRocketTarget != NULL );
+	SetLaserDotTarget( m_hLaserDot, GetEnemy() );
+	EnableLaserDot( m_hLaserDot, m_vecGrenadeTarget != NULL );
 }
 
 	
@@ -704,10 +740,14 @@ void CPropAPC::DriveVehicle( float flFrameTime, CUserCmd *ucmd, int iButtonsDown
 			if ( iButtons & IN_ATTACK )
 			{
 				FireMachineGun();
+				m_bCoverBlown = true;
+				m_flCoverTime = gpGlobals->curtime + COVER_TIME;
 			}
 			else if ( iButtons & IN_ATTACK2 )
 			{
 				FireRocket();
+				m_bCoverBlown = true;
+				m_flCoverTime = gpGlobals->curtime + COVER_TIME;
 			}
 		}
 		break;
@@ -720,6 +760,12 @@ void CPropAPC::DriveVehicle( float flFrameTime, CUserCmd *ucmd, int iButtonsDown
 		return;
 	}
 
+	// need to reset cover blown flag??
+	if ( gpGlobals->curtime > m_flCoverTime )
+	{
+		m_bCoverBlown = false;
+	}
+
 	BaseClass::DriveVehicle( flFrameTime, ucmd, iButtonsDown, iButtonsReleased );
 }
 
@@ -729,10 +775,9 @@ void CPropAPC::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useT
 
 	if ( pActivator->IsPlayer() )
 	{
-		 EmitSound ( "combine.door_lock" );
+		 EmitSound( "combine.door_lock" );
 	}
 }
-
 
 //-----------------------------------------------------------------------------
 // Primary gun 
@@ -782,7 +827,6 @@ void CPropAPC::AimPrimaryWeapon( const Vector &vecWorldTarget )
 	}
 }
 
-
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -791,7 +835,6 @@ const char *CPropAPC::GetTracerType( void )
 	return "HelicopterTracer"; 
 }
 
-
 //-----------------------------------------------------------------------------
 // Allows the shooter to change the impact effect of his bullets
 //-----------------------------------------------------------------------------
@@ -799,7 +842,6 @@ void CPropAPC::DoImpactEffect( trace_t &tr, int nDamageType )
 {
 	UTIL_ImpactTrace( &tr, nDamageType, "HelicopterImpact" );
 } 
-
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -815,9 +857,8 @@ void CPropAPC::DoMuzzleFlash( void )
 	BaseClass::DoMuzzleFlash();
 }
 
-
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Fire 20mil
 //-----------------------------------------------------------------------------
 void CPropAPC::FireMachineGun( void )
 {
@@ -840,15 +881,28 @@ void CPropAPC::FireMachineGun( void )
 	Vector vecMachineGunShootPos;
 	Vector vecMachineGunDir;
 	GetAttachment( m_nMachineGunMuzzleAttachment, vecMachineGunShootPos, &vecMachineGunDir );
-	
+
+	QAngle vecAngles;
+	VectorAngles( vecMachineGunDir, vecAngles );
+	Vector vecRight;
+	AngleVectors( vecAngles, NULL, &vecRight, NULL );
+
+	// Alternate barrels
+	Vector shotOfs;
+	if ( m_bLeftBarrel )
+		shotOfs = vecMachineGunShootPos + ( vecRight * -8.0f );
+	else
+		shotOfs = vecMachineGunShootPos + ( vecRight * 8.0f );
+
+	m_bLeftBarrel = !m_bLeftBarrel;
+
 	// Fire the round
 	int	bulletType = GetAmmoDef()->Index("AR2");
-	FireBullets( 1, vecMachineGunShootPos, vecMachineGunDir, VECTOR_CONE_8DEGREES, MAX_TRACE_LENGTH, bulletType, 1 );
+	FireBullets( 1, shotOfs, vecMachineGunDir, VECTOR_CONE_8DEGREES, MAX_TRACE_LENGTH, bulletType, 1 );
 	DoMuzzleFlash();
 
 	EmitSound( "Weapon_AR2.Single" );
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -1047,6 +1101,30 @@ void CPropAPC::OnRestore( void )
 	}
 }
 
+//-------------------------------------------------------------
+// EnterVehicle -- play animation of getting into the vehicle
+//-------------------------------------------------------------
+void CPropAPC::EnterVehicle( CBaseCombatCharacter *pPassenger )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( pPassenger );
+	if ( !pPlayer )
+		return;
+
+	BaseClass::EnterVehicle( pPlayer );
+
+	// setup to play "enter" sequence
+	int iSequence = LookupSequence( "enter" );
+	// skip if no animation present
+	if ( iSequence > ACTIVITY_NOT_AVAILABLE )
+	{
+		SetCycle(0);
+		m_flAnimTime = gpGlobals->curtime;
+		ResetSequence( iSequence );
+		ResetClientsideFrame();
+		m_bEnterAnimOn = true;
+	}
+}
+
 //========================================================================================================================================
 // APC FOUR WHEEL PHYSICS VEHICLE SERVER VEHICLE
 //========================================================================================================================================
@@ -1065,8 +1143,9 @@ void CAPCFourWheelServerVehicle::NPC_AimPrimaryWeapon( Vector vecTarget )
 void CAPCFourWheelServerVehicle::NPC_AimSecondaryWeapon( Vector vecTarget )
 {
 	// Add some random noise
-//	Vector vecOffset = vecTarget + RandomVector( -128, 128 );
-//	((CPropAPC*)m_pVehicle)->AimSecondaryWeaponAt( vecOffset );
+	CPropAPC *pAPC = ((CPropAPC*)m_pVehicle);
+	Vector vecOffset = vecTarget + RandomVector( -64, 64 );
+	pAPC->AimSecondaryWeaponAt( vecOffset );
 }
 
 //-----------------------------------------------------------------------------

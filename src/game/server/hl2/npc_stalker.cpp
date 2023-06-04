@@ -45,7 +45,7 @@
 
 //#define		STALKER_DEBUG
 #define	MIN_STALKER_FIRE_RANGE		64
-#define	MAX_STALKER_FIRE_RANGE		3072 // 2048
+#define	MAX_STALKER_FIRE_RANGE		2560 // 2048
 #define	STALKER_LASER_ATTACHMENT	1
 #define	STALKER_TRIGGER_DIST		200	// Enemy dist. that wakes up the stalker
 #define	STALKER_SENTENCE_VOLUME		(float)0.35
@@ -125,6 +125,7 @@ BEGIN_DATADESC( CNPC_Stalker )
 	DEFINE_FIELD( m_pBeam,					FIELD_CLASSPTR),
 	DEFINE_FIELD( m_pLightGlow,				FIELD_CLASSPTR),
 	DEFINE_FIELD( m_flNextNPCThink,			FIELD_FLOAT),
+	DEFINE_FIELD( m_pScriptedTarget,		FIELD_CLASSPTR),
 	DEFINE_FIELD( m_vLaserCurPos,			FIELD_POSITION_VECTOR),
 	DEFINE_FIELD( m_flNextAttackSoundTime,	FIELD_TIME ),
 	DEFINE_FIELD( m_flNextBreatheSoundTime,	FIELD_TIME ),
@@ -137,6 +138,43 @@ BEGIN_DATADESC( CNPC_Stalker )
 	DEFINE_THINKFUNC( StalkerThink ),
 
 END_DATADESC()
+
+
+//------------------------------------------------------------------------------
+// Purpose : Starts doing scripted burn to a location
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+void CNPC_Stalker::SetScriptedTarget( CScriptedTarget *pScriptedTarget )
+{
+	if (pScriptedTarget)
+	{
+		// ---------------------------------------
+		//	If I don't already have a burn target
+		// ---------------------------------------
+		if (m_pScriptedTarget == NULL)
+		{
+			// Wake the guy up
+			SetCondition(COND_PROVOKED);
+
+			// If first burn target make it my current position
+			m_pScriptedTarget	= pScriptedTarget;
+			m_vLaserCurPos		= m_pScriptedTarget->m_vLastPosition;
+		}
+		else
+		{
+			m_pScriptedTarget	= pScriptedTarget;
+		}
+		m_vLaserTargetPos	= m_pScriptedTarget->GetAbsOrigin();
+	}
+	else
+	{
+		// Break him out of burn schedule
+		SetCondition(COND_ENEMY_DEAD);
+
+		m_pScriptedTarget	= NULL;
+	}
+}
 
 //-----------------------------------------------------------------------------
 // Purpose:
@@ -230,7 +268,7 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 	if( enemyClass == CLASS_PLAYER || enemyClass == CLASS_PLAYER_ALLY || enemyClass == CLASS_PLAYER_ALLY_VITAL )
 	{
 		// Don't get angry at these folks unless provoked.
-		if( IsInSquad() && m_iPlayerAggression < STALKER_PLAYER_AGGRESSION )
+		if( InSquad() && m_iPlayerAggression < STALKER_PLAYER_AGGRESSION )
 		{
 			return false;
 		}
@@ -257,7 +295,9 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 		}
 	}
 
-#if 0
+// This is assuming retail hl2 model, which has a speed of 2
+/*	// Disabled for Caliber
+#ifdef HL2_EPISODIC
 	if( IsStrategySlotRangeOccupied( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) && !HasStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 	{
 		return false;
@@ -272,6 +312,7 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 		return false;
 	}
 #endif
+*/
 
 	return BaseClass::IsValidEnemy(pEnemy);
 }
@@ -313,6 +354,7 @@ void CNPC_Stalker::Spawn( void )
 	m_fBeamRechargeTime			= 0;
 	m_fNextDamageTime			= 0;
 
+	m_pScriptedTarget			= NULL;
 	NPCInit();
 
 	m_flDistTooFar	= MAX_STALKER_FIRE_RANGE;
@@ -404,7 +446,7 @@ void CNPC_Stalker::OnScheduleChange()
 //-----------------------------------------------------------------------------
 void CNPC_Stalker::Event_Killed( const CTakeDamageInfo &info )
 {
-	if( IsInSquad() && info.GetAttacker()->IsPlayer() )
+	if( InSquad() && info.GetAttacker()->IsPlayer() )
 	{
 		AISquadIter_t iter;
 		for ( CAI_BaseNPC *pSquadMember = GetSquad()->GetFirstMember( &iter ); pSquadMember; pSquadMember = GetSquad()->GetNextMember( &iter ) )
@@ -442,14 +484,14 @@ void CNPC_Stalker::DeathSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CNPC_Stalker::PainSound( const CTakeDamageInfo &info )
 { 
-//	if ( IsOnFire() )
-//		return;
-// This actually works decently (with the current soundset)
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
 
 	EmitSound( "NPC_Stalker.Pain" );
 	m_flNextScrambleSoundTime	= gpGlobals->curtime + 1.5;
 	m_flNextBreatheSoundTime	= gpGlobals->curtime + 1.5;
 	m_flNextAttackSoundTime		= gpGlobals->curtime + 1.5;
+	m_flNextPainSoundTime 		= gpGlobals->curtime + 1;
 };
 
 //-----------------------------------------------------------------------------
@@ -521,7 +563,6 @@ void CNPC_Stalker::UpdateAttackBeam( void )
 			CSoundEnt::InsertSound(SOUND_DANGER, tr.endpos, 60, 0.025, this);
 		}
 	}
-#if 0
 	else if (m_pScriptedTarget)
 	{
 		GetMotor()->SetIdealYawToTargetAndUpdate( m_pScriptedTarget->GetAbsOrigin() );
@@ -534,14 +575,13 @@ void CNPC_Stalker::UpdateAttackBeam( void )
 		if (tr.fraction != 1.0 && pEntity!=m_pScriptedTarget)		
 		{	
 			SetDefaultFailSchedule( SCHED_ESTABLISH_LINE_OF_FIRE ); 
-			TaskFail("No LOS");
+			TaskFail("No LOS\n");
 		}
 		else
 		{
 			CSoundEnt::InsertSound(SOUND_DANGER, tr.endpos, 60, 0.025, this);
 		}
 	}
-#endif
 	else
 	{
 		TaskFail(FAIL_NO_ENEMY);
@@ -651,7 +691,6 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 				m_vLaserDir = missPos - LaserStartPosition(GetAbsOrigin());
 				VectorNormalize(m_vLaserDir);	
 			}
-#if 0
 			else if (m_pScriptedTarget)
 			{
 				trace_t tr;
@@ -660,13 +699,12 @@ void CNPC_Stalker::StartTask( const Task_t *pTask )
 				if (tr.fraction != 1.0 && pEntity != m_pScriptedTarget)
 				{	
 					SetDefaultFailSchedule( SCHED_ESTABLISH_LINE_OF_FIRE ); 
-					TaskFail("No LOS");
+					TaskFail("No LOS\n");
 					return;
 				}
 				m_vLaserDir	= m_vLaserCurPos - LaserStartPosition(GetAbsOrigin());
 				VectorNormalize(m_vLaserDir);	
 			}
-#endif
 			else
 			{
 				TaskFail(FAIL_NO_ENEMY);
@@ -817,7 +855,22 @@ int CNPC_Stalker::SelectSchedule( void )
 				{
 					return SCHED_ALERT_FACE;
 				}
-				if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
+				else if (m_pScriptedTarget!=NULL)
+				{
+					// Check if I have a line of sight 
+					trace_t tr;
+					AI_TraceLine(LaserStartPosition(GetAbsOrigin()), m_vLaserCurPos, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr);	
+					CBaseEntity *pEntity = tr.m_pEnt;
+					if (tr.fraction != 1.0 && pEntity != m_pScriptedTarget)
+					{
+						return SCHED_ESTABLISH_LINE_OF_FIRE;
+					}
+					else
+					{
+						return SCHED_RANGE_ATTACK1;
+					}
+				}
+				else if ( HasCondition( COND_ENEMY_DEAD ) && SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
 				{
 					// Scan around for new enemies
 					return SCHED_ALERT_SCAN;
@@ -858,12 +911,10 @@ int CNPC_Stalker::SelectSchedule( void )
 			// ----------------------
 			// GIVE WAY
 			// ----------------------
-#if 0
 			if ( HasCondition ( COND_GIVE_WAY ) )
 			{
-				return SCHED_GIVE_WAY;
+				return SCHED_MOVE_AWAY;
 			}
-#endif
 
 			// -------------------------------------------
 			// If I can't range attack and not ready to beam
@@ -880,6 +931,9 @@ int CNPC_Stalker::SelectSchedule( void )
 				return SCHED_TAKE_COVER_FROM_ENEMY;
 			}
 
+			// -------------------------------------------
+			// If I can't range attack and not ready to beam
+			// -------------------------------------------
 			if ( HasCondition( COND_ENEMY_TOO_FAR )				||
 				 HasCondition( COND_TOO_FAR_TO_ATTACK )			||	 
 				 HasCondition( COND_TOO_CLOSE_TO_ATTACK )		||
@@ -950,7 +1004,10 @@ int CNPC_Stalker::TranslateSchedule( int scheduleType )
 		break;
 
 	case SCHED_FAIL_ESTABLISH_LINE_OF_FIRE:
-		return SCHED_COMBAT_STAND;
+		if (GetEnemy() != NULL)
+			return TranslateSchedule(SCHED_TAKE_COVER_FROM_ENEMY);
+		else
+			return TranslateSchedule(SCHED_COMBAT_STAND);
 		break;
 
 	case SCHED_FAIL_TAKE_COVER:
@@ -960,6 +1017,29 @@ int CNPC_Stalker::TranslateSchedule( int scheduleType )
 	}
 
 	return BaseClass::TranslateSchedule( scheduleType );
+}
+
+//------------------------------------------------------------------------------
+// Purpose : Returns new target burn position.  Calculates from last burn
+//			 position, target direction and current burn speed
+// Input   :
+// Output  :
+//------------------------------------------------------------------------------
+Vector CNPC_Stalker::ScriptedBurnPosition(void)
+{
+	// Make sure I don't overshoot
+	Vector	vTargetDir  = m_vLaserTargetPos - m_vLaserCurPos;
+	float	fTargetDist	= VectorNormalize(vTargetDir);
+	float	fBurnSpeed	= m_pScriptedTarget->MoveSpeed();
+
+	if (fTargetDist < fBurnSpeed)
+	{
+		return m_vLaserTargetPos;
+	}
+	else
+	{
+		return m_vLaserCurPos + fBurnSpeed*vTargetDir;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -988,10 +1068,24 @@ void CNPC_Stalker::CalcBeamPosition(void)
 	Vector targetDir = m_vLaserTargetPos - LaserStartPosition(GetAbsOrigin());
 	VectorNormalize(targetDir);
 
-	// ---------------------------------------
-	//  Otherwise if burning towards an enemy
-	// ---------------------------------------
-	if ( GetEnemy() )
+	// -----------------------------------------------
+	//  If I'm burning towards a burn target
+	// -----------------------------------------------
+	if (GetEnemy() == NULL && m_pScriptedTarget != NULL)
+	{
+		//  Move towards burn target at linear rate
+		m_vLaserDir		  = ScriptedBurnPosition() - LaserStartPosition(GetAbsOrigin());
+		VectorNormalize(m_vLaserDir);
+
+		// If I've reached by burn target I'm done
+		float fDist = (m_vLaserDir - targetDir).Length();
+		if ( fDist < 0.01)
+		{
+			// Update scripted target
+			SetScriptedTarget( m_pScriptedTarget->NextScriptedTarget());
+		}
+	}
+	else
 	{
 		// ---------------------------------------
 		//  Integrate towards target position
@@ -999,10 +1093,7 @@ void CNPC_Stalker::CalcBeamPosition(void)
 		float	iRate = 0.95;
 
 		if( GetEnemy()->Classify() == CLASS_BULLSEYE )
-		{
-			// Seek bullseyes faster
 			iRate = 0.8;
-		}
 
 		m_vLaserDir.x = (iRate * m_vLaserDir.x + (1-iRate) * targetDir.x);
 		m_vLaserDir.y = (iRate * m_vLaserDir.y + (1-iRate) * targetDir.y);
@@ -1163,6 +1254,15 @@ void CNPC_Stalker::DrawAttackBeam(void)
 	Vector vecSrc = LaserStartPosition(GetAbsOrigin());
 	trace_t tr;
 	AI_TraceLine( vecSrc, vecSrc + m_vLaserDir * MAX_STALKER_FIRE_RANGE, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr);
+	// If I have a BurnTarget
+	if (GetEnemy() == NULL && m_pScriptedTarget != NULL)
+	{	
+		// ------------------------------------------
+		//  Update scripts last position
+		// ------------------------------------------
+		m_vLaserCurPos = ScriptedBurnPosition();
+		m_pScriptedTarget->m_vLastPosition = m_vLaserCurPos;
+	}
 
 	CalcBeamPosition();
 
@@ -1327,7 +1427,7 @@ bool CNPC_Stalker::InnateWeaponLOSCondition( const Vector &ownerPos, const Vecto
 
 	CBaseEntity *pBE = tr.m_pEnt;
 	CBaseCombatCharacter *pBCC = ToBaseCombatCharacter( pBE );
-	if ( pBE == GetEnemy() )
+	if (pBE == GetEnemy() || pBE == m_pScriptedTarget )
 	{
 		return true;
 	}
@@ -1409,17 +1509,18 @@ void CNPC_Stalker::HandleAnimEvent( animevent_t *pEvent )
 	switch( pEvent->event )
 	{
 		case NPC_EVENT_LEFTFOOT:
-			{
-				MakeAIFootstepSound( 180.0f );
-				EmitSound( "NPC_Stalker.FootstepLeft", pEvent->eventtime );
-			}
+		{
+			MakeAIFootstepSound( 180.0f );
+			EmitSound( "NPC_Stalker.FootstepLeft", pEvent->eventtime );
 			break;
+		}
+
 		case NPC_EVENT_RIGHTFOOT:
-			{
-				MakeAIFootstepSound( 180.0f );
-				EmitSound( "NPC_Stalker.FootstepRight", pEvent->eventtime );
-			}
+		{
+			MakeAIFootstepSound( 180.0f );
+			EmitSound( "NPC_Stalker.FootstepRight", pEvent->eventtime );
 			break;
+		}
 
 		case STALKER_AE_MELEE_HIT:
 		{
@@ -1446,6 +1547,7 @@ void CNPC_Stalker::HandleAnimEvent( animevent_t *pEvent )
 			}
 			break;	
 		}
+
 		default:
 			BaseClass::HandleAnimEvent( pEvent );
 			break;
@@ -1551,6 +1653,55 @@ void CNPC_Stalker::AddZigZagToPath(void)
 			GetNavigator()->PrependWaypoint( zigZagPos, NAV_GROUND, bits_WP_TO_DETOUR );
 		}
 	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose:  This is a generic function (to be implemented by sub-classes) to
+//			 handle specific interactions between different types of characters
+//			 (For example the barnacle grabbing an NPC)
+// Input  :  Constant for the type of interaction
+// Output :	 true  - if sub-class has a response for the interaction
+//			 false - if sub-class has no response
+//-----------------------------------------------------------------------------
+bool CNPC_Stalker::HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* pSourceEnt)
+{
+	if (interactionType == g_interactionBarnacleVictimDangle)
+	{
+		return false;
+	}
+	else if ( interactionType == g_interactionBarnacleVictimReleased )
+	{
+		SetIdealState( NPC_STATE_IDLE );
+
+		SetAbsVelocity( vec3_origin );
+		SetMoveType( MOVETYPE_STEP );
+		return true;
+	}
+	else if ( interactionType == g_interactionBarnacleVictimGrab )
+	{
+		if ( GetFlags() & FL_ONGROUND )
+		{
+			RemoveFlag( FL_ONGROUND );
+		}
+
+		SetIdealState( NPC_STATE_PRONE );
+		return true;
+	}
+	else if (interactionType == g_interactionScriptedTarget)
+	{
+		// If I already have a scripted target, reject the new one
+		if (m_pScriptedTarget && pSourceEnt)
+		{
+			return false;
+		}
+		else
+		{
+			SetScriptedTarget((CScriptedTarget*)pSourceEnt);
+			return true;
+		}
+	}
+	return false;
 }
 
 //------------------------------------------------------------------------------

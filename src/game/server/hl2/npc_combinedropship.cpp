@@ -363,8 +363,7 @@ protected:
 	// Should the dropship end up having inheritors, their activate may
 	// stomp these numbers, in which case you should make these ordinary members
 	// again.
-	static int m_poseBody_Accel, m_poseBody_Sway, m_poseCargo_Body_Accel, m_poseCargo_Body_Sway, 
-		m_poseWeapon_Pitch, m_poseWeapon_Yaw;
+	static int m_poseBody_Accel, m_poseBody_Sway, m_poseCargo_Body_Accel, m_poseCargo_Body_Sway; 
 	static bool m_sbStaticPoseParamsLoaded;
 	virtual void	PopulatePoseParameters( void );
 };
@@ -375,8 +374,6 @@ int CNPC_CombineDropship::m_poseBody_Accel = 0;
 int CNPC_CombineDropship::m_poseBody_Sway = 0;
 int CNPC_CombineDropship::m_poseCargo_Body_Accel = 0;
 int CNPC_CombineDropship::m_poseCargo_Body_Sway = 0;
-int CNPC_CombineDropship::m_poseWeapon_Pitch = 0;
-int CNPC_CombineDropship::m_poseWeapon_Yaw = 0;
 
 //-----------------------------------------------------------------------------
 // Purpose: Cache whatever pose parameters we intend to use
@@ -389,8 +386,6 @@ void	CNPC_CombineDropship::PopulatePoseParameters( void )
 		m_poseBody_Sway			= LookupPoseParameter( "body_sway" );
 		m_poseCargo_Body_Accel  = LookupPoseParameter( "cargo_body_accel" );
 		m_poseCargo_Body_Sway   = LookupPoseParameter( "cargo_body_sway" );
-		m_poseWeapon_Pitch		= LookupPoseParameter( "weapon_pitch" );
-		m_poseWeapon_Yaw		= LookupPoseParameter( "weapon_yaw" );
 
 		m_sbStaticPoseParamsLoaded = true;
 	}
@@ -2000,12 +1995,10 @@ void CNPC_CombineDropship::PrescheduleThink( void )
 	case LANDING_DESCEND:
 	case LANDING_HOVER_DESCEND:
 		{
-			/*
 			if ( IsActivityFinished() && GetActivity() != ACT_DROPSHIP_DESCEND_IDLE )
 			{
 				SetActivity( (Activity)ACT_DROPSHIP_DESCEND_IDLE );
 			}
-			*/
 
 			if( IsHovering() && m_hLandTarget != NULL )
 			{
@@ -2836,11 +2829,13 @@ void CNPC_CombineDropship::UpdateContainerGunFacing( Vector &vecMuzzle, Vector &
 		QAngle angles;
 		angles.Init( RAD2DEG(targetToCenterPitch+centerToGunPitch), RAD2DEG( targetToCenterYaw + centerToGunYaw ), 0 );
 
-		float flNewAngle = AngleNormalize( UTIL_ApproachAngle( angles.x, m_hContainer->GetPoseParameter(m_poseWeapon_Pitch), DROPSHIP_GUN_SPEED));
-		m_hContainer->SetPoseParameter( m_poseWeapon_Pitch, flNewAngle );
+		int iPose = m_hContainer->LookupPoseParameter( "weapon_pitch" );
+		float flNewAngle = AngleNormalize( UTIL_ApproachAngle( angles.x, m_hContainer->GetPoseParameter(iPose), DROPSHIP_GUN_SPEED));
+		m_hContainer->SetPoseParameter( iPose, flNewAngle );
 
-		flNewAngle = AngleNormalize( UTIL_ApproachAngle( angles.y, m_hContainer->GetPoseParameter(m_poseWeapon_Yaw), DROPSHIP_GUN_SPEED));
-		m_hContainer->SetPoseParameter( m_poseWeapon_Yaw, flNewAngle );
+		iPose = m_hContainer->LookupPoseParameter( "weapon_yaw" );
+		flNewAngle = AngleNormalize( UTIL_ApproachAngle( angles.y, m_hContainer->GetPoseParameter(iPose), DROPSHIP_GUN_SPEED));
+		m_hContainer->SetPoseParameter( iPose, flNewAngle );
 		m_hContainer->StudioFrameAdvance();
 	}
 

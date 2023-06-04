@@ -58,11 +58,13 @@ public:
 	virtual Class_T	ClassifyPassenger( CBaseCombatCharacter *pPassenger, Class_T defaultClassification );
 	virtual int		OnTakeDamage( const CTakeDamageInfo &info );
 	virtual float	PassengerDamageModifier( const CTakeDamageInfo &info );
+	virtual bool	CanControlVehicle( void );
+	virtual void	EnterVehicle( CBaseCombatCharacter *pPassenger );
 
 	// Weaponry
 	const Vector	&GetPrimaryGunOrigin( void );
 	void			AimPrimaryWeapon( const Vector &vecForward );
-	void			AimSecondaryWeaponAt( CBaseEntity *pTarget );
+	void			AimSecondaryWeaponAt( Vector vecTarget );
 	float			PrimaryWeaponFireTime( void ) { return m_flMachineGunTime; }
 	float			SecondaryWeaponFireTime( void ) { return m_flRocketTime; }
 	float			MaxAttackRange() const;
@@ -122,8 +124,9 @@ private:
 
 
 private:
-	// Danger sounds made by the APC
-	float	m_flDangerSoundTime;
+	float	m_flDangerSoundTime;	// Danger sounds made by the APC
+	float	m_flCoverTime;			// time your identity stays uncovered after firing from the apc
+//	float	m_flRegenTime;			// "health" regeneration timer
 
 	// handbrake after the fact to keep vehicles from rolling
 	float	m_flHandbrakeTime;
@@ -139,10 +142,12 @@ private:
 	int		m_iMachineGunBurstLeft;
 	Vector	m_vecBarrelPos;
 	bool	m_bInFiringCone;
+	bool	m_bLeftBarrel;
+	bool	m_bCoverBlown;		// if you fire on someone, it will blow your cover
 
 	// Rocket attacks
 	EHANDLE	m_hLaserDot;
-	EHANDLE m_hRocketTarget;
+	Vector	m_vecGrenadeTarget;
 	int		m_iRocketSalvoLeft;
 	float	m_flRocketTime;
 	int		m_nRocketAttachment;

@@ -328,13 +328,13 @@ void CNPC_CScanner::Activate()
 //------------------------------------------------------------------------------
 // Purpose: Override to split in two when attacked
 //------------------------------------------------------------------------------
-int CNPC_CScanner::OnTakeDamage_Alive( const CTakeDamageInfo &info )
+int CNPC_CScanner::OnTakeDamage( const CTakeDamageInfo &info )
 {
 	// Turn off my spotlight when shot
 	SpotlightDestroy();
 	m_fNextSpotlightTime = gpGlobals->curtime + 2.0f;
 
-	return (BaseClass::OnTakeDamage_Alive( info ));
+	return (BaseClass::OnTakeDamage( info ));
 }
 	
 //------------------------------------------------------------------------------
@@ -391,38 +391,17 @@ void CNPC_CScanner::Gib( void )
 //-----------------------------------------------------------------------------
 void CNPC_CScanner::Event_Killed( const CTakeDamageInfo &info )
 {
-	// Copy off the takedamage info that killed me, since we're not going to call
-	// up into the base class's Event_Killed() until we gib. (gibbing is ultimate death)
-	m_KilledInfo = info;	
-
 	DeployMine();
-
-	ClearInspectTarget();
-
-	// Interrupt whatever schedule I'm on
-	SetCondition(COND_SCHEDULE_DONE);
 
 	// Remove spotlight
 	SpotlightDestroy();
+	ClearInspectTarget();
 
 	// Remove sprite
 	UTIL_Remove(m_pEyeFlash);
 	m_pEyeFlash = NULL;
 
-	// If I have an enemy and I'm up high, do a dive bomb (unless dissolved)
-	if ( !m_bIsClawScanner && GetEnemy() != NULL && (info.GetDamageType() & DMG_DISSOLVE) == false )
-	{
-		Vector vecDelta = GetLocalOrigin() - GetEnemy()->GetLocalOrigin();
-		if ( ( vecDelta.z > 120 ) && ( vecDelta.Length() > 360 ) )
-		{	
-			// If I'm divebombing, don't take any more damage. It will make Event_Killed() be called again.
-			// This is especially bad if someone machineguns the divebombing scanner. 
-			AttackDivebomb();
-			return;
-		}
-	}
-
-	Gib();
+	BaseClass::Event_Killed( info );
 }
 
 
@@ -453,17 +432,23 @@ int CNPC_CScanner::TranslateSchedule( int scheduleType )
 
 		case SCHED_SCANNER_ATTACK:
 			{
-				//!!TODO; If the player is being swarmed by 2+ scanners, try to dish out each attack
+				// TODO; If the player is being swarmed by 2+ scanners, try to dish out each attack
 				// role evenly - assigning by odd/even squad numbers might work
 				// ex;
 				// if ( m_pSquad > 3 )
 				//		{ if me = 1,3,5 do gas, else flash }
-				if ( random->RandomInt(0,1) )
+				if ( m_pSquad )
 				{
-					return SCHED_CSCANNER_ATTACK_FLASH;
+					if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+						return SCHED_CSCANNER_ATTACK_GAS;
+					else
+						return SCHED_CSCANNER_ATTACK_FLASH;
 				}
 				else
 				{
+					if ( random->RandomInt(0,1) )
+						return SCHED_CSCANNER_ATTACK_FLASH;
+
 					return SCHED_CSCANNER_ATTACK_GAS;
 				}
 			}
@@ -1892,7 +1877,11 @@ void CNPC_CScanner::SpotlightUpdate(void)
 	m_hSpotlight->SetWidth(flNewWidth);
 	m_hSpotlight->SetEndWidth(flNewWidth);
 
-	m_hSpotlightTarget->m_flLightScale = 0.0;
+	// Adjust width of light on the end.  
+	if ( HasSpawnFlags(SF_CSCANNER_NO_DYNAMIC_LIGHT) )
+		m_hSpotlightTarget->m_flLightScale = 0.0;
+	else
+		m_hSpotlightTarget->m_flLightScale = flNewWidth;
 }
 
 //-----------------------------------------------------------------------------

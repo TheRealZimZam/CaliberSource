@@ -45,6 +45,7 @@ ConVar	g_debug_antlion( "g_debug_antlion", "0" );
 ConVar	sk_antlion_health( "sk_antlion_health", "0" );
 ConVar	sk_antlion_swipe_damage( "sk_antlion_swipe_damage", "0" );
 ConVar	sk_antlion_jump_damage( "sk_antlion_jump_damage", "0" );
+ConVar	sk_antlion_pounce_damage( "sk_antlion_pounce_damage", "0" );
 ConVar  sk_antlion_air_attack_dmg( "sk_antlion_air_attack_dmg", "0" );
 
 
@@ -71,12 +72,31 @@ ConVar g_debug_antlion_worker( "g_debug_antlion_worker", "0" );
 
 extern ConVar bugbait_radius;
 
+#define AE_USE_SWTICH 0
+#if AE_USE_SWTICH
+//Animation events
+//#define ANTLION_AE_					11
+#define	ANTLION_AE_FOOTSTEP_SOFT		12	//Soft footstep
+#define	ANTLION_AE_WALK_FOOTSTEP		13	//Normal footstep
+#define	ANTLION_AE_FOOTSTEP_HEAVY		14	//Hard footstep
+#define ANTLION_AE_MELEE_HIT1			15	//Melee hit, one arm
+#define ANTLION_AE_MELEE_HIT2			16	//Melee hit, both arms
+#define ANTLION_AE_MELEE_POUNCE			17
+#define	ANTLION_AE_START_JUMP			18	//Start of the jump
+#define	ANTLION_AE_BURROW_IN			19	//Burrowing in
+#define	ANTLION_AE_BURROW_OUT			20	//Burrowing out
+#define	ANTLION_AE_VANISH				21	//Vanish (invis and not solid)
+#define	ANTLION_AE_OPEN_WINGS			22	//Open wings (sound and bodygroup)
+#define	ANTLION_AE_CLOSE_WINGS			23  //Close wings (sound and bodygroup)
+#define	ANTLION_AE_MELEE1_SOUND			24
+#define	ANTLION_AE_MELEE2_SOUND			25
+#endif
 int AE_ANTLION_WALK_FOOTSTEP;
+int AE_ANTLION_FOOTSTEP_SOFT;
+int AE_ANTLION_FOOTSTEP_HEAVY;
 int AE_ANTLION_MELEE_HIT1;
 int AE_ANTLION_MELEE_HIT2;
 int AE_ANTLION_MELEE_POUNCE;
-int AE_ANTLION_FOOTSTEP_SOFT;
-int AE_ANTLION_FOOTSTEP_HEAVY;
 int AE_ANTLION_START_JUMP;
 int AE_ANTLION_BURROW_IN;
 int AE_ANTLION_BURROW_OUT;
@@ -91,11 +111,10 @@ int AE_ANTLION_WORKER_EXPLODE;
 int AE_ANTLION_WORKER_SPIT;
 int AE_ANTLION_WORKER_DONT_EXPLODE;
 
-
 //Attack range definitions
 #define	ANTLION_MELEE1_RANGE		100.0f
 #define	ANTLION_MELEE2_RANGE		64.0f
-#define	ANTLION_MELEE2_RANGE_MAX	175.0f
+#define	ANTLION_MELEE2_RANGE_MAX	180.0f
 #define	ANTLION_MELEE2_RANGE_MIN	64.0f
 #define	ANTLION_JUMP_MIN			128.0f
 
@@ -146,6 +165,9 @@ int ACT_ANTLION_POUNCE;
 int ACT_ANTLION_POUNCE_MOVING;
 int ACT_ANTLION_DROWN;
 int ACT_ANTLION_LAND;
+int ACT_ANTLION_CHARGE_IN;
+//int ACT_ANTLION_CHARGE_OUT;	//same as pounce_moving
+int ACT_ANTLION_CHARGE_LOOP;
 int ACT_ANTLION_WORKER_EXPLODE;
 
 
@@ -638,6 +660,13 @@ void CNPC_Antlion::Event_Killed( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CNPC_Antlion::MeleeAttack( float distance, float damage, QAngle &viewPunch, Vector &shove )
 {
+/*
+	if ( GetEnemy() == NULL )
+	{
+		AssertMsg( 0, "antlion in melee with no enemy!\n" );
+		return;
+	}
+*/
 	Vector vecForceDir;
 
 	// Always hurt bullseyes for now
@@ -1054,104 +1083,246 @@ void CNPC_Antlion::DelaySquadAttack( float flDuration )
 void CNPC_Antlion::HandleAnimEvent( animevent_t *pEvent )
 {
 #ifdef HL2_EPISODIC
-		// Handle the spit event
-		if ( pEvent->event == AE_ANTLION_WORKER_SPIT )
+	// Handle the spit event
+	if ( pEvent->event == AE_ANTLION_WORKER_SPIT )
+	{
+		if ( GetEnemy() )
 		{
-			if ( GetEnemy() )
-			{
-				Vector vSpitPos;
-				GetAttachment( "mouth", vSpitPos );
+			Vector vSpitPos;
+			GetAttachment( "mouth", vSpitPos );
 
-				Vector	vTarget;
+			Vector	vTarget;
 				
-				// If our enemy is looking at us and far enough away, lead him
-				if ( HasCondition( COND_ENEMY_FACING_ME ) && UTIL_DistApprox( GetAbsOrigin(), GetEnemy()->GetAbsOrigin() ) > (40*12) )
+			// If our enemy is looking at us and far enough away, lead him
+			if ( HasCondition( COND_ENEMY_FACING_ME ) && UTIL_DistApprox( GetAbsOrigin(), GetEnemy()->GetAbsOrigin() ) > (40*12) )
+			{
+				UTIL_PredictedPosition( GetEnemy(), 0.5f, &vTarget ); 
+				vTarget.z = GetEnemy()->GetAbsOrigin().z;
+			}
+			else
+			{
+				// Otherwise he can't see us and he won't be able to dodge
+				vTarget = GetEnemy()->BodyTarget( vSpitPos, true );
+			}
+				
+			vTarget[2] += random->RandomFloat( 0.0f, 32.0f );
+				
+			// Try and spit at our target
+			Vector	vecToss;				
+			if ( GetSpitVector( vSpitPos, vTarget, &vecToss ) == false )
+			{
+				// Now try where they were
+				if ( GetSpitVector( vSpitPos, m_vSavePosition, &vecToss ) == false )
 				{
-					UTIL_PredictedPosition( GetEnemy(), 0.5f, &vTarget ); 
-					vTarget.z = GetEnemy()->GetAbsOrigin().z;
+					// Failing that, just shoot with the old velocity we calculated initially!
+					vecToss = m_vecSaveSpitVelocity;
+				}
+			}
+
+			// Find what our vertical theta is to estimate the time we'll impact the ground
+			Vector vecToTarget = ( vTarget - vSpitPos );
+			VectorNormalize( vecToTarget );
+			float flVelocity = VectorNormalize( vecToss );
+			float flCosTheta = DotProduct( vecToTarget, vecToss );
+			float flTime = (vSpitPos-vTarget).Length2D() / ( flVelocity * flCosTheta );
+
+			// Emit a sound where this is going to hit so that targets get a chance to act correctly
+			CSoundEnt::InsertSound( SOUND_DANGER, vTarget, (15*12), flTime, this );
+
+			// Don't fire again until this volley would have hit the ground (with some lag behind it)
+			SetNextAttack( gpGlobals->curtime + flTime + random->RandomFloat( 0.5f, 2.0f ) );
+
+			// Tell any squadmates not to fire for some portion of the time this volley will be in the air (except on hard)
+			if ( g_pGameRules->IsSkillLevel( SKILL_HARD ) == false )
+				DelaySquadAttack( flTime );
+
+			for ( int i = 0; i < 6; i++ )
+			{
+				CGrenadeSpit *pGrenade = (CGrenadeSpit*) CreateEntityByName( "grenade_spit" );
+				pGrenade->SetAbsOrigin( vSpitPos );
+				pGrenade->SetAbsAngles( vec3_angle );
+				DispatchSpawn( pGrenade );
+				pGrenade->SetThrower( this );
+				pGrenade->SetOwnerEntity( this );
+										
+				if ( i == 0 )
+				{
+					pGrenade->SetSpitType( SPIT, LARGE );
+					pGrenade->SetAbsVelocity( vecToss * flVelocity );
 				}
 				else
 				{
-					// Otherwise he can't see us and he won't be able to dodge
-					vTarget = GetEnemy()->BodyTarget( vSpitPos, true );
-				}
-				
-				vTarget[2] += random->RandomFloat( 0.0f, 32.0f );
-				
-				// Try and spit at our target
-				Vector	vecToss;				
-				if ( GetSpitVector( vSpitPos, vTarget, &vecToss ) == false )
-				{
-					// Now try where they were
-					if ( GetSpitVector( vSpitPos, m_vSavePosition, &vecToss ) == false )
-					{
-						// Failing that, just shoot with the old velocity we calculated initially!
-						vecToss = m_vecSaveSpitVelocity;
-					}
+					pGrenade->SetAbsVelocity( ( vecToss + RandomVector( -0.035f, 0.035f ) ) * flVelocity );
+					pGrenade->SetSpitType( SPIT, random->RandomInt( SMALL, MEDIUM ) );
 				}
 
-				// Find what our vertical theta is to estimate the time we'll impact the ground
-				Vector vecToTarget = ( vTarget - vSpitPos );
-				VectorNormalize( vecToTarget );
-				float flVelocity = VectorNormalize( vecToss );
-				float flCosTheta = DotProduct( vecToTarget, vecToss );
-				float flTime = (vSpitPos-vTarget).Length2D() / ( flVelocity * flCosTheta );
-
-				// Emit a sound where this is going to hit so that targets get a chance to act correctly
-				CSoundEnt::InsertSound( SOUND_DANGER, vTarget, (15*12), flTime, this );
-
-				// Don't fire again until this volley would have hit the ground (with some lag behind it)
-				SetNextAttack( gpGlobals->curtime + flTime + random->RandomFloat( 0.5f, 2.0f ) );
-
-				// Tell any squadmates not to fire for some portion of the time this volley will be in the air (except on hard)
-				if ( g_pGameRules->IsSkillLevel( SKILL_HARD ) == false )
-					DelaySquadAttack( flTime );
-
-				for ( int i = 0; i < 6; i++ )
-				{
-					CGrenadeSpit *pGrenade = (CGrenadeSpit*) CreateEntityByName( "grenade_spit" );
-					pGrenade->SetAbsOrigin( vSpitPos );
-					pGrenade->SetAbsAngles( vec3_angle );
-					DispatchSpawn( pGrenade );
-					pGrenade->SetThrower( this );
-					pGrenade->SetOwnerEntity( this );
-										
-					if ( i == 0 )
-					{
-						pGrenade->SetSpitType( SPIT, LARGE );
-						pGrenade->SetAbsVelocity( vecToss * flVelocity );
-					}
-					else
-					{
-						pGrenade->SetAbsVelocity( ( vecToss + RandomVector( -0.035f, 0.035f ) ) * flVelocity );
-						pGrenade->SetSpitType( SPIT, random->RandomInt( SMALL, MEDIUM ) );
-					}
-
-					// Tumble through the air
-					pGrenade->SetLocalAngularVelocity(
-						QAngle( random->RandomFloat( -250, -500 ),
-								random->RandomFloat( -250, -500 ),
-								random->RandomFloat( -250, -500 ) ) );
-				}
-
-				for ( int i = 0; i < 8; i++ )
-				{
-					DispatchParticleEffect( "blood_impact_yellow_01", vSpitPos + RandomVector( -12.0f, 12.0f ), RandomAngle( 0, 360 ) );
-				}
-
-				EmitSound( "NPC_Antlion.PoisonShoot" );
+				// Tumble through the air
+				pGrenade->SetLocalAngularVelocity(
+					QAngle( random->RandomFloat( -250, -500 ),
+							random->RandomFloat( -250, -500 ),
+							random->RandomFloat( -250, -500 ) ) );
 			}
-			return;
-		}
 
-		if ( pEvent->event == AE_ANTLION_WORKER_DONT_EXPLODE )
+			for ( int i = 0; i < 8; i++ )
+			{
+				DispatchParticleEffect( "blood_impact_yellow_01", vSpitPos + RandomVector( -12.0f, 12.0f ), RandomAngle( 0, 360 ) );
+			}
+
+			EmitSound( "NPC_Antlion.PoisonShoot" );
+		}
+		return;
+	}
+
+	if ( pEvent->event == AE_ANTLION_WORKER_DONT_EXPLODE )
+	{
+		m_bDontExplode = true;
+		return;
+	}
+
+	// antlion worker events
+	if ( pEvent->event == AE_ANTLION_WORKER_EXPLODE_SCREAM )
+	{
+		if ( GetWaterLevel() < 2 )
 		{
-			m_bDontExplode = true;
-			return;
+			EmitSound( "NPC_Antlion.PoisonBurstScream" );
 		}
+		else
+		{
+			EmitSound( "NPC_Antlion.PoisonBurstScreamSubmerged" );
+		}
+		return;
+	}
 
+	if ( pEvent->event == AE_ANTLION_WORKER_EXPLODE_WARN )
+	{
+		CSoundEnt::InsertSound( SOUND_PHYSICS_DANGER, GetAbsOrigin(), sk_antlion_worker_burst_radius.GetFloat(), 0.5f, this );
+		return;
+	}
+
+	if ( pEvent->event == AE_ANTLION_WORKER_EXPLODE )
+	{
+		CTakeDamageInfo info( this, this, sk_antlion_worker_burst_damage.GetFloat(), DMG_BLAST_SURFACE | ( ANTLION_WORKER_BURST_IS_POISONOUS() ? DMG_POISON : DMG_ACID ) );
+		Event_Gibbed( info );
+		return;
+	}
 #endif // HL2_EPISODIC
 
+#if AE_USE_SWTICH
+	switch ( pEvent->event )
+	{
+	case ANTLION_AE_OPEN_WINGS:
+		SetWings( true );
+		return;
+		break;
+
+	case ANTLION_AE_CLOSE_WINGS:
+		SetWings( false );
+		return;
+		break;
+
+	case ANTLION_AE_VANISH:
+		AddSolidFlags( FSOLID_NOT_SOLID );
+		m_takedamage = DAMAGE_NO;
+		AddEffects( EF_NODRAW );
+		SetWings( false );
+
+		return;
+		break;
+
+	case ANTLION_AE_BURROW_IN:
+		{
+		//Burrowing sound
+		EmitSound( "NPC_Antlion.BurrowIn" );
+
+		//Shake the screen
+		UTIL_ScreenShake( GetAbsOrigin(), 0.5f, 80.0f, 1.0f, 256.0f, SHAKE_START );
+
+		//Throw dust up
+		CreateDust();
+
+		if ( GetHintNode() )
+		{
+			GetHintNode()->Unlock( 2.0f );
+		}
+
+		return;
+		}
+		break;
+
+	case ANTLION_AE_BURROW_OUT:	
+		{
+		EmitSound( "NPC_Antlion.BurrowOut" );
+
+		//Shake the screen
+		UTIL_ScreenShake( GetAbsOrigin(), 0.5f, 80.0f, 1.0f, 256.0f, SHAKE_START );
+
+		//Throw dust up
+		CreateDust();
+
+		RemoveEffects( EF_NODRAW );
+		RemoveFlag( FL_NOTARGET );
+
+		return;
+		}
+		break;
+
+	case ANTLION_AE_FOOTSTEP_SOFT:
+		{
+		EmitSound( "NPC_Antlion.FootstepSoft", pEvent->eventtime );
+		return;
+		}
+		break;
+	
+	case ANTLION_AE_WALK_FOOTSTEP:
+		{
+		MakeAIFootstepSound( 240.0f );
+		EmitSound( "NPC_Antlion.Footstep", m_hFootstep, pEvent->eventtime );
+		return;
+		}
+		break;
+
+	case ANTLION_AE_FOOTSTEP_HEAVY:
+		{
+			EmitSound( "NPC_Antlion.FootstepHeavy", pEvent->eventtime );
+			return;
+		}
+		break;
+
+	case ANTLION_AE_MELEE_HIT1:
+		MeleeAttack( ANTLION_MELEE1_RANGE, sk_antlion_swipe_damage.GetFloat(), QAngle( 20.0f, 0.0f, -12.0f ), Vector( -250.0f, 1.0f, 1.0f ) );
+		return;
+		break;
+
+	case ANTLION_AE_MELEE_HIT2:
+		MeleeAttack( ANTLION_MELEE1_RANGE, sk_antlion_swipe_damage.GetFloat(), QAngle( 20.0f, 0.0f, 0.0f ), Vector( -350.0f, 1.0f, 1.0f ) );
+		return;
+		break;
+
+	case ANTLION_AE_MELEE_POUNCE:
+		MeleeAttack( ANTLION_MELEE2_RANGE, sk_antlion_pounce_damage.GetFloat(), QAngle( 4.0f, 0.0f, 0.0f ), Vector( -250.0f, 1.0f, 1.0f ) );
+		return;
+		break;
+
+	case ANTLION_AE_MELEE1_SOUND:
+		{
+			EmitSound( "NPC_Antlion.MeleeAttackSingle" );
+			return;
+		}
+		break;
+
+	case ANTLION_AE_MELEE2_SOUND:
+		{
+			EmitSound( "NPC_Antlion.MeleeAttackDouble" );
+			return;
+		}
+		break;
+
+	case ANTLION_AE_START_JUMP:
+		StartJump();
+		return;
+		break;
+	}
+#else
 	if ( pEvent->event == AE_ANTLION_WALK_FOOTSTEP )
 	{
 		MakeAIFootstepSound( 240.0f );
@@ -1173,7 +1344,7 @@ void CNPC_Antlion::HandleAnimEvent( animevent_t *pEvent )
 
 	if ( pEvent->event == AE_ANTLION_MELEE_POUNCE )
 	{
-		MeleeAttack( ANTLION_MELEE2_RANGE, sk_antlion_swipe_damage.GetFloat(), QAngle( 4.0f, 0.0f, 0.0f ), Vector( -250.0f, 1.0f, 1.0f ) );
+		MeleeAttack( ANTLION_MELEE2_RANGE, sk_antlion_pounce_damage.GetFloat(), QAngle( 4.0f, 0.0f, 0.0f ), Vector( -250.0f, 1.0f, 1.0f ) );
 		return;
 	}
 		
@@ -1264,36 +1435,7 @@ void CNPC_Antlion::HandleAnimEvent( animevent_t *pEvent )
 		StartJump();
 		return;
 	}
-
-	// antlion worker events
-#if HL2_EPISODIC
-	if ( pEvent->event == AE_ANTLION_WORKER_EXPLODE_SCREAM )
-	{
-		if ( GetWaterLevel() < 2 )
-		{
-			EmitSound( "NPC_Antlion.PoisonBurstScream" );
-		}
-		else
-		{
-			EmitSound( "NPC_Antlion.PoisonBurstScreamSubmerged" );
-		}
-		return;
-	}
-
-	if ( pEvent->event == AE_ANTLION_WORKER_EXPLODE_WARN )
-	{
-		CSoundEnt::InsertSound( SOUND_PHYSICS_DANGER, GetAbsOrigin(), sk_antlion_worker_burst_radius.GetFloat(), 0.5f, this );
-		return;
-	}
-
-	if ( pEvent->event == AE_ANTLION_WORKER_EXPLODE )
-	{
-		CTakeDamageInfo info( this, this, sk_antlion_worker_burst_damage.GetFloat(), DMG_BLAST_SURFACE | ( ANTLION_WORKER_BURST_IS_POISONOUS() ? DMG_POISON : DMG_ACID ) );
-		Event_Gibbed( info );
-		return;
-	}
 #endif
-	
 	BaseClass::HandleAnimEvent( pEvent );
 }
 
@@ -2273,134 +2415,137 @@ int CNPC_Antlion::SelectSchedule( void )
 	if ( m_bStartBurrowed )
 		return SCHED_ANTLION_WAIT_FOR_UNBORROW_TRIGGER;
 
-	// See if a friendly player is pushing us away
-	if ( HasCondition( COND_PLAYER_PUSHING ) )
-		return SCHED_MOVE_AWAY;
-
-	//Flipped?
-	if ( HasCondition( COND_ANTLION_FLIPPED ) )
+	if ( m_NPCState != NPC_STATE_SCRIPT )
 	{
-		ClearCondition( COND_ANTLION_FLIPPED );
-		
-		// See if it's a forced, electrical flip
-		if ( m_flZapDuration > gpGlobals->curtime )
+		// See if a friendly player is pushing us away
+		if ( HasCondition( COND_PLAYER_PUSHING ) )
+			return SCHED_MOVE_AWAY;
+
+		//Flipped?
+		if ( HasCondition( COND_ANTLION_FLIPPED ) )
 		{
-			SetContextThink( &CNPC_Antlion::ZapThink, gpGlobals->curtime, "ZapThink" );
-			return SCHED_ANTLION_ZAP_FLIP;
+			ClearCondition( COND_ANTLION_FLIPPED );
+
+	#if 0
+			// See if it's a forced, electrical flip
+			if ( m_flZapDuration > gpGlobals->curtime )
+			{
+				SetContextThink( &CNPC_Antlion::ZapThink, gpGlobals->curtime, "ZapThink" );
+				return SCHED_ANTLION_ZAP_FLIP;
+			}
+	#endif
+			// Regular flip
+			return SCHED_ANTLION_FLIP;
 		}
 
-		// Regular flip
-		return SCHED_ANTLION_FLIP;
-	}
+		if( HasCondition( COND_ANTLION_IN_WATER ) )
+		{
+			// No matter what, drown in water
+			return SCHED_ANTLION_DROWN;
+		}
 
-	if( HasCondition( COND_ANTLION_IN_WATER ) )
-	{
-		// No matter what, drown in water
-		return SCHED_ANTLION_DROWN;
-	}
+		// If we're flagged to burrow away when eluded, do so
+		if ( ( m_spawnflags & SF_ANTLION_BURROW_ON_ELUDED ) && ( HasCondition( COND_ENEMY_UNREACHABLE ) || HasCondition( COND_ENEMY_TOO_FAR ) ) )
+			return SCHED_ANTLION_BURROW_AWAY;
 
-	// If we're flagged to burrow away when eluded, do so
-	if ( ( m_spawnflags & SF_ANTLION_BURROW_ON_ELUDED ) && ( HasCondition( COND_ENEMY_UNREACHABLE ) || HasCondition( COND_ENEMY_TOO_FAR ) ) )
-		return SCHED_ANTLION_BURROW_AWAY;
+		//Hear a thumper?
+		if ( HasCondition( COND_HEAR_THUMPER ) )
+		{
+			// Ignore thumpers that aren't visible
+			CSound *pSound = GetLoudestSoundOfType( SOUND_THUMPER );
+			
+			if ( pSound )
+			{
+				CTakeDamageInfo info;
+				PainSound( info );
+				ClearCondition( COND_HEAR_THUMPER );
 
-	//Hear a thumper?
-	if ( HasCondition( COND_HEAR_THUMPER ) )
-	{
-		// Ignore thumpers that aren't visible
-		CSound *pSound = GetLoudestSoundOfType( SOUND_THUMPER );
-		
-		if ( pSound )
+				return SCHED_ANTLION_FLEE_THUMPER;
+			}
+		}
+
+		//Hear a physics danger sound?
+		if( HasCondition( COND_HEAR_PHYSICS_DANGER ) )
 		{
 			CTakeDamageInfo info;
 			PainSound( info );
-			ClearCondition( COND_HEAR_THUMPER );
-
-			return SCHED_ANTLION_FLEE_THUMPER;
+			return SCHED_ANTLION_FLEE_PHYSICS_DANGER;
 		}
-	}
 
-	//Hear a physics danger sound?
-	if( HasCondition( COND_HEAR_PHYSICS_DANGER ) )
-	{
-		CTakeDamageInfo info;
-		PainSound( info );
-		return SCHED_ANTLION_FLEE_PHYSICS_DANGER;
-	}
-
-	//On another NPC's head?
-	if( HasCondition( COND_ANTLION_ON_NPC ) )
-	{
-		// You're on an NPC's head. Get off.
-		return SCHED_ANTLION_DISMOUNT_NPC;
-	}
-
-	// If we're scripted to jump at a target, do so
-	if ( HasCondition( COND_ANTLION_CAN_JUMP_AT_TARGET ) )
-	{
-		// NDebugOverlay::Cross3D( m_vecSavedJump, 32.0f, 255, 0, 0, true, 2.0f );
-		ClearCondition( COND_ANTLION_CAN_JUMP_AT_TARGET );
-		return SCHED_ANTLION_JUMP;
-	}
-
-	//Hear bug bait splattered?
-	if ( HasCondition( COND_HEAR_BUGBAIT ) && ( m_bIgnoreBugbait == false ) )
-	{
-		//Play a special sound
-		if ( m_flNextAcknowledgeTime < gpGlobals->curtime )
+		//On another NPC's head?
+		if( HasCondition( COND_ANTLION_ON_NPC ) )
 		{
-			EmitSound( "NPC_Antlion.Distracted" );
-			m_flNextAcknowledgeTime = gpGlobals->curtime + 1.0f;
+			// You're on an NPC's head. Get off.
+			return SCHED_ANTLION_DISMOUNT_NPC;
 		}
-		
-		m_flIdleDelay = gpGlobals->curtime + 4.0f;
 
-		//If the sound is valid, act upon it
-		if ( m_bHasHeardSound )
-		{		
-			//Mark anything in the area as more interesting
-			CBaseEntity *pTarget = NULL;
-			CBaseEntity *pNewEnemy = NULL;
-			Vector		soundOrg = m_vecHeardSound;
+		// If we're scripted to jump at a target, do so
+		if ( HasCondition( COND_ANTLION_CAN_JUMP_AT_TARGET ) )
+		{
+			// NDebugOverlay::Cross3D( m_vecSavedJump, 32.0f, 255, 0, 0, true, 2.0f );
+			ClearCondition( COND_ANTLION_CAN_JUMP_AT_TARGET );
+			return SCHED_ANTLION_JUMP;
+		}
 
-			//Find all entities within that sphere
-			while ( ( pTarget = gEntList.FindEntityInSphere( pTarget, soundOrg, bugbait_radius.GetInt() ) ) != NULL )
+		//Hear bug bait splattered?
+		if ( HasCondition( COND_HEAR_BUGBAIT ) && ( m_bIgnoreBugbait == false ) )
+		{
+			//Play a special sound
+			if ( m_flNextAcknowledgeTime < gpGlobals->curtime )
 			{
-				CAI_BaseNPC *pNPC = pTarget->MyNPCPointer();
+				EmitSound( "NPC_Antlion.Distracted" );
+				m_flNextAcknowledgeTime = gpGlobals->curtime + 1.0f;
+			}
+			
+			m_flIdleDelay = gpGlobals->curtime + 4.0f;
 
-				if ( pNPC == NULL )
-					continue;
+			//If the sound is valid, act upon it
+			if ( m_bHasHeardSound )
+			{		
+				//Mark anything in the area as more interesting
+				CBaseEntity *pTarget = NULL;
+				CBaseEntity *pNewEnemy = NULL;
+				Vector		soundOrg = m_vecHeardSound;
 
-				if ( pNPC->CanBeAnEnemyOf( this ) == false )
-					continue;
-
-				//Check to see if the default relationship is hatred, and if so intensify that
-				if ( ( IRelationType( pNPC ) == D_HT ) && ( pNPC->IsPlayer() == false ) )
+				//Find all entities within that sphere
+				while ( ( pTarget = gEntList.FindEntityInSphere( pTarget, soundOrg, bugbait_radius.GetInt() ) ) != NULL )
 				{
-					AddEntityRelationship( pNPC, D_HT, 99 );
-					
-					//Try to spread out the enemy distribution
-					if ( ( pNewEnemy == NULL ) || ( random->RandomInt( 0, 1 ) ) )
-					{
-						pNewEnemy = pNPC;
+					CAI_BaseNPC *pNPC = pTarget->MyNPCPointer();
+
+					if ( pNPC == NULL )
 						continue;
+
+					if ( pNPC->CanBeAnEnemyOf( this ) == false )
+						continue;
+
+					//Check to see if the default relationship is hatred, and if so intensify that
+					if ( ( IRelationType( pNPC ) == D_HT ) && ( pNPC->IsPlayer() == false ) )
+					{
+						AddEntityRelationship( pNPC, D_HT, 99 );
+						
+						//Try to spread out the enemy distribution
+						if ( ( pNewEnemy == NULL ) || ( random->RandomInt( 0, 1 ) ) )
+						{
+							pNewEnemy = pNPC;
+							continue;
+						}
 					}
 				}
-			}
-			
-			// If we have a new enemy, take it
-			if ( pNewEnemy != NULL )
-			{
-				//Setup our ignore info
-				SetEnemy( pNewEnemy );
-			}
-			
-			ClearCondition( COND_HEAR_BUGBAIT );
+				
+				// If we have a new enemy, take it
+				if ( pNewEnemy != NULL )
+				{
+					//Setup our ignore info
+					SetEnemy( pNewEnemy );
+				}
+				
+				ClearCondition( COND_HEAR_BUGBAIT );
 
-			return SCHED_ANTLION_CHASE_BUGBAIT;
+				return SCHED_ANTLION_CHASE_BUGBAIT;
+			}
 		}
 	}
-
-	if( m_AssaultBehavior.CanSelectSchedule() )
+	else if( m_AssaultBehavior.CanSelectSchedule() )
 	{
 		DeferSchedulingToBehavior( &m_AssaultBehavior );
 		return BaseClass::SelectSchedule();
@@ -2434,14 +2579,14 @@ int CNPC_Antlion::SelectSchedule( void )
 				{
 					SetNextAttack( gpGlobals->curtime + random->RandomFloat( 2.0f, 4.0f ) );
 					ClearCondition( COND_ANTLION_SQUADMATE_KILLED );
-					return SCHED_ANTLION_TAKE_COVER_FROM_ENEMY;
+					return SCHED_TAKE_COVER_FROM_ENEMY;
 				}
 
 				// Flee on heavy damage
 				if ( HasCondition( COND_HEAVY_DAMAGE ) )
 				{
 					SetNextAttack( gpGlobals->curtime + random->RandomFloat( 2.0f, 4.0f ) );
-					return SCHED_ANTLION_TAKE_COVER_FROM_ENEMY;
+					return SCHED_TAKE_COVER_FROM_ENEMY;
 				}
 
 				// Range attack if we're able
@@ -2484,8 +2629,8 @@ int CNPC_Antlion::SelectSchedule( void )
 
 					if ( m_bLeapAttack == true )
 						return SCHED_ANTLION_POUNCE_MOVING;
-					else
-						return SCHED_ANTLION_POUNCE;
+
+					return SCHED_ANTLION_POUNCE;
 				}
 
 				// Try to jump
@@ -2680,7 +2825,7 @@ void CNPC_Antlion::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDi
 		if ( !IsRunningDynamicInteraction() )
  		{
 			//Grenades, physcannons, and physics impacts make us fuh-lip!
-			
+#if 0
 			if( hl2_episodic.GetBool() )
 			{
 				PainSound( newInfo );
@@ -2697,19 +2842,18 @@ void CNPC_Antlion::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDi
 				ApplyAbsVelocityImpulse( vecForce );
 				SetGroundEntity( NULL );
 			}
-			else
+#endif
+
+			//Don't flip off the deck
+			if ( GetFlags() & FL_ONGROUND )
 			{
-				//Don't flip off the deck
-				if ( GetFlags() & FL_ONGROUND )
-				{
-					PainSound( newInfo );
+				PainSound( newInfo );
 
-					SetCondition( COND_ANTLION_FLIPPED );
+				SetCondition( COND_ANTLION_FLIPPED );
 
-					//Get tossed!
-					ApplyAbsVelocityImpulse( ( vecShoveDir * random->RandomInt( 500.0f, 1000.0f ) ) + Vector(0,0,64.0f) );
-					SetGroundEntity( NULL );
-				}
+				//Get tossed!
+				ApplyAbsVelocityImpulse( ( vecShoveDir * random->RandomInt( 500.0f, 1000.0f ) ) + Vector(0,0,64.0f) );
+				SetGroundEntity( NULL );
 			}
 		}
 	}
@@ -2745,7 +2889,11 @@ void CNPC_Antlion::IdleSound( void )
 //-----------------------------------------------------------------------------
 void CNPC_Antlion::PainSound( const CTakeDamageInfo &info )
 {
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
+
 	EmitSound( "NPC_Antlion.Pain" );
+	m_flNextPainSoundTime = gpGlobals->curtime + 1;
 }
 
 //-----------------------------------------------------------------------------
@@ -2961,7 +3109,8 @@ int CNPC_Antlion::MeleeAttack2Conditions( float flDot, float flDist )
 	if ( tr.fraction < 1.0f )
 		return 0;
 
-	if ( IsMoving() )
+	// Must be already moving semi-quickly to do a leaping thrust
+	if ( m_flGroundSpeed > 10.0f )
 		 m_bLeapAttack = true;
 	else
 		 m_bLeapAttack = false;
@@ -3288,9 +3437,12 @@ bool CNPC_Antlion::FindBurrow( const Vector &origin, float distance, int type, b
 
 void CNPC_Antlion::BurrowUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
+	if ( IsAlive() == false )
+		return;
+
 	//Don't allow us to do this again
 	SetUse( NULL );
-	
+
 	//Allow idle sounds again
 	m_spawnflags &= ~SF_NPC_GAG;
 
@@ -3347,7 +3499,7 @@ bool CNPC_Antlion::CheckLanding( void )
 				CBasePlayer *pPlayer = ToBasePlayer( GetEnemy() );
 
 				if ( pPlayer && pPlayer->IsInAVehicle() == false )
-					 MeleeAttack( ANTLION_MELEE1_RANGE, sk_antlion_swipe_damage.GetFloat(), QAngle( 4.0f, 0.0f, 0.0f ), Vector( -250.0f, 1.0f, 1.0f ) );
+					 MeleeAttack( ANTLION_MELEE1_RANGE, sk_antlion_jump_damage.GetFloat(), QAngle( 4.0f, 0.0f, 0.0f ), Vector( -250.0f, 1.0f, 1.0f ) );
 			}
 
 			SetAbsVelocity( GetAbsVelocity() * 0.33f );
@@ -3450,10 +3602,7 @@ void CNPC_Antlion::Unburrow( void )
 //-----------------------------------------------------------------------------
 void CNPC_Antlion::InputUnburrow( inputdata_t &inputdata )
 {
-	if ( IsAlive() == false )
-		return;
-
-	SetSchedule( SCHED_ANTLION_WAIT_UNBORROW );
+	BurrowUse( inputdata.pActivator, inputdata.pCaller, USE_ON, 0 );
 }
 
 //-----------------------------------------------------------------------------
@@ -4579,6 +4728,9 @@ AI_BEGIN_CUSTOM_NPC( npc_antlion, CNPC_Antlion )
 	DECLARE_ACTIVITY( ACT_ANTLION_POUNCE_MOVING )
 	DECLARE_ACTIVITY( ACT_ANTLION_DROWN )
 	DECLARE_ACTIVITY( ACT_ANTLION_LAND )
+	DECLARE_ACTIVITY( ACT_ANTLION_CHARGE_IN )
+//	DECLARE_ACTIVITY( ACT_ANTLION_CHARGE_OUT )	//Same as pounce_moving
+	DECLARE_ACTIVITY( ACT_ANTLION_CHARGE_LOOP )
 	DECLARE_ACTIVITY( ACT_ANTLION_WORKER_EXPLODE )
 	DECLARE_ACTIVITY( ACT_ANTLION_ZAP_FLIP )
 
@@ -4761,7 +4913,7 @@ AI_BEGIN_CUSTOM_NPC( npc_antlion, CNPC_Antlion )
 		"		TASK_RUN_PATH							0"
 		"		TASK_WAIT_FOR_MOVEMENT					0"
 		"		TASK_STOP_MOVING						0"
-		"		TASK_PLAY_SEQUENCE						ACTIVITY:ACT_ANTLION_DISTRACT_ARRIVED"
+		"		TASK_PLAY_SEQUENCE						ACTIVITY:ACT_ANTLION_DISTRACT"
 		""
 		"	Interrupts"
 		"		COND_TASK_FAILED"
@@ -4793,6 +4945,7 @@ AI_BEGIN_CUSTOM_NPC( npc_antlion, CNPC_Antlion )
 	//==================================================
 	// SCHED_ANTLION_ZAP_FLIP 
 	//==================================================
+#if 0
 	DEFINE_SCHEDULE
 	(
 		SCHED_ANTLION_ZAP_FLIP,
@@ -4805,7 +4958,8 @@ AI_BEGIN_CUSTOM_NPC( npc_antlion, CNPC_Antlion )
 		"	Interrupts"
 		"		COND_TASK_FAILED"
 	)
-	
+#endif
+
 	//==================================================
 	// SCHED_ANTLION_FLIP
 	//==================================================
@@ -5011,7 +5165,7 @@ AI_BEGIN_CUSTOM_NPC( npc_antlion, CNPC_Antlion )
 		SCHED_ANTLION_WORKER_RUN_RANDOM,
 
 		"	Tasks"
-		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_ANTLION_TAKE_COVER_FROM_ENEMY"
+		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_TAKE_COVER_FROM_ENEMY"
 		"		TASK_SET_TOLERANCE_DISTANCE		48"
 		"		TASK_SET_ROUTE_SEARCH_TIME		1"	// Spend 1 second trying to build a path if stuck
 		"		TASK_GET_PATH_TO_RANDOM_NODE	128"
@@ -5021,22 +5175,6 @@ AI_BEGIN_CUSTOM_NPC( npc_antlion, CNPC_Antlion )
 		"	Interrupts"
 		"		COND_TASK_FAILED"
 		"		COND_CAN_RANGE_ATTACK1"
-	)
-
-	DEFINE_SCHEDULE
-	(
-		SCHED_ANTLION_TAKE_COVER_FROM_ENEMY,
-
-		"	Tasks"
-		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAIL_TAKE_COVER"
-		"		TASK_FIND_COVER_FROM_ENEMY		0"
-		"		TASK_RUN_PATH					0"
-		"		TASK_WAIT_FOR_MOVEMENT			0"
-		"		TASK_STOP_MOVING				0"
-		""
-		"	Interrupts"
-		"		COND_TASK_FAILED"
-		"		COND_NEW_ENEMY"
 	)
 
 	DEFINE_SCHEDULE

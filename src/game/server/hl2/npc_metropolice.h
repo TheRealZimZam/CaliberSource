@@ -27,8 +27,7 @@
 #include "ai_sentence.h"
 #include "props.h"
 
-//class CNPC_MetroPolice;
-
+//TODO; CAI_BaseActor->CNPC_Combine?
 class CNPC_MetroPolice : public CAI_BaseActor
 {
 	DECLARE_DATADESC();
@@ -285,7 +284,7 @@ private:
 	};
 
 private:
-	int				m_iPistolClips;		// How many clips the cop has in reserve
+//	int				m_iPistolClips;		// How many clips the cop has in reserve
 	int				m_iManhacks;		// How many manhacks the cop has
 	bool			m_fWeaponDrawn;		// Is my weapon drawn? (ready to use)
 	bool			m_fCanPoint;		// Can only point once per time spent in combat state.

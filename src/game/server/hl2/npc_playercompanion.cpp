@@ -1133,7 +1133,12 @@ int CNPC_PlayerCompanion::SelectCombatSchedule()
 		if ( HasCondition( COND_ENEMY_OCCLUDED ) )
 		{
 			if( GetEnemy() && !(GetEnemy()->GetFlags() & FL_NOTARGET) )
+			{
+				if( HasCondition( COND_CAN_RANGE_ATTACK2 ) && OccupyStrategySlot( SQUAD_SLOT_ATTACK1 ) )
+					return SCHED_RANGE_ATTACK2;
+
 				return SCHED_ESTABLISH_LINE_OF_FIRE;
+			}
 
 			// Fallback case
 			Remember( bits_MEMORY_INCOVER );
@@ -1847,12 +1852,7 @@ Activity CNPC_PlayerCompanion::NPC_TranslateActivity( Activity activity )
 		//Allow aiming to be overridden by hurt - citizens will still move and shoot, but they'll limp while doing so
 		case ACT_RUN:
 		case ACT_RUN_AIM:
-			if ( IsOnFire() && HaveSequenceForActivity( ACT_RUN_ON_FIRE ) )
-			{
-				// flail around!
-				return ACT_RUN_ON_FIRE;
-			}
-			else if ( ( IsCurSchedule( SCHED_TAKE_COVER_FROM_BEST_SOUND ) || IsCurSchedule( SCHED_FLEE_FROM_BEST_SOUND ) ) )
+			if ( ( IsCurSchedule( SCHED_TAKE_COVER_FROM_BEST_SOUND ) || IsCurSchedule( SCHED_FLEE_FROM_BEST_SOUND ) ) )
 			{
 				if ( random->RandomInt( 0, 1 ) && HaveSequenceForActivity( ACT_RUN_PROTECTED ) )
 					activity = ACT_RUN_PROTECTED;
@@ -2006,7 +2006,7 @@ int CNPC_PlayerCompanion::GetSoundInterests()
 			SOUND_DANGER			|
 			SOUND_PHYSICS_DANGER	|
 			SOUND_BULLET_IMPACT		|
-			SOUND_CARCASS			|
+			SMELL_CARCASS			|
 			SOUND_MOVE_AWAY			|
 			SOUND_VEHICLE			|
 			SOUND_READINESS_LOW		|
@@ -2053,11 +2053,6 @@ void CNPC_PlayerCompanion::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 		}
 	}
 	set.AppendCriteria( "num_enemies", UTIL_VarArgs( "%d", iNumEnemies ) );
-
-	if ( HasCondition( COND_ON_FIRE ) )
-	{
-		set.AppendCriteria( "hurt_by_fire", "1" );
-	}
 
 	if ( m_bReadinessCapable )
 	{
@@ -3884,9 +3879,9 @@ bool CNPC_PlayerCompanion::ShouldGib( const CTakeDamageInfo &info )
 		return true;
 
 	// If the last attack did so much damage i'm in the negatives
-//!	if ( info.GetDamageType() & (DMG_BUCKSHOT) && m_iHealth < -25 )	//!!! FIXME; Temp. Only the shot limb should gib, not the whole body. Return a seperate function
-//!		return true;
-	
+	if ( info.GetDamageType() & (DMG_BUCKSHOT) && m_iHealth < (GIB_HEALTH_VALUE - 15) )	//!!! FIXME; Temp. Only the shot limb should gib, not the whole body
+		return true;
+
 	return BaseClass::ShouldGib( info );
 }
 
@@ -4279,7 +4274,7 @@ void CNPC_PlayerCompanion::OnPlayerKilledOther( CBaseEntity *pVictim, const CTak
 	}
 
 	// set up the speech modifiers
-	CFmtStrN<512> modifiers( "num_barrels:%d,distancetoplayerenemy:%f,playerAmmo:%s,consecutive_player_kills:%d,"
+	CFmtStrN<512> modifiers( "num_barrels:%d,distancetoplayerenemy:%f,playerammo:%s,consecutive_player_kills:%d,"
 		"punted_grenade:%d,victim_was_enemy:%d,victim_was_mob:%d,victim_was_attacker:%d,headshot:%d,oneshot:%d",
 		iNumBarrels, EnemyDistance( pVictim ), info.GetAmmoName(), iConsecutivePlayerKills,
 		bPuntedGrenade, bVictimWasEnemy, bVictimWasMob, bVictimWasAttacker, bHeadshot, bOneShot );

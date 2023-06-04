@@ -22,7 +22,7 @@
 #include "player.h"
 #include "gamerules.h"		// For g_pGameRules
 #include "ammodef.h"
-#include "grenade_spit.h"
+#include "grenade_ball.h"
 #include "grenade_brickbat.h"
 #include "entitylist.h"
 #include "shake.h"
@@ -86,7 +86,7 @@ int	g_interactionBullsquidThrow		= 0;
 #define		BSQUID_AE_ROAR		( 4 )
 #define		BSQUID_AE_HOP		( 5 )
 #define		BSQUID_AE_THROW		( 6 )
-#define		BSQUID_AE_WHIP_SND	( 7 )
+#define		BSQUID_AE_TAILWHIP	( 7 )
 
 LINK_ENTITY_TO_CLASS( npc_bullsquid, CNPC_Bullsquid );
 #ifndef HL1_DLL
@@ -121,7 +121,7 @@ void CNPC_Bullsquid::Spawn()
 {
 	Precache( );
 
-	SetModel( "models/bullsquid.mdl");
+	SetModel( STRING( GetModelName() ) );
 	SetHullType(HULL_WIDE_SHORT);
 	SetHullSizeNormal();
 
@@ -152,10 +152,14 @@ void CNPC_Bullsquid::Spawn()
 //=========================================================
 void CNPC_Bullsquid::Precache()
 {
-	PrecacheModel( "models/bullsquid.mdl" );
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/bullsquid.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
+
 	m_nSquidSpitSprite = PrecacheModel("sprites/greenspit1.vmt");// client side spittle.
 
-	UTIL_PrecacheOther( "grenade_spit" );
+	UTIL_PrecacheOther( "grenade_ball" );
 
 	PrecacheScriptSound( "NPC_Bullsquid.Idle" );
 	PrecacheScriptSound( "NPC_Bullsquid.Pain" );
@@ -191,7 +195,11 @@ void CNPC_Bullsquid::IdleSound( void )
 //=========================================================
 void CNPC_Bullsquid::PainSound( const CTakeDamageInfo &info )
 {
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
+
 	EmitSound( "NPC_Bullsquid.Pain" );
+	m_flNextPainSoundTime = gpGlobals->curtime + 1;
 }
 
 //=========================================================
@@ -280,7 +288,7 @@ void CNPC_Bullsquid::HandleAnimEvent( animevent_t *pEvent )
 				pGrenade->Spawn( );
 				pGrenade->SetThrower( this );
 				pGrenade->SetOwnerEntity( this );
-				pGrenade->SetSpitSize( 2 );
+				pGrenade->SetSpitType( SPIT, 2 );
 				pGrenade->SetAbsVelocity( vToss );
 
 				// Tumble through the air
@@ -315,13 +323,6 @@ void CNPC_Bullsquid::HandleAnimEvent( animevent_t *pEvent )
 		}
 		break;
 
-		case BSQUID_AE_WHIP_SND:
-		{
-			EmitSound( "NPC_Bullsquid.TailWhip" );
-			break;
-		}
-
-/*
 		case BSQUID_AE_TAILWHIP:
 		{
 			CBaseEntity *pHurt = CheckTraceHullAttack( 70, Vector(-16,-16,-16), Vector(16,16,16), sk_bullsquid_dmg_whip.GetFloat(), DMG_SLASH | DMG_ALWAYSGIB );
@@ -334,10 +335,10 @@ void CNPC_Bullsquid::HandleAnimEvent( animevent_t *pEvent )
 					 pHurt->ViewPunch( QAngle( 20, 0, -20 ) );
 			
 				pHurt->ApplyAbsVelocityImpulse( 100 * (up+2*right) );
+				EmitSound( "NPC_Bullsquid.TailWhip" );
 			}
 		}
 		break;
-*/
 
 		case BSQUID_AE_BLINK:
 		{
@@ -367,7 +368,6 @@ void CNPC_Bullsquid::HandleAnimEvent( animevent_t *pEvent )
 			{
 				// squid throws its prey IF the prey is a client. 
 				CBaseEntity *pHurt = CheckTraceHullAttack( 70, Vector(-16,-16,-16), Vector(16,16,16), 0, 0 );
-
 
 				if ( pHurt )
 				{
@@ -564,9 +564,9 @@ int CNPC_Bullsquid::GetSoundInterests( void )
 {
 	return	SOUND_WORLD	|
 			SOUND_COMBAT	|
-		    SOUND_CARCASS	|
-			SOUND_MEAT		|
-			SOUND_GARBAGE	|
+		    SMELL_CARCASS	|
+			SMELL_MEAT		|
+			SMELL_GARBAGE	|
 			SOUND_PLAYER;
 }
 
@@ -597,7 +597,7 @@ void CNPC_Bullsquid::OnListened( void )
 		if ( !pCurrentSound->FIsSound() )
 		{
 			// if not a sound, must be a smell - determine if it's just a scent, or if it's a food scent
-			if ( pCurrentSound->m_iType & ( SOUND_MEAT | SOUND_CARCASS ) )
+			if ( pCurrentSound->m_iType & ( SMELL_MEAT | SMELL_CARCASS ) )
 			{
 				// the detected scent is a food item
 				condition = COND_SQUID_SMELL_FOOD;

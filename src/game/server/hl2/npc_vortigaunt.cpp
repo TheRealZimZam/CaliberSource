@@ -140,7 +140,6 @@ BEGIN_DATADESC( CNPC_Vortigaunt )
 	DEFINE_FIELD( m_nLastArmorAmt,		FIELD_INTEGER),
 	DEFINE_FIELD( m_iSuitSound,			FIELD_INTEGER),
 	DEFINE_FIELD( m_flSuitSoundTime,		FIELD_TIME),
-	DEFINE_FIELD( m_painTime,				FIELD_TIME),
 	DEFINE_FIELD( m_nextLineFireTime,		FIELD_TIME),
 	DEFINE_FIELD( m_bInBarnacleMouth,		FIELD_BOOLEAN),
 	DEFINE_KEYFIELD( m_bArmorRechargeEnabled, FIELD_BOOLEAN, "ArmorRechargeEnabled" ),
@@ -683,9 +682,9 @@ int CNPC_Vortigaunt::GetSoundInterests ( void)
 			SOUND_WORLD				|
 			SOUND_PLAYER			|
 			SOUND_DANGER			|
-			SOUND_CARCASS			|
-			SOUND_MEAT				|
-			SOUND_GARBAGE			|
+			SMELL_CARCASS			|
+			SMELL_MEAT				|
+			SMELL_GARBAGE			|
 			SOUND_MOVE_AWAY			|
 			SOUND_WEAPON;
 }
@@ -1407,10 +1406,10 @@ int	CNPC_Vortigaunt::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 //=========================================================
 void CNPC_Vortigaunt::PainSound( const CTakeDamageInfo &info )
 {
-	if (gpGlobals->curtime < m_painTime)
+	if (gpGlobals->curtime < m_flNextPainSoundTime)
 		return;
 	
-	m_painTime = gpGlobals->curtime + random->RandomFloat(0.5, 0.75);
+	m_flNextPainSoundTime = gpGlobals->curtime + random->RandomFloat(0.5, 0.75);
 
 	Speak( VORT_PAIN );
 }
@@ -1438,6 +1437,7 @@ void CNPC_Vortigaunt::TraceAttack( const CTakeDamageInfo &inputInfo, const Vecto
 		info.SetDamage( 0.01 );
 	}
 
+#if 0
 	switch( ptr->hitgroup)
 	{
 	case HITGROUP_CHEST:
@@ -1461,6 +1461,7 @@ void CNPC_Vortigaunt::TraceAttack( const CTakeDamageInfo &inputInfo, const Vecto
 		ptr->hitgroup = HITGROUP_HEAD;
 		break;
 	}
+#endif
 
 	BaseClass::TraceAttack( info, vecDir, ptr );
 }

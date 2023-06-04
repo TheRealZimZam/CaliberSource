@@ -2,6 +2,7 @@
 //
 // Purpose: The various ammo types for HL2	
 //
+// TODO; Need a better softcoded system for this
 //=============================================================================//
 
 #include "cbase.h"
@@ -47,10 +48,6 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 #define SIZE_AMMO_PISTOL_LARGE		104
 #define SIZE_AMMO_SMG1				50
 #define SIZE_AMMO_SMG1_LARGE		200
-#define SIZE_AMMO_SMG2				60
-#define SIZE_AMMO_SMG2_LARGE		180
-#define SIZE_AMMO_AR1				30
-#define SIZE_AMMO_AR1_LARGE			120
 #define SIZE_AMMO_AR2				25
 #define SIZE_AMMO_AR2_LARGE			100
 #define SIZE_AMMO_357				8
@@ -67,12 +64,16 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 #define SIZE_AMMO_BUCKSHOT_LARGE	15	//Bigger box based on smaller box, for sweeper use clips
 #define SIZE_AMMO_SLUG_MAG			7
 #define SIZE_AMMO_CROSSBOW			1
-#define SIZE_AMMO_FLAMER			100	// One tank
+#define SIZE_AMMO_FLAMETHROWER		100	// One tank
 #define SIZE_AMMO_PROJECTOR			200	// A full burst
 #define SIZE_AMMO_REVOLVER			6
 #endif
 
 // Obselete ammo types
+#define SIZE_AMMO_HMG				60
+#define SIZE_AMMO_HMG_LARGE			180
+#define SIZE_AMMO_AR1				30
+#define SIZE_AMMO_AR1_LARGE			120
 #define SIZE_BOX_FLARE_ROUNDS 5
 #define SIZE_BOX_SNIPER_ROUNDS 8
 
@@ -228,7 +229,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG2, "HMG"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_HMG, "HMG"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.HMGRounds_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.HMGRounds_Touch" );
@@ -242,47 +243,6 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS(item_ammo_hmg, CItem_HMGBox);
-
-// ========================================================================
-//	>> LargeBoxMRounds
-// Large box of general rifle rounds (smg1, ar1)
-// ========================================================================
-class CItem_LargeBoxMRounds : public CItem
-{
-public:
-	DECLARE_CLASS( CItem_LargeBoxMRounds, CItem );
-
-	void Precache( void )
-	{
-		PrecacheModel ("models/items/boxmrounds.mdl");
-
-		PrecacheScriptSound( "Item.MRounds_Touch" );
-	}
-
-	void Spawn( void )
-	{ 
-		Precache( );
-		SetModel( "models/items/boxmrounds.mdl");
-		BaseClass::Spawn( );
-	}
-
-	bool MyTouch( CBasePlayer *pPlayer )
-	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "HMG"))
-		{
-			CPASAttenuationFilter filter( pPlayer, "Item.MRounds_Touch" );
-			EmitSound( filter, pPlayer->entindex(), "Item.MRounds_Touch" );
-			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
-			{
-				UTIL_Remove(this);	
-			}
-			return true;
-		}
-		return false;
-	}
-};
-LINK_ENTITY_TO_CLASS(item_large_box_mrounds, CItem_LargeBoxMRounds);
-LINK_ENTITY_TO_CLASS(item_ammo_smg1_large, CItem_LargeBoxMRounds);	//OBSELETE - DO NOT USE
 
 // ========================================================================
 //	>> CItem_BoxAR1Rounds
@@ -319,6 +279,47 @@ public:
 };
 LINK_ENTITY_TO_CLASS(item_ammo_ar1, CItem_BoxAR1Rounds);
 #endif
+
+// ========================================================================
+//	>> LargeBoxMRounds
+// Large box of general rifle rounds (smg1, ar1)
+// ========================================================================
+class CItem_LargeBoxMRounds : public CItem
+{
+public:
+	DECLARE_CLASS( CItem_LargeBoxMRounds, CItem );
+
+	void Precache( void )
+	{
+		PrecacheModel ("models/items/boxmrounds.mdl");
+
+		PrecacheScriptSound( "Item.MRounds_Touch" );
+	}
+
+	void Spawn( void )
+	{ 
+		Precache( );
+		SetModel( "models/items/boxmrounds.mdl");
+		BaseClass::Spawn( );
+	}
+
+	bool MyTouch( CBasePlayer *pPlayer )
+	{
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "HMG"))	//AR1
+		{
+			CPASAttenuationFilter filter( pPlayer, "Item.MRounds_Touch" );
+			EmitSound( filter, pPlayer->entindex(), "Item.MRounds_Touch" );
+			if ( g_pGameRules->ItemShouldRespawn( this ) == GR_ITEM_RESPAWN_NO )
+			{
+				UTIL_Remove(this);	
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_large_box_mrounds, CItem_LargeBoxMRounds);
+LINK_ENTITY_TO_CLASS(item_ammo_smg1_large, CItem_LargeBoxMRounds);	//OBSELETE - DO NOT USE
 
 // ========================================================================
 //	>> BoxLRounds
@@ -476,7 +477,6 @@ public:
 	}
 };
 LINK_ENTITY_TO_CLASS(item_ammo_sniper, CItem_BoxSniperRounds);
-
 
 // ========================================================================
 //	>> LargeBoxLRounds
@@ -918,13 +918,13 @@ LINK_ENTITY_TO_CLASS( item_ammo_ar2_altfire, CItem_AR2AltFireRound );
 
 
 // ========================================================================
-//	>> CItem_FlamerTank
+//	>> CItem_FlameTank
 // Tank o' napalm
 // ========================================================================
-class CItem_FlamerTank : public CItem
+class CItem_FlameTank : public CItem
 {
 public:
-	DECLARE_CLASS( CItem_FlamerTank, CItem );
+	DECLARE_CLASS( CItem_FlameTank, CItem );
 
 	void Precache( void )
 	{
@@ -942,7 +942,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_FLAMER, "Flamer"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_FLAMETHROWER, "Flamethrower"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.FlameTank_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.FlameTank_Touch" );
@@ -955,18 +955,18 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_ammo_flametank, CItem_FlamerTank);
-LINK_ENTITY_TO_CLASS(item_ammo_flame, CItem_FlamerTank);
+LINK_ENTITY_TO_CLASS(item_ammo_flametank, CItem_FlameTank);
+LINK_ENTITY_TO_CLASS(item_ammo_flame, CItem_FlameTank);
 
 // ========================================================================
-//	>> CItem_LargeFlamerTank
+//	>> CItem_LargeFlameTank
 // Bundle o' tanks
 // ========================================================================
 #if 0
-class CItem_LargeFlamerTank : public CItem
+class CItem_LargeFlameTank : public CItem
 {
 public:
-	DECLARE_CLASS( CItem_LargeFlamerTank, CItem );
+	DECLARE_CLASS( CItem_LargeFlameTank, CItem );
 
 	void Precache( void )
 	{
@@ -984,7 +984,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PROJECTOR, "Flamer"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PROJECTOR, "Flamethrower"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.FlameTank_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.FlameTank_Touch" );
@@ -997,7 +997,7 @@ public:
 		return false;
 	}
 };
-LINK_ENTITY_TO_CLASS(item_ammo_flamer_large, CItem_LargeFlamerTank);
+LINK_ENTITY_TO_CLASS(item_ammo_bigflametank, CItem_LargeFlameTank);
 #endif
 
 // ==================================================================
@@ -1286,7 +1286,7 @@ int CItem_AmmoCrate::OnTakeDamage( const CTakeDamageInfo &info )
 		CBaseCombatWeapon *weapon = player->GetActiveWeapon();
 		
 		// Shouldnt this just grab the damage type?
-		if (weapon && ( !stricmp(weapon->GetName(), "weapon_crowbar") || !stricmp(weapon->GetName(), "weapon_swing") || !stricmp(weapon->GetName(), "weapon_stab") ) )
+		if (weapon && ( !stricmp(weapon->GetName(), "weapon_crowbar") || !stricmp(weapon->GetName(), "weapon_swing") ) )
 		{
 			// play the normal use sound
 			player->EmitSound( "HL2Player.Use" );

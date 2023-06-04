@@ -159,7 +159,7 @@ CWeaponPistol::CWeaponPistol( void )
 	m_fMinRange2		= 16;
 	m_fMaxRange2		= 200;
 
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		m_bReloadsFullClip	= true;
 		m_bCanJam			= true;

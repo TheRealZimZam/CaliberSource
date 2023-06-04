@@ -2,7 +2,7 @@
 //
 // Purpose: Concussive blast
 //
-// Todo's; Code this thing;
+// Todo's; Electric Beams
 // $NoKeywords: $
 //=============================================================================//
 
@@ -23,7 +23,7 @@
 #define STUN_GRENADE_GRACE_TIME_AFTER_PICKUP 1.5f
 #define STUN_GRENADE_WARN_TIME 1.5f
 
-ConVar sk_stun_radius			( "sk_stun_radius", "300");
+ConVar sk_stun_radius			( "sk_stun_radius", "400");
 
 #define STUNGRENADE_MODEL "models/Weapons/w_grenade.mdl"
 
@@ -182,7 +182,7 @@ void CGrenadeConcussive::Spawn( void )
 
 	// 5 dmg = full effects, peter out with less damage
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
-		m_flDamage		= 6;
+		m_flDamage		= 6;	//Player gets a cheeky bump in effective radius
 	else
 		m_flDamage		= 5;
 
@@ -224,8 +224,12 @@ void CGrenadeConcussive::Detonate(void)
 		{
 			if ( pBCC->IsPlayer() )
 			{
-				// If its a player, check body direction
+				//!!TODO; If its a player, check body direction - am I facing the explosion?
 				pBCC->TakeDamage( CTakeDamageInfo( this, this, m_flDamage, DMG_SONIC ) );
+				
+				//Only the affected player can hear this sound
+				CPASAttenuationFilter filter( pBCC, "GrenadeConcussive.Ringing" );
+				EmitSound( filter, pBCC->entindex(), "GrenadeConcussive.Ringing" );
 			}
 			else
 			{
@@ -234,13 +238,14 @@ void CGrenadeConcussive::Detonate(void)
 		}
 		else
 		{
+			// Non living objects take club damage instead, to simulate a psychic whack
 			pEntity->TakeDamage( CTakeDamageInfo( this, GetOwnerEntity(), m_flDamage, DMG_CLUB ) );
 		}
 	}
 
 	EmitSound( "GrenadeConcussive.Detonate" );
 
-	CreateConcussiveBlast( GetAbsOrigin(), 0, GetOwnerEntity(), (m_DmgRadius*0.03) );
+	CreateConcussiveBlast( GetAbsOrigin(), 0, GetOwnerEntity(), (m_DmgRadius*0.02) );
 
 	RemoveEffects( EF_NODRAW );
 	SetAbsVelocity( vec3_origin );

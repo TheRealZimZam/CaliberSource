@@ -131,7 +131,7 @@ CWeaponSMG1::CWeaponSMG1( )
 //	m_fMinRange2		= 224;
 //	m_fMaxRange2		= 1280;
 
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		m_bReloadsFullClip	= true;
 		m_bCanJam			= true;

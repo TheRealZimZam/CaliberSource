@@ -3,7 +3,7 @@
 // Purpose: Pump-action shotgun/Starting shotgun.
 //
 //			Primary attack: single barrel shot.
-//			Secondary attack: double shell shot.
+//			Secondary attack: double shell shot, requires a single pump before use.
 // TODO's: New impact effects (normal holes are too big), push player back for secondary attack
 //
 //=============================================================================//
@@ -175,7 +175,7 @@ CWeaponShotgun::CWeaponShotgun( void )
 	m_bDelayedFire1 = false;
 	m_bDelayedFire2 = false;
 
-	if ( !sv_funmode.GetBool() )
+	if ( sv_funmode.GetBool() )
 	{
 		m_bCanJam			= true;
 	}
@@ -650,7 +650,7 @@ void CWeaponShotgun::ItemPostFrame( void )
 			m_bNeedPump		= false;
 			m_bDelayedFire1 = true;
 		}
-		// If I'm secondary firing and have one round stop reloading and fire
+		// If I'm secondary firing and have two rounds stop reloading and fire
 		else if ((pOwner->m_nButtons & IN_ATTACK2 ) && (m_iClip1 >=2))
 		{
 			m_bInReload		= false;

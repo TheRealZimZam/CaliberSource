@@ -2,7 +2,7 @@
 //
 // Purpose: 
 //
-// $NoKeywords: $
+// TODO; Why is this a blending host??
 //=============================================================================//
 
 #ifndef NPC_BASEZOMBIE_H
@@ -132,8 +132,7 @@ public:
 
 	void KillMe( void )
 	{
-		m_iHealth = 5;
-		OnTakeDamage( CTakeDamageInfo( this, this, m_iHealth * 2, DMG_GENERIC ) );
+		Event_Killed( CTakeDamageInfo( this, this, m_iHealth, DMG_GENERIC ) );
 	}
 
 	int MeleeAttack1Conditions ( float flDot, float flDist );

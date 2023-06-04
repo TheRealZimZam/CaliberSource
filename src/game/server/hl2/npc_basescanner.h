@@ -79,7 +79,7 @@ public:
 	virtual float	GetAutoAimRadius();
 
 	void			Event_Killed( const CTakeDamageInfo &info );
-	int				OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	int				OnTakeDamage( const CTakeDamageInfo &info );
 	int				OnTakeDamage_Dying( const CTakeDamageInfo &info );
 	void			TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 	float			GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info );
@@ -155,6 +155,8 @@ protected:
 	void				MoveToDivebomb(float flInterval);
 	void				BlendPhyscannonLaunchSpeed();
 
+	virtual void		StopLoopingSounds(void);
+
 private:
 	bool	GetGoalDirection( Vector *vOut );
 
@@ -170,8 +172,6 @@ private:
 
 	// Do we have a physics attacker?
 	CBasePlayer *HasPhysicsAttacker( float dt );
-
-	virtual void		StopLoopingSounds(void);
 
 public:
 	// ------------------------

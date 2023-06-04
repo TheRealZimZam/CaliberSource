@@ -24,39 +24,43 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	 HOMER_TRAIL0_LIFE		0.1
-#define	 HOMER_TRAIL1_LIFE		0.2
-#define	 HOMER_TRAIL2_LIFE		3.0//	1.0
+#define	HOMER_TRAIL0_LIFE	0.1
+#define	HOMER_TRAIL1_LIFE	0.2
+#define	HOMER_TRAIL2_LIFE	3.0	//1.0
+#define	BUBBLE_WARNING		1	//Should the danger be issued once, or over a period in a cone?
 
 extern short	g_sModelIndexFireball;			// (in combatweapon.cpp) holds the index for the smoke cloud
+
+ConVar    homer_grenade_obstacle_avoidance( "homer_grenade_obstacle_avoidance","0" );
 
 ConVar    sk_dmg_homer_grenade( "sk_dmg_homer_grenade","0" );
 ConVar	  sk_homer_grenade_radius( "sk_homer_grenade_radius","0" );
 
 BEGIN_DATADESC( CGrenadeHomer )
 
-	DEFINE_ARRAY( m_hRocketTrail,					FIELD_EHANDLE, 3 ),
+	DEFINE_ARRAY( m_hRocketTrail,				FIELD_EHANDLE, 3 ),
 	DEFINE_FIELD( m_sFlySound,					FIELD_STRING),
-	DEFINE_FIELD( m_flNextFlySoundTime,			FIELD_TIME),
+//	DEFINE_FIELD( m_flNextFlySoundTime,			FIELD_TIME),
+	DEFINE_FIELD( m_flNextWarnTime,				FIELD_TIME),
 
-	DEFINE_FIELD( m_flHomingStrength,				FIELD_FLOAT),
+	DEFINE_FIELD( m_flHomingStrength,			FIELD_FLOAT),
 	DEFINE_FIELD( m_flHomingDelay,				FIELD_FLOAT),
 	DEFINE_FIELD( m_flHomingRampUp,				FIELD_FLOAT),
-	DEFINE_FIELD( m_flHomingDuration,				FIELD_FLOAT),
-	DEFINE_FIELD( m_flHomingRampDown,				FIELD_FLOAT),
+	DEFINE_FIELD( m_flHomingDuration,			FIELD_FLOAT),
+	DEFINE_FIELD( m_flHomingRampDown,			FIELD_FLOAT),
 	DEFINE_FIELD( m_flHomingSpeed,				FIELD_FLOAT),
-	DEFINE_FIELD( m_flSpinMagnitude,				FIELD_FLOAT),
-	DEFINE_FIELD( m_flSpinSpeed,					FIELD_FLOAT),
-	DEFINE_FIELD( m_nRocketTrailType,				FIELD_INTEGER),
+	DEFINE_FIELD( m_flSpinMagnitude,			FIELD_FLOAT),
+	DEFINE_FIELD( m_flSpinSpeed,				FIELD_FLOAT),
+	DEFINE_FIELD( m_nRocketTrailType,			FIELD_INTEGER),
 
 //	DEFINE_FIELD( m_spriteTexture,				FIELD_INTEGER),
 
 	DEFINE_FIELD( m_flHomingLaunchTime,			FIELD_TIME),
 	DEFINE_FIELD( m_flHomingStartTime,			FIELD_TIME ),
-	DEFINE_FIELD( m_flHomingEndTime,				FIELD_TIME ),
-	DEFINE_FIELD( m_flSpinOffset,					FIELD_FLOAT),
+	DEFINE_FIELD( m_flHomingEndTime,			FIELD_TIME ),
+	DEFINE_FIELD( m_flSpinOffset,				FIELD_FLOAT),
 	
-	DEFINE_FIELD( m_hTarget,						FIELD_EHANDLE),
+	DEFINE_FIELD( m_hTarget,					FIELD_EHANDLE),
 
 	// Function pointers
 	DEFINE_THINKFUNC( AimThink ),
@@ -99,10 +103,7 @@ void CGrenadeHomer::Precache( void )
 
 	PrecacheScriptSound( "GrenadeHomer.StopSounds" );
 	if ( NULL_STRING != m_sFlySound )
-	{
 		PrecacheScriptSound( STRING(m_sFlySound) );
-	}
-
 }
 
 
@@ -319,12 +320,15 @@ void CGrenadeHomer::Launch( CBaseEntity*		pOwner,
 		StartRocketTrail();
 	}
 
+	PlayFlySound();
+
 	SetUse( &CGrenadeHomer::DetonateUse );
 	SetTouch( &CGrenadeHomer::GrenadeHomerTouch );
 	SetThink( &CGrenadeHomer::AimThink );
 	AimThink();
-	SetNextThink( gpGlobals->curtime );
+	SetNextThink( gpGlobals->curtime + 0.1f );
 
+#ifndef BUBBLE_WARNING
 	// Issue danger!
 	if ( pTarget )
 	{
@@ -332,8 +336,9 @@ void CGrenadeHomer::Launch( CBaseEntity*		pOwner,
 		float flDist = ( pTarget->WorldSpaceCenter() - WorldSpaceCenter() ).Length();
 		float flTime = max( 0.5, flDist / GetAbsVelocity().Length() );
 
-		CSoundEnt::InsertSound ( SOUND_DANGER, m_hTarget->GetAbsOrigin(), 300, flTime, pOwner );
+		CSoundEnt::InsertSound( SOUND_DANGER, m_hTarget->GetAbsOrigin(), 300, flTime, pOwner );
 	}
+#endif
 }
 
 //------------------------------------------------------------------------------
@@ -363,100 +368,91 @@ void CGrenadeHomer::GrenadeHomerTouch( CBaseEntity *pOther )
 	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + GetAbsVelocity(),  MASK_SOLID_BRUSHONLY, 
 		this, COLLISION_GROUP_NONE, &tr);
 
-	if (tr.surface.flags & SURF_SKY)
-	{
-		StopRocketTrail();
-		UTIL_Remove( this );
-	}
-	else
-	{
-		Detonate();
-	}
+	// We got sent flying off into the distance
+//	if (tr.surface.flags & SURF_SKY)
+		Detonate( (tr.surface.flags & SURF_SKY ? true : false) );
+//	else
+//		Detonate();
 }
 
-void CGrenadeHomer::Detonate(void)
+void CGrenadeHomer::Detonate( bool bToSpace )
 {
 	StopRocketTrail();
-
 	StopSound(entindex(), CHAN_BODY, STRING(m_sFlySound));
 
 	m_takedamage	= DAMAGE_NO;	
 
-	CPASFilter filter( GetAbsOrigin() );
-
-	te->Explosion( filter, 0.0,
-		&GetAbsOrigin(), 
-		g_sModelIndexFireball,
-		2.0, 
-		15,
-		TE_EXPLFLAG_NONE,
-		m_DmgRadius,
-		m_flDamage );
-
-//	int magnitude = 1.0;
-//	int	colorRamp = random->RandomInt( 128, 255 );
-
-
-	if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
+	if ( !bToSpace )
 	{
-		// Add a shockring
-		CBroadcastRecipientFilter filter3;
-		te->BeamRingPoint( filter3, 0, 
-			GetAbsOrigin(),	//origin
-			16,			//start radius
-			1000,		//end radius
-			m_spriteTexture, //texture
-			0,			//halo index
-			0,			//start frame
-			2,			//framerate
-			0.3f,		//life
-			128,		//width
-			16,			//spread
-			0,			//amplitude
-			100,		//r
-			0,			//g
-			200,		//b
-			50,			//a
-			128			//speed
-			);
+		CPASFilter filter( GetAbsOrigin() );
+		te->Explosion( filter, 0.0,
+			&GetAbsOrigin(), 
+			g_sModelIndexFireball,
+			2.0, 
+			40,
+			TE_EXPLFLAG_NONE,
+			m_DmgRadius,
+			m_flDamage );
 
+	//	int magnitude = 1.0;
+	//	int	colorRamp = random->RandomInt( 128, 255 );
 
-		// Add a shockring
-		CBroadcastRecipientFilter filter4;
-		te->BeamRingPoint( filter4, 0, 
-			GetAbsOrigin(),	//origin
-			16,			//start radius
-			500,		//end radius
-			m_spriteTexture, //texture
-			0,			//halo index
-			0,			//start frame
-			2,			//framerate
-			0.3f,		//life
-			128,		//width
-			16,			//spread
-			0,			//amplitude
-			200,		//r
-			0,			//g
-			100,		//b
-			50,			//a
-			128			//speed
-			);
+		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
+		{
+			// Add a shockring
+			CBroadcastRecipientFilter filter3;
+			te->BeamRingPoint( filter3, 0, 
+				GetAbsOrigin(),	//origin
+				16,			//start radius
+				1000,		//end radius
+				m_spriteTexture, //texture
+				0,			//halo index
+				0,			//start frame
+				2,			//framerate
+				0.3f,		//life
+				128,		//width
+				16,			//spread
+				0,			//amplitude
+				100,		//r
+				0,			//g
+				200,		//b
+				50,			//a
+				128			//speed
+				);
 
+			// Add a shockring
+			CBroadcastRecipientFilter filter4;
+			te->BeamRingPoint( filter4, 0, 
+				GetAbsOrigin(),	//origin
+				16,			//start radius
+				500,		//end radius
+				m_spriteTexture, //texture
+				0,			//halo index
+				0,			//start frame
+				2,			//framerate
+				0.3f,		//life
+				128,		//width
+				16,			//spread
+				0,			//amplitude
+				200,		//r
+				0,			//g
+				100,		//b
+				50,			//a
+				128			//speed
+				);
+		}
 
+		Vector vecForward = GetAbsVelocity();
+		VectorNormalize(vecForward);
+		trace_t		tr;
+		UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward,  MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, & tr);
 
+		UTIL_DecalTrace( &tr, "Scorch" );
+		UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
+
+		RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), m_flDamage, DMG_BLAST ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 	}
 
-
-	Vector vecForward = GetAbsVelocity();
-	VectorNormalize(vecForward);
-	trace_t		tr;
-	UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward,  MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, & tr);
-
-	UTIL_DecalTrace( &tr, "Scorch" );
-
-	UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
-
-	RadiusDamage ( CTakeDamageInfo( this, GetOwnerEntity(), m_flDamage, DMG_BLAST ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 	CPASAttenuationFilter filter2( this, "GrenadeHomer.StopSounds" );
 	EmitSound( filter2, entindex(), "GrenadeHomer.StopSounds" );
 	UTIL_Remove( this );
@@ -469,8 +465,8 @@ void CGrenadeHomer::Detonate(void)
 //-----------------------------------------------------------------------------
 void CGrenadeHomer::PlayFlySound(void)
 {
-	if (gpGlobals->curtime > m_flNextFlySoundTime)
-	{
+//	if (gpGlobals->curtime > m_flNextFlySoundTime)
+//	{
 		CPASAttenuationFilter filter( this, 0.8 );
 
 		EmitSound_t ep;
@@ -482,8 +478,8 @@ void CGrenadeHomer::PlayFlySound(void)
 
 		EmitSound( filter, entindex(), ep );
 
-		m_flNextFlySoundTime	= gpGlobals->curtime + 1.0;
-	}
+		//m_flNextFlySoundTime	= gpGlobals->curtime + 1.0;
+//	}
 }
 
 //------------------------------------------------------------------------------
@@ -502,10 +498,7 @@ void CGrenadeHomer::AimThink( void )
 		return;
 	}
 
-	PlayFlySound();
-
 	Vector		vTargetPos	= vec3_origin;
-	Vector		vTargetDir;
 	float		flCurHomingStrength = 0;
 
 	// ------------------------------------------------
@@ -513,35 +506,45 @@ void CGrenadeHomer::AimThink( void )
 	// ------------------------------------------------
 	if (m_hTarget != NULL)
 	{
-		vTargetPos		= m_hTarget->EyePosition();
-		vTargetDir		= vTargetPos - GetAbsOrigin();
+		// Only target the eyes if its a living thing
+		if ( m_hTarget->MyCombatCharacterPointer() )
+			vTargetPos = m_hTarget->EyePosition();
+		else
+			vTargetPos = m_hTarget->GetAbsOrigin();
+
+		Vector vTargetDir = vTargetPos - GetAbsOrigin();
 		VectorNormalize(vTargetDir);
 
-		// --------------------------------------------------
-		//  If my target is far away do some primitive
-		//  obstacle avoidance
-		// --------------------------------------------------
-		if ((vTargetPos - GetAbsOrigin()).Length() > 200)
+		//!!TODO; Broken as hell, it is a cool zig-zag effect but it fucks the targeting,
+		//!! If it can be fixed properly, re-enable
+		if ( homer_grenade_obstacle_avoidance.GetBool() )
 		{
-			Vector  vTravelDir	= GetAbsVelocity();
-			VectorNormalize(vTravelDir);
-			vTravelDir *= 50;
-
-			trace_t tr;
-			UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + vTravelDir, MASK_SHOT, m_hTarget, COLLISION_GROUP_NONE, &tr );
-			if (tr.fraction != 1.0)
+			// --------------------------------------------------
+			//  If my target is far away do some primitive
+			//  obstacle avoidance
+			// --------------------------------------------------
+			if ((vTargetPos - GetAbsOrigin()).Length() > 600)
 			{
-				// Head off in normal 
-				float dotPr			=  DotProduct(vTravelDir,tr.plane.normal);
-				Vector vBounce		=  -dotPr * tr.plane.normal;
-				vBounce.z			=  0;
-				VectorNormalize(vBounce);
-				vTargetDir			+= vBounce;
-				VectorNormalize(vTargetDir);
-				// DEBUG TOOL
-				//NDebugOverlay::Line(GetOrigin(), GetOrigin()+vTravelDir, 255,0,0, true, 20);
-				//NDebugOverlay::Line(GetOrigin(), GetOrigin()+(12*tr.plane.normal), 0,0,255, true, 20);
-				//NDebugOverlay::Line(GetOrigin(), GetOrigin()+(vTargetDir), 0,255,0, true, 20);
+				Vector  vTravelDir	= GetAbsVelocity();
+				VectorNormalize(vTravelDir);
+				vTravelDir *= 50;
+
+				trace_t tr;
+				UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + vTravelDir, MASK_SHOT, m_hTarget, COLLISION_GROUP_NONE, &tr );
+				if (tr.fraction < 1.0)	//!=
+				{
+					// Head off in normal 
+					float dotPr			=  DotProduct(vTravelDir,tr.plane.normal);
+					Vector vBounce		=  -dotPr * tr.plane.normal;
+					vBounce.z			=  0;
+					VectorNormalize(vBounce);
+					vTargetDir			+= vBounce;
+					VectorNormalize(vTargetDir);
+					// DEBUG TOOL
+					//NDebugOverlay::Line(GetOrigin(), GetOrigin()+vTravelDir, 255,0,0, true, 20);
+					//NDebugOverlay::Line(GetOrigin(), GetOrigin()+(12*tr.plane.normal), 0,0,255, true, 20);
+					//NDebugOverlay::Line(GetOrigin(), GetOrigin()+(vTargetDir), 0,255,0, true, 20);
+				}
 			}
 		}
 
@@ -588,7 +591,7 @@ void CGrenadeHomer::AimThink( void )
 		//  Set Homing
 		// ---------------
 		if (flCurHomingStrength > 0)
-		{	
+		{
 			// -------------
 			// Smoke trail.
 			// -------------
@@ -598,7 +601,7 @@ void CGrenadeHomer::AimThink( void )
 			}
 
 			// Extract speed and direction
-			Vector	vCurDir		= GetAbsVelocity();
+			Vector	vCurDir		= GetAbsVelocity();	//GetAbsVelocity
 			float flCurSpeed = VectorNormalize(vCurDir);
 			flTargetSpeed = max(flTargetSpeed, flCurSpeed);
 
@@ -615,7 +618,7 @@ void CGrenadeHomer::AimThink( void )
 			SetAbsVelocity( vecNewVelocity );
 		}
 	}
-	
+
 	// ----------------------------------------------------------------------------------------
 	// Add time-coherent noise to the current velocity 
 	// ----------------------------------------------------------------------------------------
@@ -635,7 +638,7 @@ void CGrenadeHomer::AimThink( void )
 	VectorAngles( GetAbsVelocity(), angles );
 	SetLocalAngles( angles );
 
-#if 0 // BUBBLE
+#if BUBBLE_WARNING
 	if( gpGlobals->curtime > m_flNextWarnTime )
 	{
 		// Make a bubble of warning sound in front of me.
@@ -649,7 +652,7 @@ void CGrenadeHomer::AimThink( void )
 		// Make a bubble of warning ahead of the missile.
 		CSoundEnt::InsertSound ( SOUND_DANGER, vecWarnLocation, flSpeed * WARN_INTERVAL, 0.5 );
 
-#if 0
+#if _DEBUG
 		Vector vecRight, vecForward;
 
 		AngleVectors( GetAbsAngles(), &vecForward, &vecRight, NULL );

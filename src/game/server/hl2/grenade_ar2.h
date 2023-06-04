@@ -57,6 +57,7 @@ protected:
 	float				m_fSpawnTime;
 	float				m_fDangerRadius;
 	bool 				m_bWantsToDetonate;
+	static int			m_nAirburstSprite;
 };
 
 //Airburst/player variant

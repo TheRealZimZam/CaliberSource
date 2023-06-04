@@ -6,7 +6,7 @@
 // The minimally invasive way I tried didnt work and I dont know how else to do it without a large re-write.
 // My idea is to have a think function interpret and store the finished sentence, and then play it when given the chance, 
 // rather than on a purely on-call basis as it is right now. I dont know about the perf costs of that, but
-// it shouldnt be too bad if its only updated every other think or something similar. - wm.
+// it shouldnt be too bad if its only updated every other think or something similar. - m.
 //
 // Auto-squadding, COND_COMBINE_DROP_GRENADE for tripmines, integrate with metrocops somehow??
 //
@@ -20,6 +20,14 @@
 // targets - comes in second place in terms of intelligence, barely being
 // one-upped by citizen17 - can be an extremely tough enemy, 
 // especially on higher difficulties, so use sparingly
+//
+// Soldier types;
+// 1. Default
+// 2. Demolitions - big bulky dude with explosives and body-armour,
+// usually also the squad-leader.
+// 3. Shock - faster than default soldier, usually has shotgun.
+// 4. Flamethrower - same as default, but immune to certain damage types.
+// 5. Elite - super-soldier, has benefits of all the other classes, and a different voice.
 //-----------------------------------------------------------------------------
 #include "cbase.h"
 #include "ai_hull.h"
@@ -40,13 +48,14 @@
 #include "basegrenade_shared.h"
 #include "vstdlib/random.h"
 #include "engine/IEngineSound.h"
+#include "IEffects.h"
 #include "globals.h"
 #include "grenade_frag.h"
 #include "grenade_ar2.h"
 #include "ndebugoverlay.h"
 #include "weapon_physcannon.h"
+#include "gib.h"
 #include "SoundEmitterSystem/isoundemittersystembase.h"
-//#include "npc_headcrab.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -56,8 +65,7 @@ extern ConVar sk_npc_dmg_smg_grenade;
 extern ConVar sk_ar2_grenade_radius;
 extern ConVar temp_demofixes;	//TEMPTEMP
 
-#define COMBINE_SKIN_DEFAULT		0
-#define COMBINE_SKIN_SHOTGUNNER		1
+// Use the old shoot system instead of shot regulator
 #define USE_OLD_SHOOT				0
 
 ConVar	sk_combine_grenadespeed( "sk_combine_grenadespeed", "650");
@@ -163,9 +171,9 @@ DEFINE_FIELD( m_voicePitch, FIELD_INTEGER ),
 DEFINE_FIELD( m_vecTossVelocity, FIELD_VECTOR ),
 DEFINE_FIELD( m_hForcedGrenadeTarget, FIELD_EHANDLE ),
 DEFINE_FIELD( m_lastGrenadeCondition, FIELD_INTEGER ),
+DEFINE_FIELD( m_bShouldAutosquad, FIELD_BOOLEAN ),
 DEFINE_FIELD( m_bShouldPatrol, FIELD_BOOLEAN ),
-//DEFINE_FIELD( m_bFirstEncounter, FIELD_BOOLEAN ),
-DEFINE_FIELD( m_flNextPainSoundTime, FIELD_TIME ),
+DEFINE_FIELD( m_bHelmet, FIELD_BOOLEAN ),
 DEFINE_FIELD( m_flNextAlertSoundTime, FIELD_TIME ),
 DEFINE_FIELD( m_flNextGrenadeCheck, FIELD_TIME ),
 DEFINE_FIELD( m_flNextSignalTime, FIELD_TIME ),
@@ -201,8 +209,7 @@ DEFINE_INPUTFUNC( FIELD_VOID,	"HitByBugbait",		InputHitByBugbait ),
 DEFINE_INPUTFUNC( FIELD_STRING,	"ThrowGrenadeAtTarget",	InputThrowGrenadeAtTarget ),
 
 DEFINE_FIELD( m_iLastAnimEventHandled, FIELD_INTEGER ),
-DEFINE_FIELD( m_fIsDemolition, FIELD_BOOLEAN ),
-DEFINE_FIELD( m_fIsElite, FIELD_BOOLEAN ),
+DEFINE_KEYFIELD( m_sType, FIELD_INTEGER, "type" ),
 DEFINE_FIELD( m_vecAltFireTarget, FIELD_VECTOR ),
 
 DEFINE_KEYFIELD( m_iTacticalVariant, FIELD_INTEGER, "tacticalvariant" ),
@@ -218,7 +225,6 @@ CNPC_Combine::CNPC_Combine()
 {
 	m_vecTossVelocity.Init();	//= vec3_origin
 }
-
 
 //-----------------------------------------------------------------------------
 // Create components
@@ -312,14 +318,17 @@ void CNPC_Combine::Precache()
 {
 	PrecacheModel("models/Weapons/w_grenade.mdl");
 	UTIL_PrecacheOther( "npc_handgrenade" );
+	
+	PrecacheModel("models/helmet.mdl");
 
+	PrecacheScriptSound( "NPC_Combine.HelmetRicochet" );
 	PrecacheScriptSound( "NPC_Combine.GrenadeLaunch" );
 	PrecacheScriptSound( "NPC_Combine.WeaponBash" );
 	PrecacheScriptSound( "Weapon_CombineGuard.Special1" );
 	enginesound->PrecacheSentenceGroup( "COMBINE" );
 
 	// get voice pitch
-	if (m_fIsDemolition)
+	if (IsDemolition())
 		m_voicePitch = 90;
 	else
 		m_voicePitch = 96 + random->RandomInt(0,12);
@@ -356,7 +365,6 @@ void CNPC_Combine::Spawn( void )
 	m_flNextGrenadeCheck	= gpGlobals->curtime + 1;
 	m_flNextSignalTime		= 0;
 	m_flNextAlertSoundTime	= 0;
-	m_flNextPainSoundTime	= 0;
 //	m_flNextNewEnemyTime	= 0;
 	m_iNewEnemies			= 0;
 	m_bShouldPatrol			= false;
@@ -377,10 +385,10 @@ void CNPC_Combine::Spawn( void )
 
 	// Can be in a squad
 	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_NO_HIT_SQUADMATES );
-
 	CapabilitiesAdd( bits_CAP_DUCK );				// In reloading and cover
 
-//	m_bFirstEncounter	= true;// this is true when the grunt spawns, because he hasn't encountered an enemy yet.
+//	m_bFirstEncounter = true;// this is true when the grunt spawns, because he hasn't encountered an enemy yet.
+	m_bHelmet = true;// this is true when the grunt spawns, because he hasn't been shot yet.
 
 	m_HackedGunPos = Vector ( 0, 0, 55 );
 
@@ -391,6 +399,22 @@ void CNPC_Combine::Spawn( void )
 	m_flAlertPatrolTime			= 0;
 
 	m_flNextAltFireTime = gpGlobals->curtime;
+
+	// Put this guy into a squad by defualt if not in a squad
+	// @TODO (toml 12-05-02): RECONCILE WITH SAVE/RESTORE
+	if (HasSpawnFlags(SF_COMBINE_AUTOSQUAD) && !m_pSquad)
+	{
+		// Create a random squad name
+		char pSquadName[255];
+		Q_snprintf(pSquadName,sizeof(pSquadName),"CombineSquad%i%i",random->RandomInt(0,10),random->RandomInt(0,10));
+		m_pSquad = g_AI_SquadManager.FindCreateSquad(this, AllocPooledString(pSquadName));
+		// Add nearby combine to squad
+		// for xx
+		// TODO; get_grunts_within_1k_or_so
+		//
+		// if ( pGrunt->!m_pSquad )
+		//	m_pSquad->AddToSquad(pGrunt);
+	}
 
 	NPCInit();
 }
@@ -409,6 +433,26 @@ bool CNPC_Combine::CreateBehaviors()
 	AddBehavior( &m_FuncTankBehavior );
 
 	return BaseClass::CreateBehaviors();
+}
+
+bool CNPC_Combine::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if (FStrEq(szKeyName, "weapons"))
+	{
+		int iNumber = atof(szValue);
+
+		// Could do a big switch here, but this isnt a full conversion, keep it simple
+		const char *stWeapon = "weapon_smg2";
+		if ( iNumber > 8 )
+			stWeapon = "weapon_shotgun";
+
+		CBaseCombatWeapon *pWeapon = Weapon_Create( stWeapon );
+		Weapon_Equip( pWeapon );
+	}
+	else
+		return BaseClass::KeyValue( szKeyName, szValue );
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -484,7 +528,6 @@ void CNPC_Combine::PrescheduleThink()
 		}
 	}
 #endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -645,7 +688,7 @@ bool CNPC_Combine::OverrideMoveFacing( const AILocalMoveGoal_t &move, float flIn
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-Class_T	CNPC_Combine::Classify ( void )
+Class_T	CNPC_Combine::Classify( void )
 {
 	return CLASS_COMBINE;
 }
@@ -699,13 +742,9 @@ void CNPC_Combine::StartTaskChaseEnemyContinuously( const Task_t *pTask )
 
 	// NOTE: This is TaskRunPath here.
 	if ( TranslateActivity( ACT_RUN ) != ACT_INVALID )
-	{
 		GetNavigator()->SetMovementActivity( ACT_RUN );
-	}
 	else
-	{
 		GetNavigator()->SetMovementActivity( ACT_WALK );
-	}
 
 	// Cover is void once I move
 	Forget( bits_MEMORY_INCOVER );
@@ -789,13 +828,10 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 	case TASK_COMBINE_SET_STANDING:
 		{
 			if ( pTask->flTaskData == 1.0f)
-			{
 				Stand();
-			}
 			else
-			{
 				Crouch();
-			}
+
 			TaskComplete();
 		}
 		break;
@@ -810,7 +846,7 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 		break;
 
 	case TASK_COMBINE_SIGNAL_BEST_SOUND:
-		if( IsInSquad() && GetSquad()->NumMembers() > 1 )
+		if( InSquad() && GetSquad()->NumMembers() > 1 )
 		{
 #ifdef HL2MP
 			CBasePlayer *pPlayer = AI_GetNearestPlayer( GetAbsOrigin() );
@@ -987,12 +1023,12 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 #ifdef USE_OLD_SHOOT
 			if (GetEnemy() && (GetEnemy()->WorldSpaceCenter() - WorldSpaceCenter()).Length() > 512.0 )
 			{
-				m_flNextAttack	= gpGlobals->curtime + pTask->flTaskData;
+				m_flNextAttack = gpGlobals->curtime + pTask->flTaskData;
 			}
 #else
 			if (GetEnemy() && (GetEnemy()->WorldSpaceCenter() - WorldSpaceCenter()).Length() > 512.0 )
 			{
-				m_flNextAttack	= GetShotRegulator()->FireNoEarlierThan( gpGlobals->curtime + pTask->flTaskData );
+				m_flNextAttack = GetShotRegulator()->FireNoEarlierThan( gpGlobals->curtime + pTask->flTaskData );
 			}	
 #endif
 		}
@@ -1013,7 +1049,7 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 
 					if( pCombine )
 					{
-						pCombine->m_flNextGrenadeCheck = m_flNextGrenadeCheck + 3;	//This adds onto everybody elses individual time
+						pCombine->m_flNextGrenadeCheck = m_flNextGrenadeCheck + (g_pGameRules->IsSkillLevel( SKILL_HARD ) ? 3 : 4);	//This adds onto everybody elses individual time
 					}
 
 					pSquadmate = m_pSquad->GetNextMember( &iter );
@@ -1363,10 +1399,6 @@ void CNPC_Combine::RunTask( const Task_t *pTask )
 					}
 				}
 			}
-			else
-			{
-				// DevMsg("Wait\n");
-			}
 		}
 		break;
 #endif
@@ -1470,6 +1502,8 @@ int CNPC_Combine::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	{
 		DesireCrouch();
 		Crouch();
+		// Call him a dumbass
+		m_Sentences.Speak( "COMBINE_FRIENDLY_FIRE", SENTENCE_PRIORITY_MEDIUM );
 	}
 
 	//Should this be in here???
@@ -1481,6 +1515,75 @@ int CNPC_Combine::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 #endif
 
 	return BaseClass::OnTakeDamage_Alive( info );
+}
+
+void CNPC_Combine::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &vecDir, trace_t *ptr )
+{
+	// Soldiers dont communicate headshots too well, add a little flair to fix that
+	CTakeDamageInfo info = inputInfo;
+	if ( random->RandomInt( 0, 3 ) == 3 )
+	{
+		switch( ptr->hitgroup )
+		{
+		case HITGROUP_HEAD:
+		case 10:
+			if ( m_bHelmet && info.GetDamageType() & (DMG_BULLET|DMG_SLASH|DMG_CLUB) )
+			{
+				// Check to see if its a ricochet - big bullets just go straight through
+				info.SetDamage( info.GetDamage() - 15 );	//If its something that did 15 damage or less
+				if ( info.GetDamage() <= 0 )
+				{
+					g_pEffects->Ricochet( ptr->endpos, ptr->plane.normal );
+					info.SetDamage( 0.01 );
+					// No more saves 4 you
+					DetatchHelmet();
+				}
+				else
+				{
+					// Dont bother, full penetration
+					info.SetDamage( inputInfo.GetDamage() );
+				}
+			}
+			// always a head shot
+			ptr->hitgroup = HITGROUP_HEAD;
+			break;
+		}
+	}
+
+	BaseClass::TraceAttack( info, vecDir, ptr );
+}
+
+void CNPC_Combine::DetatchHelmet()
+{
+	if ( temp_demofixes.GetBool() )
+	{
+		// Dont even try to spawn the model
+		EmitSound( "NPC_Combine.HelmetRicochet" );
+		m_bHelmet = false;
+		return;
+	}
+
+	//TODO; Helmet model (different classes have different designs)
+	// Try to detatch the helmet
+	Vector vecHelmetForce;
+	vecHelmetForce.x = random->RandomFloat( -200, 200 );
+	vecHelmetForce.y = random->RandomFloat( -200, 200 );
+	vecHelmetForce.z = random->RandomFloat( 150, 300 );
+	CBaseEntity *pHelmet = CreateRagGib( "models/helmet.mdl", EyePosition(), GetAbsAngles(), vecHelmetForce );
+
+	// If we couldnt find a valid gib dont set the flag
+	if ( pHelmet )
+	{
+		//TODO; Change the skin
+
+		pHelmet->SetOwnerEntity( this );
+		color32 color = GetRenderColor();
+		pHelmet->SetRenderColor( color.r, color.g, color.b, color.a );	//Gotta do this for burnt grunts
+		EmitSound( "NPC_Combine.HelmetRicochet" );
+		m_bHelmet = false;
+	}
+
+	DevMsg("%s: Ow! My freakin hat!\n", GetClassname() );
 }
 
 //-----------------------------------------------------------------------------
@@ -1548,6 +1651,10 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 			case ACT_WALK:
 				eNewActivity = ACT_WALK_RIFLE;
 			break;
+			case ACT_RANGE_ATTACK1:
+				if ( !IsCrouching() )
+					eNewActivity = ACT_RANGE_ATTACK_SMG1;
+			break;
 		}
 	}
 
@@ -1573,7 +1680,7 @@ Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 		case ACT_RUN:
 		case ACT_RUN_RIFLE:	//TEMPTEMP
 		case ACT_RUN_AIM:
-			if ( m_iHealth <= COMBINE_LIMP_HEALTH )
+			if ( m_iHealth <= COMBINE_LIMP_HEALTH && HaveSequenceForActivity( ACT_RUN_HURT ) )
 			{
 				// limp!
 				eNewActivity = ACT_RUN_HURT;
@@ -1697,12 +1804,11 @@ int CNPC_Combine::SelectSchedule( void )
 					return SCHED_COMBINE_AR2_ALTFIRE;
 				}
 			}
-			else if ( CheckCanThrowGrenade( vecTarget ) )
+			if ( CheckCanThrowGrenade( vecTarget ) )
 			{
 				m_hForcedGrenadeTarget = NULL;
 				return SCHED_COMBINE_FORCED_GRENADE_THROW;
 			}
-			
 		}
 
 		// Can't throw at the target, so lets try moving to somewhere where I can see it
@@ -1802,6 +1908,26 @@ int CNPC_Combine::SelectSchedule( void )
 		{
 			if ( m_bShouldPatrol )
 				return SCHED_COMBINE_PATROL;
+
+#if 0
+			// Remove nearby tripmines/satchels when idle
+			if ( HasCondition( COND_HEAR_THUMPER ) )
+			{
+				// If I see one by myself just avoid it
+
+				// If im in a squad, get the squad away from it, then drop a grenade and run!
+				if ( Tripmine->GetOwner() == pPlayer )
+				{
+					if( m_pSquad && m_pSquad->GetSquadMemberNearestTo( Tripmine->GetAbsOrigin() ) == this && OccupyStrategySlot( SQUAD_SLOT_INVESTIGATE_SOUND ) )
+					{
+						// Shoot a sound out
+						
+						// Defoose
+						return SCHED_COMBINE_DEFUSE;
+					}
+				}
+			}
+#endif
 		}
 		// NOTE: Fall through - Idle and Alert use the same set of schedules!
 
@@ -1816,20 +1942,6 @@ int CNPC_Combine::SelectSchedule( void )
 					return SCHED_TAKE_COVER_FROM_ORIGIN;
 				}
 			}
-
-#if 0
-			// Remove nearby tripmines/satchels
-			if ( HasCondition( COND_HEAR_THUMPER ) )
-			{
-				// If I see one by myself just avoid it
-				
-				// If im in a squad, get the squad away from it, then drop a grenade and run!
-				if( m_pSquad && m_pSquad->GetSquadMemberNearestTo( Tripmine->GetAbsOrigin() ) == this && OccupyStrategySlot( SQUAD_SLOT_INVESTIGATE_SOUND ) )
-				{
-					return SCHED_COMBINE_DEFUSE;
-				}
-			}
-#endif
 
 			// Investigate nearby sounds
 			if( HasCondition( COND_HEAR_COMBAT ) || HasCondition ( COND_HEAR_PLAYER ) )
@@ -2359,6 +2471,7 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 				// Don't run about if there's a hint group
 				return TranslateSchedule( SCHED_ESTABLISH_LINE_OF_FIRE );
 			}
+			//DevMsg("%s: Yore dead freemen!!\n", GetClassname() );
 			return SCHED_COMBINE_ASSAULT;
 		}
 
@@ -2451,14 +2564,14 @@ int CNPC_Combine::TranslateSchedule( int scheduleType )
 			float flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
 			if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) && flDistToEnemy < 300 )
 			{
-				return SCHED_RANGE_ATTACK1;
+				return TranslateSchedule( SCHED_RANGE_ATTACK1 );
 			}
 #endif
 
 #ifndef HL2_EPISODIC
 			if ( HasCondition( COND_CAN_RANGE_ATTACK2 ) && OccupyStrategySlot( SQUAD_SLOT_GRENADE1 ) )
 			{
-				return SCHED_COMBINE_GRENADE_AND_RELOAD;
+				return TranslateSchedule( SCHED_COMBINE_GRENADE_AND_RELOAD );
 			}
 #endif
 			return TranslateSchedule( SCHED_HIDE_AND_RELOAD );	//SCHED_COMBINE_COVER_AND_RELOAD
@@ -2717,7 +2830,7 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 				else
 					m_flNextGrenadeCheck = gpGlobals->curtime + (COMBINE_GRENADE_TIME * random->RandomFloat(0.75f, 1.25f));// wait five seconds before considering another throw
 
-			//	DevMsg( "Throwing a grenade!\n");
+				DevMsg("%s: Throwing a grenade!\n", GetClassname() );
 			}
 			handledEvent = true;
 			break;
@@ -2745,7 +2858,7 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 				else
 					m_flNextGrenadeCheck = gpGlobals->curtime + 8;// wait eight seconds before even looking again to see if a grenade can be thrown
 
-			//	DevMsg( "Using grenade launcher to flush you out!\n");
+				DevMsg("%s: Using grenade launcher to flush you out!\n", GetClassname() );
 			}
 			handledEvent = true;
 			break;
@@ -2767,7 +2880,7 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 				ClearCondition( COND_CAN_RANGE_ATTACK2 );
 				m_flNextGrenadeCheck = gpGlobals->curtime + (COMBINE_GRENADE_TIME * random->RandomFloat(0.75f, 1.25f));
 
-			//	DevMsg( "Dropping a grenade!\n");
+				DevMsg("%s: Dropping a grenade!\n", GetClassname() );
 			}
 			handledEvent = true;
 			break;
@@ -2794,6 +2907,7 @@ void CNPC_Combine::HandleAnimEvent( animevent_t *pEvent )
 						CalculateMeleeDamageForce( &info, forward, pBCC->GetAbsOrigin() );
 						pBCC->TakeDamage( info );
 
+						//TODO; Elite stabs
 						EmitSound( "NPC_Combine.WeaponBash" );
 					}
 				}
@@ -3006,23 +3120,31 @@ void CNPC_Combine::AnnounceEnemyKill( CBaseEntity *pEnemy )
 // may still fail but in most cases, well after the grunt has 
 // started moving.
 //=========================================================
+#if 0
 char *CNPC_Combine::GetSentencePrefix( const char *pszSoundName )
 {
 	char *Prefix = "COMBINE";
 
+	if( IsDemolition() )
+		Prefix = "COMBINE_LEADER";
+
+#if 0
+	if( IsShock() )
+		Prefix = "COMBINE_SHOCK";
+#endif
+
 	if( IsElite() )
 		Prefix = "COMBINE_ELITE";
 
-#if 0
-	if( IsDemolition() )
-		Prefix = "COMBINE_LEADER";
-#endif
+	// TODO; If we dont have a sentence, fallback to base
 
+	// Send it
 	CFmtStr snd;
 	snd.sprintf("%s_%s", Prefix, pszSoundName );
 
 	return snd.Access();
 }
+#endif
 
 void CNPC_Combine::SpeakSentence( int sentenceType )
 {
@@ -3056,9 +3178,8 @@ void CNPC_Combine::SpeakSentence( int sentenceType )
 				}
 			}
 			if ( IsElite() )
-			{
 				pSentenceName = "COMBINE_ELITE_FLANK";
-			}
+
 			m_Sentences.Speak( pSentenceName );
 		}
 		break;
@@ -3100,12 +3221,14 @@ void CNPC_Combine::PainSound( const CTakeDamageInfo &info )
 				// Shouts like "Target ineffective" and "Hes on me"
 				Remember( bits_MEMORY_PAIN_LIGHT_SOUND );
 				pSentenceName = "COMBINE_TAUNT";
+				DevMsg("%s: That tickles!\n", GetClassname() );
 			}
 			else if ( !HasMemory(bits_MEMORY_PAIN_HEAVY_SOUND) && healthRatio < 0.3f )
 			{
 				// Shouts like "Medic" and "Falling back"
 				Remember( bits_MEMORY_PAIN_HEAVY_SOUND );
 				pSentenceName = "COMBINE_COVER";
+				DevMsg("%s: That hurt!\n", GetClassname() );
 			}
 		}
 
@@ -3141,6 +3264,7 @@ void CNPC_Combine::LostEnemySound( void )
 	
 	if ( m_Sentences.Speak( pSentence ) >= 0 )
 	{
+		//DevMsg("%s: ...What i wanna know is where's the freeman?\n", GetClassname() );
 		m_flNextLostSoundTime = gpGlobals->curtime + random->RandomFloat(5.0,15.0);
 	}
 }
@@ -3740,11 +3864,6 @@ WeaponProficiency_t CNPC_Combine::CalcWeaponProficiency( CBaseCombatWeapon *pWea
 	}
 	else if( FClassnameIs( pWeapon, "weapon_supershotgun" )	)
 	{
-		if( m_nSkin != COMBINE_SKIN_SHOTGUNNER )
-		{
-			m_nSkin = COMBINE_SKIN_SHOTGUNNER;
-		}
-
 		return WEAPON_PROFICIENCY_AVERAGE;
 	}
 	else if( FClassnameIs( pWeapon, "weapon_smg1" ) || FClassnameIs( pWeapon, "weapon_smg2" ) )
@@ -4184,7 +4303,7 @@ DEFINE_SCHEDULE
  "	Tasks"
  "		TASK_STOP_MOVING			0"
  "		TASK_SET_FAIL_SCHEDULE		SCHEDULE:SCHED_RELOAD"
-//"		TASK_SPEAK_SENTENCE			3"
+ "		TASK_SPEAK_SENTENCE			3"
  "		TASK_FIND_NODE_COVER_FROM_ENEMY	0"
  "		TASK_RUN_PATH				0"
  "		TASK_WAIT_FOR_MOVEMENT		0"

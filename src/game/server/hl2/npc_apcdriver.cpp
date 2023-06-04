@@ -279,7 +279,7 @@ void CNPC_APCDriver::PrescheduleThink( )
 		{
 			m_hAPC->AimPrimaryWeapon( GetEnemy()->BodyTarget( GetAbsOrigin(), false ) );
 		}
-		m_hAPC->AimSecondaryWeaponAt( GetEnemy() );
+		m_hAPC->AimSecondaryWeaponAt( GetEnemy()->BodyTarget( GetAbsOrigin(), true ) );
 	}
 	else if ( m_hAPC->m_lifeState == LIFE_DEAD )
 	{

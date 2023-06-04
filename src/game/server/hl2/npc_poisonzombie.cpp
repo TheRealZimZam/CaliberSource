@@ -223,8 +223,6 @@ private:
 	bool m_bCrabs[MAX_CRABS];		// Which crabs in particular are on our back.
 	float m_flNextCrabThrowTime;	// The next time we are allowed to throw a headcrab.
 
-	float m_flNextPainSoundTime;
-
 	bool m_bNearEnemy;
 
 	// NOT serialized:
@@ -241,8 +239,6 @@ BEGIN_DATADESC( CNPC_PoisonZombie )
 	DEFINE_KEYFIELD( m_nCrabCount, FIELD_INTEGER, "crabcount" ),
 	DEFINE_ARRAY( m_bCrabs, FIELD_BOOLEAN, MAX_CRABS ),
 	DEFINE_FIELD( m_flNextCrabThrowTime, FIELD_TIME ),
-
-	DEFINE_FIELD( m_flNextPainSoundTime, FIELD_TIME ),
 
 	DEFINE_FIELD( m_bNearEnemy, FIELD_BOOLEAN ),
 
@@ -1004,7 +1000,7 @@ void CNPC_PoisonZombie::PainSound( const CTakeDamageInfo &info )
 {
 	// Don't make pain sounds too often.
 	if ( m_flNextPainSoundTime <= gpGlobals->curtime )
-	{	
+	{
 		BreatheOffShort();
 		EmitSound( "NPC_PoisonZombie.Pain" );
 		m_flNextPainSoundTime = gpGlobals->curtime + random->RandomFloat( 4.0, 7.0 );

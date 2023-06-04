@@ -77,7 +77,11 @@ void CGrenadeMolotov::Spawn( void )
 	SetThink( &CGrenadeMolotov::MolotovThink );
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
-	m_flDamage		= sk_plr_dmg_molotov.GetFloat();
+	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
+		m_flDamage		= sk_plr_dmg_molotov.GetFloat();
+	else
+		m_flDamage		= sk_npc_dmg_molotov.GetFloat();
+
 	m_DmgRadius		= sk_molotov_radius.GetFloat();
 
 	m_takedamage	= DAMAGE_YES;
@@ -157,7 +161,7 @@ void CGrenadeMolotov::Detonate( void )
 
 	if ( GetWaterLevel() > 1 )
 	{
-		UTIL_Bubbles( GetAbsOrigin(), GetAbsOrigin(), 3 );
+		UTIL_Bubbles( GetAbsOrigin(), GetAbsOrigin(), 6 );
 		UTIL_Remove( this );
 		return;
 	}
@@ -211,7 +215,7 @@ void CGrenadeMolotov::Detonate( void )
 		&trace.endpos, 
 		g_sModelIndexFireball,
 		4.0, 
-		15,
+		20,
 		TE_EXPLFLAG_NOPARTICLES| TE_EXPLFLAG_NOSOUND,
 		m_DmgRadius,
 		m_flDamage );
@@ -223,6 +227,7 @@ void CGrenadeMolotov::Detonate( void )
 	UTIL_DecalTrace( &trace, "Scorch" );
 
 	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), BASEGRENADE_EXPLOSION_VOLUME, 3.0 );
+	RadiusDamage( CTakeDamageInfo( this, pOwner, m_flDamage, DMG_BURN ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 
 	//Ignite entities
 	CBaseEntity *pEntity = NULL;
@@ -235,7 +240,6 @@ void CGrenadeMolotov::Detonate( void )
 			pAnim->Ignite( lifetime * 0.5f );
 		}
 	}
-	RadiusDamage( CTakeDamageInfo( this, pOwner, m_flDamage, DMG_BURN ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
 
 	RemoveEffects( EF_NODRAW );
 	SetAbsVelocity( vec3_origin );

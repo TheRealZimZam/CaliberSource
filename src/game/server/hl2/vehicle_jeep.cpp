@@ -928,7 +928,7 @@ void CPropJeep::FireCannon( void )
 	
 	// make cylinders of gun spin a bit
 	m_nSpinPos += JEEP_GUN_SPIN_RATE;
-	//SetPoseParameter( JEEP_GUN_SPIN, m_nSpinPos );	//FIXME: Don't bother with this for E3, won't look right
+	SetPoseParameter( JEEP_GUN_SPIN, m_nSpinPos );
 }
 
 //-----------------------------------------------------------------------------

@@ -26,7 +26,7 @@
 
 ConVar	sk_conscript_health( "sk_conscript_health","0");
 
-Activity ACT_CONSCRIPT_SUPPRESS;
+Activity ACT_CONSCRIPT_BLINDFIRE;
 
 //=========================================================
 // Conscript
@@ -82,7 +82,7 @@ private:
 	//=========================================================
 	enum
 	{
-		SCHED_CONSCRIPT_SUPPRESS = BaseClass::NEXT_SCHEDULE,
+		SCHED_CONSCRIPT_BLINDFIRE = BaseClass::NEXT_SCHEDULE,
 		NEXT_SCHEDULE,
 	};
 
@@ -238,7 +238,7 @@ int	CNPC_Conscript::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 	CTakeDamageInfo newInfo = info;
 
-	if( IsInSquad() && (info.GetDamageType() & DMG_BLAST) && info.GetInflictor() )
+	if( InSquad() && (info.GetDamageType() & DMG_BLAST) && info.GetInflictor() )
 	{
 		// Blast damage. If this kills a squad member, give the 
 		// remaining citizens a resistance bonus to this inflictor
@@ -352,21 +352,21 @@ void CNPC_Conscript::UseFunc( CBaseEntity *pActivator, CBaseEntity *pCaller, USE
 
 AI_BEGIN_CUSTOM_NPC( npc_conscript, CNPC_Conscript )
 
-DECLARE_ACTIVITY( ACT_CONSCRIPT_SUPPRESS )
+DECLARE_ACTIVITY( ACT_CONSCRIPT_BLINDFIRE )
 
  //=========================================================
  // SUPPRESS
  //=========================================================
  DEFINE_SCHEDULE	
  (
- SCHED_CONSCRIPT_SUPPRESS,
+ SCHED_CONSCRIPT_BLINDFIRE,
 
  "	Tasks"
  "		TASK_STOP_MOVING			0"
  "		TASK_FACE_ENEMY				0"
- "		TASK_WAIT					0.5"
- "		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_CONSCRIPT_SUPPRESS"
+ "		TASK_SET_ACTIVITY			ACTIVITY:ACT_CONSCRIPT_BLINDFIRE"
  "		TASK_RANGE_ATTACK1			0"
+ "		TASK_WAIT					0.5"
  ""
  "	Interrupts"
  "		COND_ENEMY_DEAD"

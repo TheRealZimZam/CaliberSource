@@ -386,8 +386,15 @@ const char *CFastZombie::pMoanSounds[] =
 //-----------------------------------------------------------------------------
 void CFastZombie::Precache( void )
 {
-	PrecacheModel("models/zombie/fast.mdl");
+	BaseClass::Precache();
+
+	// For wasteland zombies
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/zombie/fast.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
 	PrecacheModel("models/zombie/fast_torso.mdl");
+
 #ifdef HL2_EPISODIC
 	PrecacheScriptSound( "NPC_FastZombie.CarEnter1" );
 	PrecacheScriptSound( "NPC_FastZombie.CarEnter2" );
@@ -419,8 +426,6 @@ void CFastZombie::Precache( void )
 	PrecacheScriptSound( "NPC_FastZombie.Gurgle" );
 
 	PrecacheScriptSound( "NPC_FastZombie.Moan1" );
-
-	BaseClass::Precache();
 }
 
 //---------------------------------------------------------
@@ -744,7 +749,7 @@ void CFastZombie::SetZombieModel( void )
 	}
 	else
 	{
-		SetModel( "models/zombie/fast.mdl" );
+		SetModel( STRING( GetModelName() ) );
 		SetHullType(HULL_HUMAN);
 	}
 
@@ -1778,8 +1783,6 @@ void CFastZombie::Event_Killed( const CTakeDamageInfo &info )
 	// Shut up my screaming sounds.
 	CPASAttenuationFilter filter( this );
 	EmitSound( filter, entindex(), "NPC_FastZombie.NoSound" );
-
-	CTakeDamageInfo dInfo = info;
 
 #if 0
 	CTakeDamageInfo dInfo = info;

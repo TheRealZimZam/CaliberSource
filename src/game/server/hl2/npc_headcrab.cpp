@@ -2496,7 +2496,11 @@ void CBaseHeadcrab::CreateDust( bool placeDecal )
 //-----------------------------------------------------------------------------
 void CHeadcrab::Precache( void )
 {
-	PrecacheModel( "models/headcrabclassic.mdl" );
+	//For wasteland crabs
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/headcrabclassic.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
 
 	PrecacheScriptSound( "NPC_HeadCrab.Gib" );
 	PrecacheScriptSound( "NPC_HeadCrab.Idle" );
@@ -2518,7 +2522,7 @@ void CHeadcrab::Precache( void )
 void CHeadcrab::Spawn( void )
 {
 	Precache();
-	SetModel( "models/headcrabclassic.mdl" );
+	SetModel( STRING( GetModelName() ) );
 
 	BaseClass::Spawn();
 
@@ -2636,7 +2640,11 @@ END_DATADESC()
 //-----------------------------------------------------------------------------
 void CFastHeadcrab::Precache( void )
 {
-	PrecacheModel( "models/headcrab.mdl" );
+	//For wasteland crabs
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/headcrab.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
 
 	PrecacheScriptSound( "NPC_FastHeadcrab.Idle" );
 	PrecacheScriptSound( "NPC_FastHeadcrab.Alert" );
@@ -2655,7 +2663,7 @@ void CFastHeadcrab::Precache( void )
 void CFastHeadcrab::Spawn( void )
 {
 	Precache();
-	SetModel( "models/headcrab.mdl" );
+	SetModel( STRING( GetModelName() ) );
 
 	BaseClass::Spawn();
 
@@ -3066,7 +3074,7 @@ void CBlackHeadcrab::TelegraphSound( void )
 void CBlackHeadcrab::Spawn( void )
 {
 	Precache();
-	SetModel( "models/headcrabblack.mdl" );
+	SetModel( STRING( GetModelName() ) );
 
 	BaseClass::Spawn();
 
@@ -3083,7 +3091,11 @@ void CBlackHeadcrab::Spawn( void )
 //-----------------------------------------------------------------------------
 void CBlackHeadcrab::Precache( void )
 {
-	PrecacheModel( "models/headcrabblack.mdl" );
+	//For wasteland crabs
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/headcrabblack.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
 
 	PrecacheScriptSound( "NPC_BlackHeadcrab.Telegraph" );
 	PrecacheScriptSound( "NPC_BlackHeadcrab.Attack" );

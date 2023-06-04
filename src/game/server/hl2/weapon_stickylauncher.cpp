@@ -21,12 +21,14 @@
 #define	PISTOL_FASTEST_REFIRE_TIME		0.1f
 #define	PISTOL_FASTEST_DRY_REFIRE_TIME	0.2f
 
-static void LaunchStickyBomb( CBaseCombatCharacter *pOwner, const Vector &origin, const Vector &direction );
+#define ENABLE_STICKY_LAUNCHER 0
 
 //-----------------------------------------------------------------------------
 // CWeaponStickyLauncher
 //-----------------------------------------------------------------------------
+static void LaunchStickyBomb( CBaseCombatCharacter *pOwner, const Vector &origin, const Vector &direction );
 
+#if ENABLE_STICKY_LAUNCHER
 class CWeaponStickyLauncher : public CBaseHLCombatWeapon
 {
 	DECLARE_CLASS( CWeaponStickyLauncher, CBaseHLCombatWeapon );
@@ -70,6 +72,7 @@ acttable_t	CWeaponStickyLauncher::m_acttable[] =
 };
 
 IMPLEMENT_ACTTABLE( CWeaponStickyLauncher );
+#endif
 
 class CStickyBomb : public CBaseAnimating
 {
@@ -117,14 +120,14 @@ END_SEND_TABLE()
 //---------------------------------------------------------
 BEGIN_DATADESC( CStickyBomb )
 
-	DEFINE_FIELD( CStickyBomb, m_hOperator,			FIELD_EHANDLE ),
-	DEFINE_FIELD( CStickyBomb, m_boneIndexAttached,	FIELD_INTEGER ),
-	DEFINE_FIELD( CStickyBomb, m_bonePosition,		FIELD_VECTOR ),
-	DEFINE_FIELD( CStickyBomb, m_boneAngles,		FIELD_VECTOR ),
+	DEFINE_FIELD( m_hOperator,			FIELD_EHANDLE ),
+	DEFINE_FIELD( m_boneIndexAttached,	FIELD_INTEGER ),
+	DEFINE_FIELD( m_bonePosition,		FIELD_VECTOR ),
+	DEFINE_FIELD( m_boneAngles,			FIELD_VECTOR ),
 
 END_DATADESC()
 
-
+#if ENABLE_STICKY_LAUNCHER
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
@@ -243,7 +246,6 @@ void CWeaponStickyLauncher::ItemPostFrame( void )
 //==================================================
 //AddViewKick
 //==================================================
-
 void CWeaponStickyLauncher::AddViewKick( void )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
@@ -260,7 +262,7 @@ void CWeaponStickyLauncher::AddViewKick( void )
 	//Add it to the view punch
 	pPlayer->ViewPunch( viewPunch );
 }
-
+#endif
 
 
 #define STICKY_BOMB_MODEL	"models/Weapons/glueblob.mdl"
@@ -304,11 +306,11 @@ void CStickyBomb::Spawn()
 	SetNextThink( TICK_NEVER_THINK );
 	m_flAnimTime = gpGlobals->curtime;
 	m_flPlaybackRate = 0.0;
-	m_flCycle = 0;
+	SetCycle( 0 );
 	UTIL_SetSize( this, vec3_origin, vec3_origin );
 	Relink();
 	// no shadows, please.
-	m_fEffects |= EF_NOSHADOW|EF_NORECEIVESHADOW;
+	AddEffects(EF_NOSHADOW|EF_NORECEIVESHADOW);
 	SetRenderColor( 255, 0, 0 );
 }
 void CStickyBomb::SetVelocity( const Vector &velocity, const AngularImpulse &angVelocity )
@@ -383,7 +385,9 @@ void CStickyBomb::Touch( CBaseEntity *pOther )
 	// Don't stick if already stuck
 	if ( GetMoveType() == MOVETYPE_FLYGRAVITY )
 	{
-		trace_t tr = GetTouchTrace();
+		trace_t	tr;
+		tr = BaseClass::GetTouchTrace();
+
 		// stickies don't stick to each other or sky
 		if ( FClassnameIs(pOther, "grenade_stickybomb") || (tr.surface.flags & SURF_SKY) )
 		{

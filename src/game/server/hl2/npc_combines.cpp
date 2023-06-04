@@ -60,7 +60,7 @@ void CNPC_CombineS::Spawn( void )
 
 	if( IsDemolition() )
 	{
-		// Stronger, tougher.
+		// Extra body-armour.
 		SetHealth( sk_combine_guard_health.GetFloat() );
 		SetMaxHealth( sk_combine_guard_health.GetFloat() );
 		SetKickDamage( sk_combine_guard_kick.GetFloat() );
@@ -99,23 +99,13 @@ void CNPC_CombineS::Spawn( void )
 //-----------------------------------------------------------------------------
 void CNPC_CombineS::Precache()
 {
-	const char *pModelName = STRING( GetModelName() );
-
-	if( !Q_stricmp( pModelName, "models/combine_super_soldier.mdl" ) )
-	{
-		m_fIsDemolition = true;
-	}
-	else
-	{
-		m_fIsDemolition = false;
-	}
-
 	if( !GetModelName() )
-	{
 		SetModelName( MAKE_STRING( "models/combine_soldier.mdl" ) );
-	}
 
 	PrecacheModel( STRING( GetModelName() ) );
+
+	PrecacheScriptSound( "NPC_CombineS.FootstepLeft" );
+	PrecacheScriptSound( "NPC_CombineS.FootstepRight" );
 
 //	PrecacheScriptSound( "NPC_Combine.Die" );
 	PrecacheScriptSound( "NPC_Combine.DieIWHBYD" );
@@ -204,10 +194,16 @@ void CNPC_CombineS::HandleAnimEvent( animevent_t *pEvent )
 	switch( pEvent->event )
 	{
 	case NPC_EVENT_LEFTFOOT:
+		{
 			MakeAIFootstepSound( 240.0f );
+			EmitSound( "NPC_CombineS.FootstepLeft", pEvent->eventtime );
+		}
 		break;
 	case NPC_EVENT_RIGHTFOOT:
+		{
 			MakeAIFootstepSound( 240.0f );
+			EmitSound( "NPC_CombineS.FootstepRight", pEvent->eventtime );
+		}
 		break;
 	case AE_SOLDIER_BLOCK_PHYSICS:
 		DevMsg( "BLOCKING!\n" );

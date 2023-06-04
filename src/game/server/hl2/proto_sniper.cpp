@@ -44,7 +44,7 @@
 
 extern Vector PointOnLineNearestPoint(const Vector& vStartPos, const Vector& vEndPos, const Vector& vPoint);
 
-ConVar sniperbulletspeed( "sniperbulletspeed", "6000" );	//This might be better to offload
+ConVar sniperbulletspeed( "sniperbulletspeed", "9001" );
 ConVar snipersoundmultiplier( "snipersoundmultiplier", "3", FCVAR_CHEAT, "Speed of sound multiplier - 1 is normal, higher is more delayed" );
 ConVar sniperLines( "showsniperlines", "0" );
 ConVar sniperviewdist("sniperviewdist", "35" );	//Achtually the viewCONE
@@ -56,8 +56,7 @@ ConVar sniper_xbox_delay( "sniper_xbox_delay", "1" );
 extern ConVar sk_dmg_sniper_penetrate_plr;
 extern ConVar sk_dmg_sniper_penetrate_npc;
 
-// No model, impervious to damage.
-#define SF_SNIPER_HIDDEN		(1 << 16)
+#define SF_SNIPER_HIDDEN		(1 << 16) ///< No model, impervious to damage.
 #define SF_SNIPER_VIEWCONE		(1 << 17) ///< when set, sniper only sees in a small cone around the laser.
 #define SF_SNIPER_NOCORPSE		(1 << 18) ///< when set, no corpse
 #define SF_SNIPER_STARTDISABLED	(1 << 19)
@@ -243,6 +242,7 @@ public:
 
 	virtual int SelectSchedule( void );
 	virtual int TranslateSchedule( int scheduleType );
+	Activity NPC_TranslateActivity( Activity eNewActivity );
 
 	bool KeyValue( const char *szKeyName, const char *szValue );
 
@@ -519,19 +519,19 @@ enum Sniper_Conds
 //=========================================================
 enum
 {
-	SCHED_PSNIPER_SCAN = LAST_SHARED_SCHEDULE,
-	SCHED_PSNIPER_CAMP,
-	SCHED_PSNIPER_ATTACK,
-	SCHED_PSNIPER_RELOAD,
-	SCHED_PSNIPER_ATTACKDECOY,
-	SCHED_PSNIPER_SUPPRESSED,
-	SCHED_PSNIPER_DISABLEDWAIT,
-	SCHED_PSNIPER_FRUSTRATED_ATTACK,
-	SCHED_PSNIPER_SWEEP_TARGET,
-	SCHED_PSNIPER_SWEEP_TARGET_NOINTERRUPT,
-	SCHED_PSNIPER_SNAPATTACK,
-	SCHED_PSNIPER_NO_CLEAR_SHOT,
-	SCHED_PSNIPER_PLAYER_DEAD,
+	SCHED_SNIPER_SCAN = LAST_SHARED_SCHEDULE,
+	SCHED_SNIPER_CAMP,
+	SCHED_SNIPER_ATTACK,
+	SCHED_SNIPER_RELOAD,
+	SCHED_SNIPER_ATTACKDECOY,
+	SCHED_SNIPER_SUPPRESSED,
+	SCHED_SNIPER_DISABLEDWAIT,
+	SCHED_SNIPER_FRUSTRATED_ATTACK,
+	SCHED_SNIPER_SWEEP_TARGET,
+	SCHED_SNIPER_SWEEP_TARGET_NOINTERRUPT,
+	SCHED_SNIPER_SNAPATTACK,
+	SCHED_SNIPER_NO_CLEAR_SHOT,
+	SCHED_SNIPER_PLAYER_DEAD,
 };
 
 //=========================================================
@@ -919,20 +919,24 @@ LINK_ENTITY_TO_CLASS( sniperbullet, CSniperBullet );
 //-----------------------------------------------------------------------------
 void CProtoSniper::Precache( void )
 {
-	PrecacheModel("models/combine_soldier.mdl");
+	PrecacheModel("models/combine_elite.mdl");
 	sHaloSprite = PrecacheModel("sprites/light_glow03.vmt");
 	sFlashSprite = PrecacheModel( "sprites/muzzleflash1.vmt" );
-	PrecacheModel("sprites/purplelaser1.vmt");	
+	PrecacheModel("sprites/purplelaser1.vmt");
 
 	UTIL_PrecacheOther( "sniperbullet" );
 
 	PrecacheScriptSound( "NPC_Sniper.Die" );
-	PrecacheScriptSound( "NPC_Sniper.Idle" );
-	PrecacheScriptSound( "NPC_Sniper.Alert" );
-	PrecacheScriptSound( "NPC_Sniper.CoverDestroyed" );
-	PrecacheScriptSound( "NPC_Sniper.TargetDestroyed" );
-	PrecacheScriptSound( "NPC_Sniper.TargetHidden" );
-	PrecacheScriptSound( "NPC_Sniper.HearDanger");
+
+	if ( sniperspeak.GetBool() )
+	{
+		PrecacheScriptSound( "NPC_Sniper.Idle" );
+		PrecacheScriptSound( "NPC_Sniper.Alert" );
+		PrecacheScriptSound( "NPC_Sniper.CoverDestroyed" );
+		PrecacheScriptSound( "NPC_Sniper.TargetDestroyed" );
+		PrecacheScriptSound( "NPC_Sniper.TargetHidden" );
+		PrecacheScriptSound( "NPC_Sniper.HearDanger");
+	}
 	PrecacheScriptSound( "NPC_Sniper.FireBullet" );
 	PrecacheScriptSound( "NPC_Sniper.Reload" );
 
@@ -950,7 +954,7 @@ void CProtoSniper::Spawn( void )
 	Precache();
 
 	/// HACK:
-	SetModel( "models/combine_soldier.mdl" );
+	SetModel( "models/combine_elite.mdl" );
 
 	//m_hBullet = (CSniperBullet *)Create( "sniperbullet", GetBulletOrigin(), GetLocalAngles(), NULL );
 
@@ -964,8 +968,9 @@ void CProtoSniper::Spawn( void )
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_FLY );
-	m_bloodColor		= DONT_BLEED;
-	m_iHealth			= 15;
+	SetBloodColor( BLOOD_COLOR_RED );
+
+	m_iHealth			= 20;
 	m_flFieldOfView		= 0.2;
 	m_NPCState			= NPC_STATE_NONE;
 
@@ -981,6 +986,7 @@ void CProtoSniper::Spawn( void )
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK1 );
 	CapabilitiesAdd( bits_CAP_SIMPLE_RADIUS_DAMAGE );
+	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_NO_HIT_SQUADMATES );
 
 	m_HackedGunPos = Vector ( 0, 0, 0 );
 
@@ -998,6 +1004,7 @@ void CProtoSniper::Spawn( void )
 	{
 		AddEffects( EF_NODRAW );
 		AddSolidFlags( FSOLID_NOT_SOLID );
+		SetBloodColor( DONT_BLEED );
 	}
 
 	// Point the cursor straight ahead so that the sniper's
@@ -1058,7 +1065,7 @@ void CProtoSniper::InputSweepTargetHighestPriority( inputdata_t &inputdata )
 	SetSweepTarget( inputdata.value.String() );
 	m_bSweepHighestPriority = true;
 
-	if( GetCurSchedule() && stricmp( GetCurSchedule()->GetName(), "SCHED_PSNIPER_RELOAD" ) )
+	if( GetCurSchedule() && stricmp( GetCurSchedule()->GetName(), "SCHED_SNIPER_RELOAD" ) )
 	{
 		// If you're doing anything except reloading, stop and do this.
 		ClearSchedule( "Told to sweep target via input" );
@@ -1361,24 +1368,22 @@ int CProtoSniper::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		}
 	}
 
-	if( (info.GetDamageType() & DMG_BLAST) && info.GetDamage() < m_iHealth )
+	if( (info.GetDamageType() & (DMG_BLAST|DMG_BURN)) )
 	{
+		float flDist = GetAbsOrigin().DistTo( info.GetInflictor()->GetAbsOrigin() );
+		if( flDist > SNIPER_MAX_INFLICTOR_DIST )
+		{
+			// Sniper only takes damage from explosives that are nearby. This makes a sniper 
+			// susceptible to a grenade that lands in his nest, but not to a large explosion
+			// that goes off elsewhere and just happens to be able to trace into the sniper's 
+			// nest.
+			return 0;
+		}
+
 		// Only blasts powerful enough to kill hurt
-		return 0;
-	}
-
-	float flDist = GetAbsOrigin().DistTo( info.GetInflictor()->GetAbsOrigin() );
-	if( flDist > SNIPER_MAX_INFLICTOR_DIST )
-	{
-		// Sniper only takes damage from explosives that are nearby. This makes a sniper 
-		// susceptible to a grenade that lands in his nest, but not to a large explosion
-		// that goes off elsewhere and just happens to be able to trace into the sniper's 
-		// nest.
-		return 0;
-	}
-
-	if( info.GetDamageType() & DMG_BURN )
-	{
+		if ( info.GetDamage() < m_iHealth )
+			return 0;
+		
 		newInfo.SetDamage( m_iHealth );
 	}
 
@@ -1411,7 +1416,7 @@ void CProtoSniper::Event_Killed( const CTakeDamageInfo &info )
 
 		CBaseEntity *pGib;
 		bool bShouldIgnite = IsOnFire();	//|| hl2_episodic.GetBool()
-		pGib = CreateRagGib( "models/combine_soldier.mdl", GetLocalOrigin(), GetLocalAngles(), (vecForward * flForce) + Vector(0, 0, 600), flFadeTime, bShouldIgnite );
+		pGib = CreateRagGib( "models/combine_elite.mdl", GetLocalOrigin(), GetLocalAngles(), (vecForward * flForce) + Vector(0, 0, 600), flFadeTime, bShouldIgnite );
 	}
 
 	m_OnDeath.FireOutput( info.GetAttacker(), this );
@@ -1438,6 +1443,8 @@ void CProtoSniper::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInf
 	{
 		m_bKilledPlayer = true;
 	}
+
+	BaseClass::Event_KilledOther( pVictim, info );
 }
 
 //---------------------------------------------------------
@@ -1462,7 +1469,7 @@ int CProtoSniper::SelectSchedule( void )
 	{
 		if( HasCondition(COND_IN_PVS) )
 		{
-			return SCHED_PSNIPER_PLAYER_DEAD;
+			return SCHED_SNIPER_PLAYER_DEAD;
 		}
 	}
 	
@@ -1489,14 +1496,14 @@ int CProtoSniper::SelectSchedule( void )
 			}
 		}
 
-		return SCHED_PSNIPER_SUPPRESSED;
+		return SCHED_SNIPER_SUPPRESSED;
 	}
 
 	// OK. If you fall through all the cases above, but you're DISABLED,
 	// play the schedule that waits a little while and tries again.
 	if( !m_fEnabled )
 	{
-		return SCHED_PSNIPER_DISABLEDWAIT;
+		return SCHED_SNIPER_DISABLEDWAIT;
 	}
 
 	if( HasCondition( COND_SNIPER_SWEEP_TARGET ) )
@@ -1504,11 +1511,11 @@ int CProtoSniper::SelectSchedule( void )
 		// Sweep a target. Scripted by level designers!
 		if( m_hSweepTarget && m_hSweepTarget->HasSpawnFlags( SF_SNIPERTARGET_NOINTERRUPT ) || m_bSweepHighestPriority )
 		{
-			return SCHED_PSNIPER_SWEEP_TARGET_NOINTERRUPT;
+			return SCHED_SNIPER_SWEEP_TARGET_NOINTERRUPT;
 		}
 		else
 		{
-			return SCHED_PSNIPER_SWEEP_TARGET;
+			return SCHED_SNIPER_SWEEP_TARGET;
 		}
 	}
 
@@ -1520,12 +1527,12 @@ int CProtoSniper::SelectSchedule( void )
 			EmitSound( "NPC_Sniper.TargetDestroyed" );
 		}
 		SetEnemy( NULL );
-		return SCHED_PSNIPER_SCAN;
+		return SCHED_SNIPER_SCAN;
 	}
 
 	if( HasCondition( COND_SNIPER_FRUSTRATED ) )
 	{
-		return SCHED_PSNIPER_FRUSTRATED_ATTACK;
+		return SCHED_SNIPER_FRUSTRATED_ATTACK;
 	}
 
 	if( HasCondition( COND_SNIPER_CANATTACKDECOY ) )
@@ -1539,7 +1546,7 @@ int CProtoSniper::SelectSchedule( void )
 		{
 			EmitSound( "NPC_Sniper.TargetHidden" );
 		}
-		return SCHED_PSNIPER_NO_CLEAR_SHOT;
+		return SCHED_SNIPER_NO_CLEAR_SHOT;
 	}
 
 	if( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
@@ -1550,7 +1557,7 @@ int CProtoSniper::SelectSchedule( void )
 	else
 	{
 		// Camp on this target
-		return SCHED_PSNIPER_CAMP;
+		return SCHED_SNIPER_CAMP;
 	}
 }
 
@@ -1914,21 +1921,41 @@ int CProtoSniper::TranslateSchedule( int scheduleType )
 	case SCHED_RANGE_ATTACK1:
 		if( m_hSweepTarget != NULL && m_fSnapShot && ShouldSnapShot() )
 		{
-			return SCHED_PSNIPER_SNAPATTACK;
+			return SCHED_SNIPER_SNAPATTACK;
 		}
 
-		return SCHED_PSNIPER_ATTACK;
+		return SCHED_SNIPER_ATTACK;
 		break;
 
 	case SCHED_RANGE_ATTACK2:
-		return SCHED_PSNIPER_ATTACKDECOY;
+		return SCHED_SNIPER_ATTACKDECOY;
 		break;
 
 	case SCHED_RELOAD:
-		return SCHED_PSNIPER_RELOAD;
+		return SCHED_SNIPER_RELOAD;
 		break;
 	}
 	return BaseClass::TranslateSchedule( scheduleType );
+}
+
+Activity CProtoSniper::NPC_TranslateActivity( Activity eNewActivity )
+{
+	if( !(m_spawnflags & SF_SNIPER_HIDDEN) )
+	{
+	//	switch ( eNewActivity )
+	//	{
+	//		// Sniper stands when shooting, but hides when not
+	//		case ACT_IDLE:
+	//		case ACT_HOVER:
+				if ( GetEnemy() || m_NPCState == NPC_STATE_COMBAT )
+					eNewActivity = ACT_IDLE_ANGRY;
+				else if ( HaveSequenceForActivity( ACT_CROUCHIDLE ) )
+					eNewActivity = ACT_CROUCHIDLE;
+	//		break;
+	//	}
+	}
+
+	return BaseClass::NPC_TranslateActivity( eNewActivity );
 }
 
 //---------------------------------------------------------
@@ -1980,7 +2007,7 @@ bool CProtoSniper::FireBullet( const Vector &vecTarget, bool bDirectShot )
 //	EmitSound( filternoatten, entindex(), "NPC_Sniper.FireBullet" );
 
 	CPVSFilter filter( vecBulletOrigin );
-	te->Sprite( filter, 0.1, &vecBulletOrigin, sFlashSprite, 0.4, 255 );
+	te->Sprite( filter, 0.1, &vecBulletOrigin, sFlashSprite, 0.4, 255, 10 );
 //	BaseClass::DoMuzzleFlash();
 	//TODO; Need a dlight here
 
@@ -2572,14 +2599,14 @@ Vector CProtoSniper::LeadTarget( CBaseEntity *pTarget )
 	// Get bullet time to target
 	targetDist = (vecTarget - GetBulletOrigin() ).Length();
 	targetTime = targetDist / GetBulletSpeed();
-	
+
 	// project target's velocity over that time. 
 	Vector vecVelocity = vec3_origin;
 
 	if( pTarget->IsPlayer() || pTarget->Classify() == CLASS_MISSILE )
 	{
 		// This target is a client, who has an actual velocity.
-		vecVelocity = pTarget->GetSmoothedVelocity();
+		vecVelocity = pTarget->GetSmoothedVelocity();	//GetAbsVelocity
 
 		// Slow the vertical velocity down a lot, or the sniper will
 		// lead a jumping player by firing several feet above his head.
@@ -3004,7 +3031,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_SCAN,
+		SCHED_SNIPER_SCAN,
 
 		"	Tasks"
 		"		TASK_WAIT_INDEFINITE		0"
@@ -3022,7 +3049,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_CAMP,
+		SCHED_SNIPER_CAMP,
 
 		"	Tasks"
 		"		TASK_WAIT_INDEFINITE		0"
@@ -3044,7 +3071,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_ATTACK,
+		SCHED_SNIPER_ATTACK,
 
 		"	Tasks"
 		"		TASK_SNIPER_PAINT_ENEMY		0"
@@ -3062,7 +3089,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_SNAPATTACK,
+		SCHED_SNIPER_SNAPATTACK,
 
 		"	Tasks"
 		"		TASK_SNIPER_ATTACK_CURSOR	0"
@@ -3080,7 +3107,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_RELOAD,
+		SCHED_SNIPER_RELOAD,
 
 		"	Tasks"
 		"		TASK_RELOAD				0"
@@ -3095,7 +3122,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_ATTACKDECOY,
+		SCHED_SNIPER_ATTACKDECOY,
 
 		"	Tasks"
 		"		TASK_SNIPER_PAINT_DECOY		2.0"
@@ -3114,7 +3141,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_SUPPRESSED,
+		SCHED_SNIPER_SUPPRESSED,
 
 		"	Tasks"
 		"		TASK_WAIT			2.0"
@@ -3128,7 +3155,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_DISABLEDWAIT,
+		SCHED_SNIPER_DISABLEDWAIT,
 
 		"	Tasks"
 		"		TASK_WAIT			0.5"
@@ -3143,7 +3170,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_FRUSTRATED_ATTACK,
+		SCHED_SNIPER_FRUSTRATED_ATTACK,
 
 		"	Tasks"
 		"		TASK_WAIT						2.0"
@@ -3166,7 +3193,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_SWEEP_TARGET,
+		SCHED_SNIPER_SWEEP_TARGET,
 
 		"	Tasks"
 		"		TASK_SNIPER_PAINT_SWEEP_TARGET	0.0"
@@ -3183,7 +3210,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_SWEEP_TARGET_NOINTERRUPT,
+		SCHED_SNIPER_SWEEP_TARGET_NOINTERRUPT,
 
 		"	Tasks"
 		"		TASK_SNIPER_PAINT_SWEEP_TARGET	0.0"
@@ -3196,7 +3223,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-		SCHED_PSNIPER_NO_CLEAR_SHOT,
+		SCHED_SNIPER_NO_CLEAR_SHOT,
 
 		"	Tasks"
 		"		TASK_SNIPER_PAINT_NO_SHOT	0.0"
@@ -3216,7 +3243,7 @@ AI_BEGIN_CUSTOM_NPC( proto_sniper, CProtoSniper )
 	//=========================================================
 	DEFINE_SCHEDULE
 	(
-	SCHED_PSNIPER_PLAYER_DEAD,
+	SCHED_SNIPER_PLAYER_DEAD,
 
 	"	Tasks"
 	"		TASK_SNIPER_PLAYER_DEAD		0"
@@ -3274,7 +3301,7 @@ void CSniperBullet::BulletThink( void )
 				// Warn my enemy if they can see the sniper.
 				if( pEnemyNPC && GetOwnerEntity() && pEnemyNPC->FVisible( GetOwnerEntity()->WorldSpaceCenter() ) )
 				{
-					CSoundEnt::InsertSound( SOUND_DANGER | SOUND_CONTEXT_FROM_SNIPER, pSniper->GetEnemy()->EarPosition(), 16, 1.0f, GetOwnerEntity() );
+					CSoundEnt::InsertSound( SOUND_DANGER | SOUND_CONTEXT_FROM_SNIPER, pSniper->GetEnemy()->EarPosition(), 32, 1.0f, GetOwnerEntity() );
 				}
 			}
 		}
@@ -3504,9 +3531,7 @@ bool CSniperBullet::Start( const Vector &vecOrigin, const Vector &vecTarget, CBa
 	//-------------------------------
 	//-------------------------------
 */	
-	
 
-/*
 #ifdef SNIPER_DEBUG
 	Msg( "PENETRATING %d items", i );
 #endif // SNIPER_DEBUG
@@ -3514,7 +3539,6 @@ bool CSniperBullet::Start( const Vector &vecOrigin, const Vector &vecTarget, CBa
 #ifdef SNIPER_DEBUG
 	Msg( "Dist: %f Travel Time: %f\n", flShotDist, m_ImpactTime );
 #endif // SNIPER_DEBUG
-*/
 }
 
 

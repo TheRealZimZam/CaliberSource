@@ -825,9 +825,7 @@ void CNPC_Zombine::PainSound( const CTakeDamageInfo &info )
 {
 	// We're constantly taking damage when we are on fire. Don't make all those noises!
 	if ( IsOnFire() )
-	{
 		return;
-	}
 
 	EmitSound( "Zombine.Pain" );
 }
@@ -917,7 +915,7 @@ void CNPC_Zombine::MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize )
 //-----------------------------------------------------------------------------
 const char *CNPC_Zombine::GetHeadcrabClassname( void )
 {
-	return "npc_headcrab";
+	return "npc_cheadcrab";
 }
 
 void CNPC_Zombine::ReleaseGrenade( Vector vPhysgunPos )

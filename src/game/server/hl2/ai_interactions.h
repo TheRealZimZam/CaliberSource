@@ -64,6 +64,9 @@ extern int	g_interactionVortigauntStompHit;
 extern int	g_interactionVortigauntKick;
 extern int	g_interactionVortigauntClaw;
 
+//Wasteland scanner
+extern int	g_interactionWScannerBomb;
+
 //Floor turret
 extern int	g_interactionTurretStillStanding;
 

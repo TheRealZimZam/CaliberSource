@@ -95,23 +95,21 @@ LINK_ENTITY_TO_CLASS(func_recharge, CRecharge);
 
 bool CRecharge::KeyValue( const char *szKeyName, const char *szValue )
 {
-	if (	FStrEq(szKeyName, "style") ||
-				FStrEq(szKeyName, "height") ||
-				FStrEq(szKeyName, "value1") ||
-				FStrEq(szKeyName, "value2") ||
-				FStrEq(szKeyName, "value3"))
+	if (FStrEq(szKeyName, "style") ||
+		FStrEq(szKeyName, "height") ||
+		FStrEq(szKeyName, "value1") ||
+		FStrEq(szKeyName, "value2") ||
+		FStrEq(szKeyName, "value3"))
 	{
+		return(true);
 	}
 	else if (FStrEq(szKeyName, "dmdelay"))
 	{
 		m_iReactivate = atoi(szValue);
-	}
-	else
-	{
-		return BaseClass::KeyValue( szKeyName, szValue );
+		return(true);
 	}
 
-	return true;
+	return(BaseClass::KeyValue( szKeyName, szValue ));
 }
 
 void CRecharge::Spawn()
@@ -125,7 +123,8 @@ void CRecharge::Spawn()
 
 	UpdateJuice( MaxJuice() );
 
-	m_nState = 0;			
+	m_nState = 0;
+	SetTextureFrameIndex( m_nState );
 
 	CreateVPhysics();
 }
@@ -219,7 +218,8 @@ void CRecharge::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 	// if there is no juice left, turn it off
 	if (m_iJuice <= 0)
 	{
-		m_nState = 1;			
+		m_nState = 1;
+		SetTextureFrameIndex( m_nState );
 		Off();
 	}
 
@@ -304,7 +304,8 @@ void CRecharge::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 void CRecharge::Recharge(void)
 {
 	UpdateJuice( MaxJuice() );
-	m_nState = 0;			
+	m_nState = 0;
+	SetTextureFrameIndex( m_nState );
 	SetThink( &CRecharge::SUB_DoNothing );
 }
 
@@ -372,7 +373,7 @@ private:
 	COutputEvent m_OnFull;
 	COutputEvent m_OnPlayerUse;
 
-	virtual void StudioFrameAdvance ( void );
+	virtual void StudioFrameAdvance( void );
 	float m_flJuice;
 };
 

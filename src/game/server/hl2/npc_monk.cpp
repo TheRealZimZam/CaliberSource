@@ -219,6 +219,15 @@ Activity CNPC_Monk::NPC_TranslateActivity( Activity eNewActivity )
 				eNewActivity = ACT_RUN_AIM;
 			}
 		}
+#if 0
+		else
+		{
+			if ( eNewActivity == ACT_IDLE && GetActiveWeapon() )
+			{
+				eNewActivity = ACT_MONK_GUN_IDLE;
+			}
+		}
+#endif
 	}
 
 	return eNewActivity;

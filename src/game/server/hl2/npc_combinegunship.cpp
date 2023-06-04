@@ -66,7 +66,7 @@ int g_iGunshipEffectIndex = -1;
 #define SF_GUNSHIP_NO_GROUND_ATTACK		( 1 << 12 )	
 #define SF_GUNSHIP_USE_CHOPPER_MODEL	( 1 << 13 )
 
-ConVar sk_gunship_health( "sk_gunship_health","100");
+ConVar sk_gunship_health( "sk_gunship_health","2000");
 ConVar sk_gunship_burst_size("sk_gunship_burst_size", "15" );
 ConVar sk_gunship_burst_min("sk_gunship_burst_min", "800" );
 ConVar sk_gunship_burst_dist("sk_gunship_burst_dist", "768" );
@@ -241,6 +241,7 @@ public:
 
 	bool	FVisible( CBaseEntity *pEntity, int traceMask = MASK_BLOCKLOS, CBaseEntity **ppBlocker = NULL );
 	int		OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	void	PainSound( const CTakeDamageInfo &info );
 	void	FireDamageOutputsUpto( int iDamageNumber );
 
 	virtual float GetAcceleration( void ) { return 15; }
@@ -2783,14 +2784,15 @@ void CNPC_CombineGunship::DoImpactEffect( trace_t &tr, int nDamageType )
 	UTIL_ImpactTrace( &tr, nDamageType, "ImpactGunship" );
 
 	// These glow effects don't sort properly, so they're cut for E3 2003 (sjb)
-#if 0 
+#if 0
 	CEffectData data;
 
 	data.m_vOrigin = tr.endpos;
 	data.m_vNormal = vec3_origin;
 	data.m_vAngles = vec3_angle;
+	data.m_nColor = COMMAND_POINT_BLUE;
 
-	DispatchEffect( "GunshipImpact", data );
+	DispatchEffect( "CommandPointer", data );
 #endif
 }
 
@@ -2834,7 +2836,7 @@ void CNPC_CombineGunship::MakeTracer( const Vector &vecTracerSrc, const trace_t 
 void CNPC_CombineGunship::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
 	// Reflect bullets
-	if ( info.GetDamageType() & DMG_BULLET )
+	if ( info.GetDamageType() & DMG_BULLET && !(info.GetDamageType() & DMG_ARMORPIERCING) )
 	{
 		if ( random->RandomInt( 0, 2 ) == 0 )
 		{
@@ -2915,103 +2917,132 @@ void CNPC_CombineGunship::FireDamageOutputsUpto( int iDamageNumber )
 int	CNPC_CombineGunship::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 {
 	// Allow npc_kill to kill me
+	bool bBlastDamage = (inputInfo.GetDamageType() & DMG_BLAST) != 0;
 	if ( inputInfo.GetDamageType() != DMG_GENERIC )
 	{
-		//Actually no, allow big guns/hmgs to damage me
-#if 0
-		// Ignore mundane bullet damage.
-		if ( ( inputInfo.GetDamageType() & DMG_BLAST ) == false )
-			return 0;
-#endif
-
-		// Ignore blasts less than this amount
-		if ( inputInfo.GetDamage() < GUNSHIP_MIN_DAMAGE_THRESHOLD )
+		if ( bBlastDamage && inputInfo.GetDamage() < GUNSHIP_MIN_DAMAGE_THRESHOLD )
 			return 0;
 	}
 
 	CTakeDamageInfo info = inputInfo;
-
-	// Make a pain sound
-	if ( !HasSpawnFlags( SF_GUNSHIP_USE_CHOPPER_MODEL ) )
-	{
-		EmitSound( "NPC_CombineGunship.Pain" );
-	}
-
 	Vector	damageDir = info.GetDamageForce();
 	VectorNormalize( damageDir );
 
 	// Don't get knocked around if I'm ground attacking
 	if ( !m_bIsGroundAttacking )
 	{
-		ApplyAbsVelocityImpulse( damageDir * 200.0f );
+		ApplyAbsVelocityImpulse( damageDir * ( bBlastDamage ? 200.0f : 10.0f ) );
 	}
-	
+
+	// Make a pain sound
+	if ( !HasSpawnFlags( SF_GUNSHIP_USE_CHOPPER_MODEL ) )
+	{
+		PainSound( info );
+	}
+
 	if ( m_bInvulnerable == false )
 	{
-		// Take a percentage of our health away
-		// Adjust health for damage
-		int iHealthIncrements = sk_gunship_health_increments.GetInt();
-		if ( g_pGameRules->IsSkillLevel( SKILL_EASY ) )
+		if ( bBlastDamage )
 		{
-			iHealthIncrements = ceil( iHealthIncrements * 0.5 );
-		}
-		else if ( g_pGameRules->IsSkillLevel( SKILL_HARD ) )
-		{
-			iHealthIncrements = floor( iHealthIncrements * 1.5 );
-		}
-		info.SetDamage( ( GetMaxHealth() / (float)iHealthIncrements ) + 1 );
-		
-		// Find out which "stage" we're at in our health
-		int healthIncrement = iHealthIncrements - ( GetHealth() / (float)(( GetMaxHealth() / (float)iHealthIncrements )) );
-		switch ( healthIncrement )
-		{
-		case 1:
-			// If we're on Easy, we're half dead now, so fire the rest of our outputs too
-			// This is done in case the mapmaker's connected those inputs to something important 
-			// that has to happen before the gunship dies.
+			// Take a percentage of our health away
+			// Adjust health for damage
+			int iHealthIncrements = sk_gunship_health_increments.GetInt();
 			if ( g_pGameRules->IsSkillLevel( SKILL_EASY ) )
 			{
+				iHealthIncrements = ceil( iHealthIncrements * 0.5 );
+			}
+			else if ( g_pGameRules->IsSkillLevel( SKILL_HARD ) )
+			{
+				iHealthIncrements = floor( iHealthIncrements * 1.5 );
+			}
+			info.SetDamage( ( GetMaxHealth() / (float)iHealthIncrements ) + 1 );
+			
+			// Find out which "stage" we're at in our health
+			int healthIncrement = iHealthIncrements - ( GetHealth() / (float)(( GetMaxHealth() / (float)iHealthIncrements )) );
+			switch ( healthIncrement )
+			{
+			case 1:
+				// If we're on Easy, we're half dead now, so fire the rest of our outputs too
+				// This is done in case the mapmaker's connected those inputs to something important 
+				// that has to happen before the gunship dies.
+				if ( g_pGameRules->IsSkillLevel( SKILL_EASY ) )
+				{
+					FireDamageOutputsUpto( 3 );
+				}
+				else
+				{
+					FireDamageOutputsUpto( 1 );
+				}
+				break;
+
+			default:
+				FireDamageOutputsUpto( healthIncrement );
+				break;
+			}
+
+			// Start smoking when we're almost dead
+			CreateSmokeTrail();
+
+			if ( m_pSmokeTrail )
+			{
+				if ( healthIncrement < 2 )
+				{
+					m_pSmokeTrail->SetLifetime( 8.0 );
+				}
+
+				m_pSmokeTrail->FollowEntity( this, "exhaustl" );
+			}
+
+			// Move with the target
+			Vector	gibVelocity = GetAbsVelocity() + (-damageDir * 200.0f);
+
+			// Dump out metal gibs
+			CPVSFilter filter( GetAbsOrigin() );
+			for ( int i = 0; i < 10; i++ )
+			{
+				int iModelIndex = modelinfo->GetModelIndex( g_PropDataSystem.GetRandomChunkModel( "MetalChunks" ) );	
+				te->BreakModel( filter, 0.0, GetAbsOrigin(), vec3_angle, Vector(40,40,40), gibVelocity, iModelIndex, 400, 1, 2.5, BREAK_METAL );
+			}
+		}
+		else
+		{
+			// Check my health the nerdy way
+
+			if ( m_iHealth <= (m_iMaxHealth/2) )
+			{
+				// Down to half health
 				FireDamageOutputsUpto( 3 );
+				CreateSmokeTrail();
+				if ( m_pSmokeTrail )
+				{
+					m_pSmokeTrail->FollowEntity( this, "exhaustl" );
+				}
+				// Dump out metal gibs
+				if ( random->RandomInt( 0, 10 ) == 10 )
+				{
+					Vector	gibVelocity = GetAbsVelocity() + (-damageDir * 200.0f);
+					CPVSFilter filter( GetAbsOrigin() );
+					for ( int i = 0; i < 5; i++ )
+					{
+						int iModelIndex = modelinfo->GetModelIndex( g_PropDataSystem.GetRandomChunkModel( "MetalChunks" ) );	
+						te->BreakModel( filter, 0.0, GetAbsOrigin(), vec3_angle, Vector(40,40,40), gibVelocity, iModelIndex, 400, 1, 2.5, BREAK_METAL );
+					}
+				}
 			}
-			else
-			{
-				FireDamageOutputsUpto( 1 );
-			}
-			break;
-
-		default:
-			FireDamageOutputsUpto( healthIncrement );
-			break;
-		}
-
-		// Start smoking when we're almost dead
-		CreateSmokeTrail();
-
-		if ( m_pSmokeTrail )
-		{
-			if ( healthIncrement < 2 )
-			{
-				m_pSmokeTrail->SetLifetime( 8.0 );
-			}
-
-			m_pSmokeTrail->FollowEntity( this, "exhaustl" );
-		}
-
-		// Move with the target
-		Vector	gibVelocity = GetAbsVelocity() + (-damageDir * 200.0f);
-
-		// Dump out metal gibs
-		CPVSFilter filter( GetAbsOrigin() );
-	 	for ( int i = 0; i < 10; i++ )
-		{
-			int iModelIndex = modelinfo->GetModelIndex( g_PropDataSystem.GetRandomChunkModel( "MetalChunks" ) );	
-			te->BreakModel( filter, 0.0, GetAbsOrigin(), vec3_angle, Vector(40,40,40), gibVelocity, iModelIndex, 400, 1, 2.5, BREAK_METAL );
 		}
 	}
 
 	return BaseClass::OnTakeDamage_Alive( info );
 }
 
+void CNPC_CombineGunship::PainSound( const CTakeDamageInfo &info )
+{
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
+
+	EmitSound( "NPC_CombineGunship.Pain" );
+	m_flNextPainSoundTime = gpGlobals->curtime + 5;
+}
 
 //------------------------------------------------------------------------------
 // Purpose : The proper way to begin the gunship cannon firing at the enemy.

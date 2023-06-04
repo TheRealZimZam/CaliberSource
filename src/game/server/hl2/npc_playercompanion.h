@@ -9,7 +9,8 @@
 #ifndef NPC_PLAYERCOMPANION_H
 #define NPC_PLAYERCOMPANION_H
 
-#include "ai_playerally.h"
+//#include "ai_playerally.h"
+#include "npc_talker.h"
 
 #include "ai_behavior_follow.h"
 #include "ai_behavior_standoff.h"
@@ -92,9 +93,9 @@ class CPhysicsProp;
 //
 //-----------------------------------------------------------------------------
 
-class CNPC_PlayerCompanion : public CAI_PlayerAlly
+class CNPC_PlayerCompanion : public CNPCSimpleTalker
 {
-	DECLARE_CLASS( CNPC_PlayerCompanion, CAI_PlayerAlly );
+	DECLARE_CLASS( CNPC_PlayerCompanion, CNPCSimpleTalker );
 
 public:
 	//---------------------------------

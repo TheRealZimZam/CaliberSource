@@ -53,6 +53,7 @@
 #define CHOPPER_MODEL_CORPSE_NAME	"models/combine_helicopter_broken.mdl"
 #define CHOPPER_RED_LIGHT_SPRITE	"sprites/redglow1.vmt"
 
+#define CHOPPER_BLAST	0
 #define CHOPPER_MAX_SMALL_CHUNKS	1
 #define CHOPPER_MAX_CHUNKS	3
 static const char *s_pChunkModelName[CHOPPER_MAX_CHUNKS] = 
@@ -3618,6 +3619,29 @@ int CNPC_AttackHelicopter::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void Chopper_BecomeChunks( CBaseEntity *pChopper )
 {
+#if CHOPPER_BLAST
+	//hl1 osprey effect port
+	CBroadcastRecipientFilter filter2;
+	te->BeamRingPoint( filter2, 0, pChopper->GetAbsOrigin(),	//origin
+		0,			//start radius
+		2000,		//end radius
+		CHOPPER_RED_LIGHT_SPRITE, //texture -TEMP
+		0,			//halo index
+		0,			//start frame
+		0,			//framerate
+		4,			//life
+		32,			//width
+		0,			//spread
+		0,			//amplitude
+		255,	//r
+		255,	//g
+		192,	//b
+		128,	//a
+		0,		//speed
+		FBEAM_FADEOUT
+		);
+#endif
+
 	QAngle vecChunkAngles = pChopper->GetAbsAngles();
 	Vector vecForward, vecUp;
 	pChopper->GetVectors( &vecForward, NULL, &vecUp );
@@ -3713,7 +3737,7 @@ void CNPC_AttackHelicopter::Event_Killed( const CTakeDamageInfo &info )
 		m_OnShotDown.FireOutput( this, this );
 	}
 
-	m_lifeState			= LIFE_DYING;
+	m_lifeState = LIFE_DYING;
 
 	//CSoundEnvelopeController &controller = CSoundEnvelopeController::GetController();
 	//controller.SoundChangeVolume( m_pGunFiringSound, 0.0, 0.1f );

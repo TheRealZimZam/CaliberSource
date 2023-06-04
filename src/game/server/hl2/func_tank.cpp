@@ -84,6 +84,7 @@ BEGIN_DATADESC( CFuncTank )
 	DEFINE_FIELD( m_iLargeAmmoType, FIELD_INTEGER ),
 #endif // HL2_EPISODIC
 
+	DEFINE_KEYFIELD( m_soundFire,		FIELD_SOUNDNAME, "firesound" ),
 	DEFINE_KEYFIELD( m_soundUse,		FIELD_SOUNDNAME, "usesound" ),
 	DEFINE_KEYFIELD( m_soundStartRotate, FIELD_SOUNDNAME, "rotatestartsound" ),
 	DEFINE_KEYFIELD( m_soundStopRotate, FIELD_SOUNDNAME, "rotatestopsound" ),
@@ -893,26 +894,21 @@ void CFuncTank::Precache( void )
 	if ( m_iszSpriteFlash != NULL_STRING )
 		PrecacheModel( STRING(m_iszSpriteFlash) );
 
+	if ( m_soundFire != NULL_STRING )
+		PrecacheScriptSound( STRING(m_soundFire) );
 	if ( m_soundStartRotate != NULL_STRING )
 		PrecacheScriptSound( STRING(m_soundStartRotate) );
 	if ( m_soundStopRotate != NULL_STRING )
 		PrecacheScriptSound( STRING(m_soundStopRotate) );
 	if ( m_soundLoopRotate != NULL_STRING )
 		PrecacheScriptSound( STRING(m_soundLoopRotate) );
-
 	if ( m_soundUse != NULL_STRING )
 		PrecacheScriptSound( STRING(m_soundUse) );
 
-//	PrecacheScriptSound( "FuncTank.BeginUse50cal" );
-//	PrecacheScriptSound( "FuncTank.BeginUseMinigun" );
-//	PrecacheScriptSound( "FuncTank.Fire" );
-	PrecacheScriptSound( "Weapon_Functank.Single" );
-
-	// Precache the combine cannon
-	if ( m_iEffectHandling == EH_COMBINE_CANNON )
-	{
+	if ( m_iEffectHandling == EH_AR2 )
+		PrecacheScriptSound( "Weapon_Functank.Single" );
+	else if ( m_iEffectHandling == EH_COMBINE_CANNON )
 		PrecacheScriptSound( "NPC_Combine_Cannon.FireBullet" );
-	}
 }
 
 void CFuncTank::UpdateOnRemove( void )
@@ -1280,7 +1276,7 @@ void CFuncTank::NPC_Fire( void )
 	Vector vecForward;
 	AngleVectors( GetAbsAngles(), &vecForward );
 
-	if ( (pNPC->CapabilitiesGet() & bits_CAP_NO_HIT_SQUADMATES) && pNPC->IsInSquad() )
+	if ( (pNPC->CapabilitiesGet() & bits_CAP_NO_HIT_SQUADMATES) && pNPC->InSquad() )
 	{
 		// Avoid shooting squadmates.
 		if ( pNPC->IsSquadmateInSpread( vecBarrelEnd, vecBarrelEnd + vecForward * 2048, gTankSpread[m_spread].x, 8*12 ) )
@@ -2243,12 +2239,24 @@ void CFuncTank::Fire( int bulletCount, const Vector &barrelEnd, const Vector &fo
 		if ( m_iszSpriteFlash != NULL_STRING )
 		{
 			CSprite *pSprite = CSprite::SpriteCreate( STRING(m_iszSpriteFlash), barrelEnd, TRUE );
-			pSprite->AnimateAndDie( 5 );
+			pSprite->AnimateAndDie( random->RandomInt( 4, 6 ) );
 			pSprite->SetTransparency( kRenderTransAdd, 255, 255, 255, 255, kRenderFxNoDissipation );
 			pSprite->SetScale( m_spriteScale );
 		}
 
 //		EmitSound( "FuncTank.Fire" );
+		if ( m_soundFire != NULL_STRING )
+		{
+			CPASAttenuationFilter filter( this );
+
+			EmitSound_t ep;
+			ep.m_nChannel = CHAN_WEAPON;
+			ep.m_pSoundName = (char*)STRING(m_soundFire);
+			ep.m_flVolume = 1.0f;
+			ep.m_SoundLevel = SNDLVL_NORM;
+
+			EmitSound( filter, entindex(), ep );
+		}
 	}
 
 	if( pAttacker && pAttacker->IsPlayer() )
@@ -2527,7 +2535,6 @@ public:
 	color32		m_flPulseColor;
 	float		m_flPulseLife;
 	float		m_flPulseLag;
-	string_t	m_sPulseFireSound;
 };
 LINK_ENTITY_TO_CLASS( func_tankpulselaser, CFuncTankPulseLaser );
 
@@ -2538,7 +2545,6 @@ BEGIN_DATADESC( CFuncTankPulseLaser )
 	DEFINE_KEYFIELD( m_flPulseColor,	 FIELD_COLOR32,		"PulseColor" ),
 	DEFINE_KEYFIELD( m_flPulseLife,	 FIELD_FLOAT,		"PulseLife" ),
 	DEFINE_KEYFIELD( m_flPulseLag,		 FIELD_FLOAT,		"PulseLag" ),
-	DEFINE_KEYFIELD( m_sPulseFireSound, FIELD_SOUNDNAME,	"PulseFireSound" ),
 
 END_DATADESC()
 
@@ -2551,10 +2557,6 @@ void CFuncTankPulseLaser::Precache(void)
 {
 	UTIL_PrecacheOther( "grenade_beam" );
 
-	if ( m_sPulseFireSound != NULL_STRING )
-	{
-		PrecacheScriptSound( STRING(m_sPulseFireSound) );
-	}
 	BaseClass::Precache();
 }
 //------------------------------------------------------------------------------
@@ -2587,20 +2589,6 @@ void CFuncTankPulseLaser::Fire( int bulletCount, const Vector &barrelEnd, const 
 		CGrenadeBeam *pPulse =  CGrenadeBeam::Create( pAttacker, barrelEnd);
 		pPulse->Format(m_flPulseColor, m_flPulseWidth);
 		pPulse->Shoot(vecDir,m_flPulseSpeed,m_flPulseLife,m_flPulseLag,m_iBulletDamage);
-
-		if ( m_sPulseFireSound != NULL_STRING )
-		{
-			CPASAttenuationFilter filter( this, 0.6f );
-
-			EmitSound_t ep;
-			ep.m_nChannel = CHAN_WEAPON;
-			ep.m_pSoundName = (char*)STRING(m_sPulseFireSound);
-			ep.m_flVolume = 1.0f;
-			ep.m_SoundLevel = SNDLVL_85dB;
-
-			EmitSound( filter, entindex(), ep );
-		}
-
 	}
 	CFuncTank::Fire( bulletCount, barrelEnd, vecForward, pAttacker, bIgnoreSpread );
 }
@@ -2738,18 +2726,25 @@ void CFuncTankRocket::Precache( void )
 
 void CFuncTankRocket::Fire( int bulletCount, const Vector &barrelEnd, const Vector &forward, CBaseEntity *pAttacker, bool bIgnoreSpread )
 {
-	CMissile *pRocket = (CMissile *) CBaseEntity::Create( "rpg_missile", barrelEnd, GetAbsAngles(), this );
-	
-	pRocket->GuidingDisabled( true );
-	pRocket->SetNextThink( gpGlobals->curtime + 0.1f );
-	pRocket->SetAbsVelocity( forward * m_flRocketSpeed );
-	if ( GetController() && GetController()->IsPlayer() )
+	int i;
+	for ( i = 0; i < bulletCount; i++ )
 	{
-		pRocket->SetDamage( m_iBulletDamage );
-	}
-	else
-	{
-		pRocket->SetDamage( m_iBulletDamageVsPlayer );
+		CMissile *pRocket = (CMissile *) CBaseEntity::Create( "missile", barrelEnd, GetAbsAngles(), this );
+
+		pRocket->GuidingDisabled( true );
+		// Skip the accel phase, go straight to cruise
+		//pRocket->SetThink( &CMissile::SeekThink );
+		pRocket->SetNextThink( gpGlobals->curtime + 0.1f );
+		pRocket->SetAbsVelocity( forward * m_flRocketSpeed );
+
+		if ( GetController() && GetController()->IsPlayer() )
+		{
+			pRocket->SetDamage( m_iBulletDamage );
+		}
+		else
+		{
+			pRocket->SetDamage( m_iBulletDamageVsPlayer );
+		}
 	}
 
 	CFuncTank::Fire( bulletCount, barrelEnd, forward, this, bIgnoreSpread );
@@ -3785,7 +3780,7 @@ public:
 	int			m_Magnitude;
 	float		m_fireDelay;
 	string_t	m_fireStartSound;
-	//string_t	m_fireEndSound;
+	string_t	m_fireEndSound;
 
 	string_t	m_incomingSound;
 	float		m_flWarningTime;
@@ -3804,7 +3799,7 @@ BEGIN_DATADESC( CFuncTankMortar )
 	DEFINE_KEYFIELD( m_Magnitude, FIELD_INTEGER, "iMagnitude" ),
 	DEFINE_KEYFIELD( m_fireDelay, FIELD_FLOAT, "firedelay" ),
 	DEFINE_KEYFIELD( m_fireStartSound, FIELD_STRING, "firestartsound" ),
-	//DEFINE_KEYFIELD( m_fireEndSound, FIELD_STRING, "fireendsound" ),
+	DEFINE_KEYFIELD( m_fireEndSound, FIELD_STRING, "fireendsound" ),
 	DEFINE_KEYFIELD( m_incomingSound, FIELD_STRING, "incomingsound" ),
 	DEFINE_KEYFIELD( m_flWarningTime, FIELD_TIME, "warningtime" ),
 	DEFINE_KEYFIELD( m_flFireVariance, FIELD_TIME, "firevariance" ),
@@ -3830,8 +3825,8 @@ void CFuncTankMortar::Precache( void )
 {
 	if ( m_fireStartSound != NULL_STRING )
 		PrecacheScriptSound( STRING(m_fireStartSound) );
-	//if ( m_fireEndSound != NULL_STRING )
-	//	PrecacheScriptSound( STRING(m_fireEndSound) );
+	if ( m_fireEndSound != NULL_STRING )
+		PrecacheScriptSound( STRING(m_fireEndSound) );
 	if ( m_incomingSound != NULL_STRING )
 		PrecacheScriptSound( STRING(m_incomingSound) );
 	BaseClass::Precache();
@@ -4439,5 +4434,82 @@ void CFuncTankCombineCannon::InputDisableHarrass( inputdata_t &inputdata )
 	m_bShouldHarrass = false;
 }
 
-
 LINK_ENTITY_TO_CLASS( func_tank_combine_cannon, CFuncTankCombineCannon );
+LINK_ENTITY_TO_CLASS( func_tank_combinecannon, CFuncTankCombineCannon );
+
+
+#if 0
+//============================================================================
+// FUNC TANK CONTROLS
+//============================================================================
+class CFuncTankControls : public CBaseEntity
+{
+public:
+	virtual int	ObjectCaps( void );
+	void Spawn( void );
+	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void Think( void );
+
+	virtual int	Save( CSave &save );
+	virtual int	Restore( CRestore &restore );
+	static TYPEDESCRIPTION m_SaveData[];
+
+	CFuncTank *m_pTank;
+};
+LINK_ENTITY_TO_CLASS( func_tankcontrols, CFuncTankControls );
+
+TYPEDESCRIPTION	CFuncTankControls::m_SaveData[] = 
+{
+	DEFINE_FIELD( CFuncTankControls, m_pTank, FIELD_CLASSPTR ),
+};
+
+IMPLEMENT_SAVERESTORE( CFuncTankControls, CBaseEntity );
+
+int	CFuncTankControls :: ObjectCaps( void ) 
+{ 
+	return (CBaseEntity::ObjectCaps() & ~FCAP_ACROSS_TRANSITION) | FCAP_IMPULSE_USE; 
+}
+
+
+void CFuncTankControls :: Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{ // pass the Use command onto the controls
+	if ( m_pTank )
+		m_pTank->Use( pActivator, pCaller, useType, value );
+
+	ASSERT( m_pTank != NULL );	// if this fails,  most likely means save/restore hasn't worked properly
+}
+
+
+void CFuncTankControls :: Think( void )
+{
+	edict_t *pTarget = NULL;
+
+	do 
+	{
+		pTarget = FIND_ENTITY_BY_TARGETNAME( pTarget, STRING(pev->target) );
+	} while ( !FNullEnt(pTarget) && strncmp( STRING(pTarget->v.classname), "func_tank", 9 ) );
+
+	if ( FNullEnt( pTarget ) )
+	{
+		ALERT( at_console, "No tank %s\n", STRING(pev->target) );
+		return;
+	}
+
+	m_pTank = (CFuncTank*)Instance(pTarget);
+}
+
+void CFuncTankControls::Spawn( void )
+{
+	pev->solid = SOLID_TRIGGER;
+	pev->movetype = MOVETYPE_NONE;
+	pev->effects |= EF_NODRAW;
+	SET_MODEL( ENT(pev), STRING(pev->model) );
+
+	UTIL_SetSize( pev, pev->mins, pev->maxs );
+	UTIL_SetOrigin( pev, pev->origin );
+	
+	pev->nextthink = gpGlobals->time + 0.3;	// After all the func_tank's have spawned
+
+	CBaseEntity::Spawn();
+}
+#endif

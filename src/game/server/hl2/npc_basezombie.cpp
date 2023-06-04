@@ -188,22 +188,23 @@ public:
 
 CAngryZombieCounter	AngryZombieCounter( "CAngryZombieCounter" );
 
-
-int AE_ZOMBIE_ATTACK_RIGHT;
-int AE_ZOMBIE_ATTACK_LEFT;
-int AE_ZOMBIE_ATTACK_BOTH;
-int AE_ZOMBIE_SWATITEM;
-int AE_ZOMBIE_STARTSWAT;
-int AE_ZOMBIE_STEP_LEFT;
-int AE_ZOMBIE_STEP_RIGHT;
-int AE_ZOMBIE_SCUFF_LEFT;
-int AE_ZOMBIE_SCUFF_RIGHT;
-int AE_ZOMBIE_ATTACK_SCREAM;
-int AE_ZOMBIE_GET_UP;
-int AE_ZOMBIE_POUND;
-int AE_ZOMBIE_ALERTSOUND;
-int AE_ZOMBIE_POPHEADCRAB;
-
+//typedef enum
+//{
+	int AE_ZOMBIE_ATTACK_RIGHT;
+	int AE_ZOMBIE_ATTACK_LEFT;
+	int AE_ZOMBIE_ATTACK_BOTH;
+	int AE_ZOMBIE_SWATITEM;
+	int AE_ZOMBIE_STARTSWAT;
+	int AE_ZOMBIE_STEP_LEFT;
+	int AE_ZOMBIE_STEP_RIGHT;
+	int AE_ZOMBIE_SCUFF_LEFT;
+	int AE_ZOMBIE_SCUFF_RIGHT;
+	int AE_ZOMBIE_ATTACK_SCREAM;
+	int AE_ZOMBIE_GET_UP;
+	int AE_ZOMBIE_POUND;
+	int AE_ZOMBIE_ALERTSOUND;
+	int AE_ZOMBIE_POPHEADCRAB;
+//}
 
 //=========================================================
 //=========================================================
@@ -1209,7 +1210,6 @@ void CNPC_BaseZombie::DieChopped( const CTakeDamageInfo &info )
 
 		pTorsoGib->SetOwnerEntity( this );
 		CopyRenderColorTo( pTorsoGib );
-
 	}
 
 	if ( UTIL_ShouldShowBlood( BLOOD_COLOR_YELLOW ) )
@@ -1245,6 +1245,8 @@ void CNPC_BaseZombie::DieChopped( const CTakeDamageInfo &info )
 			UTIL_BloodImpact( vecSpot, vecDir, BloodColor(), 1 );
 		}
 	}
+
+	KillMe();
 }
 
 //-----------------------------------------------------------------------------
@@ -1549,6 +1551,62 @@ void CNPC_BaseZombie::HandleAnimEvent( animevent_t *pEvent )
 		return;
 	}
 
+#if 0
+	switch( pEvent->event )
+	{
+		case AE_ZOMBIE_POUND:
+		{
+			PoundSound();
+			return;
+		}
+
+		case AE_ZOMBIE_ALERTSOUND:
+		{
+			AlertSound();
+			return;
+		}
+
+		case AE_ZOMBIE_STEP_LEFT:
+		{
+			MakeAIFootstepSound( 180.0f );
+			FootstepSound( false );
+			return;
+		}
+
+		case AE_ZOMBIE_STEP_RIGHT:
+		{
+			MakeAIFootstepSound( 180.0f );
+			FootstepSound( true );
+			return;
+		}
+
+		case AE_ZOMBIE_SCUFF_LEFT:
+		{
+			MakeAIFootstepSound( 180.0f );
+			FootscuffSound( false );
+			return;
+		}
+
+		case AE_ZOMBIE_SCUFF_RIGHT:
+		{
+			MakeAIFootstepSound( 180.0f );
+			FootscuffSound( true );
+			return;
+		}
+
+		case AE_ZOMBIE_STARTSWAT:
+		case AE_ZOMBIE_ATTACK_SCREAM:
+		{
+			AttackSound();
+			return;
+		}
+
+		default:
+		break;
+	}
+#endif
+
+#if 1
 	if ( pEvent->event == AE_ZOMBIE_POUND )
 	{
 		PoundSound();
@@ -1574,6 +1632,7 @@ void CNPC_BaseZombie::HandleAnimEvent( animevent_t *pEvent )
 		FootstepSound( true );
 		return;
 	}
+#endif 
 
 	if ( pEvent->event == AE_ZOMBIE_GET_UP )
 	{
@@ -1587,6 +1646,7 @@ void CNPC_BaseZombie::HandleAnimEvent( animevent_t *pEvent )
 		return;
 	}
 
+#if 1
 	if ( pEvent->event == AE_ZOMBIE_SCUFF_LEFT )
 	{
 		MakeAIFootstepSound( 180.0f );
@@ -1602,18 +1662,12 @@ void CNPC_BaseZombie::HandleAnimEvent( animevent_t *pEvent )
 	}
 
 	// all swat animations are handled as a single case.
-	if ( pEvent->event == AE_ZOMBIE_STARTSWAT )
-	{
-		MakeAIFootstepSound( 180.0f );
-		AttackSound();
-		return;
-	}
-
-	if ( pEvent->event == AE_ZOMBIE_ATTACK_SCREAM )
+	if ( pEvent->event == AE_ZOMBIE_STARTSWAT || pEvent->event == AE_ZOMBIE_ATTACK_SCREAM )
 	{
 		AttackSound();
 		return;
 	}
+#endif
 
 	if ( pEvent->event == AE_ZOMBIE_SWATITEM )
 	{

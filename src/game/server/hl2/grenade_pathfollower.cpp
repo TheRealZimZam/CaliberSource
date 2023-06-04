@@ -126,7 +126,7 @@ void CGrenadePathfollower::Detonate(void)
 		&GetAbsOrigin(), 
 		g_sModelIndexFireball,
 		0.5, 
-		15,
+		40,
 		TE_EXPLFLAG_NONE,
 		m_DmgRadius,
 		m_flDamage );
@@ -168,6 +168,7 @@ void CGrenadePathfollower::Launch( float flLaunchSpeed, string_t sPathCornerName
 	else
 	{
 		Warning( "ERROR: Grenade_Pathfollower (%s) with no pathcorner!\n",GetDebugName());
+		Detonate();
 		return;
 	}
 

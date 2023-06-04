@@ -710,7 +710,8 @@ void CAntlionTemplateMaker::MakeNPC( void )
 
 	if ( pent == NULL )
 	{
-		Warning("NULL Ent in NPCMaker!\n" );
+		Warning("NULL Ent in AntlionMaker!\n" );
+		SetThink( NULL );
 		return;
 	}
 	

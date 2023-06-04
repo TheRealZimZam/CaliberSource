@@ -54,9 +54,16 @@ public:
 	void				CalcBeamPosition(void);
 	Vector				LaserStartPosition(Vector vStalkerPos);
 
+	// ------------------------------
+	//	Scripted Target Burns
+	// ------------------------------
+	CScriptedTarget*	m_pScriptedTarget;		// My current scripted target
+	void				SetScriptedTarget( CScriptedTarget *pScriptedTarget );
+
 	Vector				m_vLaserCurPos;			// Last position successfully burned
 	bool				InnateWeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions );
-	
+	Vector				ScriptedBurnPosition(void);
+
 	// ------------------------------
 	//	Dormancy
 	// ------------------------------
@@ -97,6 +104,7 @@ public:
 	void			DeathSound( const CTakeDamageInfo &info );
 	void			PainSound( const CTakeDamageInfo &info );
 
+	bool			HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* pSourceEnt);
 	void			Event_Killed( const CTakeDamageInfo &info );
 	void			DoSmokeEffect( const Vector &position );
 

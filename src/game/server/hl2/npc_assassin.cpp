@@ -97,7 +97,10 @@ END_DATADESC()
 //-----------------------------------------------------------------------------
 void CNPC_Assassin::Precache( void )
 {
-	PrecacheModel( "models/assassin.mdl" );
+	if( !GetModelName() )
+		SetModelName( MAKE_STRING( "models/assassin.mdl" ) );
+
+	PrecacheModel( STRING( GetModelName() ) );
 
 	PrecacheScriptSound( "Zombie.AttackHit" );
 	PrecacheScriptSound( "NPC_Assassin.AttackMiss" );
@@ -122,7 +125,7 @@ void CNPC_Assassin::Spawn( void )
 {
 	Precache();
 
-	SetModel( "models/assassin.mdl" );
+	SetModel( STRING( GetModelName() ) );
 
 	SetHullType(HULL_HUMAN);
 	SetHullSizeNormal();
@@ -345,7 +348,6 @@ void CNPC_Assassin::FirePistol( int hand )
 //---------------------------------------------------------
 void CNPC_Assassin::HandleAnimEvent( animevent_t *pEvent )
 {
-
 	if ( pEvent->event == AE_ASSASIN_FIRE_PISTOL_RIGHT )
 	{
 		FirePistol( 0 );
@@ -523,9 +525,20 @@ int CNPC_Assassin::SelectSchedule( void )
 				return BaseClass::SelectSchedule();
 			}
 
+			// Need to move
+			if ( HasCondition( COND_REPEATED_DAMAGE ) )
+			{
+				m_iFrustration++;
+
+				// Getting hosed, pop smoke and run away!
+				if ( m_flNextSmokeTime > gpGlobals->curtime )
+					return SCHED_ASSASSIN_SMOKE;
+			}
+
 			// -----------
-			// new enemy
+			// New enemy
 			// -----------
+#if 0
 			if ( HasCondition( COND_NEW_ENEMY ) )
 			{
 				CBaseEntity *pEnemy = GetEnemy();
@@ -536,31 +549,14 @@ int CNPC_Assassin::SelectSchedule( void )
 						// I'm the first one to spot the enemy, start shooting
 						return SCHED_RANGE_ATTACK1;
 					}
-					if ( m_pSquad->IsLeader( this ) )
-					{
-						if( HasCondition( COND_WEAPON_HAS_LOS ) && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
-						{
-							// If everyone else is attacking and I have line of fire, wait for a chance to cover someone.
-							return SCHED_ASSASSIN_FIND_VANTAGE_POINT;
-						}
-					}
 					else
 					{
-						return SCHED_TAKE_COVER_FROM_ENEMY;
+						return SCHED_ASSASSIN_FIND_VANTAGE_POINT;
 					}
 				}
-				return SCHED_TAKE_COVER_FROM_ENEMY;
+				return SCHED_ASSASSIN_FIND_VANTAGE_POINT;
 			}
-
-			// Need to move
-			if ( HasCondition( COND_REPEATED_DAMAGE ) )
-			{
-				m_iFrustration++;
-
-				// Getting hosed, pop smoke and run away!
-				if ( m_flNextSmokeTime > gpGlobals->curtime )
-					return SCHED_ASSASSIN_SMOKE;
-			}
+#endif
 
 			if ( (HasCondition( COND_SEE_ENEMY ) && HasCondition( COND_ENEMY_TARGETTING_ME ) && random->RandomInt( 0, 32 ) == 0 && m_flNextFlipTime < gpGlobals->curtime)
 					|| ((HasCondition( COND_LIGHT_DAMAGE ) && random->RandomInt( 0, 2 ) == 0 )) || HasCondition( COND_HEAVY_DAMAGE ) )
@@ -871,6 +867,7 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 			{
 				EmitSound( "NPC_Assassin.Smoke" );
 				m_flNextSmokeTime = gpGlobals->curtime + 20.0f;
+				SetWait( 0.5 );
 				break;
 			}
 			else
@@ -904,9 +901,9 @@ void CNPC_Assassin::RunTask( const Task_t *pTask )
 		break;
 
 	case TASK_ASSASSIN_SMOKE:
-		if ( IsWaitFinished() )
+		if ( IsWaitFinished() )	//|| IsActivityFinished()
 		{
-			//!	CreateAssassinSmoke( this->GetAbsOrigin() );
+			CAssassinSmoke::CreateAssassinSmoke( GetAbsOrigin() );
 			TaskComplete();
 		}
 		break;

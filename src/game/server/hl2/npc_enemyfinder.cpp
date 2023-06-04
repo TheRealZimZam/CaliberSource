@@ -397,7 +397,7 @@ void CNPC_EnemyFinder::PrescheduleThink()
 	{
 		m_debugOverlays |= OVERLAY_BBOX_BIT;
 
-		if( IsInSquad() && GetSquad()->NumMembers() > 1 )
+		if( InSquad() && GetSquad()->NumMembers() > 1 )
 		{
 			AISquadIter_t iter;
 			CAI_BaseNPC *pSquadmate = m_pSquad ? m_pSquad->GetFirstMember( &iter ) : NULL;

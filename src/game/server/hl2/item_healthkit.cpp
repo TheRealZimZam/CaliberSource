@@ -486,7 +486,13 @@ void CWallHealth::Off(void)
 		SetThink(&CWallHealth::Recharge);
 	}
 	else
+	{
+		// Toggle the texture
+		if (m_nState == 1)
+			SetTextureFrameIndex( 1 );
+
 		SetThink( NULL );
+	}
 }
 
 //-----------------------------------------------------------------------------

@@ -393,15 +393,15 @@ int CGrenadeFrag::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	// Manually apply vphysics because BaseCombatCharacter takedamage doesn't call back to CBaseEntity OnTakeDamage
 	VPhysicsTakeDamage( inputInfo );
 
-	// Grenades only suffer blast damage and burn damage.
-	if( !(inputInfo.GetDamageType() & (DMG_BLAST|DMG_BURN) ) )
+	// Freezing and emps doesnt make little apple go big boom
+	if( (inputInfo.GetDamageType() & (DMG_SONIC|DMG_TIMEBASED) ) )
 		return 0;
 
 	return BaseClass::OnTakeDamage( inputInfo );
 }
 
 #ifdef HL2_EPISODIC
-extern int	g_interactionBarnacleVictimGrab; ///< usually declared in ai_interactions.h but no reason to haul all of that in here.
+extern int g_interactionBarnacleVictimGrab; ///< usually declared in ai_interactions.h but no reason to haul all of that in here.
 extern int g_interactionBarnacleVictimBite;
 extern int g_interactionBarnacleVictimReleased;
 bool CGrenadeFrag::HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* sourceEnt)

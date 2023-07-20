@@ -419,9 +419,15 @@ bool CAI_BaseNPC::Event_Gibbed( const CTakeDamageInfo &info )
 Activity CAI_BaseNPC::GetFlinchActivity( bool bHeavyDamage, bool bGesture )
 {
 	Activity	flinchActivity;
-//	bool		fTriedDirection;
-//	float		flDot;
+/*
+	bool		fTriedDirection;
+	float		flDot;
 
+	fTriedDirection = false;
+	Vector forward;
+	AngleVectors( GetLocalAngles(), &forward );
+	flDot = -DotProduct( forward, g_vecAttackDir );
+*/
 	switch ( LastHitGroup() )
 	{
 		// pick a region-specific flinch
@@ -451,13 +457,9 @@ Activity CAI_BaseNPC::GetFlinchActivity( bool bHeavyDamage, bool bGesture )
 	default:
 		// just get a generic flinch.
 		if ( bHeavyDamage )
-		{
 			flinchActivity = bGesture ? ACT_GESTURE_BIG_FLINCH : ACT_BIG_FLINCH;
-		}
 		else
-		{
 			flinchActivity = bGesture ? ACT_GESTURE_SMALL_FLINCH : ACT_SMALL_FLINCH;
-		}
 		break;
 	}
 
@@ -1192,12 +1194,7 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 
 	if ( subInfo.GetDamage() >= 1.0 && !(subInfo.GetDamageType() & DMG_SHOCK ) )
 	{
-		if( !IsPlayer() || ( IsPlayer() && g_pGameRules->IsMultiplayer() ) )
-		{
-			// NPC's always bleed. Players only bleed in multiplayer.
-			SpawnBlood( ptr->endpos, vecDir, BloodColor(), subInfo.GetDamage() );// a little surface blood.
-		}
-
+		SpawnBlood( ptr->endpos, vecDir, BloodColor(), subInfo.GetDamage() );// a little surface blood.
 		TraceBleed( subInfo.GetDamage(), vecDir, ptr, subInfo.GetDamageType() );
 
 		if ( ptr->hitgroup == HITGROUP_HEAD && m_iHealth - subInfo.GetDamage() > 0 )
@@ -1207,13 +1204,9 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 	}
 
 	if( info.GetInflictor() )
-	{
 		subInfo.SetInflictor( info.GetInflictor() );
-	}
 	else
-	{
 		subInfo.SetInflictor( info.GetAttacker() );
-	}
 
 	AddMultiDamage( subInfo, this );
 }
@@ -1556,6 +1549,8 @@ void CBaseEntity::CreateBubbleTrailTracer( const Vector &vecShotSrc, const Vecto
 	UTIL_BubbleTrail( vecTracerSrc, vecBubbleEnd, nBubbles );
 }
 
+// ^
+// The most disgusting hackery ive seen in awhile - M
 //=========================================================
 //=========================================================
 void CAI_BaseNPC::MakeDamageBloodDecal ( int cCount, float flNoise, trace_t *ptr, Vector vecDir )
@@ -2150,6 +2145,7 @@ void CAI_BaseNPC::OnListened()
 				case SOUND_DANGER_SNIPERONLY:/* silence warning */					break;
 				case SOUND_MOVE_AWAY:		condition = COND_HEAR_MOVE_AWAY;		break;
 				case SOUND_VEHICLE:			condition = COND_HEAR_VEHICLE;			break;
+				case SOUND_WEAPON:			condition = COND_HEAR_WORLD;			break;
 
 				default:
 					DevMsg( "**ERROR: NPC %s hearing sound of unknown type %d!\n", GetClassname(), pCurrentSound->SoundType() );
@@ -4079,7 +4075,7 @@ void CAI_BaseNPC::NPCThink( void )
 // CAI_BaseNPC - USE - will make a npc angry at whomever
 // activated it.
 //=========================================================
-void CAI_BaseNPC::NPCUse ( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+void CAI_BaseNPC::NPCUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	return;
 
@@ -4876,9 +4872,9 @@ void CAI_BaseNPC::RunAI( void )
 		NDebugOverlay::Line( vecPoint, vecPoint + Vector( 0, 0, 32 ) - right * 32, 255, 0, 0, false , 0.1 );
 	}
 	
-#ifdef _DEBUG
+//#ifdef _DEBUG
 	m_bSelected = ( (m_debugOverlays & OVERLAY_NPC_SELECTED_BIT) != 0 );
-#endif
+//#endif
 
 	m_bConditionsGathered = false;
 	m_bSkippedChooseEnemy = false;
@@ -6841,11 +6837,11 @@ bool CAI_BaseNPC::IsNavHullValid() const
 // initialization that should take place for all npcs
 // goes here.
 //=========================================================
-void CAI_BaseNPC::NPCInit ( void )
+void CAI_BaseNPC::NPCInit( void )
 {
 	if (!g_pGameRules->FAllowNPCs())
 	{
-		UTIL_Remove( this );
+		SUB_Remove();
 		return;
 	}
 
@@ -10018,7 +10014,7 @@ CBaseEntity *CAI_BaseNPC::FindNamedEntity( const char *name, IEntityFindFilter *
 	}
 	else if ( !stricmp( name, "!nearestfriend" ) || !stricmp( name, "!friend" ) )
 	{
-		// FIXME: look at CBaseEntity *CNPCSimpleTalker::FindNearestFriend(bool fPlayer)
+		// FIXME: look at CBaseEntity *CNPC_SimpleTalker::FindNearestFriend(bool fPlayer)
 		// punt for now
 		//TODO; Search for nearest D_LI
 		return ( CBaseEntity * )AI_GetSinglePlayer();
@@ -12248,6 +12244,7 @@ float CAI_BaseNPC::CalcYawSpeed( void )
 	return -1.0f;
 }
 
+// Before we actually move
 bool CAI_BaseNPC::OnCalcBaseMove( AILocalMoveGoal_t *pMoveGoal,
 										float distClear,
 										AIMoveResult_t *pResult )
@@ -12264,7 +12261,7 @@ bool CAI_BaseNPC::OnCalcBaseMove( AILocalMoveGoal_t *pMoveGoal,
 	return false;
 }
 
-
+// I just ran into something, said something is probably a brush-based door, check if it is
 bool CAI_BaseNPC::OnObstructionPreSteer( AILocalMoveGoal_t *pMoveGoal,
 										float distClear,
 										AIMoveResult_t *pResult )
@@ -12281,7 +12278,10 @@ bool CAI_BaseNPC::OnObstructionPreSteer( AILocalMoveGoal_t *pMoveGoal,
 	return false;
 }
 
-
+//-----------------------------------------------------------------------------
+//!!! TODO; Npc's have a bad habit of standing in the doorway, blocking it from opening
+//!!! (especially if its a one way door), need to fix that sometime in the future!
+//-----------------------------------------------------------------------------
 bool CAI_BaseNPC::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal,
  									 CBaseDoor *pDoor,
 									 float distClear,
@@ -12290,36 +12290,29 @@ bool CAI_BaseNPC::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal,
 	if ( pMoveGoal->maxDist < distClear )
 		return false;
 
-//!	if ( pDoor->m_toggle_state ==  TS_AT_BOTTOM || pDoor->m_toggle_state == TS_GOING_DOWN )
-//!	{
-		if ( distClear < 0.1 )
+	if ( distClear < 0.1 )
+	{
+		*pResult = AIMR_BLOCKED_ENTITY;
+	}
+	else
+	{
+		pMoveGoal->maxDist = distClear;
+		*pResult = AIMR_OK;
+		return true;
+	}
+
+	// If we couldnt clear the door, try and open it
+	if ( IsMoveBlocked( *pResult ) && pMoveGoal->directTrace.vHitNormal != vec3_origin )
+	{
+		// If im not too stupid to open a door
+		if ( (CapabilitiesGet() & bits_CAP_DOORS_GROUP) )
 		{
-			*pResult = AIMR_BLOCKED_ENTITY;
-		}
-		else
-		{
-			pMoveGoal->maxDist = distClear;
+			// Ask the door to open
+			pDoor->Use(this, this, USE_TOGGLE, 0 );
 			*pResult = AIMR_OK;
 			return true;
 		}
-
-		if ( IsMoveBlocked( *pResult ) && pMoveGoal->directTrace.vHitNormal != vec3_origin )
-		{
-			if ( (CapabilitiesGet() & bits_CAP_DOORS_GROUP) )
-			{
-				//!if ( !pDoor->m_bLocked )
-				//!{
-					// Ask the door to open
-					pDoor->Use(this, this, USE_TOGGLE, 0 );
-					*pResult = AIMR_OK;
-					return true;
-				//!}
-			}
-		}
-
-//!		return false;
-//!	}
-//! Handled directly in the door +use code now
+	}
 
 	return false;
 }

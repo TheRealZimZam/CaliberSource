@@ -1300,238 +1300,12 @@ void CEnvFunnel::Spawn( void )
 	AddEffects( EF_NODRAW );
 }
 
-//=========================================================
-// Beverage Dispenser
-// overloaded m_iHealth, is now how many cans remain in the machine.
-//=========================================================
-class CEnvBeverage : public CBaseEntity
-{
-public:
-	DECLARE_CLASS( CEnvBeverage, CBaseEntity );
-
-	void	Spawn( void );
-	void	Precache( void );
-	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
-	bool	KeyValue( const char *szKeyName, const char *szValue );
-
-	// Input handlers.
-	void	InputActivate( inputdata_t &inputdata );
-
-	DECLARE_DATADESC();
-
-public:
-	bool	m_CanInDispenser;
-	int		m_nBeverageType;
-};
-
-void CEnvBeverage::Precache ( void )
-{
-	PrecacheModel( "models/can.mdl" );
-}
-
-BEGIN_DATADESC( CEnvBeverage )
-	DEFINE_FIELD( m_CanInDispenser, FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_nBeverageType, FIELD_INTEGER ),
-
-	DEFINE_INPUTFUNC( FIELD_VOID, "Activate", InputActivate ),
-END_DATADESC()
-
-LINK_ENTITY_TO_CLASS( env_beverage, CEnvBeverage );
-
-
-bool CEnvBeverage::KeyValue( const char *szKeyName, const char *szValue )
-{
-	if (FStrEq(szKeyName, "beveragetype"))
-	{
-		m_nBeverageType = atoi(szValue);
-	}
-	else
-	{
-		return BaseClass::KeyValue( szKeyName, szValue );
-	}
-
-	return true;
-}
-
-void CEnvBeverage::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
-{
-	if ( m_CanInDispenser || m_iHealth <= 0 )
-	{
-		// no more cans while one is waiting in the dispenser, or if I'm out of cans.
-		return;
-	}
-
-	CBaseAnimating *pCan = (CBaseAnimating *)CBaseEntity::Create( "item_sodacan", GetLocalOrigin(), GetLocalAngles(), this );
-
-	if ( m_nBeverageType == 6 )
-	{
-		// random
-		pCan->m_nSkin = random->RandomInt( 0, 5 );
-	}
-	else
-	{
-		pCan->m_nSkin = m_nBeverageType;
-	}
-
-	m_CanInDispenser = true;
-	m_iHealth -= 1;
-
-	//SetThink (SUB_Remove);
-	//SetNextThink( gpGlobals->curtime );
-}
-
-void CEnvBeverage::InputActivate( inputdata_t &inputdata )
-{
-	Use( inputdata.pActivator, inputdata.pCaller, USE_ON, 0 );
-}
-
-void CEnvBeverage::Spawn( void )
-{
-	Precache();
-	SetSolid( SOLID_NONE );
-	AddEffects( EF_NODRAW );
-	m_CanInDispenser = false;
-
-	if ( m_iHealth == 0 )
-	{
-		m_iHealth = 10;
-	}
-}
-
-//=========================================================
-// Soda can
-//=========================================================
-class CItemSoda : public CBaseAnimating
-{
-public:
-	DECLARE_CLASS( CItemSoda, CBaseAnimating );
-
-	void	Spawn( void );
-	void	Precache( void );
-	void	CanDrop( void );
-//	void	CanThink( void );
-	void	CanTouch( CBaseEntity *pOther );
-	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
-
-	DECLARE_DATADESC();
-
-//private:
-//	float	m_flCanWarmTime;
-//	bool	m_bWarm;
-
-};
-
-ConVar sk_soda( "sk_soda", "1" );
-
-BEGIN_DATADESC( CItemSoda )
-
-	// Function Pointers
-	DEFINE_FUNCTION( CanDrop ),
-//	DEFINE_FUNCTION( CanThink ),
-	DEFINE_FUNCTION( CanTouch ),
-	
-//	DEFINE_FIELD( m_flCanWarmTime, FIELD_TIME ),
-//	DEFINE_FIELD( m_bWarm, FIELD_BOOLEAN ),
-
-END_DATADESC()
-
-LINK_ENTITY_TO_CLASS( item_sodacan, CItemSoda );
-
-void CItemSoda::Precache ( void )
-{
-	PrecacheModel( "models/can.mdl" );
-
-	PrecacheScriptSound( "ItemSoda.Bounce" );
-	PrecacheScriptSound( "Player.Drink" );
-}
-
-void CItemSoda::Spawn( void )
-{
-	Precache();
-	SetSolid( SOLID_NONE );
-	SetMoveType( MOVETYPE_FLYGRAVITY );
-
-	SetModel ( "models/can.mdl" );
-	UTIL_SetSize( this, Vector ( 0, 0, 0 ), Vector ( 0, 0, 0 ) );
-
-//	m_flCanWarmTime = gpGlobals->curtime + 60.0f;	//Gets warm and gross after this amount of time
-//	m_bWarm = false;
-
-	SetThink (&CItemSoda::CanDrop);
-	SetNextThink( gpGlobals->curtime + 0.5f );
-}
-
-void CItemSoda::CanDrop( void )
-{
-	EmitSound( "ItemSoda.Bounce" );
-
-	SetSolid( SOLID_BBOX );
-	AddSolidFlags( FSOLID_TRIGGER );
-	UTIL_SetSize( this, Vector ( -8, -8, 0 ), Vector ( 8, 8, 8 ) );
-
-	SetThink( NULL );	//&CItemSoda::CanThink
-	SetTouch( &CItemSoda::CanTouch );
-}
-
-/*
-void CItemSoda::CanThink( void )
-{
-	if ( gpGlobals->curtime > m_flCanWarmTime )
-	{
-		m_bWarm = true;
-		SetThink( NULL );
-		SetNextThink( gpGlobals->curtime + 0.2f );
-	}
-	else
-	{
-		SetNextThink( gpGlobals->curtime + 0.5f );
-	}
-}
-*/
-
-void CItemSoda::CanTouch( CBaseEntity *pOther )
-{
-	if ( !pOther->IsPlayer() )
-		return;
-
-	Use( pOther, NULL, USE_ON, 0 ); // only the first param is used
-}
-
-void CItemSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
-{
-	if ( !pActivator->IsPlayer() )
-		return;
-
-	// spoit sound here
-	CPASAttenuationFilter filter( pActivator, "Player.Drink" );
-	EmitSound( filter, pActivator->entindex(), "Player.Drink" );
-
-//	if ( !m_bWarm )
-		pActivator->TakeHealth( sk_soda.GetFloat(), DMG_GENERIC );	// awesome, cool, refreshing beverage - a bit of health
-//	else
-//		pActivator->TakeHealth( -1, DMG_POISON );	// warm tarty liquid of gross despair - almost no health
-
-	if ( GetOwnerEntity() )
-	{
-		// tell the machine the can was taken
-		CEnvBeverage *bev = (CEnvBeverage *)GetOwnerEntity();
-		bev->m_CanInDispenser = false;
-	}
-
-	AddSolidFlags( FSOLID_NOT_SOLID );
-	SetMoveType( MOVETYPE_NONE );
-	AddEffects( EF_NODRAW );
-	SetTouch ( NULL );
-	SetThink ( &CItemSoda::SUB_Remove );
-	SetNextThink( gpGlobals->curtime );
-}
 
 #ifndef _XBOX
 //=========================================================
 // func_precipitation - temporary snow solution for first HL2
 // technology demo
 //=========================================================
-
 class CPrecipitation : public CBaseEntity
 {
 public:
@@ -1883,25 +1657,8 @@ void CEmbers::EmberUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 
 
 //-----------------------------------------------------------------------------
-// Purpose:
+// Purpose: Physics wire
 //-----------------------------------------------------------------------------
-class CPhysicsWire : public CBaseEntity
-{
-public:
-	DECLARE_CLASS( CPhysicsWire, CBaseEntity );
-
-	void	Spawn( void );
-	void	Precache( void );
-
-	DECLARE_DATADESC();
-
-protected:
-
-	bool SetupPhysics( void );
-
-	int		m_nDensity;
-};
-
 LINK_ENTITY_TO_CLASS( env_physwire, CPhysicsWire );
 
 BEGIN_DATADESC( CPhysicsWire )
@@ -1916,10 +1673,6 @@ BEGIN_DATADESC( CPhysicsWire )
 
 END_DATADESC()
 
-
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
 void CPhysicsWire::Spawn( void )
 {
 	BaseClass::Spawn();

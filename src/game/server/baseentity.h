@@ -1015,7 +1015,7 @@ public:
 	void					SUB_DoNothing( void );
 	void					SUB_StartFadeOut( float delay = 10.0f, bool bNotSolid = true );
 	void					SUB_StartFadeOutInstant();
-	void					SUB_FadeOut ( void );
+	void					SUB_FadeOut( void );
 	void					SUB_Vanish( void );
 	void					SUB_CallUseToggle( void ) { this->Use( this, this, USE_TOGGLE, 0 ); }
 	void					SUB_PerformFadeOut( void );

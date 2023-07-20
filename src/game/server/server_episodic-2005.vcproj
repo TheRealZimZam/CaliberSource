@@ -357,6 +357,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\ai_basetalker.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ai_basetalker.h"
+				>
+			</File>
+			<File
 				RelativePath=".\ai_behavior.cpp"
 				>
 			</File>
@@ -666,14 +674,6 @@
 			</File>
 			<File
 				RelativePath=".\ai_planesolver.h"
-				>
-			</File>
-			<File
-				RelativePath=".\ai_playerally.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\ai_playerally.h"
 				>
 			</File>
 			<File
@@ -990,6 +990,14 @@
 			</File>
 			<File
 				RelativePath="..\shared\beam_shared.h"
+				>
+			</File>
+			<File
+				RelativePath=".\beverage.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\beverage.h"
 				>
 			</File>
 			<File
@@ -1321,6 +1329,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\entityfreezing.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\entityfreezing.h"
+				>
+			</File>
+			<File
 				RelativePath=".\entityinput.h"
 				>
 			</File>
@@ -1494,6 +1510,10 @@
 			</File>
 			<File
 				RelativePath=".\explode.h"
+				>
+			</File>
+			<File
+				RelativePath=".\caliber\fakebot.cpp"
 				>
 			</File>
 			<File
@@ -2283,6 +2303,14 @@
 						UsePrecompiledHeader="0"
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\npc_talker.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\npc_talker.h"
+				>
 			</File>
 			<File
 				RelativePath=".\npc_vehicledriver.cpp"
@@ -4675,11 +4703,11 @@
 						>
 					</File>
 					<File
-						RelativePath=".\npc_talker.cpp"
+						RelativePath=".\episodic\npc_surface.cpp"
 						>
 					</File>
 					<File
-						RelativePath=".\npc_talker.h"
+						RelativePath=".\episodic\npc_surface.h"
 						>
 					</File>
 					<File

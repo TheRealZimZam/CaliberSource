@@ -19,6 +19,42 @@
 #define SF_CORNER_WAITFORTRIG	0x001
 #define SF_CORNER_TELEPORT		0x002
 
+//-----------------------------------------------------------------------------
+// Purpose: CBasePlatTrain
+//-----------------------------------------------------------------------------
+#define SF_PLAT_TOGGLE				0x0001
+
+class CBasePlatTrain : public CBaseToggle
+{
+	DECLARE_CLASS( CBasePlatTrain, CBaseToggle );
+
+public:
+	~CBasePlatTrain();
+	bool KeyValue( const char *szKeyName, const char *szValue );
+	void Precache( void );
+
+	// This is done to fix spawn flag collisions between this class and a derived class
+	virtual bool IsTogglePlat( void ) { return (m_spawnflags & SF_PLAT_TOGGLE) ? true : false; }
+
+	DECLARE_DATADESC();
+
+	void	PlayMovingSound();
+	void	StopMovingSound();
+
+	string_t	m_NoiseMoving;	// sound a plat makes while moving
+	string_t	m_NoiseArrived;
+
+	CSoundPatch *m_pMovementSound;
+#ifdef HL1_DLL
+	int			m_MoveSound;
+	int			m_StopSound;
+#endif
+
+	float	m_volume;			// Sound volume
+	float	m_flTWidth;
+	float	m_flTLength;
+};
+
 // Tracktrain spawn flags
 #define SF_TRACKTRAIN_NOPITCH					0x0001
 #define SF_TRACKTRAIN_NOCONTROL					0x0002
@@ -39,14 +75,12 @@
 #define TRAIN_FAST		0x04 
 #define TRAIN_BACK		0x05
 
-
 enum TrainVelocityType_t
 {
         TrainVelocity_Instantaneous = 0,
         TrainVelocity_LinearBlend,
         TrainVelocity_EaseInEaseOut,
 };
-
 
 enum TrainOrientationType_t
 {
@@ -56,10 +90,12 @@ enum TrainOrientationType_t
         TrainOrientation_EaseInEaseOut,
 };
 
-
-class CFuncTrackTrain : public CBaseEntity
+//-----------------------------------------------------------------------------
+// Purpose: CFuncTrackTrain
+//-----------------------------------------------------------------------------
+class CFuncTrackTrain : public CBasePlatTrain
 {
-	DECLARE_CLASS( CFuncTrackTrain, CBaseEntity );
+	DECLARE_CLASS( CFuncTrackTrain, CBasePlatTrain );
 	DECLARE_SERVERCLASS();
 
 public:
@@ -102,12 +138,15 @@ public:
 	void InputSetSpeedDir( inputdata_t &inputdata );
 	void InputSetSpeedReal( inputdata_t &inputdata );
 	void InputStop( inputdata_t &inputdata );
+	void InputStart( inputdata_t &inputdata );
 	void InputResume( inputdata_t &inputdata );
 	void InputReverse( inputdata_t &inputdata );
 	void InputStartForward( inputdata_t &inputdata );
 	void InputStartBackward( inputdata_t &inputdata );
 	void InputToggle( inputdata_t &inputdata );
 	void InputSetSpeedDirAccel( inputdata_t &inputdata );
+	void InputSetSpeedForwardModifier( inputdata_t &inputdata );
+	void InputTeleportToPathTrack( inputdata_t &inputdata );
 
 	static CFuncTrackTrain *Instance( edict_t *pent );
 
@@ -122,6 +161,9 @@ public:
 	float GetDesiredSpeed() const { return m_flDesiredSpeed;}
 
 	virtual bool IsBaseTrain( void ) const { return true; }
+
+	void SetSpeedForwardModifier( float flModifier );
+	void SetBlockDamage( float flDamage ) { m_flBlockDamage = flDamage; }
 
 private:
 
@@ -157,7 +199,7 @@ private:
 	Vector		m_controlMaxs;
 	Vector		m_lastBlockPos;				// These are used to build a heuristic decision about being temporarily blocked by physics objects
 	int			m_lastBlockTick;			// ^^^^^^^
-	float		m_flVolume;
+//	float		m_flVolume;
 	float		m_flBank;
 	float		m_oldSpeed;
 	float		m_flBlockDamage;			// Damage to inflict when blocked.
@@ -192,6 +234,8 @@ private:
 	bool		m_bAccelToSpeed;
 
 	float		m_flNextMPSoundTime;
+	float		m_flSpeedForwardModifier;
+	float		m_flUnmodifiedDesiredSpeed;
 };
 
 

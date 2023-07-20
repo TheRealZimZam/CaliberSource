@@ -563,7 +563,7 @@ CBasePlayer::CBasePlayer( )
 	Weapon_SetLast( NULL );
 	m_bitsDamageType = 0;
 
-	m_bForceOrigin = false;
+//	m_bForceOrigin = false;
 	m_hVehicle = NULL;
 	m_pCurrentCommand = NULL;
 	
@@ -801,7 +801,7 @@ void CBasePlayer::DeathSound( const CTakeDamageInfo &info )
 {
 	// Did we die from falling?
 	if ( m_bitsDamageType & DMG_FALL )
-		EmitSound( "Player.FallGib" );	// Play a splat sound.
+		EmitSound( "Player.Gib" );	// Play a splat sound.
 	else
 		EmitSound( "Player.Death" );
 
@@ -892,7 +892,6 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 
 		SetLastHitGroup( ptr->hitgroup );
 
-		
 		switch ( ptr->hitgroup )
 		{
 		case HITGROUP_GENERIC:
@@ -915,12 +914,9 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 			info.ScaleDamage( sk_player_leg.GetFloat() );
 #if 0
 			//Slow down a bit if hit in the knee
-			if( m_takedamage )
-			{
-				//m_bSlowedByHit = true;
-				//m_flUnslowTime = gpGlobals->curtime + 1;
-				m_Shared.SetSlowedTime( 0.5f );
-			}
+			//m_bSlowedByHit = true;
+			//m_flUnslowTime = gpGlobals->curtime + 1;
+			m_Shared.SetSlowedTime( 0.5f );
 #endif
 			break;
 		default:
@@ -2159,7 +2155,6 @@ void CBasePlayer::ShowViewPortPanel( const char * name, bool bShow, KeyValues *d
 void CBasePlayer::PlayerDeathThink(void)
 {
 	float flForward;
-
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	if (GetFlags() & FL_ONGROUND)
@@ -2206,14 +2201,18 @@ void CBasePlayer::PlayerDeathThink(void)
 
 	AddEffects( EF_NOINTERP );
 	m_flPlaybackRate = 0.0;
-	
+
 	int fAnyButtonDown = (m_nButtons & ~IN_SCORE);
 	
 	// Strip out the duck key from this check if it's toggled
 	if ( (fAnyButtonDown & IN_DUCK) && GetToggledDuckState())
-	{
 		fAnyButtonDown &= ~IN_DUCK;
-	}
+
+// if the player has been dead for one second longer than allowed by forcerespawn, 
+// forcerespawn isn't on. Send the player off to an intermission camera until they 
+// choose to respawn.
+	if ( gpGlobals->curtime > (m_flDeathTime + DEATH_ANIMATION_TIME) && !IsObserver() )
+		StartDeathCam();	// go to dead camera. 
 
 	// wait for all buttons released
 	if (m_lifeState == LIFE_DEAD)
@@ -2221,23 +2220,13 @@ void CBasePlayer::PlayerDeathThink(void)
 		if (fAnyButtonDown)
 			return;
 
-		if ( g_pGameRules->FPlayerCanRespawn( this ) )
-		{
+		if ( g_pGameRules->FPlayerCanRespawn( this ) && gpGlobals->curtime >= g_pGameRules->FlPlayerSpawnTime( this ) )
 			m_lifeState = LIFE_RESPAWNABLE;
-		}
-		
+
 		return;
 	}
 
-// if the player has been dead for one second longer than allowed by forcerespawn, 
-// forcerespawn isn't on. Send the player off to an intermission camera until they 
-// choose to respawn.
-	if ( gpGlobals->curtime > (m_flDeathTime + DEATH_ANIMATION_TIME) && !IsObserver() )	//g_pGameRules->IsMultiplayer()
-	{
-		// go to dead camera. 
-		StartDeathCam();	//StartObserverMode( m_iObserverLastMode )
-	}
-	
+
 // wait for any button down,  or mp_forcerespawn is set and the respawn time is up
 	if (!fAnyButtonDown 
 		&& !( g_pGameRules->IsMultiplayer() && forcerespawn.GetInt() > 0 && (gpGlobals->curtime > (m_flDeathTime + 5))) )
@@ -3992,86 +3981,85 @@ void CBasePlayer::CheckTimeBasedDamage()
 		// This is kind of hacky but necessary until we setup DamageType as an enum.
 		int iDamage = ( DMG_PARALYZE << i );
 		if ( !g_pGameRules->Damage_IsTimeBased( iDamage ) )
-			continue;
-
-
-		// make sure bit is set for damage type
-		if ( m_bitsDamageType & iDamage )
 		{
-			switch (i)
+			// make sure bit is set for damage type
+			if ( m_bitsDamageType & iDamage )
 			{
-			case itbd_Paralyze:
-				// UNDONE - flag movement as half-speed
-				bDuration = PARALYZE_DURATION;
-				break;
-			case itbd_NerveGas:
-//				OnTakeDamage(pev, pev, NERVEGAS_DAMAGE, DMG_GENERIC);	
-				bDuration = NERVEGAS_DURATION;
-				break;
-			case itbd_Poison:
-//				OnTakeDamage( CTakeDamageInfo( this, this, POISON_DAMAGE, DMG_GENERIC ) );
-				bDuration = POISON_DURATION;
-				break;
-			case itbd_Radiation:
-//				OnTakeDamage(pev, pev, RADIATION_DAMAGE, DMG_GENERIC);
-				bDuration = RADIATION_DURATION;
-				break;
-			case itbd_DrownRecover:
-				// NOTE: this hack is actually used to RESTORE health
-				// after the player has been drowning and finally takes a breath
-				if (m_idrowndmg > m_idrownrestored)
+				switch (i)
 				{
-					int idif = min(m_idrowndmg - m_idrownrestored, 10);
+				case itbd_Paralyze:
+					// UNDONE - flag movement as half-speed
+					bDuration = PARALYZE_DURATION;
+					break;
+				case itbd_NerveGas:
+	//				OnTakeDamage(pev, pev, NERVEGAS_DAMAGE, DMG_GENERIC);	
+					bDuration = NERVEGAS_DURATION;
+					break;
+	//			case itbd_Poison:
+	//				OnTakeDamage( CTakeDamageInfo( this, this, POISON_DAMAGE, DMG_GENERIC ) );
+	//				bDuration = POISON_DURATION;
+	//				break;
+				case itbd_Radiation:
+	//				OnTakeDamage(pev, pev, RADIATION_DAMAGE, DMG_GENERIC);
+					bDuration = RADIATION_DURATION;
+					break;
+				case itbd_DrownRecover:
+					// NOTE: this hack is actually used to RESTORE health
+					// after the player has been drowning and finally takes a breath
+					if (m_idrowndmg > m_idrownrestored)
+					{
+						int idif = min(m_idrowndmg - m_idrownrestored, 10);
 
-					TakeHealth(idif, DMG_GENERIC);
-					m_idrownrestored += idif;
-				}
-				bDuration = 4;	// get up to 5*10 = 50 points back
-				break;
+						TakeHealth(idif, DMG_GENERIC);
+						m_idrownrestored += idif;
+					}
+					bDuration = 4;	// get up to 5*10 = 50 points back
+					break;
 
-			case itbd_PoisonRecover:
-			{
-				// NOTE: this hack is actually used to RESTORE health
-				// after the player has been poisoned.
-				if (m_nPoisonDmg > m_nPoisonRestored)
+				case itbd_PoisonRecover:
 				{
-					int nDif = min(m_nPoisonDmg - m_nPoisonRestored, 10);
-					TakeHealth(nDif, DMG_GENERIC);
-					m_nPoisonRestored += nDif;
+					// NOTE: this hack is actually used to RESTORE health
+					// after the player has been poisoned.
+					if (m_nPoisonDmg > m_nPoisonRestored)
+					{
+						int nDif = min(m_nPoisonDmg - m_nPoisonRestored, 10);
+						TakeHealth(nDif, DMG_GENERIC);
+						m_nPoisonRestored += nDif;
+					}
+					bDuration = 9;	// get up to 10*10 = 100 points back
+					break;
 				}
-				bDuration = 9;	// get up to 10*10 = 100 points back
-				break;
-			}
 
-			case itbd_Acid:
-//				OnTakeDamage(pev, pev, ACID_DAMAGE, DMG_GENERIC);
-				bDuration = ACID_DURATION;
-				break;
-			case itbd_SlowBurn:
-//				OnTakeDamage(pev, pev, SLOWBURN_DAMAGE, DMG_GENERIC);
-				bDuration = SLOWBURN_DURATION;
-				break;
-			case itbd_SlowFreeze:
-//				OnTakeDamage(pev, pev, SLOWFREEZE_DAMAGE, DMG_GENERIC);
-				bDuration = SLOWFREEZE_DURATION;
-				break;
-			default:
-				bDuration = 0;
-			}
+				case itbd_Acid:
+	//				OnTakeDamage(pev, pev, ACID_DAMAGE, DMG_GENERIC);
+					bDuration = ACID_DURATION;
+					break;
+				case itbd_SlowBurn:
+	//				OnTakeDamage(pev, pev, SLOWBURN_DAMAGE, DMG_GENERIC);
+					bDuration = SLOWBURN_DURATION;
+					break;
+				case itbd_SlowFreeze:
+	//				OnTakeDamage(pev, pev, SLOWFREEZE_DAMAGE, DMG_GENERIC);
+					bDuration = SLOWFREEZE_DURATION;
+					break;
+				default:
+					bDuration = 0;
+				}
 
-			if (m_rgbTimeBasedDamage[i])
-			{
-				// decrement damage duration, detect when done.
-				if (!m_rgbTimeBasedDamage[i] || --m_rgbTimeBasedDamage[i] == 0)
+				if (m_rgbTimeBasedDamage[i])
 				{
-					m_rgbTimeBasedDamage[i] = 0;
-					// if we're done, clear damage bits
-					m_bitsDamageType &= ~(DMG_PARALYZE << i);	
+					// decrement damage duration, detect when done.
+					if (!m_rgbTimeBasedDamage[i] || --m_rgbTimeBasedDamage[i] == 0)
+					{
+						m_rgbTimeBasedDamage[i] = 0;
+						// if we're done, clear damage bits
+						m_bitsDamageType &= ~(DMG_PARALYZE << i);	
+					}
 				}
+				else
+					// first time taking this damage type - init damage duration
+					m_rgbTimeBasedDamage[i] = bDuration;
 			}
-			else
-				// first time taking this damage type - init damage duration
-				m_rgbTimeBasedDamage[i] = bDuration;
 		}
 	}
 }
@@ -4261,17 +4249,14 @@ void CBasePlayer::SetSuitUpdate(char *name, int fgroup, int iNoRepeatTime)
 	int i;
 	int isentence;
 	int iempty = -1;
-	
-	
+
 	// Ignore suit updates if no suit
 	if ( !IsSuitEquipped() )
 		return;
 
+	// due to static channel design, etc. We don't play HEV sounds in multiplayer right now.
 	if ( g_pGameRules->IsMultiplayer() )
-	{
-		// due to static channel design, etc. We don't play HEV sounds in multiplayer right now.
 		return;
-	}
 
 	// if name == NULL, then clear out the queue
 
@@ -4445,7 +4430,7 @@ void CBasePlayer::UpdatePlayerSound( void )
 	if ( player_showsound.GetBool() )
 	{
 		Vector forward = UTIL_YawToVector( pl.v_angle.y );
-		UTIL_Smoke( GetAbsOrigin() + forward * iVolume, (iVolume*0.25), 15 );
+		UTIL_Smoke( GetAbsOrigin() + forward * iVolume, (iVolume*0.15), 15 );
 		DevMsg( "%d/%d\n", iVolume, m_iTargetVolume );
 	}
 }
@@ -4516,16 +4501,6 @@ IPhysicsObject *CBasePlayer::GetGroundVPhysics()
 			return pPhysGround;
 	}
 	return NULL;
-}
-
-
-//-----------------------------------------------------------------------------
-// For debugging...
-//-----------------------------------------------------------------------------
-void CBasePlayer::ForceOrigin( const Vector &vecOrigin )
-{
-	m_bForceOrigin = true;
-	m_vForcedOrigin = vecOrigin;
 }
 
 //-----------------------------------------------------------------------------
@@ -4627,6 +4602,7 @@ void CBasePlayer::PostThink()
 		UpdatePlayerSound();
 		VPROF_SCOPE_END();
 
+/*
 		if ( m_bForceOrigin )
 		{
 			SetLocalOrigin( m_vForcedOrigin );
@@ -4634,6 +4610,7 @@ void CBasePlayer::PostThink()
 			m_Local.m_vecPunchAngle = RandomAngle( -25, 25 );
 			m_Local.m_vecPunchAngleVel.Init();
 		}
+*/
 
 		VPROF_SCOPE_BEGIN( "CBasePlayer::PostThink-PostThinkVPhysics" );
 		PostThinkVPhysics();
@@ -4644,7 +4621,6 @@ void CBasePlayer::PostThink()
 	// Even if dead simulate entities
 	SimulatePlayerSimulatedEntities();
 #endif
-
 }
 
 // handles touching physics objects
@@ -4822,7 +4798,7 @@ CBaseEntity *CBasePlayer::EntSelectSpawnPoint()
 	player = edict();
 
 // choose a info_player_deathmatch point
-	if (g_pGameRules->IsCoOp())
+	if (g_pGameRules->IsCoOp() )
 	{
 		pSpot = gEntList.FindEntityByClassname( g_pLastSpawn, "info_player_coop");
 		if ( pSpot )
@@ -5022,7 +4998,7 @@ void CBasePlayer::Spawn( void )
 
 	m_flgeigerDelay = gpGlobals->curtime + 2.0;	// wait a few seconds until user-defined message registrations
 												// are recieved by all clients
-	
+
 	m_flFieldOfView		= 0.766;// some NPCs use this to determine whether or not the player is looking at them.
 
 	m_vecAdditionalPVSOrigin = vec3_origin;
@@ -5090,13 +5066,9 @@ void CBasePlayer::Spawn( void )
 	}
 
 	if ( GetTeamNumber() != TEAM_SPECTATOR )
-	{
 		StopObserverMode();
-	}
 	else
-	{
 		StartObserverMode( m_iObserverLastMode );
-	}
 
 	StopReplayMode();
 
@@ -5140,11 +5112,10 @@ void CBasePlayer::Activate( void )
 void CBasePlayer::Precache( void )
 {
 	BaseClass::Precache();
-
-
-	PrecacheScriptSound( "Player.FallGib" );
-	PrecacheScriptSound( "Player.Death" );
-	PrecacheScriptSound( "Player.Pain" );
+	//! cached by client
+	//!PrecacheScriptSound( "Player.Death" );
+	//!PrecacheScriptSound( "Player.Pain" );
+	//!PrecacheScriptSound( "Player.Gib" );
 	PrecacheScriptSound( "Player.Jump" );
 	PrecacheScriptSound( "Player.BulletImpact" );
 	PrecacheScriptSound( "Player.PlasmaDamage" );
@@ -5164,24 +5135,6 @@ void CBasePlayer::Precache( void )
 	PrecacheParticleSystem( "slime_splash_02" );
 	PrecacheParticleSystem( "slime_splash_03" );
 #endif
-
-	// in the event that the player JUST spawned, and the level node graph
-	// was loaded, fix all of the node graph pointers before the game starts.
-	
-	// !!!BUGBUG - now that we have multiplayer, this needs to be moved!
-	/* todo - put in better spot and use new ainetowrk stuff
-	if ( WorldGraph.m_fGraphPresent && !WorldGraph.m_fGraphPointersSet )
-	{
-		if ( !WorldGraph.FSetGraphPointers() )
-		{
-			Msg( "**Graph pointers were not set!\n");
-		}
-		else
-		{
-			Msg( "**Graph Pointers Set!\n" );
-		} 
-	}
-	*/
 
 	// SOUNDS / MODELS ARE PRECACHED in ClientPrecache() (game specific)
 	// because they need to precache before any clients have connected
@@ -5206,7 +5159,6 @@ void CBasePlayer::Precache( void )
 
 	if ( gInitHUD )
 		m_fInitHUD = true;
-
 }
 
 //-----------------------------------------------------------------------------
@@ -5656,8 +5608,6 @@ public:
 	void	Spawn ( CBasePlayer *pOwner );
 	void	Think( void );
 
-	virtual void Precache();
-
 	virtual int	ObjectCaps( void ) { return FCAP_DONT_SAVE; }
 };
 
@@ -5671,13 +5621,6 @@ void CSprayCan::Spawn ( CBasePlayer *pOwner )
 	SetOwnerEntity( pOwner );
 	SetNextThink( gpGlobals->curtime );
 	EmitSound( "SprayCan.Paint" );
-}
-
-void CSprayCan::Precache()
-{
-	BaseClass::Precache();
-
-	PrecacheScriptSound( "SprayCan.Paint" );
 }
 
 void CSprayCan::Think( void )

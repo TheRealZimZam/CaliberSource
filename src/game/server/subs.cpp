@@ -94,6 +94,129 @@ void CBaseEntity::SUB_DoNothing( void )
 {
 }
 
+//
+// fade out - slowly fades a entity out, then removes it.
+//
+// DON'T USE ME FOR GIBS AND STUFF IN MULTIPLAYER!
+// SET A FUTURE THINK AND A RENDERMODE!!
+#define MIN_CORPSE_FADE_TIME		10.0
+#define	MIN_CORPSE_FADE_DIST		256.0
+#define	MAX_CORPSE_FADE_DIST		1500.0
+
+bool CBaseEntity::SUB_AllowedToFade( void )
+{
+	if( VPhysicsGetObject() )
+	{
+		if( VPhysicsGetObject()->GetGameFlags() & FVPHYSICS_PLAYER_HELD || GetEFlags() & EFL_IS_BEING_LIFTED_BY_BARNACLE )
+			return false;
+	}
+
+	// on Xbox, allow these to fade out even if player is looking
+#ifndef _XBOX
+	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
+	if ( pPlayer && pPlayer->FInViewCone( this ) )
+		return false;
+#endif
+
+	return true;
+}
+
+void CBaseEntity::SUB_StartFadeOut( float delay, bool notSolid )
+{
+	SetThink( &CBaseEntity::SUB_FadeOut );
+	SetNextThink( gpGlobals->curtime + delay );
+	SetRenderColorA( 255 );
+	m_nRenderMode = kRenderNormal;
+
+	if ( notSolid )
+	{
+		AddSolidFlags( FSOLID_NOT_SOLID );
+		SetLocalAngularVelocity( vec3_angle );
+	}
+}
+
+void CBaseEntity::SUB_StartFadeOutInstant()
+{
+	SUB_StartFadeOut( 0, true );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Vanish when players aren't looking
+//-----------------------------------------------------------------------------
+void CBaseEntity::SUB_Vanish( void )
+{
+	//Always think again next frame
+	SetNextThink( gpGlobals->curtime + 0.1f );
+
+	CBasePlayer *pPlayer;
+
+	//Get all players
+	for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+	{
+		//Get the next client
+		if ( ( pPlayer = UTIL_PlayerByIndex( i ) ) != NULL )
+		{
+			Vector corpseDir = (GetAbsOrigin() - pPlayer->WorldSpaceCenter() );
+
+			float flDistSqr = corpseDir.LengthSqr();
+			//If the player is close enough, don't fade out
+			if ( flDistSqr < (MIN_CORPSE_FADE_DIST*MIN_CORPSE_FADE_DIST) )
+				return;
+
+			// If the player's far enough away, we don't care about looking at it
+			if ( flDistSqr < (MAX_CORPSE_FADE_DIST*MAX_CORPSE_FADE_DIST) )
+			{
+				VectorNormalize( corpseDir );
+
+				Vector	plForward;
+				pPlayer->EyeVectors( &plForward );
+
+				float dot = plForward.Dot( corpseDir );
+
+				if ( dot > 0.0f )
+					return;
+			}
+		}
+	}
+
+	//If we're here, then we can vanish safely
+	m_iHealth = 0;
+	SetThink( &CBaseEntity::SUB_Remove );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Fade out slowly
+//-----------------------------------------------------------------------------
+void CBaseEntity::SUB_PerformFadeOut( void )
+{
+	float dt = gpGlobals->frametime;
+	if ( dt > 0.1f )
+	{
+		dt = 0.1f;
+	}
+	m_nRenderMode = kRenderTransTexture;
+	int speed = max(1,256*dt); // fade out over 1 second
+	SetRenderColorA( UTIL_Approach( 0, m_clrRender->a, speed ) );
+}
+
+void CBaseEntity::SUB_FadeOut( void )
+{
+	if ( SUB_AllowedToFade() == false )
+	{
+		SetNextThink( gpGlobals->curtime + 1 );
+		SetRenderColorA( 255 );
+		return;
+	}
+
+	SUB_PerformFadeOut();
+
+	if ( m_clrRender->a == 0 )
+		SUB_Remove();
+	else
+		SetNextThink( gpGlobals->curtime );
+}
+
+
 /*
 ==============================
 SUB_UseTargets

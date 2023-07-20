@@ -19,39 +19,9 @@
 
 static void PlatSpawnInsideTrigger(edict_t *pevPlatform);
 
-#define SF_PLAT_TOGGLE				0x0001
-
-class CBasePlatTrain : public CBaseToggle
-{
-	DECLARE_CLASS( CBasePlatTrain, CBaseToggle );
-
-public:
-	~CBasePlatTrain();
-	bool KeyValue( const char *szKeyName, const char *szValue );
-	void Precache( void );
-
-	// This is done to fix spawn flag collisions between this class and a derived class
-	virtual bool IsTogglePlat( void ) { return (m_spawnflags & SF_PLAT_TOGGLE) ? true : false; }
-
-	DECLARE_DATADESC();
-
-	void	PlayMovingSound();
-	void	StopMovingSound();
-
-	string_t	m_NoiseMoving;	// sound a plat makes while moving
-	string_t	m_NoiseArrived;
-
-	CSoundPatch *m_pMovementSound;
-#ifdef HL1_DLL
-	int			m_MoveSound;
-	int			m_StopSound;
-#endif
-
-	float	m_volume;			// Sound volume
-	float	m_flTWidth;
-	float	m_flTLength;
-};
-
+//-----------------------------------------------------------------------------
+// Purpose: CBasePlatTrain
+//-----------------------------------------------------------------------------
 BEGIN_DATADESC( CBasePlatTrain )
 
 	DEFINE_KEYFIELD( m_NoiseMoving, FIELD_SOUNDNAME, "noise1" ),
@@ -60,7 +30,6 @@ BEGIN_DATADESC( CBasePlatTrain )
 #ifdef HL1_DLL
 	DEFINE_KEYFIELD( m_MoveSound, FIELD_INTEGER, "movesnd" ),
 	DEFINE_KEYFIELD( m_StopSound, FIELD_INTEGER, "stopsnd" ),
-
 #endif 
 	DEFINE_SOUNDPATCH( m_pMovementSound ),
 
@@ -742,6 +711,8 @@ public:
 	void Start( void );
 	void Stop( void );
 
+	bool IsBaseTrain( void ) const { return true; }
+
 	DECLARE_DATADESC();
 
 public:
@@ -1135,7 +1106,7 @@ void CFuncTrain::Stop( void )
 
 		SetNextThink( TICK_NEVER_THINK );
 		SetAbsVelocity( vec3_origin );
-		
+
 		if ( m_NoiseArrived != NULL_STRING )
 		{
 			CPASAttenuationFilter filter( this );
@@ -1183,7 +1154,7 @@ BEGIN_DATADESC( CFuncTrackTrain )
 	DEFINE_FIELD( m_dir, FIELD_FLOAT ),
 	DEFINE_FIELD( m_controlMins, FIELD_VECTOR ),
 	DEFINE_FIELD( m_controlMaxs, FIELD_VECTOR ),
-	DEFINE_FIELD( m_flVolume, FIELD_FLOAT ),
+//	DEFINE_FIELD( m_flVolume, FIELD_FLOAT ),
 	DEFINE_FIELD( m_oldSpeed, FIELD_FLOAT ),
 	//DEFINE_FIELD( m_lastBlockPos, FIELD_POSITION_VECTOR ), // temp values for blocking, don't save
 	//DEFINE_FIELD( m_lastBlockTick, FIELD_INTEGER ),
@@ -1200,6 +1171,7 @@ BEGIN_DATADESC( CFuncTrackTrain )
 
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_VOID, "Stop", InputStop ),
+	DEFINE_INPUTFUNC( FIELD_VOID, "Start",	InputStart ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "StartForward", InputStartForward ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "StartBackward", InputStartBackward ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "Toggle", InputToggle ),
@@ -1209,6 +1181,8 @@ BEGIN_DATADESC( CFuncTrackTrain )
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeedDir", InputSetSpeedDir ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeedReal", InputSetSpeedReal ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeedDirAccel", InputSetSpeedDirAccel ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "TeleportToPathTrack", InputTeleportToPathTrack ),
+	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeedForwardModifier", InputSetSpeedForwardModifier ),
 
 	// Outputs
 	DEFINE_OUTPUT( m_OnStart, "OnStart" ),
@@ -1249,6 +1223,9 @@ CFuncTrackTrain::CFuncTrackTrain()
 	m_eVelocityType = TrainVelocity_Instantaneous;
 	m_lastBlockPos.Init();
 	m_lastBlockTick = gpGlobals->tickcount;
+
+	m_flSpeedForwardModifier = 1.0f;
+	m_flUnmodifiedDesiredSpeed = 0.0f;
 }
 
 
@@ -1300,8 +1277,8 @@ bool CFuncTrackTrain::KeyValue( const char *szKeyName, const char *szValue )
 {
 	if (FStrEq(szKeyName, "volume"))
 	{
-		m_flVolume = (float) (atoi(szValue));
-		m_flVolume *= 0.1f;
+		m_volume = (float) (atoi(szValue));
+		m_volume *= 0.1f;
 	}
 	else
 	{
@@ -1320,16 +1297,19 @@ void CFuncTrackTrain::InputStop( inputdata_t &inputdata )
 	Stop();
 }
 
-
 //------------------------------------------------------------------------------
 // Purpose: Input handler that starts the train moving.
 //------------------------------------------------------------------------------
+void CFuncTrackTrain::InputStart( inputdata_t &inputdata )
+{
+	InputResume(inputdata);
+}
+
 void CFuncTrackTrain::InputResume( inputdata_t &inputdata )
 {
 	m_flSpeed = m_oldSpeed;
 	Start();
 }
-
 
 //------------------------------------------------------------------------------
 // Purpose: Input handler that reverses the trains current direction of motion.
@@ -1339,7 +1319,6 @@ void CFuncTrackTrain::InputReverse( inputdata_t &inputdata )
 	SetDirForward( !IsDirForward() );
 	SetSpeed( m_flSpeed );
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Returns whether we are travelling forward along our path.
@@ -1387,7 +1366,6 @@ void CFuncTrackTrain::InputStartForward( inputdata_t &inputdata )
 	SetSpeed( m_maxSpeed );
 }
 
-
 //------------------------------------------------------------------------------
 // Purpose: Input handler that starts the train moving.
 //------------------------------------------------------------------------------
@@ -1397,7 +1375,6 @@ void CFuncTrackTrain::InputStartBackward( inputdata_t &inputdata )
 	SetSpeed( m_maxSpeed );
 }
 
-
 //------------------------------------------------------------------------------
 // Purpose: Starts the train moving.
 //------------------------------------------------------------------------------
@@ -1406,7 +1383,6 @@ void CFuncTrackTrain::Start( void )
 	m_OnStart.FireOutput(this,this);
 	Next();
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Toggles the train between moving and not moving.
@@ -1503,13 +1479,55 @@ void CFuncTrackTrain::InputSetSpeedDirAccel( inputdata_t &inputdata )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CFuncTrackTrain::InputSetSpeedForwardModifier( inputdata_t &inputdata )
+{
+	SetSpeedForwardModifier( inputdata.value.Float() ) ;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CFuncTrackTrain::SetSpeedForwardModifier( float flModifier )
+{
+	float flSpeedForwardModifier = flModifier;
+	flSpeedForwardModifier = fabs( flSpeedForwardModifier );
+
+	m_flSpeedForwardModifier = clamp( flSpeedForwardModifier, 0.f, 1.f );
+	SetSpeed( m_flUnmodifiedDesiredSpeed, true );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CFuncTrackTrain::InputTeleportToPathTrack( inputdata_t &inputdata )
+{
+	const char *pszName = inputdata.value.String();
+	CPathTrack *pTrack = dynamic_cast<CPathTrack*>( gEntList.FindEntityByName( NULL, pszName ) );
+
+	if ( pTrack )
+	{
+		TeleportToPathTrack( pTrack );
+		m_ppath = pTrack;
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Sets the speed of the train to the given value in units per second.
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::SetSpeed( float flSpeed, bool bAccel /*= false */  )
 {
 	m_bAccelToSpeed = bAccel;
 
+	m_flUnmodifiedDesiredSpeed = flSpeed;
 	float flOldSpeed = m_flSpeed;
+
+	// are we using a speed forward modifier?
+	if ( m_flSpeedForwardModifier < 1.0 && m_dir > 0 )
+	{
+		flSpeed = flSpeed * m_flSpeedForwardModifier;
+	}
 
 	if ( m_bAccelToSpeed )
 	{
@@ -1560,13 +1578,18 @@ void CFuncTrackTrain::SetSpeed( float flSpeed, bool bAccel /*= false */  )
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::Stop( void )
 {
+	//stop moving
 	m_OnStop.FireOutput(this,this);
 	SetLocalVelocity( vec3_origin );
 	SetLocalAngularVelocity( vec3_angle );
+
 	m_oldSpeed = m_flSpeed;
 	m_flSpeed = 0;
 	SoundStop();
 	SetThink(NULL);
+
+	SetNextThink( TICK_NEVER_THINK );
+	SetAbsVelocity( vec3_origin );
 }
 
 static CBaseEntity *FindPhysicsBlockerForHierarchy( CBaseEntity *pParentEntity )
@@ -1705,7 +1728,7 @@ void CFuncTrackTrain::SoundStop( void )
 			EmitSound_t ep;
 			ep.m_nChannel = CHAN_ITEM;
 			ep.m_pSoundName =  STRING(m_iszSoundStop);
-			ep.m_flVolume = m_flVolume;
+			ep.m_flVolume = m_volume;
 			ep.m_SoundLevel = SNDLVL_NORM;
 
 			EmitSound( filter, entindex(), ep );
@@ -1762,7 +1785,7 @@ void CFuncTrackTrain::SoundUpdate( void )
 			EmitSound_t ep;
 			ep.m_nChannel = CHAN_ITEM;
 			ep.m_pSoundName =  STRING(m_iszSoundStart);
-			ep.m_flVolume = m_flVolume;
+			ep.m_flVolume = m_volume;
 			ep.m_SoundLevel = SNDLVL_NORM;
 			ep.m_pOrigin = &vecWorldSpaceCenter;
 
@@ -1774,7 +1797,7 @@ void CFuncTrackTrain::SoundUpdate( void )
 			EmitSound_t ep;
 			ep.m_nChannel = CHAN_STATIC;
 			ep.m_pSoundName =  STRING(m_iszSoundMove);
-			ep.m_flVolume = m_flVolume;
+			ep.m_flVolume = m_volume;
 			ep.m_SoundLevel = SNDLVL_NORM;
 			ep.m_nPitch = (int)flpitch;
 			ep.m_pOrigin = &vecWorldSpaceCenter;
@@ -1795,7 +1818,7 @@ void CFuncTrackTrain::SoundUpdate( void )
 			EmitSound_t ep;
 			ep.m_nChannel = CHAN_STATIC;
 			ep.m_pSoundName =  STRING(m_iszSoundMove);
-			ep.m_flVolume = m_flVolume;
+			ep.m_flVolume = m_volume;
 			ep.m_SoundLevel = SNDLVL_NORM;
 			ep.m_nPitch = (int)flpitch;
 			ep.m_nFlags = SND_CHANGE_PITCH;
@@ -2668,9 +2691,9 @@ bool CFuncTrackTrain::CreateVPhysics( void )
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::Precache( void )
 {
-	if (m_flVolume == 0.0)
+	if (m_volume == 0.0)
 	{
-		m_flVolume = 1.0;
+		m_volume = 1.0;
 	}
 
 	if ( m_iszSoundMove != NULL_STRING )

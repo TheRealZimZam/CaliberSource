@@ -60,8 +60,6 @@ void W_Precache(void)
 {
 	PrecacheFileWeaponInfoDatabase( filesystem, g_pGameRules->GetEncryptionKey() );
 
-
-
 #ifdef HL1_DLL
 	g_sModelIndexWExplosion = CBaseEntity::PrecacheModel("sprites/WXplo1.vmt");	// underwater fireball
 	g_sModelIndexBloodSpray = CBaseEntity::PrecacheModel("sprites/bloodspray.vmt");	// initial blood
@@ -190,35 +188,6 @@ void CBaseCombatWeapon::HandleAnimEvent( animevent_t *pEvent )
 	{
 		Operator_HandleAnimEvent( pEvent, pOwner );
 	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Make the weapon visible and tangible
-//-----------------------------------------------------------------------------
-CBaseEntity* CBaseCombatWeapon::Respawn( void )
-{
-	// make a copy of this weapon that is invisible and inaccessible to players (no touch function). The weapon spawn/respawn code
-	// will decide when to make the weapon visible and touchable.
-	CBaseEntity *pNewWeapon = CBaseEntity::Create( GetClassname(), g_pGameRules->VecWeaponRespawnSpot( this ), GetLocalAngles(), GetOwnerEntity() );
-
-	if ( pNewWeapon )
-	{
-		pNewWeapon->AddEffects( EF_NODRAW );// invisible for now
-		pNewWeapon->SetTouch( NULL );// no touch
-		pNewWeapon->SetThink( &CBaseCombatWeapon::AttemptToMaterialize );
-
-		UTIL_DropToFloor( this, MASK_SOLID );
-
-		// not a typo! We want to know when the weapon the player just picked up should respawn! This new entity we created is the replacement,
-		// but when it should respawn is based on conditions belonging to the weapon that was taken.
-		pNewWeapon->SetNextThink( gpGlobals->curtime + g_pGameRules->FlWeaponRespawnTime( this ) );
-	}
-	else
-	{
-		Warning("Respawn failed to create %s!\n", GetClassname() );
-	}
-
-	return pNewWeapon;
 }
 
 //-----------------------------------------------------------------------------
@@ -475,8 +444,47 @@ void CBaseCombatWeapon::Kill( void )
 }
 
 //====================================================================================
-// FALL TO GROUND
+// WEAPON SPAWNING
 //====================================================================================
+CBaseEntity* CBaseCombatWeapon::Respawn( void )
+{
+	// Last ditch check if we should actually respawn
+	if ( !HasSpawnFlags(SF_NORESPAWN) )
+	{
+		// make a copy of this weapon that is invisible and inaccessible to players (no touch function). The weapon spawn/respawn code
+		// will decide when to make the weapon visible and touchable.
+		CBaseEntity *pNewWeapon = CBaseEntity::Create( GetClassname(), g_pGameRules->VecWeaponRespawnSpot( this ), GetLocalAngles(), GetOwnerEntity() );
+
+		if ( pNewWeapon )
+		{
+			pNewWeapon->AddEffects( EF_NODRAW ); // invisible for now
+			pNewWeapon->SetMoveType( MOVETYPE_NONE ); // cannot move
+			pNewWeapon->SetTouch( NULL );// no touch
+			pNewWeapon->SetThink( &CBaseCombatWeapon::AttemptToMaterialize );
+
+			if ( !HasSpawnFlags( SF_WEAPON_START_CONSTRAINED ) )
+				UTIL_DropToFloor( pNewWeapon, MASK_SOLID );
+			else
+				pNewWeapon->AddSpawnFlags( SF_WEAPON_START_CONSTRAINED );
+
+			if ( HasSpawnFlags( SF_WEAPON_ROTATE ) )
+				pNewWeapon->AddSpawnFlags( SF_WEAPON_ROTATE );
+
+			// not a typo! We want to know when the weapon the player just picked up should respawn! This new entity we created is the replacement,
+			// but when it should respawn is based on conditions belonging to the weapon that was taken.
+			pNewWeapon->SetNextThink( gpGlobals->curtime + g_pGameRules->FlWeaponRespawnTime( this ) );
+		}
+		else
+		{
+			Warning("Respawn failed to create %s!\n", GetClassname() );
+		}
+
+		return pNewWeapon;
+	}
+
+	return false;
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Setup for the fall
 //-----------------------------------------------------------------------------
@@ -521,9 +529,7 @@ void CBaseCombatWeapon::FallInit( void )
 	}	
 
 	SetPickupTouch();
-	
 	SetThink( &CBaseCombatWeapon::FallThink );
-
 	SetNextThink( gpGlobals->curtime + 0.1f );
 }
 
@@ -533,36 +539,40 @@ void CBaseCombatWeapon::FallInit( void )
 //			we change its solid type to trigger and set it in a large box that 
 //			helps the player get it.
 //-----------------------------------------------------------------------------
-void CBaseCombatWeapon::FallThink ( void )
+void CBaseCombatWeapon::SpinThink( void )
+{
+	// Weapons add some vertical velocity to the spin so they slightly hover up and down,
+	// because guns are so self-centered and flamboyant
+	//!!!TODO;
+
+	// Baseclass takes care of the horizontal spin
+	BaseClass::SpinThink();
+}
+
+void CBaseCombatWeapon::FallThink( void )
 {
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	bool shouldMaterialize = false;
 	IPhysicsObject *pPhysics = VPhysicsGetObject();
 	if ( pPhysics )
-	{
 		shouldMaterialize = pPhysics->IsAsleep();
-	}
 	else
-	{
 		shouldMaterialize = (GetFlags() & FL_ONGROUND) ? true : false;
-	}
 
 	if ( shouldMaterialize )
 	{
 		// clatter if we have an owner (i.e., dropped by someone)
-		// don't clatter if the gun is waiting to respawn (if it's waiting, it is invisible!)
 		if ( GetOwnerEntity() )
 		{
 			EmitSound( "BaseCombatWeapon.WeaponDrop" );
 		}
-		Materialize(); 
+		//UNDONE; materialization is only for respawning MP weapons,
+		// and respawning weapons are ALWAYS non-physical - M.M
+		//Materialize(); 
 	}
 }
 
-//====================================================================================
-// WEAPON SPAWNING
-//====================================================================================
 //-----------------------------------------------------------------------------
 // Purpose: Make a weapon visible and tangible
 //-----------------------------------------------------------------------------// 
@@ -571,31 +581,29 @@ void CBaseCombatWeapon::Materialize( void )
 	if ( IsEffectActive( EF_NODRAW ) )
 	{
 		// changing from invisible state to visible.
-#ifdef HL2MP
-		EmitSound( "AlyxEmp.Charge" );
-#else
 		EmitSound( "BaseCombatWeapon.WeaponMaterialize" );
-#endif
-		
 		RemoveEffects( EF_NODRAW );
-		DoMuzzleFlash();
+		DoMuzzleFlash();	//!!TODO; Need a real effect!
 	}
 #ifdef HL2MP
-	if ( HasSpawnFlags( SF_NORESPAWN ) == false )
-	{
-		VPhysicsInitNormal( SOLID_BBOX, GetSolidFlags() | FSOLID_TRIGGER, false );
-		SetMoveType( MOVETYPE_VPHYSICS );
-
-		HL2MPRules()->AddLevelDesignerPlacedObject( this );
-	}
-#else
+	HL2MPRules()->AddLevelDesignerPlacedObject( this );
+#endif
+	SetMoveType( MOVETYPE_FLYGRAVITY );
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_TRIGGER );
-#endif
 
-	SetPickupTouch();
+	SetTouch(&CBaseCombatWeapon::DefaultTouch);
+	if (HasSpawnFlags( SF_WEAPON_ROTATE ))
+	{
+		SetMoveType( MOVETYPE_FLY );
+		SetThink( &CBaseCombatWeapon::SpinThink );
+	}
+	else
+	{
+		SetThink( NULL );	//dont think about anything
+	}
 
-	SetThink (NULL);
+	SetNextThink( gpGlobals->curtime + 0.2f );
 }
 
 //-----------------------------------------------------------------------------

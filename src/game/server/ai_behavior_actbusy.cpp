@@ -11,10 +11,10 @@
 #include "ai_navigator.h"
 #include "ai_hint.h"
 #include "ai_behavior_follow.h"
+#include "ai_basetalker.h"
 #include "KeyValues.h"
 #include "filesystem.h"
 #include "eventqueue.h"
-#include "ai_playerally.h"
 #include "SoundEmitterSystem/isoundemittersystembase.h"
 #include "entityblocker.h"
 #include "npcevent.h"
@@ -940,7 +940,7 @@ Activity CAI_ActBusyBehavior::NPC_TranslateActivity( Activity nActivity )
 	if( nActivity == ACT_RUN )
 	{
 		// FIXME: Forcing STIMULATED here is illegal if the entity doesn't support it as an activity
-		CAI_PlayerAlly *pAlly = dynamic_cast<CAI_PlayerAlly*>(GetOuter());
+		CAI_BaseTalker *pAlly = dynamic_cast<CAI_BaseTalker*>(GetOuter());
 		if ( pAlly )
 			return ACT_RUN_STIMULATED;
 	}
@@ -2062,7 +2062,7 @@ void CAI_ActBusyBehavior::RunTask( const Task_t *pTask )
 			}
 			else
 			{
-				CAI_PlayerAlly *pAlly = dynamic_cast<CAI_PlayerAlly*>(GetOuter());
+				CAI_BaseTalker *pAlly = dynamic_cast<CAI_BaseTalker*>(GetOuter());
 				if ( pAlly )
 				{
 					pAlly->SelectInterjection();

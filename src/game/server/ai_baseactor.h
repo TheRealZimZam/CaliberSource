@@ -3,6 +3,7 @@
 // Purpose: Hooks and classes for the support of humanoid NPCs with 
 //			groovy facial animation capabilities, aka, "Actors"
 //
+// TODO; Why is this a subclass of humanoid?? Aliens might be able to talk too...
 //=============================================================================//
 
 #ifndef AI_BASEACTOR_H

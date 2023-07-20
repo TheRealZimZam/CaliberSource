@@ -430,6 +430,7 @@ void CItem::ItemTouch( CBaseEntity *pOther )
 
 CBaseEntity* CItem::Respawn( void )
 {
+	// Invisible, untouchable
 	SetTouch( NULL );
 	AddEffects( EF_NODRAW );
 
@@ -448,6 +449,8 @@ CBaseEntity* CItem::Respawn( void )
 
 	RemoveAllDecals(); //remove any decals
 
+	// TODO; Create another model here to indicate respawn in progress
+
 	SetThink ( &CItem::Materialize );
 	SetNextThink( gpGlobals->curtime + g_pGameRules->FlItemRespawnTime( this ) );
 	return this;
@@ -460,12 +463,7 @@ void CItem::Materialize( void )
 	if ( IsEffectActive( EF_NODRAW ) )
 	{
 		// changing from invisible state to visible.
-
-#ifdef HL2MP
-		EmitSound( "AlyxEmp.Charge" );
-#else
 		EmitSound( "Item.Materialize" );
-#endif
 		RemoveEffects( EF_NODRAW );
 		DoMuzzleFlash();
 	}

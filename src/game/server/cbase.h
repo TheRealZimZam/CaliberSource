@@ -125,6 +125,9 @@ enum
 #define GIB_NEVER			1// never gib, no matter how much death damage is done ( freezing, etc )
 #define GIB_ALWAYS			2// always gib
 
+// !!!set this bit on guns and stuff that should never respawn.
+#define	SF_NORESPAWN	( 1 << 20 )	//1 << 30
+
 class CAI_BaseNPC;
 class CAI_ScriptedSequence;
 class CSound;

@@ -9,7 +9,7 @@
 #include "ai_behavior_fear.h"
 #include "ai_hint.h"
 #include "ai_navigator.h"
-//#include "ai_playerally.h"
+//#include "ai_basetalker.h"
 #include "ai_speech.h"
 #include "ai_senses.h"
 #include "ai_memory.h"
@@ -429,7 +429,7 @@ void CAI_FearBehavior::BuildScheduleTestBits()
 		// If I like the player, keep close to him
 		if ( m_bPlayerIsAlly )
 		{
-			if( !IsCurSchedule(SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY, false) && !IsCurSchedule(SCHED_FEAR_MOVE_TO_SAFE_PLACE, false) )
+			if( !IsCurSchedule(SCHED_FEAR_FLEE_TO_SAFE_PLACE, false) && !IsCurSchedule(SCHED_FEAR_MOVE_TO_SAFE_PLACE, false) )
 			{
 				GetOuter()->SetCustomInterruptCondition( GetClassScheduleIdSpace()->ConditionLocalToGlobal(COND_FEAR_SEPARATED_FROM_PLAYER) );
 			}
@@ -450,12 +450,12 @@ int CAI_FearBehavior::TranslateSchedule( int scheduleType )
 			// dont bother with the litesearch, just go straight to hauling ass.
 			// this stops an oscillation
 			// YES (sjb)
-			return SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY;
+			return SCHED_FEAR_FLEE_TO_SAFE_PLACE;
 		}
 		break;
 
 #if 0
-	case SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY:
+	case SCHED_FEAR_FLEE_TO_SAFE_PLACE:
 		// My enemy is breathing on me, fight back!
 		if( HasCondition(COND_FEAR_ENEMY_TOO_CLOSE) )
 		{
@@ -476,7 +476,6 @@ int CAI_FearBehavior::TranslateSchedule( int scheduleType )
 Activity CAI_FearBehavior::NPC_TranslateActivity( Activity activity )
 {
 	Activity fearactivity = ACT_INVALID;
-
 	switch ( activity )
 	{
 	case ACT_RUN:
@@ -495,10 +494,10 @@ Activity CAI_FearBehavior::NPC_TranslateActivity( Activity activity )
 		break;
 	}
 
-	if ( fearactivity != ACT_INVALID)
+	if ( fearactivity != ACT_INVALID )
 		return fearactivity;
-
-	return BaseClass::NPC_TranslateActivity( activity );
+	else
+		return BaseClass::NPC_TranslateActivity( activity );
 }
 
 //-----------------------------------------------------------------------------
@@ -551,7 +550,7 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER( CAI_FearBehavior )
 		SCHED_FEAR_MOVE_TO_SAFE_PLACE,
 
 		"	Tasks"
-		"		TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY"
+		"		TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FEAR_FLEE_TO_SAFE_PLACE"
 		"		TASK_FEAR_GET_PATH_TO_SAFETY_HINT	0"
 		"		TASK_RUN_PATH						0"
 		"		TASK_WAIT_FOR_MOVEMENT				0"
@@ -567,7 +566,7 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER( CAI_FearBehavior )
 
 	DEFINE_SCHEDULE
 	(
-		SCHED_FEAR_MOVE_TO_SAFE_PLACE_RETRY,
+		SCHED_FEAR_FLEE_TO_SAFE_PLACE,
 
 		"	Tasks"
 		"		TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_RUN_FROM_ENEMY"

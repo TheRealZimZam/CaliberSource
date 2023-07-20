@@ -31,6 +31,12 @@ inline CBasePlayer *AI_GetSinglePlayer()
 	return UTIL_GetLocalPlayer();
 }
 
+inline CBasePlayer *AI_GetNearestPlayer( Vector &vecOrigin )
+{
+	//!!! TODO
+	return NULL;
+}
+
 inline bool AI_IsSinglePlayer()
 {
 	return ( gpGlobals->maxClients == 1 );

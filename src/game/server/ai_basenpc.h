@@ -142,7 +142,7 @@ enum Interruptability_t
 #define SF_NPC_GAG						( 1 << 1  )	// no idle noises from this npc
 #define SF_NPC_FALL_TO_GROUND			( 1 << 2  )	// used my NPC_Maker
 #define SF_NPC_DROP_HEALTHKIT			( 1 << 3  )	// Drop a healthkit upon death
-#define SF_NPC_START_EFFICIENT			( 1 << 4  ) // Set into efficiency mode from spawn
+#define SF_NPC_START_EFFICIENT			( 1 << 4  ) // Set into efficiency mode from spawn	//SF_MONSTER_PRISONER
 //										( 1 << 5  )
 //										( 1 << 6  )
 #define SF_NPC_WAIT_FOR_SCRIPT			( 1 << 7  )	// spawnflag that makes npcs wait to check for attacking until the script is done or they've been attacked
@@ -2086,9 +2086,9 @@ public:
 	float				m_LastShootAccuracy;
 	int 				m_TotalShots;
 	int					m_TotalHits;
-#ifdef _DEBUG
+//#ifdef _DEBUG
 	bool				m_bSelected;
-#endif
+//#endif
 
 	float				m_flSoundWaitTime;	// Time when I'm allowed to make another sound
 	int					m_nSoundPriority;

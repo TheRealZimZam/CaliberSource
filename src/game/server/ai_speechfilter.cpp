@@ -8,7 +8,7 @@
 #include "cbase.h"
 #include "ai_speechfilter.h"
 #ifndef CSTRIKE
-#include "ai_playerally.h"
+#include "ai_basetalker.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -100,7 +100,7 @@ void CAI_SpeechFilter::PopulateSubjectList( bool purge )
 		if ( pSearch )
 		{
 #ifndef CSTRIKE_DLL
-			CAI_PlayerAlly *pAlly = dynamic_cast<CAI_PlayerAlly *>(pSearch);
+			CAI_BaseTalker *pAlly = dynamic_cast<CAI_BaseTalker *>(pSearch);
 			if ( pAlly )
 			{
 				if( purge )
@@ -135,7 +135,7 @@ void CAI_SpeechFilter::PopulateSubjectList( bool purge )
 			if( pSearch )
 			{
 #ifndef CSTRIKE_DLL
-				CAI_PlayerAlly *pAlly = dynamic_cast<CAI_PlayerAlly *>(pSearch);
+				CAI_BaseTalker *pAlly = dynamic_cast<CAI_BaseTalker *>(pSearch);
 				if ( pAlly )
 				{
 					if( purge )
@@ -178,7 +178,7 @@ void CAI_SpeechFilter::OnEntityCreated( CBaseEntity *pEntity )
 	if ( !m_bDisabled && pEntity->NameMatches( m_iszSubject ) || pEntity->ClassMatches( m_iszSubject ) )
 	{
 #ifndef CSTRIKE_DLL
-		CAI_PlayerAlly *pAlly = dynamic_cast<CAI_PlayerAlly *>(pEntity);
+		CAI_BaseTalker *pAlly = dynamic_cast<CAI_BaseTalker *>(pEntity);
 		if ( pAlly )
 		{
 			pAlly->SetSpeechFilter( this );

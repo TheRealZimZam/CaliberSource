@@ -12,7 +12,7 @@
 #include "ai_navigator.h"
 #include "ai_speech.h"
 #include "ai_senses.h"
-#include "ai_playerally.h"
+#include "ai_basetalker.h"
 #include "ai_route.h"
 #include "ai_pathfinder.h"
 #include "sceneentity.h"
@@ -146,7 +146,7 @@ bool CAI_LeadBehavior::IsNavigationUrgent( void )
 void CAI_LeadBehavior::LeadPlayer( const AI_LeadArgs_t &leadArgs, CAI_LeadBehaviorHandler *pSink )
 {
 #ifndef CSTRIKE_DLL
-	CAI_PlayerAlly *pOuter = dynamic_cast<CAI_PlayerAlly*>(GetOuter());
+	CAI_BaseTalker *pOuter = dynamic_cast<CAI_BaseTalker*>(GetOuter());
 	if ( pOuter && AI_IsSinglePlayer() )
 	{
 		pOuter->SetSpeechTarget( UTIL_GetLocalPlayer() );
@@ -1015,7 +1015,7 @@ bool CAI_LeadBehavior::Speak( AIConcept_t concept )
 		// If we're a player ally, only speak the concept if we're allowed to.
 		// This allows the response rules to control it better (i.e. handles respeakdelay)
 		// We ignore nag timers for this, because the response rules will control refire rates.
-		CAI_PlayerAlly *pAlly = dynamic_cast<CAI_PlayerAlly*>(GetOuter());
+		CAI_BaseTalker *pAlly = dynamic_cast<CAI_BaseTalker*>(GetOuter());
 		if ( pAlly )
  			return pAlly->SpeakIfAllowed( concept, GetConceptModifiers( concept ) );
 	}

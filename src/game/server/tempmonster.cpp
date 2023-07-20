@@ -9,12 +9,12 @@
 // NPC template
 //=========================================================
 #include "cbase.h"
+#include "ai_basenpc.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 #if 0
-
 //=========================================================
 // NPC's Anim Events Go Here
 //=========================================================

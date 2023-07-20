@@ -311,8 +311,12 @@ void ClientPrecache( void )
 	CBaseEntity::PrecacheModel( "sprites/blueglow1.vmt" );	
 	CBaseEntity::PrecacheModel( "sprites/purpleglow1.vmt" );	
 	CBaseEntity::PrecacheModel( "sprites/purplelaser1.vmt" );	
-	
+
+	CBaseEntity::PrecacheScriptSound( "SprayCan.Paint" );
 	CBaseEntity::PrecacheScriptSound( "Hud.Hint" );
+	CBaseEntity::PrecacheScriptSound( "Player.Death" );
+	CBaseEntity::PrecacheScriptSound( "Player.Pain" );
+	CBaseEntity::PrecacheScriptSound( "Player.Gib" );
 	CBaseEntity::PrecacheScriptSound( "Player.FallDamage" );
 	CBaseEntity::PrecacheScriptSound( "Player.Swim" );
 
@@ -320,6 +324,7 @@ void ClientPrecache( void )
 	CBaseEntity::PrecacheScriptSound( "Player.PickupWeapon" );
 	CBaseEntity::PrecacheScriptSound( "Player.DenyWeaponSelection" );
 	CBaseEntity::PrecacheScriptSound( "Player.WeaponSelected" );
+	CBaseEntity::PrecacheScriptSound( "Player.WeaponSelectionOpen" );
 	CBaseEntity::PrecacheScriptSound( "Player.WeaponSelectionClose" );
 	CBaseEntity::PrecacheScriptSound( "Player.WeaponSelectionMoveSlot" );
 

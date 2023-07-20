@@ -885,7 +885,7 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 	Activity	deathActivity;
 	float		flDot;
 	trace_t		tr;
-	Vector		vecSrc;
+	Vector		vecSrc = WorldSpaceCenter();
 
 #ifdef HL2MP
 	if (IsPlayer())
@@ -900,8 +900,6 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 		}
 	}
 #endif
-
-	vecSrc = WorldSpaceCenter();
 
 	deathActivity = ACT_DIESIMPLE;// in case we can't find any special deaths to do.
 
@@ -935,6 +933,7 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 			deathActivity = ACT_DIEBACKWARD;
 		}
 
+		// Blasted with a shotgun, but i havent been gibbed, do a flip-flop
 		if ( m_iHealth < GIB_HEALTH_VALUE )
 		{
 			if ( IsPlayer() || random->RandomInt(0,3) == 3 )
@@ -944,7 +943,6 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 		}
 		break;
 	}
-
 
 	// can we perform the prescribed death?
 	if ( SelectWeightedSequence ( deathActivity ) == ACTIVITY_NOT_AVAILABLE )
@@ -966,8 +964,7 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 				deathActivity = ACT_DIESIMPLE;
 			}
 	}
-
-	if ( deathActivity == ACT_DIEBACKWARD )
+	else if ( deathActivity == ACT_DIEBACKWARD )
 	{
 			// make sure there's room to fall backward
 			UTIL_TraceHull ( vecSrc, vecSrc - forward * 64, Vector(-16,-16,-18), 

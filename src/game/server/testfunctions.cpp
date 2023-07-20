@@ -52,7 +52,9 @@ void Test_RandomPlayerPosition()
 	vecOrigin.x = RandomFloat( vMin.x, vMax.x );
 	vecOrigin.y = RandomFloat( vMin.y, vMax.y );
 	vecOrigin.z = RandomFloat( vMin.z, vMax.z );
-	pPlayer->ForceOrigin( vecOrigin );
+
+//	pPlayer->ForceOrigin( vecOrigin );
+	pPlayer->SetLocalOrigin( vecOrigin );
 }
 
 

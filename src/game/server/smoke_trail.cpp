@@ -465,7 +465,7 @@ IMPLEMENT_SERVERCLASS_ST( CFireTrail, DT_FireTrail )
 	SendPropFloat( SENDINFO( m_flLifetime ), 0, SPROP_NOSCALE ),
 END_SEND_TABLE()
 
-LINK_ENTITY_TO_CLASS( env_fire_trail, CFireTrail );
+LINK_ENTITY_TO_CLASS( env_firetrail, CFireTrail );
 
 void CFireTrail::Precache( void )
 {
@@ -503,7 +503,7 @@ void CFireTrail::FollowEntity( CBaseEntity *pEntity, const char *pAttachmentName
 //-----------------------------------------------------------------------------
 CFireTrail *CFireTrail::CreateFireTrail( void )
 {
-	CBaseEntity *pEnt = CreateEntityByName( "env_fire_trail" );
+	CBaseEntity *pEnt = CreateEntityByName( "env_firetrail" );
 	
 	if ( pEnt )
 	{

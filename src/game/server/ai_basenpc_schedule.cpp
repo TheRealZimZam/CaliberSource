@@ -2678,11 +2678,9 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 			if ( SelectWeightedSequence( ACT_STRAFE_RIGHT ) != ACTIVITY_NOT_AVAILABLE )
 			{
 				if ( DotProduct2D ( vec2DirToPoint, vec2RightSide ) > 0 )
-					// strafe right
-					GetNavigator()->SetMovementActivity(ACT_STRAFE_RIGHT);
+					GetNavigator()->SetMovementActivity(ACT_STRAFE_RIGHT);	// strafe right
 				else
-					// strafe left
-					GetNavigator()->SetMovementActivity(ACT_STRAFE_LEFT);
+					GetNavigator()->SetMovementActivity(ACT_STRAFE_LEFT);	// strafe left
 			}
 			else
 			{

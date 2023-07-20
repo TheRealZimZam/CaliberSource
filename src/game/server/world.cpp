@@ -420,12 +420,11 @@ bool CWorld::KeyValue( const char *szKeyName, const char *szValue )
 		ConVarRef skyname( "sv_skyname" );
 		skyname.SetValue( szValue );
 	}
-/*
 	else if ( FStrEq(szKeyName, "sounds") )
 	{
-		gpGlobals->cdAudioTrack = atoi(szValue);
+		//gpGlobals->cdAudioTrack = atoi(szValue);
+		//TODO; Create a CTriggerCDAudio
 	}
-*/
 	else if ( FStrEq(szKeyName, "WaveHeight") )
 	{
 		// Sent over net now.
@@ -576,10 +575,17 @@ static const char *g_DefaultLightstyles[] =
 	"mmamammmmammamamaaamammma",
 	// 11 SLOW PULSE NOT FADE TO BLACK
 	"abcdefghijklmnopqrrqponmlkjihgfedcba",
+#ifdef HL2_DLL	//CALIBER
 	// 12 UNDERWATER LIGHT MUTATION
-	// this light only distorts the lightmap - no contribution
-	// is made to the brightness of affected surfaces
+	"mmnnmmlllmmnn",
+	// 13 DISCO
+	"aaaaaazzzzzzmmmmmmzzzzzz",
+	// 14 WARPSPEED
+	"abcdefghijklmnopqrstuvwwnniiiiddddddzzzzzzzzxxkkbaaaaa",
+#else
+	// 12 UNDERWATER LIGHT MUTATION
 	"mmnnmmnnnmmnn",
+#endif
 };
 
 
@@ -655,13 +661,9 @@ void CWorld::Precache( void )
 	g_Language.SetValue( LANGUAGE_ENGLISH );	// TODO use VGUI to get current language
 
 	if ( g_Language.GetInt() == LANGUAGE_GERMAN )
-	{
 		PrecacheModel( "models/germangibs.mdl" );
-	}
 	else
-	{
 		PrecacheModel( "models/gibs/hgibs.mdl" );
-	}
 
 	PrecacheScriptSound( "BaseEntity.EnterWater" );
 	PrecacheScriptSound( "BaseEntity.ExitWater" );

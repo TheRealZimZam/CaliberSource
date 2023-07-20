@@ -3500,6 +3500,71 @@ void CTriggerCDAudio::PlayTrack( void )
 }
 
 
+#ifdef HL1_DLL
+// This plays a CD track when fired or when the player enters it's radius
+class CTargetCDAudio : public CPointEntity
+{
+public:
+	void			Spawn( void );
+	void			KeyValue( const char *szKeyName, const char *szValue );
+
+	virtual void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void			Think( void );
+	void			Play( void );
+};
+
+LINK_ENTITY_TO_CLASS( target_cdaudio, CTargetCDAudio );
+
+void CTargetCDAudio::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if (FStrEq(szKeyName, "radius"))
+	{
+		pev->scale = atof(szValue);
+	//	pkvd->fHandled = TRUE;
+	}
+	else
+		return BaseClass::KeyValue( szKeyName, szValue );
+}
+
+void CTargetCDAudio :: Spawn( void )
+{
+	SetSolid( SOLID_NONE );
+	SetMoveType( MOVETYPE_NONE );
+
+	if ( pev->scale > 0 )
+		SetNextThink( gpGlobals->curtime + 1.0f );
+}
+
+void CTargetCDAudio::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	Play();
+}
+
+// only plays for ONE client, so only use in single play!
+void CTargetCDAudio::Think( void )
+{
+	edict_t *pClient;
+	
+	// manually find the single player. 
+	pClient = engine->PEntityOfEntIndex( 1 );
+
+	// Can't play if the client is not connected!
+	if ( !pClient )
+		return;
+	
+	SetNextThink( gpGlobals->curtime + 0.5f );
+
+	if ( (pClient->v.origin - pev->origin).Length() <= pev->scale )
+		Play();
+}
+
+void CTargetCDAudio::Play( void ) 
+{ 
+	PlayCDTrack( (int)m_iHealth );
+	UTIL_Remove(this); 
+}
+#endif
+
 //-----------------------------------------------------------------------------
 // Purpose: Measures the proximity to a specified entity of any entities within
 //			the trigger, provided they are within a given radius of the specified

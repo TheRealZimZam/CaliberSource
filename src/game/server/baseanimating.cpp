@@ -634,6 +634,31 @@ void CBaseAnimating::ResetEventIndexes ( void )
 	::ResetEventIndexes( GetModelPtr() );
 }
 
+void CBaseAnimating::ResetSequence(int nSequence)
+{
+	if (ai_sequence_debug.GetBool() == true && (m_debugOverlays & OVERLAY_NPC_SELECTED_BIT))
+	{
+		DevMsg("ResetSequence : %s: %s -> %s\n", GetClassname(), GetSequenceName(GetSequence()), GetSequenceName(nSequence));
+	}
+	
+	if ( !SequenceLoops() )
+	{
+		SetCycle( 0 );
+	}
+
+	// Tracker 17868:  If the sequence number didn't actually change, but you call resetsequence info, it changes
+	//  the newsequenceparity bit which causes the client to call m_flCycle.Reset() which causes a very slight 
+	//  discontinuity in looping animations as they reset around to cycle 0.0.  This was causing the parentattached
+	//  helmet on barney to hitch every time barney's idle cycled back around to its start.
+	bool changed = nSequence != GetSequence() ? true : false;
+
+	SetSequence( nSequence );
+	if ( changed || !SequenceLoops() )
+	{
+		ResetSequenceInfo();
+	}
+}
+
 //=========================================================
 // LookupHeaviestSequence
 //
@@ -846,6 +871,11 @@ bool CBaseAnimating::CanBecomeRagdoll( void )
 		 return false;
 
 	return true;
+}
+
+void CBaseAnimating::InputBecomeRagdoll( inputdata_t &inputdata )
+{
+	BecomeRagdollOnClient( vec3_origin );
 }
 
 //=========================================================
@@ -3451,32 +3481,6 @@ void CBaseAnimating::Scorch( int rate, int floor )
 	SetRenderColor( color.r, color.g, color.b );
 }
 
-
-void CBaseAnimating::ResetSequence(int nSequence)
-{
-	if (ai_sequence_debug.GetBool() == true && (m_debugOverlays & OVERLAY_NPC_SELECTED_BIT))
-	{
-		DevMsg("ResetSequence : %s: %s -> %s\n", GetClassname(), GetSequenceName(GetSequence()), GetSequenceName(nSequence));
-	}
-	
-	if ( !SequenceLoops() )
-	{
-		SetCycle( 0 );
-	}
-
-	// Tracker 17868:  If the sequence number didn't actually change, but you call resetsequence info, it changes
-	//  the newsequenceparity bit which causes the client to call m_flCycle.Reset() which causes a very slight 
-	//  discontinuity in looping animations as they reset around to cycle 0.0.  This was causing the parentattached
-	//  helmet on barney to hitch every time barney's idle cycled back around to its start.
-	bool changed = nSequence != GetSequence() ? true : false;
-
-	SetSequence( nSequence );
-	if ( changed || !SequenceLoops() )
-	{
-		ResetSequenceInfo();
-	}
-}
-
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 void CBaseAnimating::InputIgnite( inputdata_t &inputdata )
@@ -3499,9 +3503,227 @@ void CBaseAnimating::InputIgniteHitboxFireScale( inputdata_t &inputdata )
 	IgniteHitboxFireScale( inputdata.value.Float() );
 }
 
-void CBaseAnimating::InputBecomeRagdoll( inputdata_t &inputdata )
+//-----------------------------------------------------------------------------
+// Freezing
+//-----------------------------------------------------------------------------
+void CBaseAnimating::Thaw( float flThawAmount )
 {
-	BecomeRagdollOnClient( vec3_origin );
+#if defined( HL2_EP3 ) || defined( INFESTED_DLL )
+	if ( m_flFrozen <= 0.0f )
+		return;
+
+	bool bWasFrozen = IsFrozen();
+
+	CEntityFreezing *pFreezing = NULL;
+
+	if ( ( GetFlags() & FL_FREEZING ) != 0 )
+	{
+		// Get the freezing effect
+		pFreezing = dynamic_cast<CEntityFreezing*>( GetEffectEntity() );
+	}
+
+	float fTotalFrozen = 0.0f;
+
+	if ( pFreezing )
+	{
+		studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel( GetModel() );
+		if ( pStudioHdr )
+		{
+			// Thaw all hitboxes
+			mstudiohitboxset_t *set = pStudioHdr->pHitboxSet( GetHitboxSet() );
+			if ( set && set->numhitboxes > 0 )
+			{
+				for ( int i = 0; i < set->numhitboxes; ++i )
+				{
+					pFreezing->m_flFrozenPerHitbox.GetForModify( i ) = MAX( 0.0f, pFreezing->m_flFrozenPerHitbox[ i ] - flThawAmount );
+				}
+
+				fTotalFrozen /= set->numhitboxes;
+			}
+		}
+	}
+
+	float flNewFrozen;
+
+	if ( fTotalFrozen )
+	{
+		// Total frozen amount from hitboxes
+		flNewFrozen = MAX( 0.0f, fTotalFrozen * 2.0f );
+	}
+	else
+	{
+		// Not hitboxes frozen, so do the thawing directly
+		flNewFrozen = MAX( 0.0f, m_flFrozen - flThawAmount );
+	}
+
+	m_flAttackFrozen = MIN( m_flAttackFrozen, flNewFrozen );
+	m_flMovementFrozen = MIN( m_flMovementFrozen, flNewFrozen );
+	m_flFrozen = flNewFrozen;
+
+	if ( bWasFrozen && !IsFrozen() )
+	{
+		// We're not in a frozen state anymore!
+		Unfreeze();
+	}
+
+	if ( pFreezing )
+	{
+		if ( m_flFrozen > 0.0f )
+		{
+			// Update our freezing effect
+			pFreezing->SetFrozen( m_flFrozen );
+		}
+		else
+		{
+			// Remove the freezing effect
+			UTIL_Remove( pFreezing );
+			SetEffectEntity( NULL );
+			RemoveFlag( FL_FREEZING );
+		}
+	}
+#endif
+}
+
+//-----------------------------------------------------------------------------
+// Debug function to make this base animating freeze in place (or unfreeze).
+//-----------------------------------------------------------------------------
+void CBaseAnimating::ToggleFreeze() 
+{
+	if ( !IsFrozen() )
+	{
+		Freeze();
+	}
+	else
+	{
+		Unfreeze();
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Freezes this NPC
+//-----------------------------------------------------------------------------
+void CBaseAnimating::Freeze( float flFreezeAmount, CBaseEntity *pFreezer, Ray_t *pFreezeRay ) 
+{
+#if defined( HL2_EP3 ) || defined( INFESTED_DLL )
+	if ( flFreezeAmount < 0 )
+	{
+		// This is a debugging freeze
+		m_flFrozen = 1.0f;
+		m_flFrozenThawRate = 0.0f;
+		return;
+	}
+
+	// Bail if it's not allowed to freeze
+	if ( m_flFrozenMax < 0.0f )
+		return;
+
+	CEntityFreezing *pFreezing = NULL;
+
+	if ( ( GetFlags() & FL_FREEZING ) != 0 )
+	{
+		pFreezing = dynamic_cast<CEntityFreezing*>( GetEffectEntity() );
+	}
+	else
+	{
+		pFreezing = CEntityFreezing::Create( this );
+		SetEffectEntity( pFreezing );
+		AddFlag( FL_FREEZING );
+	}
+	
+	if ( !pFreezing )
+	{
+		return;
+	}
+
+	float fMaxFrozen = ( m_flFrozenMax == 0.0f ) ? ( 1.0f ) : m_flFrozenMax;
+
+	if ( pFreezeRay )
+	{
+		float fTotalFrozen = 0.0f;
+		m_flMovementFrozen = 0.0f;
+		m_flAttackFrozen = 0.0f;
+
+		float flMidHeight = WorldSpaceCenter().z;
+
+		studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel( GetModel() );
+		if ( pStudioHdr )
+		{
+			// Freeze hitboxes that intersect this ray
+			mstudiohitboxset_t *set = pStudioHdr->pHitboxSet( GetHitboxSet() );
+			if ( set && set->numhitboxes > 0 )
+			{
+				for ( int i = 0; i < set->numhitboxes; ++i )
+				{
+					// Get the hitbox data
+					mstudiobbox_t *pBox = set->pHitbox(i);
+
+					Vector vecPosition;
+					QAngle angAngles;
+					GetBonePosition( pBox->bone, vecPosition, angAngles );
+
+					trace_t tr;
+					if ( IntersectRayWithOBB( *pFreezeRay, vecPosition, angAngles, pBox->bbmin * GetModelHierarchyScale(), pBox->bbmax * GetModelHierarchyScale(), 0.0f, &tr ) )
+					{
+						// Ice ray intersected this bounding box
+						pFreezing->m_flFrozenPerHitbox.GetForModify( i ) = MIN( 1.0f, pFreezing->m_flFrozenPerHitbox[ i ] + flFreezeAmount );
+					}
+
+					fTotalFrozen += pFreezing->m_flFrozenPerHitbox[ i ];
+
+					// If it's above their middle prevent attacking otherwise prevent movement
+					if ( vecPosition.z > flMidHeight )
+					{
+						m_flAttackFrozen += pFreezing->m_flFrozenPerHitbox[ i ];
+					}
+					else
+					{
+						m_flMovementFrozen += pFreezing->m_flFrozenPerHitbox[ i ];
+					}
+				}
+
+				fTotalFrozen /= set->numhitboxes;
+				m_flMovementFrozen /= set->numhitboxes;
+				m_flAttackFrozen /= set->numhitboxes;
+			}
+		}
+
+		m_flFrozen = MIN( fMaxFrozen, fTotalFrozen * 3.0f );
+		m_flMovementFrozen = MIN( m_flFrozen, m_flMovementFrozen * 3.0f );
+		m_flAttackFrozen = MIN( m_flFrozen, m_flAttackFrozen * 3.0f );
+	}
+	else
+	{
+		studiohdr_t *pStudioHdr = GetModel() ? modelinfo->GetStudiomodel( GetModel() ) : NULL;
+		if ( pStudioHdr )
+		{
+			// Freeze all hitboxes
+			mstudiohitboxset_t *set = pStudioHdr->pHitboxSet( GetHitboxSet() );
+			if ( set )
+			{
+				for ( int i = 0; i < set->numhitboxes; ++i )
+				{
+					pFreezing->m_flFrozenPerHitbox.GetForModify( i ) = MIN( 1.0f, pFreezing->m_flFrozenPerHitbox[ i ] + flFreezeAmount );
+				}
+			}
+		}
+
+		m_flFrozen = MIN( fMaxFrozen, m_flFrozen + flFreezeAmount );
+	}
+
+	pFreezing->SetFrozen( m_flFrozen );
+#endif
+}
+
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void CBaseAnimating::Unfreeze()
+{
+	if ( m_flFrozenThawRate < 0.0f )
+	{
+		// It's never going to thaw, so jump it back to zero
+		m_flFrozen = 0.0f;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -3533,4 +3755,15 @@ bool CBaseAnimating::PrefetchSequence( int iSequence )
 bool CBaseAnimating::IsSequenceLooping( CStudioHdr *pStudioHdr, int iSequence )
 {
 	return (::GetSequenceFlags( pStudioHdr, iSequence ) & STUDIO_LOOPING) != 0;
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CBaseAnimating::SpinThink( void )
+{
+	// Basic think function
+	//TODO; SPEEN!
+	SetNextThink( gpGlobals->curtime + 0.2f );
 }

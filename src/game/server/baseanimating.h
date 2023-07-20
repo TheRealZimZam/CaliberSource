@@ -60,6 +60,9 @@ public:
 
 	virtual CBaseAnimating*	GetBaseAnimating() { return this; }
 
+	// Basic think function
+	void SpinThink( void );
+
 	// Cycle access
 	void SetCycle( float flCycle );
 	float GetCycle() const;
@@ -129,6 +132,7 @@ public:
 	virtual bool BecomeRagdollOnClient( const Vector &force );
 	virtual bool IsRagdoll();
 	virtual bool CanBecomeRagdoll( void ); //Check if this entity will ragdoll when dead.
+	void InputBecomeRagdoll( inputdata_t &inputdata );
 
 	virtual	void GetSkeleton( CStudioHdr *pStudioHdr, Vector pos[], Quaternion q[], int boneMask );
 
@@ -295,7 +299,15 @@ public:
 	void InputIgniteLifetime( inputdata_t &inputdata );
 	void InputIgniteNumHitboxFires( inputdata_t &inputdata );
 	void InputIgniteHitboxFireScale( inputdata_t &inputdata );
-	void InputBecomeRagdoll( inputdata_t &inputdata );
+
+	// Ice
+	virtual bool	IsFrozen( void ) { return m_flFrozen >= 1.0f; }
+	float			GetFrozenAmount( void ) const { return m_flFrozen; }
+	float			GetFrozenThawRate( void ) { return m_flFrozenThawRate; }
+	void			Thaw( float flThawAmount );
+	void			ToggleFreeze(void);
+	virtual void	Freeze( float flFreezeAmount = -1.0f, CBaseEntity *pFreezer = NULL, Ray_t *pFreezeRay = NULL );
+	virtual void	Unfreeze();
 
 	// Dissolve, returns true if the ragdoll has been created
 	bool Dissolve( const char *pMaterialName, float flStartTime, bool bNPCOnly = true, int nDissolveType = 0, Vector vDissolverOrigin = vec3_origin, int iMagnitude = 0 );
@@ -405,6 +417,12 @@ private:
 	memhandle_t		m_boneCacheHandle;
 	unsigned short	m_fBoneCacheFlags;		// Used for bone cache state on model
 
+	CNetworkVar( float, m_flFrozen );		// 0 - 1 amount that the model is frozen
+	float				m_flMovementFrozen;	// How frozen are the movement parts
+	float				m_flAttackFrozen;	// How frozen are the attacking parts
+	float				m_flFrozenThawRate;	// amount it unfreezes per second
+	float				m_flFrozenMax;		// maximum amount this entitiy is allowed to freeze
+
 protected:
 	CNetworkVar( float, m_fadeMinDist );	// Point at which fading is absolute
 	CNetworkVar( float, m_fadeMaxDist );	// Point at which fading is inactive
@@ -466,7 +484,12 @@ inline void CBaseAnimating::ResetSequence(int nSequence)
 
 inline float CBaseAnimating::GetPlaybackRate()
 {
-	return m_flPlaybackRate;
+#if defined( PORTAL2 )
+	return m_flPlaybackRate * ( 1.0f / sqrt( GetModelScaleType() == HIERARCHICAL_MODEL_SCALE ? GetModelScale() : 1.0f ) );
+#endif // PORTAL2or INFESTED
+
+	// Slow the animation while partially frozen
+	return m_flPlaybackRate * clamp( 1.0f - m_flFrozen, 0.0f, 1.0f );
 }
 
 inline void CBaseAnimating::SetPlaybackRate( float rate )

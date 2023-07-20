@@ -5,7 +5,7 @@
 //=============================================================================
 
 #include "cbase.h"
-#include "ai_playerally.h"
+#include "ai_basetalker.h"
 #include "ai_motor.h"
 #include "bone_setup.h"
 #include "vehicle_base.h"
@@ -1557,7 +1557,7 @@ void CAI_PassengerBehavior::SetTransitionSequence( int nSequence )
 bool CAI_PassengerBehavior::SpeakIfAllowed( AIConcept_t concept, const char *modifiers /*= NULL*/, bool bRespondingToPlayer /*= false*/, char *pszOutResponseChosen /*= NULL*/, size_t bufsize /*= 0*/ )
 {
 	// FIXME: Store this cast off?
-	CAI_PlayerAlly *pAlly = dynamic_cast<CAI_PlayerAlly *>(GetOuter());
+	CAI_BaseTalker *pAlly = dynamic_cast<CAI_BaseTalker *>(GetOuter());
 	if ( pAlly != NULL )
 		return pAlly->SpeakIfAllowed( concept, modifiers, bRespondingToPlayer, pszOutResponseChosen, bufsize );
 

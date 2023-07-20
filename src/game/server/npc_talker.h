@@ -31,7 +31,7 @@
 #include "minmax.h"
 #endif
 
-#include "ai_playerally.h"
+#include "ai_basetalker.h"
 
 #include "soundflags.h"
 
@@ -54,20 +54,20 @@
 #define TLK_CFRIENDS		4
 
 //=============================================================================
-// >> CNPCSimpleTalker
+// >> CNPC_SimpleTalker
 //=============================================================================
 
 #define MONOLOGNAME_LEN	16				// sentence names passed as monolog may be no longer than this.
 #define AI_SP_START_MONOLOG 	'~'
 #define AI_SP_MONOLOG_LINE  	'@'
 
-class CNPCSimpleTalker;
+class CNPC_SimpleTalker;
 
-class CNPCSimpleTalkerExpresser : public CAI_ComponentWithOuter<CNPCSimpleTalker, CAI_Expresser>
+class CNPC_SimpleTalkerExpresser : public CAI_ComponentWithOuter<CNPC_SimpleTalker, CAI_Expresser>
 {
 public:
-	CNPCSimpleTalkerExpresser( CNPCSimpleTalker *pOuter )
-		: CAI_ComponentWithOuter<CNPCSimpleTalker, CAI_Expresser>( pOuter )
+	CNPC_SimpleTalkerExpresser( CNPC_SimpleTalker *pOuter )
+		: CAI_ComponentWithOuter<CNPC_SimpleTalker, CAI_Expresser>( pOuter )
 	{
 		EndMonolog();
 	}
@@ -103,14 +103,14 @@ public:
 
 //-------------------------------------
 
-class CNPCSimpleTalker : public CAI_PlayerAlly
+class CNPC_SimpleTalker : public CAI_BaseTalker
 {
-	DECLARE_CLASS( CNPCSimpleTalker, CAI_PlayerAlly );
+	DECLARE_CLASS( CNPC_SimpleTalker, CAI_BaseTalker );
 public:
 	void			Precache( void );
 	virtual bool	KeyValue( const char *szKeyName, const char *szValue );
 
-	virtual CAI_Expresser *CreateExpresser() { return new CNPCSimpleTalkerExpresser(this); }
+	virtual CAI_Expresser *CreateExpresser() { return new CNPC_SimpleTalkerExpresser(this); }
 	
 //	virtual void			StartFollowing( CBaseEntity *pLeader ) { m_FollowBehavior.SetFollowTarget( pLeader ); DeferSchedulingToBehavior( &m_FollowBehavior ); }
 	virtual void			StartFollowing( CBaseEntity *pLeader );
@@ -219,7 +219,7 @@ public:
 	bool			SpeakAnswerFriend( CBaseEntity *pFriend );
 	void			TrySmellTalk( void );
 
-	virtual void	SetAnswerQuestion( CNPCSimpleTalker *pSpeaker );
+	virtual void	SetAnswerQuestion( CNPC_SimpleTalker *pSpeaker );
 	
 	bool ShouldSuspendMonolog( void );
 	bool ShouldResumeMonolog( void );

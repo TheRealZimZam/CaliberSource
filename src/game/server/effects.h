@@ -64,5 +64,24 @@ private:
 };
 CEnvQuadraticBeam *CreateQuadraticBeam( const char *pSpriteName, const Vector &start, const Vector &control, const Vector &end, float width, CBaseEntity *pOwner );
 
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+class CPhysicsWire : public CBaseEntity
+{
+public:
+	DECLARE_CLASS( CPhysicsWire, CBaseEntity );
+
+	void	Spawn( void );
+	void	Precache( void );
+
+	DECLARE_DATADESC();
+
+protected:
+
+	bool SetupPhysics( void );
+
+	int		m_nDensity;
+};
 
 #endif // EFFECTS_H

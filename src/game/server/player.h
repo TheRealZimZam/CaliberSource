@@ -86,9 +86,6 @@ class CAI_Expresser;
 // for step sounds
 struct surfacedata_t;
 
-// !!!set this bit on guns and stuff that should never respawn.
-#define	SF_NORESPAWN	( 1 << 30 )
-
 //
 // Player PHYSICS FLAGS bits
 //
@@ -412,6 +409,7 @@ public:
 	virtual bool			Weapon_ShouldSelectItem( CBaseCombatWeapon *pWeapon );
 	void					Weapon_DropSlot( int weaponSlot );
 	CBaseCombatWeapon		*Weapon_GetLast( void ) { return m_hLastWeapon.Get(); }
+	virtual bool			BumpWeapon( CBaseCombatWeapon *pWeapon );
 
 	bool					HasAnyAmmoOfType( int nAmmoIndex );
 
@@ -496,7 +494,6 @@ public:
 	
 	void					AddPoints( int score, bool bAllowNegativeScore );
 	void					AddPointsToTeam( int score, bool bAllowNegativeScore );
-	virtual bool			BumpWeapon( CBaseCombatWeapon *pWeapon );
 	bool					RemovePlayerItem( CBaseCombatWeapon *pItem );
 	CBaseEntity				*HasNamedPlayerItem( const char *pszItemName );
 	bool 					HasWeapons( void );// do I have ANY weapons?
@@ -695,9 +692,6 @@ public:
 	// Suicide...
 	virtual void CommitSuicide( bool bExplode = false, bool bForce = false );
 	virtual void CommitSuicide( const Vector &vecForce, bool bExplode = false, bool bForce = false );
-
-	// For debugging...
-	void	ForceOrigin( const Vector &vecOrigin );
 
 	// Bot accessors...
 	void	SetTimeBase( float flTimeBase );
@@ -970,7 +964,7 @@ private:
 	float					m_flNextDecalTime;// next time this player can spray a decal
 
 	// Team Handling
-	// char					m_szTeamName[TEAM_NAME_LENGTH];
+	//char					m_szTeamName[TEAM_NAME_LENGTH];
 
 	// Multiplayer handling
 	PlayerConnectedState	m_iConnected;
@@ -1026,10 +1020,6 @@ public:
 	int						m_nNumCrateHudHints;
 
 private:
-
-	// Used in test code to teleport the player to random locations in the map.
-	Vector					m_vForcedOrigin;
-	bool					m_bForceOrigin;	
 
 	// Clients try to run on their own realtime clock, this is this client's clock
 	CNetworkVar( int, m_nTickBase );

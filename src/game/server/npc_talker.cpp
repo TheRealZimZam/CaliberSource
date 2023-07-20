@@ -16,7 +16,7 @@
 
 
 	
-BEGIN_SIMPLE_DATADESC( CNPCSimpleTalkerExpresser )
+BEGIN_SIMPLE_DATADESC( CNPC_SimpleTalkerExpresser )
 	//									m_pSink		(reconnected on load)
 	DEFINE_AUTO_ARRAY(	m_szMonologSentence,	FIELD_CHARACTER	),
 	DEFINE_FIELD(		m_iMonologIndex,		FIELD_INTEGER	),
@@ -24,7 +24,7 @@ BEGIN_SIMPLE_DATADESC( CNPCSimpleTalkerExpresser )
 	DEFINE_FIELD(		m_hMonologTalkTarget,	FIELD_EHANDLE	),
 END_DATADESC()
 
-BEGIN_DATADESC( CNPCSimpleTalker )
+BEGIN_DATADESC( CNPC_SimpleTalker )
 	DEFINE_FIELD( m_useTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flNextIdleSpeechTime, FIELD_TIME ),
 	DEFINE_FIELD( m_nSpeak, FIELD_INTEGER ),
@@ -37,7 +37,7 @@ BEGIN_DATADESC( CNPCSimpleTalker )
 END_DATADESC()
 
 // array of friend names
-char *CNPCSimpleTalker::m_szFriends[TLK_CFRIENDS] = 
+char *CNPC_SimpleTalker::m_szFriends[TLK_CFRIENDS] = 
 {
 	"NPC_barney",
 	"NPC_scientist",
@@ -45,7 +45,7 @@ char *CNPCSimpleTalker::m_szFriends[TLK_CFRIENDS] =
 	NULL,
 };
 
-bool CNPCSimpleTalker::KeyValue( const char *szKeyName, const char *szValue )
+bool CNPC_SimpleTalker::KeyValue( const char *szKeyName, const char *szValue )
 {
 	if (FStrEq(szKeyName, "UseSentence"))
 	{
@@ -61,7 +61,7 @@ bool CNPCSimpleTalker::KeyValue( const char *szKeyName, const char *szValue )
 	return true;
 }
 
-void CNPCSimpleTalker::Precache( void )
+void CNPC_SimpleTalker::Precache( void )
 {
 	// FIXME:  Need to figure out how to hook these...
 /*
@@ -78,7 +78,7 @@ void CNPCSimpleTalker::Precache( void )
 // Purpose: Allows for modification of the interrupt mask for the current schedule.
 //			In the most cases the base implementation should be called first.
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::BuildScheduleTestBits( void )
+void CNPC_SimpleTalker::BuildScheduleTestBits( void )
 {
 	BaseClass::BuildScheduleTestBits();
 
@@ -89,18 +89,18 @@ void CNPCSimpleTalker::BuildScheduleTestBits( void )
 	}
 }
 
-void CNPCSimpleTalker::PrescheduleThink( void )
+void CNPC_SimpleTalker::PrescheduleThink( void )
 {
 	BaseClass::PrescheduleThink();
 	
-	(assert_cast<CNPCSimpleTalkerExpresser *>(GetExpresser()))->SpeakMonolog();
+	(assert_cast<CNPC_SimpleTalkerExpresser *>(GetExpresser()))->SpeakMonolog();
 }
 
-bool CNPCSimpleTalker::ShouldSuspendMonolog( void )
+bool CNPC_SimpleTalker::ShouldSuspendMonolog( void )
 {
 	float flDist;
 
-	flDist = ((assert_cast<CNPCSimpleTalkerExpresser *>(GetExpresser()))->GetMonologueTarget()->GetAbsOrigin() - GetAbsOrigin()).Length();
+	flDist = ((assert_cast<CNPC_SimpleTalkerExpresser *>(GetExpresser()))->GetMonologueTarget()->GetAbsOrigin() - GetAbsOrigin()).Length();
 	
 	if( flDist >= 384 )
 	{
@@ -110,13 +110,13 @@ bool CNPCSimpleTalker::ShouldSuspendMonolog( void )
 	return false;
 }
 
-bool CNPCSimpleTalker::ShouldResumeMonolog( void )
+bool CNPC_SimpleTalker::ShouldResumeMonolog( void )
 {
 	float flDist;
 
 	if( HasCondition( COND_SEE_PLAYER ) )
 	{
-		flDist = ((assert_cast<CNPCSimpleTalkerExpresser *>(GetExpresser()))->GetMonologueTarget()->GetAbsOrigin() - GetAbsOrigin()).Length();
+		flDist = ((assert_cast<CNPC_SimpleTalkerExpresser *>(GetExpresser()))->GetMonologueTarget()->GetAbsOrigin() - GetAbsOrigin()).Length();
 		
 		if( flDist <= 256 )
 		{
@@ -127,7 +127,7 @@ bool CNPCSimpleTalker::ShouldResumeMonolog( void )
 	return false;
 }
 
-int CNPCSimpleTalker::SelectSchedule( void )
+int CNPC_SimpleTalker::SelectSchedule( void )
 {
 	if ( !HasCondition(COND_RECEIVED_ORDERS) )
 	{
@@ -147,7 +147,7 @@ int CNPCSimpleTalker::SelectSchedule( void )
 	return BaseClass::SelectSchedule();
 }
 
-void CNPCSimpleTalker::StartTask( const Task_t *pTask )
+void CNPC_SimpleTalker::StartTask( const Task_t *pTask )
 {
 	switch ( pTask->iTask )
 	{
@@ -218,7 +218,7 @@ void CNPCSimpleTalker::StartTask( const Task_t *pTask )
 	}
 }
 
-void CNPCSimpleTalker::RunTask( const Task_t *pTask )
+void CNPC_SimpleTalker::RunTask( const Task_t *pTask )
 {
 	switch( pTask->iTask )
 	{
@@ -281,7 +281,7 @@ void CNPCSimpleTalker::RunTask( const Task_t *pTask )
 // Output  :
 //------------------------------------------------------------------------------
 
-Activity CNPCSimpleTalker::NPC_TranslateActivity( Activity eNewActivity )
+Activity CNPC_SimpleTalker::NPC_TranslateActivity( Activity eNewActivity )
 {
 	if ((eNewActivity == ACT_IDLE)										&& 
 		(GetExpresser()->IsSpeaking())										&&
@@ -298,7 +298,7 @@ Activity CNPCSimpleTalker::NPC_TranslateActivity( Activity eNewActivity )
 }
 
 
-void CNPCSimpleTalker::Event_Killed( const CTakeDamageInfo &info )
+void CNPC_SimpleTalker::Event_Killed( const CTakeDamageInfo &info )
 {
 #ifdef HL1_DLL
 	AlertFriends( info.GetAttacker() );
@@ -313,7 +313,7 @@ void CNPCSimpleTalker::Event_Killed( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-CBaseEntity	*CNPCSimpleTalker::EnumFriends( CBaseEntity *pPrevious, int listNumber, bool bTrace )
+CBaseEntity	*CNPC_SimpleTalker::EnumFriends( CBaseEntity *pPrevious, int listNumber, bool bTrace )
 {
 	CBaseEntity *pFriend = pPrevious;
 	char *pszFriend;
@@ -351,7 +351,7 @@ CBaseEntity	*CNPCSimpleTalker::EnumFriends( CBaseEntity *pPrevious, int listNumb
 // Purpose: 
 // Input  : *pKiller - 
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::AlertFriends( CBaseEntity *pKiller )
+void CNPC_SimpleTalker::AlertFriends( CBaseEntity *pKiller )
 {
 	CBaseEntity *pFriend = NULL;
 	int i;
@@ -367,7 +367,7 @@ void CNPCSimpleTalker::AlertFriends( CBaseEntity *pKiller )
 				// If a client killed me, make everyone else mad/afraid of him
 				if ( pKiller->GetFlags() & FL_CLIENT )
 				{
-					CNPCSimpleTalker*pTalkNPC = (CNPCSimpleTalker *)pFriend;
+					CNPC_SimpleTalker*pTalkNPC = (CNPC_SimpleTalker *)pFriend;
 
 #if 0
 					if (pTalkNPC && pTalkNPC->IsOkToCombatSpeak())
@@ -384,7 +384,7 @@ void CNPCSimpleTalker::AlertFriends( CBaseEntity *pKiller )
 					if( IRelationType(pKiller) == D_HT)
 					{
 						// Killed by an enemy!!!
-						CNPCSimpleTalker *pAlly = (CNPCSimpleTalker *)pNPC;
+						CNPC_SimpleTalker *pAlly = (CNPC_SimpleTalker *)pNPC;
 						
 						if( pAlly && pAlly->GetExpresser()->CanSpeakConcept( TLK_ALLY_KILLED ) )
 						{
@@ -400,7 +400,7 @@ void CNPCSimpleTalker::AlertFriends( CBaseEntity *pKiller )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::ShutUpFriends( void )
+void CNPC_SimpleTalker::ShutUpFriends( void )
 {
 	CBaseEntity *pFriend = NULL;
 	int i;
@@ -422,7 +422,7 @@ void CNPCSimpleTalker::ShutUpFriends( void )
 
 // UNDONE: Keep a follow time in each follower, make a list of followers in this function and do LRU
 // UNDONE: Check this in Restore to keep restored NPCs from joining a full list of followers
-void CNPCSimpleTalker::LimitFollowers( CBaseEntity *pPlayer, int maxFollowers )
+void CNPC_SimpleTalker::LimitFollowers( CBaseEntity *pPlayer, int maxFollowers )
 {
 	CBaseEntity *pFriend = NULL;
 	int i, count;
@@ -434,13 +434,13 @@ void CNPCSimpleTalker::LimitFollowers( CBaseEntity *pPlayer, int maxFollowers )
 		while ((pFriend = EnumFriends( pFriend, i, false )) != NULL)
 		{
 			CAI_BaseNPC *pNPC = pFriend->MyNPCPointer();
-			CNPCSimpleTalker *pTalker;
+			CNPC_SimpleTalker *pTalker;
 			if ( pNPC )
 			{
 				if ( pNPC->GetTarget() == pPlayer )
 				{
 					count++;
-					if ( count > maxFollowers && (pTalker = dynamic_cast<CNPCSimpleTalker *>( pNPC ) ) != NULL )
+					if ( count > maxFollowers && (pTalker = dynamic_cast<CNPC_SimpleTalker *>( pNPC ) ) != NULL )
 						pTalker->StopFollowing();
 				}
 			}
@@ -452,7 +452,7 @@ void CNPCSimpleTalker::LimitFollowers( CBaseEntity *pPlayer, int maxFollowers )
 // HandleAnimEvent - catches the NPC-specific messages
 // that occur when tagged animation frames are played.
 //=========================================================
-void CNPCSimpleTalker::HandleAnimEvent( animevent_t *pEvent )
+void CNPC_SimpleTalker::HandleAnimEvent( animevent_t *pEvent )
 {
 	switch( pEvent->event )
 	{		
@@ -475,12 +475,12 @@ void CNPCSimpleTalker::HandleAnimEvent( animevent_t *pEvent )
 //-----------------------------------------------------------------------------
 // Purpose: Scan for nearest, visible friend. If fPlayer is true, look for nearest player
 //-----------------------------------------------------------------------------
-bool CNPCSimpleTalker::IsValidSpeechTarget( int flags, CBaseEntity *pEntity )
+bool CNPC_SimpleTalker::IsValidSpeechTarget( int flags, CBaseEntity *pEntity )
 {
 	return BaseClass::IsValidSpeechTarget( flags, pEntity );
 }
 
-CBaseEntity *CNPCSimpleTalker::FindNearestFriend(bool fPlayer)
+CBaseEntity *CNPC_SimpleTalker::FindNearestFriend(bool fPlayer)
 {
 	return FindSpeechTarget( (fPlayer) ? AIST_PLAYERS : AIST_NPCS );
 }
@@ -489,7 +489,7 @@ CBaseEntity *CNPCSimpleTalker::FindNearestFriend(bool fPlayer)
 //-----------------------------------------------------------------------------
 // Purpose: Respond to a previous question
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::IdleRespond( void )
+void CNPC_SimpleTalker::IdleRespond( void )
 {
 	if (!IsOkToSpeak())
 		return;
@@ -500,7 +500,7 @@ void CNPCSimpleTalker::IdleRespond( void )
 	DeferAllIdleSpeech( random->RandomFloat( TALKER_DEFER_IDLE_SPEAK_MIN, TALKER_DEFER_IDLE_SPEAK_MAX ) );
 }
 
-bool CNPCSimpleTalker::IsOkToSpeak( void )
+bool CNPC_SimpleTalker::IsOkToSpeak( void )
 {
 	if ( m_flNextIdleSpeechTime > gpGlobals->curtime )
 		return false;
@@ -512,7 +512,7 @@ bool CNPCSimpleTalker::IsOkToSpeak( void )
 //-----------------------------------------------------------------------------
 // Purpose: Find a nearby friend to stare at
 //-----------------------------------------------------------------------------
-int CNPCSimpleTalker::FIdleStare( void )
+int CNPC_SimpleTalker::FIdleStare( void )
 {
 	// Don't idly speak if our speech filter is preventing us
 	if ( GetSpeechFilter() && GetSpeechFilter()->GetIdleModifier() == 0 )
@@ -528,7 +528,7 @@ int CNPCSimpleTalker::FIdleStare( void )
 // Purpose: Try to greet player first time he's seen
 // Output : int
 //-----------------------------------------------------------------------------
-int CNPCSimpleTalker::FIdleHello( void )
+int CNPC_SimpleTalker::FIdleHello( void )
 {
 	// Filter might be preventing us from ever greeting the player
 	if ( !CanSayHello() )
@@ -552,7 +552,7 @@ int CNPCSimpleTalker::FIdleHello( void )
 //-----------------------------------------------------------------------------
 // Purpose: Say hello to the specified player
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::SayHelloToPlayer( CBaseEntity *pPlayer )
+void CNPC_SimpleTalker::SayHelloToPlayer( CBaseEntity *pPlayer )
 {
 	Assert( !GetExpresser()->SpokeConcept(TLK_HELLO) );
 
@@ -562,10 +562,10 @@ void CNPCSimpleTalker::SayHelloToPlayer( CBaseEntity *pPlayer )
 	DeferAllIdleSpeech( random->RandomFloat( 5, 10 ) );
 
 	CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
-	CAI_PlayerAlly *pTalker;
+	CAI_BaseTalker *pTalker;
 	for ( int i = 0; i < g_AI_Manager.NumAIs(); i++ )
 	{
-		pTalker = dynamic_cast<CAI_PlayerAlly *>(ppAIs[i]);
+		pTalker = dynamic_cast<CAI_BaseTalker *>(ppAIs[i]);
 
 		if( pTalker && FVisible( pTalker ) )
 		{
@@ -581,11 +581,11 @@ void CNPCSimpleTalker::SayHelloToPlayer( CBaseEntity *pPlayer )
 // of time. Mostly filthy hack to hold us over until
 // acting comes online.
 //---------------------------------------------------------
-void CNPCSimpleTalker::DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore )
+void CNPC_SimpleTalker::DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore )
 {
 	// Brute force. Just plow through NPC list looking for talkers.
 	CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
-	CNPCSimpleTalker *pTalker;
+	CNPC_SimpleTalker *pTalker;
 
 	float flTime = gpGlobals->curtime + flDelay;
 
@@ -593,7 +593,7 @@ void CNPCSimpleTalker::DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore )
 	{
 		if( ppAIs[i] != pIgnore )
 		{
-			pTalker = dynamic_cast<CNPCSimpleTalker *>(ppAIs[i]);
+			pTalker = dynamic_cast<CNPC_SimpleTalker *>(ppAIs[i]);
 
 			if( pTalker )
 			{
@@ -609,7 +609,7 @@ void CNPCSimpleTalker::DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore )
 // FIdleSpeak
 // ask question of nearby friend, or make statement
 //=========================================================
-int CNPCSimpleTalker::FIdleSpeak( void )
+int CNPC_SimpleTalker::FIdleSpeak( void )
 { 
 	// try to start a conversation, or make statement
 	int pitch;
@@ -668,7 +668,7 @@ int CNPCSimpleTalker::FIdleSpeak( void )
 		if ( SpeakQuestionFriend( pFriend ) )
 		{
 			// force friend to answer
-			CAI_PlayerAlly *pTalkNPC = dynamic_cast<CAI_PlayerAlly *>(pFriend);
+			CAI_BaseTalker *pTalkNPC = dynamic_cast<CAI_BaseTalker *>(pFriend);
 			if (pTalkNPC && !pTalkNPC->HasSpawnFlags(SF_NPC_GAG) && !pTalkNPC->IsInAScript() )
 			{
 				SetSpeechTarget( pFriend );
@@ -723,7 +723,7 @@ int CNPCSimpleTalker::FIdleSpeak( void )
 //-----------------------------------------------------------------------------
 // Purpose: Speak the right question based upon who we're asking
 //-----------------------------------------------------------------------------
-bool CNPCSimpleTalker::SpeakQuestionFriend( CBaseEntity *pFriend )
+bool CNPC_SimpleTalker::SpeakQuestionFriend( CBaseEntity *pFriend )
 {
 	return Speak( TLK_QUESTION );
 }
@@ -731,7 +731,7 @@ bool CNPCSimpleTalker::SpeakQuestionFriend( CBaseEntity *pFriend )
 //-----------------------------------------------------------------------------
 // Purpose: Speak the right answer based upon who we're answering
 //-----------------------------------------------------------------------------
-bool CNPCSimpleTalker::SpeakAnswerFriend( CBaseEntity *pFriend )
+bool CNPC_SimpleTalker::SpeakAnswerFriend( CBaseEntity *pFriend )
 {
 	return Speak( TLK_ANSWER );
 }
@@ -739,7 +739,7 @@ bool CNPCSimpleTalker::SpeakAnswerFriend( CBaseEntity *pFriend )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::FIdleSpeakWhileMoving( void )
+void CNPC_SimpleTalker::FIdleSpeakWhileMoving( void )
 {
 	if ( GetExpresser()->CanSpeak() )
 	{
@@ -759,7 +759,7 @@ void CNPCSimpleTalker::FIdleSpeakWhileMoving( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-int CNPCSimpleTalker::PlayScriptedSentence( const char *pszSentence, float delay, float volume, soundlevel_t soundlevel, bool bConcurrent, CBaseEntity *pListener )
+int CNPC_SimpleTalker::PlayScriptedSentence( const char *pszSentence, float delay, float volume, soundlevel_t soundlevel, bool bConcurrent, CBaseEntity *pListener )
 {
 	if ( !bConcurrent )
 		ShutUpFriends();
@@ -779,7 +779,7 @@ int CNPCSimpleTalker::PlayScriptedSentence( const char *pszSentence, float delay
 //-----------------------------------------------------------------------------
 // Purpose: Tell this NPC to answer a question from another NPC
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::SetAnswerQuestion( CNPCSimpleTalker *pSpeaker )
+void CNPC_SimpleTalker::SetAnswerQuestion( CNPC_SimpleTalker *pSpeaker )
 {
 	if ( !m_hCine )
 	{
@@ -793,7 +793,7 @@ void CNPCSimpleTalker::SetAnswerQuestion( CNPCSimpleTalker *pSpeaker )
 // Purpose: 
 //-----------------------------------------------------------------------------
 #ifdef HL1_DLL
-int CNPCSimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
+int CNPC_SimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
 	CTakeDamageInfo subInfo = info;
 
@@ -805,7 +805,7 @@ int CNPCSimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		if (pFriend && pFriend->IsAlive())
 		{
 			// only if not dead or dying!
-			CNPCSimpleTalker *pTalkNPC = (CNPCSimpleTalker *)pFriend;
+			CNPC_SimpleTalker *pTalkNPC = (CNPC_SimpleTalker *)pFriend;
 #if 0
 			if (pTalkNPC && pTalkNPC->IsOkToCombatSpeak())
 			{
@@ -820,7 +820,7 @@ int CNPCSimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 }
 #endif
 
-int CNPCSimpleTalker::SelectNonCombatSpeechSchedule()
+int CNPC_SimpleTalker::SelectNonCombatSpeechSchedule()
 {
 	if ( !IsOkToSpeak() )
 		return SCHED_NONE;
@@ -866,7 +866,7 @@ int CNPCSimpleTalker::SelectNonCombatSpeechSchedule()
 // Purpose: 
 // Output : Returns true on success, false on failure.
 //-----------------------------------------------------------------------------
-bool CNPCSimpleTalker::CanSayHello( void )
+bool CNPC_SimpleTalker::CanSayHello( void )
 {	
 	if ( GetSpeechFilter() && GetSpeechFilter()->NeverSayHello() )
 		return false;
@@ -880,7 +880,7 @@ bool CNPCSimpleTalker::CanSayHello( void )
 	return true;
 }
 
-void CNPCSimpleTalker::OnStartingFollow( CBaseEntity *pTarget )
+void CNPC_SimpleTalker::OnStartingFollow( CBaseEntity *pTarget )
 {
 	GetExpresser()->SetSpokeConcept( TLK_HELLO, NULL );	// Don't say hi after you've started following
 	if ( IsOkToSpeak() ) // don't speak if idle talk is blocked. player commanded/use follow will always speak
@@ -889,7 +889,7 @@ void CNPCSimpleTalker::OnStartingFollow( CBaseEntity *pTarget )
 	ClearCondition( COND_PLAYER_PUSHING );
 }
 
-void CNPCSimpleTalker::OnStoppingFollow( CBaseEntity *pTarget )
+void CNPC_SimpleTalker::OnStoppingFollow( CBaseEntity *pTarget )
 {
 	if ( !(m_afMemory & bits_MEMORY_PROVOKED) )
 	{
@@ -904,7 +904,7 @@ void CNPCSimpleTalker::OnStoppingFollow( CBaseEntity *pTarget )
 	}
 }
 
-void CNPCSimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+void CNPC_SimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	// Don't allow use during a scripted_sentence
 	if ( m_useTime > gpGlobals->curtime )
@@ -929,7 +929,7 @@ void CNPCSimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 	}
 }
 
-void CNPCSimpleTalker::StartFollowing( CBaseEntity *pLeader )
+void CNPC_SimpleTalker::StartFollowing( CBaseEntity *pLeader )
 {
 	if ( !HasSpawnFlags( SF_NPC_GAG ) )
 	{
@@ -949,7 +949,7 @@ void CNPCSimpleTalker::StartFollowing( CBaseEntity *pLeader )
 	DeferSchedulingToBehavior( &m_FollowBehavior );
 }
 
-void CNPCSimpleTalker::StopFollowing( void )
+void CNPC_SimpleTalker::StopFollowing( void )
 {
 	if ( !(m_afMemory & bits_MEMORY_PROVOKED) )
 	{
@@ -973,7 +973,7 @@ void CNPCSimpleTalker::StopFollowing( void )
 }
 
 //-----------------------------------------------------------------------------
-void CNPCSimpleTalker::InputIdleRespond( inputdata_t &inputdata )
+void CNPC_SimpleTalker::InputIdleRespond( inputdata_t &inputdata )
 {
 	// We've been told to respond. Check combat speak, not isoktospeak, because
 	// we don't want to check the idle speech time.
@@ -983,7 +983,7 @@ void CNPCSimpleTalker::InputIdleRespond( inputdata_t &inputdata )
 	IdleRespond();
 }
 
-int CNPCSimpleTalkerExpresser::SpeakRawSentence( const char *pszSentence, float delay, float volume, soundlevel_t soundlevel, CBaseEntity *pListener )
+int CNPC_SimpleTalkerExpresser::SpeakRawSentence( const char *pszSentence, float delay, float volume, soundlevel_t soundlevel, CBaseEntity *pListener )
 {
 	char szSpecificSentence[1024];
 	int sentenceIndex = -1;
@@ -1015,7 +1015,7 @@ int CNPCSimpleTalkerExpresser::SpeakRawSentence( const char *pszSentence, float 
 
 //-------------------------------------
 
-void CNPCSimpleTalkerExpresser::BeginMonolog( char *pszSentenceName, CBaseEntity *pListener )
+void CNPC_SimpleTalkerExpresser::BeginMonolog( char *pszSentenceName, CBaseEntity *pListener )
 {
 	if( pListener )
 	{
@@ -1043,7 +1043,7 @@ void CNPCSimpleTalkerExpresser::BeginMonolog( char *pszSentenceName, CBaseEntity
 
 //-------------------------------------
 
-void CNPCSimpleTalkerExpresser::EndMonolog( void )
+void CNPC_SimpleTalkerExpresser::EndMonolog( void )
 {
 	m_szMonologSentence[0] = 0;
 	m_iMonologIndex = -1;
@@ -1053,7 +1053,7 @@ void CNPCSimpleTalkerExpresser::EndMonolog( void )
 
 //-------------------------------------
 
-void CNPCSimpleTalkerExpresser::SpeakMonolog( void )
+void CNPC_SimpleTalkerExpresser::SpeakMonolog( void )
 {
 	int i;
 	char szSentence[ MONOLOGNAME_LEN ];
@@ -1096,7 +1096,7 @@ void CNPCSimpleTalkerExpresser::SpeakMonolog( void )
 
 //-------------------------------------
 
-void CNPCSimpleTalkerExpresser::SuspendMonolog( float flInterval )
+void CNPC_SimpleTalkerExpresser::SuspendMonolog( float flInterval )
 {
 	if( HasMonolog() )
 	{
@@ -1112,7 +1112,7 @@ void CNPCSimpleTalkerExpresser::SuspendMonolog( float flInterval )
 
 //-------------------------------------
 
-void CNPCSimpleTalkerExpresser::ResumeMonolog( void )
+void CNPC_SimpleTalkerExpresser::ResumeMonolog( void )
 {
 	if( m_iMonologIndex > 0 )
 	{
@@ -1126,7 +1126,7 @@ void CNPCSimpleTalkerExpresser::ResumeMonolog( void )
 }
 
 // try to smell something
-void CNPCSimpleTalker::TrySmellTalk( void )
+void CNPC_SimpleTalker::TrySmellTalk( void )
 {
 	if ( !IsOkToSpeak() )
 		return;
@@ -1135,7 +1135,7 @@ void CNPCSimpleTalker::TrySmellTalk( void )
 		Speak( TLK_SMELL );
 }
 
-void CNPCSimpleTalker::OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  CAI_BehaviorBase *pNewBehavior )
+void CNPC_SimpleTalker::OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  CAI_BehaviorBase *pNewBehavior )
 {
 	BaseClass::OnChangeRunningBehavior( pOldBehavior,  pNewBehavior );
 
@@ -1151,7 +1151,7 @@ void CNPCSimpleTalker::OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior, 
 }
 
 
-bool CNPCSimpleTalker::OnBehaviorChangeStatus( CAI_BehaviorBase *pBehavior, bool fCanFinishSchedule )
+bool CNPC_SimpleTalker::OnBehaviorChangeStatus( CAI_BehaviorBase *pBehavior, bool fCanFinishSchedule )
 {
 	bool interrupt = BaseClass::OnBehaviorChangeStatus( pBehavior, fCanFinishSchedule );
 	if ( !interrupt )
@@ -1164,7 +1164,7 @@ bool CNPCSimpleTalker::OnBehaviorChangeStatus( CAI_BehaviorBase *pBehavior, bool
 //-----------------------------------------------------------------------------
 // Purpose: Return true if I should speak based on the chance & the speech filter's modifier
 //-----------------------------------------------------------------------------
-bool CNPCSimpleTalker::ShouldSpeakRandom( int iChance, float flModifier )
+bool CNPC_SimpleTalker::ShouldSpeakRandom( int iChance, float flModifier )
 {
 	if ( flModifier != 1.0 )
 	{
@@ -1179,7 +1179,7 @@ bool CNPCSimpleTalker::ShouldSpeakRandom( int iChance, float flModifier )
 }
 
 
-AI_BEGIN_CUSTOM_NPC(talk_monster,CNPCSimpleTalker)
+AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 	DECLARE_USES_SCHEDULE_PROVIDER( CAI_FollowBehavior )
 
 	DECLARE_TASK(TASK_TALKER_RESPOND)

@@ -16,30 +16,15 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-class CRuleEntity : public CBaseEntity
-{
-public:
-	DECLARE_CLASS( CRuleEntity, CBaseEntity );
 
-	void	Spawn( void );
-
-	DECLARE_DATADESC();
-
-	void	SetMaster( string_t iszMaster ) { m_iszMaster = iszMaster; }
-
-protected:
-	bool	CanFireForActivator( CBaseEntity *pActivator );
-
-private:
-	string_t	m_iszMaster;
-};
-
+// 
+// CRuleEntity -- base class for all rule entities
+//
 BEGIN_DATADESC( CRuleEntity )
 
 	DEFINE_KEYFIELD( m_iszMaster, FIELD_STRING, "master" ),
 
 END_DATADESC()
-
 
 
 void CRuleEntity::Spawn( void )
@@ -66,25 +51,11 @@ bool CRuleEntity::CanFireForActivator( CBaseEntity *pActivator )
 // 
 // CRulePointEntity -- base class for all rule "point" entities (not brushes)
 //
-class CRulePointEntity : public CRuleEntity
-{
-public:
-	DECLARE_DATADESC();
-	DECLARE_CLASS( CRulePointEntity, CRuleEntity );
-
-	int		m_Score;
-	void		Spawn( void );
-};
-
-//---------------------------------------------------------
-// Save/Restore
-//---------------------------------------------------------
 BEGIN_DATADESC( CRulePointEntity )
 
 	DEFINE_FIELD( m_Score,	FIELD_INTEGER ),
 
 END_DATADESC()
-
 
 void CRulePointEntity::Spawn( void )
 {
@@ -93,20 +64,11 @@ void CRulePointEntity::Spawn( void )
 	m_Score = 0;
 }
 
+
 // 
 // CRuleBrushEntity -- base class for all rule "brush" entities (not brushes)
 // Default behavior is to set up like a trigger, invisible, but keep the model for volume testing
 //
-class CRuleBrushEntity : public CRuleEntity
-{
-public:
-	DECLARE_CLASS( CRuleBrushEntity, CRuleEntity );
-
-	void		Spawn( void );
-
-private:
-};
-
 void CRuleBrushEntity::Spawn( void )
 {
 	SetModel( STRING( GetModelName() ) );
@@ -118,7 +80,6 @@ void CRuleBrushEntity::Spawn( void )
 //	Points +/- total
 //	Flag: Allow negative scores					SF_SCORE_NEGATIVE
 //	Flag: Award points to team in teamplay		SF_SCORE_TEAM
-
 #define SF_SCORE_NEGATIVE			0x0001
 #define SF_SCORE_TEAM				0x0002
 
@@ -177,21 +138,7 @@ void CGameScore::InputApplyScore( inputdata_t &inputdata )
 	if ( pActivator == NULL )
 		 return;
 
-	if ( CanFireForActivator( pActivator ) == false )
-		return;
-
-	// Only players can use this
-	if ( pActivator->IsPlayer() )
-	{
-		if ( AwardToTeam() )
-		{
-			pActivator->AddPointsToTeam( Points(), AllowNegativeScore() );
-		}
-		else
-		{
-			pActivator->AddPoints( Points(), AllowNegativeScore() );
-		}
-	}
+	Use( pActivator, inputdata.pCaller, USE_ON, 0 );
 }
 
 void CGameScore::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
@@ -215,7 +162,6 @@ void CGameScore::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE us
 
 
 // CGameEnd / game_end	-- Ends the game in MP, Shows scorescreen in SP
-
 class CGameEnd : public CRulePointEntity
 {
 	DECLARE_CLASS( CGameEnd, CRulePointEntity );
@@ -251,7 +197,7 @@ void CGameEnd::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useT
 	if ( g_pGameRules->IsMultiplayer() )
 		g_pGameRules->EndMultiplayerGame();
 	else
-		engine->ServerCommand( UTIL_VarArgs( "%s\n", "disconnect" ) );
+		engine->ServerCommand( UTIL_VarArgs( "%s\n", "disconnect" ) );	//!!TODO; Need a proper thing here
 }
 
 
@@ -260,7 +206,6 @@ void CGameEnd::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useT
 //	Flag: All players					SF_ENVTEXT_ALLPLAYERS
 //
 #define SF_ENVTEXT_ALLPLAYERS			0x0001
-
 
 class CGameText : public CRulePointEntity
 {

@@ -3002,7 +3002,7 @@ public:
 	bool KeyValue( const char *szKeyName, const char *szValue );
 	void Spawn ( void );
 	void ManagerThink ( void );
-	void ManagerUse   ( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void ManagerUse ( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 #if _DEBUG
 	void ManagerReport( void );

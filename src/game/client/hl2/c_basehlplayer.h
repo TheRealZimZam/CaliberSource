@@ -12,10 +12,11 @@
 #pragma once
 #endif
 
-
 #include "c_baseplayer.h"
 #include "c_hl2_playerlocaldata.h"
 #include "multiplayer_animstate.h"
+
+#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
 
 class C_BaseHLPlayer : public C_BasePlayer
 {
@@ -75,7 +76,12 @@ public:
 
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible
-	IPlayerAnimState *m_PlayerAnimState;
+
+#if SINGLEPLAYER_ANIMSTATE
+	IPlayerAnimState	*m_PlayerAnimState;
+#else
+	CMultiPlayerAnimState	*m_PlayerAnimState;
+#endif
 
 	QAngle	m_angEyeAngles;
 	CInterpolatedVar< QAngle >	m_iv_angEyeAngles;

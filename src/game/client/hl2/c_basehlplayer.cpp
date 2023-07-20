@@ -27,8 +27,6 @@ extern ConVar zoom_sensitivity_ratio;
 extern ConVar default_fov;
 extern ConVar sensitivity;
 
-#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
-
 #if SINGLEPLAYER_ANIMSTATE
 #else
 //extern ConVar hl2_walkspeed;
@@ -126,24 +124,21 @@ C_BaseHLPlayer::C_BaseHLPlayer() :
 	AddVar( &m_angEyeAngles, &m_iv_angEyeAngles, LATCH_SIMULATION_VAR );
 
 #if SINGLEPLAYER_ANIMSTATE
-		// Base animstate
-		m_PlayerAnimState = CreatePlayerAnimState( this );
+	// SP animstate
+	m_PlayerAnimState = CreatePlayerAnimState( this );
 #else
 	// FIXME; MP state is extremely broken and WIP, rn it just crashes anyway
 	// Probably not going to spend time fixing because the few additional
 	// features arent really worth it - we only need animations so the player
 	// can admire himself in the mirror anyway.
-/*
-		// Setup the movement data.
-		MultiPlayerMovementData_t movementData;
-		movementData.m_flRunSpeed = HL2_RUN_SPEED;
-		movementData.m_flWalkSpeed = HL2_WALK_SPEED;
-		movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
+	// Setup the movement data.
+	MultiPlayerMovementData_t movementData;
+	movementData.m_flRunSpeed = HL2_RUN_SPEED;
+	movementData.m_flWalkSpeed = HL2_WALK_SPEED;
+	movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
 
-		// Create animation state for this player.
-		CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
-		m_PlayerAnimState->Init( this, movementData );
-*/
+	// Create animation state for this player.
+	m_PlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
 #endif
 
 	m_fLastPredFreeze = -1;

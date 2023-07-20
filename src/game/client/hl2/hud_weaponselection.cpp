@@ -57,7 +57,7 @@ public:
 		return m_hSelectedWeapon;
 	}
 
-	virtual void OpenSelection( void );
+	virtual void OpenSelection( bool bDoSound = false );
 	virtual void HideSelection( void );
 	
 	virtual void LevelInit();
@@ -485,10 +485,17 @@ void CHudWeaponSelection::ApplySchemeSettings(vgui::IScheme *pScheme)
 //-----------------------------------------------------------------------------
 // Purpose: Opens weapon selection control
 //-----------------------------------------------------------------------------
-void CHudWeaponSelection::OpenSelection( void )
+void CHudWeaponSelection::OpenSelection( bool bDoSound )
 {
 	Assert(!IsInSelectionMode());
 	CBaseHudWeaponSelection::OpenSelection();
+
+	C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
+	if ( !player )
+		return;
+
+	if ( bDoSound )
+		player->EmitSound( "Player.WeaponSelectionOpen" );
 
 	g_pClientMode->GetViewportAnimationController()->StartAnimationSequence("OpenWeaponSelectionMenu");
 	m_iSelectedBoxPosition = 0;
@@ -806,7 +813,7 @@ void CHudWeaponSelection::SelectWeaponSlot( int iSlot )
 		else if ( !IsInSelectionMode() )
 		{
 			// open the weapon selection
-			OpenSelection();
+			OpenSelection( true );
 		}
 
 		// Mark the change

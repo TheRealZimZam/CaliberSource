@@ -21,7 +21,7 @@
 extern Vector GetTracerOrigin( const CEffectData &data );
 extern void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType );
 
-extern ConVar muzzleflash_light;
+extern ConVar fx_muzzleflash_light;
 
 
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheTracers )
@@ -479,7 +479,7 @@ DECLARE_CLIENT_EFFECT( "AR2Explosion", AR2ExplosionCallback );
 //-----------------------------------------------------------------------------
 void CreateMuzzleflashELight( const Vector &origin, int exponent, int nMinRadius, int nMaxRadius, ClientEntityHandle_t hEntity )
 {
-	if ( muzzleflash_light.GetInt() )
+	if ( fx_muzzleflash_light.GetInt() > 0 )
 	{
 		int entityIndex = ClientEntityList().HandleToEntIndex( hEntity );
 		if ( entityIndex >= 0 )
@@ -575,7 +575,7 @@ void MuzzleFlash_Airboat( ClientEntityHandle_t hEntity, int attachmentIndex )
 	
 #ifndef _XBOX
 	// Grab the origin out of the transform for the attachment
-	if ( muzzleflash_light.GetInt() )
+	if ( fx_muzzleflash_light.GetInt() )
 	{
 		// If the client hasn't seen this entity yet, bail.
 		matrix3x4_t	matAttachment;

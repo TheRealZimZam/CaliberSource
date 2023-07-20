@@ -116,16 +116,13 @@ public:
 	// Decal the surface
 	virtual	void HitSurface( C_BaseEntity *pOther )
 	{
-		//JDW: Removed for the time being
-
-		/*
+		//JDW: Not removed for the time being
 		int index = decalsystem->GetDecalIndexForName( "YellowBlood" );
 		
 		if (index >= 0 )
 		{
 			effects->DecalShoot( index, pOther->entindex(), pOther->GetModel(), pOther->GetAbsOrigin(), pOther->GetAbsAngles(), GetAbsOrigin(), 0, 0 );
 		}
-		*/
 	}
 };
 

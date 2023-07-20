@@ -233,6 +233,7 @@ public:
 	float InnateRange1MaxRange( void );
 	int RangeAttack1Conditions( float flDot, float flDist );
 	int MeleeAttack1Conditions( float flDot, float flDist );
+	int MeleeAttack2Conditions( float flDot, float flDist );
 
 	virtual float GetClawAttackRange() const { return 50; }
 
@@ -333,6 +334,7 @@ private:
 	bool	m_fJustJumped;
 	float	m_flJumpStartAltitude;
 	float	m_flTimeUpdateSound;
+	int		m_iHits;	//For frenzy
 
 	CSoundPatch	*m_pLayer2; // used for climbing ladders, and when jumping (pre apex)
 
@@ -359,6 +361,7 @@ BEGIN_DATADESC( CFastZombie )
 	DEFINE_FIELD( m_fJustJumped, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flJumpStartAltitude, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flTimeUpdateSound, FIELD_TIME ),
+	DEFINE_FIELD( m_iHits, FIELD_INTEGER ),
 
 	// Function Pointers
 	DEFINE_ENTITYFUNC( LeapAttackTouch ),
@@ -467,6 +470,10 @@ int CFastZombie::SelectSchedule ( void )
 	switch ( m_NPCState )
 	{
 	case NPC_STATE_COMBAT:
+		if ( HasCondition( COND_CAN_MELEE_ATTACK2 ) )
+			return SCHED_MELEE_ATTACK2;
+		break;
+
 		if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
 		{
 			// Set state to alert and recurse!
@@ -648,6 +655,7 @@ void CFastZombie::Spawn( void )
 	Precache();
 
 	m_fJustJumped = false;
+	m_iHits = 0;
 
 	m_fIsTorso = m_fIsHeadless = false;
 
@@ -667,11 +675,11 @@ void CFastZombie::Spawn( void )
 	m_flFieldOfView		= 0.6;
 
 	CapabilitiesClear();
-	CapabilitiesAdd( bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_GROUND | bits_CAP_INNATE_RANGE_ATTACK1 /* | bits_CAP_INNATE_MELEE_ATTACK1 */);
+	CapabilitiesAdd( bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_GROUND | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
 
 	if ( m_fIsTorso == true )
 	{
-		CapabilitiesRemove( bits_CAP_MOVE_JUMP | bits_CAP_INNATE_RANGE_ATTACK1 );
+		CapabilitiesRemove( bits_CAP_MOVE_JUMP | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
 	}
 
 	m_flNextAttack = gpGlobals->curtime;
@@ -820,6 +828,20 @@ int CFastZombie::MeleeAttack1Conditions( float flDot, float flDist )
 	return baseResult;
 }
 
+int CFastZombie::MeleeAttack2Conditions( float flDot, float flDist )
+{
+	// All we need to do is check meleeattack1, then the number of hits
+	// we have stored.
+	int baseAttack = MeleeAttack1Conditions( flDot, flDist );
+	if ( baseAttack == COND_CAN_MELEE_ATTACK1 )
+	{
+		if ( m_iHits >= 4 )
+			return COND_CAN_MELEE_ATTACK2;
+	}
+
+	return COND_NONE;
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Returns a moan sound for this class of zombie.
 //-----------------------------------------------------------------------------
@@ -844,6 +866,7 @@ void CFastZombie::FootstepSound( bool fRightFoot )
 //-----------------------------------------------------------------------------
 void CFastZombie::AttackHitSound( void )
 {
+	m_iHits++;
 	EmitSound( "NPC_FastZombie.AttackHit" );
 }
 
@@ -853,6 +876,7 @@ void CFastZombie::AttackHitSound( void )
 void CFastZombie::AttackMissSound( void )
 {
 	// Play a random attack miss sound
+	m_iHits--;
 	EmitSound( "NPC_FastZombie.AttackMiss" );
 }
 
@@ -1214,6 +1238,7 @@ void CFastZombie::StartTask( const Task_t *pTask )
 		}
 		else
 		{
+			m_iHits = 0;
 			TaskFail("");
 		}
 		break;
@@ -1364,6 +1389,12 @@ void CFastZombie::RunTask( const Task_t *pTask )
 		}
 		break;
 
+	case TASK_MELEE_ATTACK2:
+		m_iHits = 0;
+		if(IsActivityFinished())
+			TaskComplete();
+		break;
+
 	default:
 		BaseClass::RunTask( pTask );
 		break;
@@ -1380,7 +1411,6 @@ int CFastZombie::TranslateSchedule( int scheduleType )
 	case SCHED_RANGE_ATTACK1:
 		{
 			// Scream right now, cause in half a second, we're gonna jump!!
-	
 			if( !m_fHasScreamed )
 			{
 				// Only play that over-the-top attack scream once per combat state.
@@ -1398,13 +1428,16 @@ int CFastZombie::TranslateSchedule( int scheduleType )
 
 	case SCHED_MELEE_ATTACK1:
 		if ( m_fIsTorso == true )
-		{
 			return SCHED_FASTZOMBIE_TORSO_MELEE_ATTACK1;
-		}
 		else
-		{
 			return SCHED_FASTZOMBIE_MELEE_ATTACK1;
-		}
+		break;
+
+	case SCHED_MELEE_ATTACK2:
+		if ( m_fIsTorso == true )
+			return TranslateSchedule(SCHED_MELEE_ATTACK1);
+
+		return SCHED_FASTZOMBIE_FRENZY;
 		break;
 
 	case SCHED_FASTZOMBIE_UNSTICK_JUMP:
@@ -1438,7 +1471,9 @@ Activity CFastZombie::NPC_TranslateActivity( Activity baseAct )
 {
 	if ( baseAct == ACT_CLIMB_DOWN )
 		return ACT_CLIMB_UP;
-	
+	else if ( baseAct == ACT_MELEE_ATTACK2 )
+		return (Activity)ACT_FASTZOMBIE_BIG_SLASH;
+
 	return BaseClass::NPC_TranslateActivity( baseAct );
 }
 
@@ -2060,7 +2095,6 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 	//=========================================================
 	// > Melee_Attack1
 	//=========================================================
-	//!!! Shouldnt "frenzy" be a seperate sched???
 	DEFINE_SCHEDULE
 	(
 		SCHED_FASTZOMBIE_MELEE_ATTACK1,
@@ -2070,11 +2104,7 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		TASK_FACE_ENEMY					0"
 		"		TASK_MELEE_ATTACK1				0"
 		"		TASK_MELEE_ATTACK1				0"
-//		"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_FASTZOMBIE_FRENZY"
-//		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY"
-//		"		TASK_FASTZOMBIE_VERIFY_ATTACK	0"
-//		"		TASK_PLAY_SEQUENCE_FACE_ENEMY	ACTIVITY:ACT_FASTZOMBIE_BIG_SLASH"
-		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FASTZOMBIE_FRENZY"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ZOMBIE_POST_MELEE_WAIT"
 
 		""
 		"	Interrupts"
@@ -2092,7 +2122,8 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_FASTZOMBIE_FRENZY"
 		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY"
 		"		TASK_FASTZOMBIE_VERIFY_ATTACK	0"
-		"		TASK_PLAY_SEQUENCE_FACE_ENEMY	ACTIVITY:ACT_FASTZOMBIE_BIG_SLASH"
+		"		TASK_MELEE_ATTACK2				0"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ZOMBIE_POST_MELEE_WAIT"
 
 		""
 		"	Interrupts"
@@ -2113,9 +2144,7 @@ AI_BEGIN_CUSTOM_NPC( npc_fastzombie, CFastZombie )
 		"		TASK_STOP_MOVING				0"
 		"		TASK_FACE_ENEMY					0"
 		"		TASK_MELEE_ATTACK1				0"
-		"		TASK_MELEE_ATTACK1				0"
-		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY"
-		"		TASK_FASTZOMBIE_VERIFY_ATTACK	0"
+		"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_CHASE_ENEMY"
 
 		""
 		"	Interrupts"

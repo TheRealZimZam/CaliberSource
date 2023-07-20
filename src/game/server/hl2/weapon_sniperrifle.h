@@ -59,6 +59,7 @@ protected:
 	float m_fNextZoom;
 	int m_nZoomLevel;
 	bool m_bBoltAction;	//Use special bolt-action reloading mechanism
+	bool m_bUseProjectile;	//Use the sniperbullet projectile instead of a hitscan
 
 };
 

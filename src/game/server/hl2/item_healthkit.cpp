@@ -135,7 +135,11 @@ PRECACHE_REGISTER(item_healthkit);
 
 
 //-----------------------------------------------------------------------------
-// Small dynamically dropped health kit
+// CHealthVial
+// Small dynamically dropped health kit, can be normal HEV tube or a candybar
+// TODO; it might be better to seperate candybar into its own class, but
+// I ((think)) this is better perf wise?? All the candybar logic is only done
+// at spawn... -M
 //-----------------------------------------------------------------------------
 class CHealthVial : public CItem
 {
@@ -161,6 +165,9 @@ public:
 
 	void Precache( void )
 	{
+		if ( FClassnameIs( this, "item_candybar" ) )
+			m_bIsFood = true;
+
 		if (m_bIsFood)
 		{
 			PrecacheScriptSound( "Player.Eat" );
@@ -210,12 +217,14 @@ public:
 		return false;
 	}
 
-	bool		m_bIsFood;
-
 	DECLARE_DATADESC();
+
+protected:
+	bool		m_bIsFood;
 };
 
 LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
+LINK_ENTITY_TO_CLASS( item_candybar, CHealthVial );
 
 BEGIN_DATADESC( CHealthVial )
 

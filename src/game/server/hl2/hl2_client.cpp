@@ -7,15 +7,16 @@
 //=============================================================================//
 
 #include "cbase.h"
+#include "player.h"
+#include "game.h"
 #include "hl2_player.h"
 #include "hl2_gamerules.h"
 #include "gamerules.h"
-#include "teamplay_gamerules.h"
 #include "EntityList.h"
 #include "physics.h"
-#include "game.h"
 #include "player_resource.h"
 #include "engine/IEngineSound.h"
+#include "filesystem.h"
 
 #include "tier0/vprof.h"
 
@@ -98,28 +99,62 @@ CBaseEntity* FindEntity( edict_t *pEdict, char *classname)
 //-----------------------------------------------------------------------------
 void ClientGamePrecache( void )
 {
-	CBaseEntity::PrecacheModel("models/player.mdl");
-	CBaseEntity::PrecacheModel( "models/gibs/agibs.mdl" );
-	CBaseEntity::PrecacheModel ("models/weapons/v_hands.mdl");
+	const char *pFilename = "scripts/client_precache.txt";
+	KeyValues *pValues = new KeyValues( "ClientPrecache" );
 
-	CBaseEntity::PrecacheScriptSound( "HUDQuickInfo.LowAmmo" );
-	CBaseEntity::PrecacheScriptSound( "HUDQuickInfo.LowHealth" );
+	if ( !pValues->LoadFromFile( filesystem, pFilename, "GAME" ) )
+	{
+		Error( "Can't open %s for client precache info.", pFilename );
 
-	CBaseEntity::PrecacheScriptSound( "FX_AntlionImpact.ShellImpact" );
-	CBaseEntity::PrecacheScriptSound( "Missile.ShotDown" );
-	CBaseEntity::PrecacheScriptSound( "Bullets.SmallNearmiss" );
-	CBaseEntity::PrecacheScriptSound( "Bullets.MediumNearmiss" );
-	CBaseEntity::PrecacheScriptSound( "Bullets.LargeNearmiss" );
-	
-	CBaseEntity::PrecacheScriptSound( "Geiger.BeepHigh" );
-	CBaseEntity::PrecacheScriptSound( "Geiger.BeepLow" );
+		// Do the default list
+		CBaseEntity::PrecacheModel("sprites/hud1.vmt");
+		CBaseEntity::PrecacheModel("models/player.mdl");
+		CBaseEntity::PrecacheModel("models/gibs/agibs.mdl");
+		CBaseEntity::PrecacheModel("models/weapons/v_hands.mdl");
+
+		CBaseEntity::PrecacheScriptSound( "HUDQuickInfo.LowAmmo" );
+		CBaseEntity::PrecacheScriptSound( "HUDQuickInfo.LowHealth" );
+
+		CBaseEntity::PrecacheScriptSound( "FX_AntlionImpact.ShellImpact" );	//Why??
+		CBaseEntity::PrecacheScriptSound( "Missile.ShotDown" );
+		CBaseEntity::PrecacheScriptSound( "Bullets.SmallNearmiss" );
+		CBaseEntity::PrecacheScriptSound( "Bullets.MediumNearmiss" );
+		CBaseEntity::PrecacheScriptSound( "Bullets.LargeNearmiss" );
+		
+		CBaseEntity::PrecacheScriptSound( "Geiger.BeepHigh" );
+		CBaseEntity::PrecacheScriptSound( "Geiger.BeepLow" );
+		
+		pValues->deleteThis();
+		return;
+	}
+
+	for ( KeyValues *pData = pValues->GetFirstSubKey(); pData != NULL; pData = pData->GetNextKey() )
+	{
+		const char *pszType = pData->GetName();
+		const char *pszFile = pData->GetString();
+
+		if ( Q_strlen( pszType ) > 0 &&
+			 Q_strlen( pszFile ) > 0 )
+		{
+			if ( !Q_stricmp( pData->GetName(), "model" ) )
+			{
+				CBaseEntity::PrecacheModel( pszFile );
+			}
+			else if ( !Q_stricmp( pData->GetName(), "scriptsound" ) )
+			{
+				CBaseEntity::PrecacheScriptSound( pszFile );
+			}
+		}
+	}
+
+	pValues->deleteThis();
 }
 
 
 // called by ClientKill and DeadThink
 void respawn( CBaseEntity *pEdict, bool fCopyCorpse )
 {
-	if (gpGlobals->coop || gpGlobals->deathmatch)
+	if (gpGlobals->coop || gpGlobals->deathmatch || teamplay.GetInt() > 0)
 	{
 		if ( fCopyCorpse )
 		{
@@ -131,7 +166,8 @@ void respawn( CBaseEntity *pEdict, bool fCopyCorpse )
 		pEdict->Spawn();
 	}
 	else
-	{       // restart the entire server
+	{
+		// restart the entire server
 		engine->ServerCommand("reload\n");
 	}
 }
@@ -139,13 +175,22 @@ void respawn( CBaseEntity *pEdict, bool fCopyCorpse )
 void GameStartFrame( void )
 {
 	VPROF("GameStartFrame()");
+
+	if ( g_pGameRules )
+		g_pGameRules->Think();
+
 	if ( g_fGameOver )
 		return;
 
 	gpGlobals->teamplay = (teamplay.GetInt() != 0);
+
+#ifdef DEBUG
+	extern void Bot_RunAll();
+	Bot_RunAll();
+#endif
 }
 
-#ifdef HL2_EPISODIC
+#ifdef HL2_DLL
 extern ConVar gamerules_survival;
 #endif
 
@@ -154,27 +199,33 @@ extern ConVar gamerules_survival;
 //=========================================================
 void InstallGameRules()
 {
-#ifdef HL2_EPISODIC
+#ifdef HL2_DLL
 	if ( gamerules_survival.GetBool() )
-	{
 		// Survival mode
 		CreateGameRulesObject( "CHalfLife2Survival" );
-	}
 	else
-#endif
-	{
-		// generic half-life
+		// Caliber All-in-one
 		CreateGameRulesObject( "CHalfLife2" );
-	}
-
-/*
-	if ( teamplay.GetInt() > 0 )
+#else
 	{
-		// teamplay
-		return new CTeamplayRules;
+		if ( teamplay.GetInt() > 0 )
+		{
+			// teamplay
+			CreateGameRulesObject( "CTeamplayRules" );
+		}
+		else if (gpGlobals->deathmatch == 1)
+		{
+			// vanilla deathmatch
+			teamplay.SetValue( 0 );
+			CreateGameRulesObject( "CMultiplayRules" );
+		}
+		else
+		{
+			// vanilla deathmatch??
+			teamplay.SetValue( 0 );
+			CreateGameRulesObject( "CMultiplayRules" );
+		}
 	}
-	// vanilla deathmatch
-	return new CMultiplayRules;
-*/
+#endif
 }
 

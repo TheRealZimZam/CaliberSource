@@ -22,6 +22,8 @@
 #include "basemultiplayerplayer.h"
 #endif
 
+#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
+
 class CAI_Squad;
 
 extern int TrainSpeed(int iSpeed, int iMax);
@@ -327,7 +329,12 @@ private:
 	CNetworkQAngle( m_angEyeAngles );
 	CNetworkVar( int, m_iSpawnInterpCounter );
 
+#if SINGLEPLAYER_ANIMSTATE
 	IPlayerAnimState	*m_PlayerAnimState;
+#else
+	CMultiPlayerAnimState	*m_PlayerAnimState;
+#endif
+
 	float				m_flNextModelChangeTime;
 	float				m_flNextTeamChangeTime;
 
@@ -368,22 +375,14 @@ private:
 	float				m_flNextFlashlightCheckTime;
 	float				m_flFlashlightPowerDrainScale;
 
+	// How much cash i have on me
+	int					m_iCash;
+
 	// Aiming heuristics code
 	float				m_flIdleTime;		//Amount of time we've been motionless
 	float				m_flMoveTime;		//Amount of time we've been in motion
 	float				m_flLastDamageTime;	//Last time we took damage
 	float				m_flTargetFindTime;
-
-	// Accuracy
-//!!!TBA
-/*
-	bool	m_bSnapAccuracy;
-	float	m_flAccuracy;
-	float	m_flTargetAccuracy;
-	float	m_flLastRicochetNearby;
-	float	m_flNumberOfRicochets;
-	float	m_flLastExplosionNearby;
-*/
 
 	EHANDLE				m_hPlayerProxy;
 

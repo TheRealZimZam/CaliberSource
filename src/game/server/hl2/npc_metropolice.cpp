@@ -1765,11 +1765,6 @@ bool CNPC_MetroPolice::HandleInteraction(int interactionType, void *data, CBaseC
 //---------------------------------------------------------------------------
 Activity CNPC_MetroPolice::NPC_TranslateActivity( Activity newActivity )
 {
-	if( IsOnFire() && newActivity == ACT_RUN )
-	{
-		return ACT_RUN_ON_FIRE;
-	}
-
 	// If we're shoving, see if we should be more forceful in doing so
 	if ( newActivity == ACT_PUSH_PLAYER )
 	{

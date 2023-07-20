@@ -63,6 +63,8 @@ static const char *s_pChunkModelName[CHOPPER_MAX_CHUNKS] =
 	"models/gibs/helicopter_brokenpiece_03.mdl",
 };
 
+#define CHOPPER_CHUNK_EXPLODE_FLAGS (SF_ENVEXPLOSION_NODAMAGE|SF_ENVEXPLOSION_NODLIGHTS|SF_ENVEXPLOSION_NODECAL|SF_ENVEXPLOSION_NOSMOKE|SF_ENVEXPLOSION_NOPARTICLES)
+
 #define BOMB_SKIN_LIGHT_ON		1
 #define BOMB_SKIN_LIGHT_OFF		0
 
@@ -381,9 +383,11 @@ public:
 
 	int		BloodColor( void ) { return DONT_BLEED; }
 	Class_T Classify ( void ) { return CLASS_COMBINE_GUNSHIP; }
-	virtual int	OnTakeDamage_Alive( const CTakeDamageInfo &info );
-	virtual void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
-	virtual int OnTakeDamage( const CTakeDamageInfo &info );
+
+	int	OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	int OnTakeDamage( const CTakeDamageInfo &info );
+	void TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
+	void GibMonster( void );
 
 	// Shot spread
 	virtual Vector GetAttackSpread( CBaseCombatWeapon *pWeapon, CBaseEntity *pTarget );
@@ -951,7 +955,7 @@ void CNPC_AttackHelicopter::Precache( void )
 	if ( m_bNonCombat == false )
 	{
 		UTIL_PrecacheOther( "grenade_helicopter" );
-		UTIL_PrecacheOther( "env_fire_trail" );
+		UTIL_PrecacheOther( "env_firetrail" );
 		PrecacheModel( CHOPPER_MODEL_CORPSE_NAME );
 		Chopper_PrecacheChunks( this );
 		PrecacheModel("models/combine_soldier.mdl");
@@ -3397,14 +3401,14 @@ void Chopper_CreateChunk( CBaseEntity *pChopper, const Vector &vecChunkPos, cons
 	
 	CFireTrail *pFireTrail = CFireTrail::CreateFireTrail();
 
-	if ( pFireTrail == NULL )
-		return;
-
-	pFireTrail->FollowEntity( pChunk, "" );
-	pFireTrail->SetParent( pChunk, 0 );
-	pFireTrail->SetLocalOrigin( vec3_origin );
-	pFireTrail->SetMoveType( MOVETYPE_NONE );
-	pFireTrail->SetLifetime( pChunk->m_lifeTime );
+	if ( pFireTrail )
+	{
+		pFireTrail->FollowEntity( pChunk, "" );
+		pFireTrail->SetParent( pChunk, 0 );
+		pFireTrail->SetLocalOrigin( vec3_origin );
+		pFireTrail->SetMoveType( MOVETYPE_NONE );
+		pFireTrail->SetLifetime( pChunk->m_lifeTime );
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -3412,19 +3416,17 @@ void Chopper_CreateChunk( CBaseEntity *pChopper, const Vector &vecChunkPos, cons
 //------------------------------------------------------------------------------
 void CNPC_AttackHelicopter::ExplodeAndThrowChunk( const Vector &vecExplosionPos )
 {
+#if 0	//HL2_EPISODIC
 	CEffectData data;
 	data.m_vOrigin = vecExplosionPos;
 	DispatchEffect( "HelicopterMegaBomb", data );
-
+#else
+	if(GetCrashPoint() != NULL)
+		ExplosionCreate( vecExplosionPos, QAngle(0,0,1), this, 200, 256, CHOPPER_CHUNK_EXPLODE_FLAGS );
+#endif
 	EmitSound( "BaseExplosionEffect.Sound" );
 
 	UTIL_ScreenShake( vecExplosionPos, 25.0, 150.0, 1.0, 750.0f, SHAKE_START );
-
-	if(GetCrashPoint() != NULL)
-	{
-		// Make it clear that I'm done for.
-		ExplosionCreate( vecExplosionPos, QAngle(0,0,1), this, 100, 128, false );
-	}
 
 	if ( random->RandomInt( 0, 4 ) )
 	{
@@ -5979,13 +5981,16 @@ void CHelicopterChunk::FallThink( void )
 		SetThink( NULL );
 		return;
 	}
-	
+
 	if ( random->RandomInt( 0, 8 ) == 0 )
 	{
+#if 0
 		CEffectData data;
 		data.m_vOrigin = GetAbsOrigin() + RandomVector( -64, 64 );
 		DispatchEffect( "HelicopterMegaBomb", data );
-
+#else
+		ExplosionCreate( GetAbsOrigin(), GetAbsAngles(), this, 100, 128, CHOPPER_CHUNK_EXPLODE_FLAGS );
+#endif
 		EmitSound( "BaseExplosionEffect.Sound" );
 	}
 

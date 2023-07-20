@@ -848,13 +848,14 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 	case TASK_COMBINE_SIGNAL_BEST_SOUND:
 		if( InSquad() && GetSquad()->NumMembers() > 1 )
 		{
+/*
 #ifdef HL2MP
 			CBasePlayer *pPlayer = AI_GetNearestPlayer( GetAbsOrigin() );
 #else
 			CBasePlayer *pPlayer = AI_GetSinglePlayer();
 #endif
-
-			if( pPlayer && OccupyStrategySlot( SQUAD_SLOT_EXCLUSIVE_HANDSIGN ) )
+*/
+			if( OccupyStrategySlot( SQUAD_SLOT_EXCLUSIVE_HANDSIGN ) )	//pPlayer
 			{
 				CSound *pSound;
 				pSound = GetBestSound( SOUND_DANGER );
@@ -2144,15 +2145,13 @@ int CNPC_Combine::SelectCombatSchedule()
 		else
 		{
 			// Taking damage should have entered a "null" enemy position into memory
+
 			Assert( GetEnemy() != NULL );
-		//!	return SCHED_SMALL_FLINCH;
-#if 0
-			//TODO; If damage came from player, he must be shooting me from a cheeky spot, take cover!
-#ifdef HL2MP
-			CBasePlayer *pPlayer = AI_GetNearestPlayer( GetAbsOrigin() );
+#if 1	// Use old alert flinch from source '03
+			return SCHED_ALERT_SMALL_FLINCH;
 #else
+			//TODO; If damage came from player, he must be shooting me from a cheeky spot, take cover!
 			CBasePlayer *pPlayer = AI_GetSinglePlayer();
-#endif
 			if( pPlayer && !BaseClass::FVisible(pPlayer->vLastKnownLocation) )
 			{
 				return SCHED_TAKE_COVER_FROM_ORIGIN;
@@ -3992,12 +3991,6 @@ bool CNPC_Combine::IsRunningApproachEnemySchedule()
 	return false;
 }
 
-#if 0
-bool CNPC_Combine::ShouldPickADeathPose( void ) 
-{
-	return !IsCrouching(); 
-}
-#endif
 
 //-----------------------------------------------------------------------------
 //

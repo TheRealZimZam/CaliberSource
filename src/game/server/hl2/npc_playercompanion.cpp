@@ -1577,8 +1577,8 @@ void CNPC_PlayerCompanion::StartTask( const Task_t *pTask )
 			Assert( ( GetGroundEntity() && ( GetGroundEntity()->IsPlayer() || ( GetGroundEntity()->IsNPC() && IRelationType( GetGroundEntity() ) == D_LI ) ) ) );
 			GetNavigator()->SetAllowBigStep( GetGroundEntity() );
 			ChainStartTask( TASK_MOVE_AWAY_PATH, 48 );
-			
-			/*
+
+#ifndef HL1_DLL
 			trace_t tr;
 			UTIL_TraceHull( GetAbsOrigin(), GetAbsOrigin(), GetHullMins(), GetHullMaxs(), MASK_NPCSOLID, this, COLLISION_GROUP_NONE, &tr );
 			if ( tr.startsolid && tr.m_pEnt == GetGroundEntity() )
@@ -1586,7 +1586,7 @@ void CNPC_PlayerCompanion::StartTask( const Task_t *pTask )
 				// Allow us to move through the entity for a short time
 				NPCPhysics_CreateSolver( this, GetGroundEntity(), true, 2.0f );
 			}
-			*/
+#endif
 		}
 		break;
 
@@ -1886,7 +1886,7 @@ Activity CNPC_PlayerCompanion::NPC_TranslateActivity( Activity activity )
 		break;
 	}
 
-	return TranslateActivityReadiness( activity );
+	return BaseClass::NPC_TranslateActivity( TranslateActivityReadiness( activity ) );
 }
 
 //------------------------------------------------------------------------------

@@ -200,6 +200,7 @@ void CWeaponShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool
 	CAI_BaseNPC *npc = pOperator->MyNPCPointer();
 	ASSERT( npc != NULL );
 	WeaponSound( SINGLE_NPC );
+	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
 	pOperator->DoMuzzleFlash();
 	m_iClip1 = m_iClip1 - 1;
 
@@ -226,6 +227,7 @@ void CWeaponShotgun::FireNPCSecondaryAttack( CBaseCombatCharacter *pOperator, bo
 	CAI_BaseNPC *npc = pOperator->MyNPCPointer();
 	ASSERT( npc != NULL );
 	WeaponSound( DOUBLE_NPC );
+	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
 	pOperator->DoMuzzleFlash();
 	m_iClip1 = m_iClip1 - 2;
 
@@ -475,6 +477,7 @@ void CWeaponShotgun::Pump( void )
 	m_bNeedPump = false;
 
 	WeaponSound( SPECIAL1 );
+	CSoundEnt::InsertSound( SOUND_WEAPON, GetAbsOrigin(), 384, 0.2, GetOwner() );
 
 	// Finish reload animation
 	SendWeaponAnim( ACT_SHOTGUN_PUMP );
@@ -539,7 +542,7 @@ void CWeaponShotgun::PrimaryAttack( void )
 	pPlayer->FireBullets( sk_plr_num_shotgun_pellets.GetInt(), vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, GetPrimaryAmmoType(), 2, -1, -1, 0, NULL, true, true );
 	pPlayer->ViewPunch( QAngle( -SHOTGUN_KICKBACK, random->RandomFloat( -SHOTGUN_KICKBACK, SHOTGUN_KICKBACK ), 0 ) );
 
-	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
+	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2, GetOwner() );
 
 	if (!m_iClip1 && pPlayer->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
 	{
@@ -612,7 +615,7 @@ void CWeaponShotgun::SecondaryAttack( void )
 		pPlayer->TakeDamage( CTakeDamageInfo( this, this, 1, DMG_CLUB ) );
 	}
 
-	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );
+	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );
 
 	if (!m_iClip1 && pPlayer->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
 	{

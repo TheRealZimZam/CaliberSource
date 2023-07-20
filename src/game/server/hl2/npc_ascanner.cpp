@@ -517,6 +517,7 @@ int CNPC_ADrone::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	}
 
 	// Flinch in the direction of the attack
+#if 0
 	float vAttackYaw = VecToYaw(g_vecAttackDir);
 
 	float vAngleDiff = UTIL_AngleDiff( vAttackYaw, m_fHeadYaw );
@@ -537,6 +538,7 @@ int CNPC_ADrone::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	{
 		SetActivity((Activity)ACT_ASCANNER_FLINCH_FRONT);
 	}
+#endif
 
 	return BaseClass::OnTakeDamage_Alive( info );
 }

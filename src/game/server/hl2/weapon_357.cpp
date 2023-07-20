@@ -167,6 +167,7 @@ CWeapon357::CWeapon357( void )
 		m_bCanJam			= true;
 	}
 	m_bReloadsSingly	= false;
+	m_bReloadsFullClip	= true;
 	m_bFiresUnderwater	= false;
 }
 

@@ -18,7 +18,7 @@
 #include "ai_behavior_follow.h"
 #include "ai_behavior_lead.h"
 #include "npcevent.h"
-#include "ai_playerally.h"
+#include "npc_talker.h"
 #include "ai_senses.h"
 #include "soundent.h"
 
@@ -32,9 +32,9 @@ ConVar monk_headshot_freq( "monk_headshot_freq", "2" );
 //-----------------------------------------------------------------------------
 int ACT_MONK_GUN_IDLE;
 
-class CNPC_Monk : public CAI_PlayerAlly
+class CNPC_Monk : public CNPC_SimpleTalker
 {
-	DECLARE_CLASS( CNPC_Monk, CAI_PlayerAlly );
+	DECLARE_CLASS( CNPC_Monk, CNPC_SimpleTalker );
 
 public:
 

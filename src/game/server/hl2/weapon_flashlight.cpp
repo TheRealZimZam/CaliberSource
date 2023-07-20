@@ -29,6 +29,8 @@
 // CWeaponFlashlight
 //-----------------------------------------------------------------------------
 
+#define FLASHLIGHT_PLAYER_BLIND_DISTANCE 12*50	//Dont turn on towards a friendly player if hes this far from me
+
 class CWeaponFlashlight : public CBaseHLCombatWeapon
 {
 	DECLARE_DATADESC();
@@ -50,6 +52,7 @@ public:
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
+	int		WeaponRangeAttack1Condition( float flDot, float flDist );
 	Activity	GetPrimaryAttackActivity( void );
 	
 	DECLARE_ACTTABLE();
@@ -124,6 +127,30 @@ void CWeaponFlashlight::Precache( void )
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
+int CWeaponFlashlight::WeaponRangeAttack1Condition( float flDot, float flDist )
+{
+	CAI_BaseNPC *pOperator = GetOwner()->MyNPCPointer();
+	Vector vecTarget = pOperator->GetEnemyLKP();
+
+	// ---------------------------------------------------------------------
+	// Is a friendly player in my way?
+	// ---------------------------------------------------------------------
+	if( flDist < FLASHLIGHT_PLAYER_BLIND_DISTANCE )
+	{
+		CBaseEntity *pTarget = NULL;
+		while ( ( pTarget = gEntList.FindEntityInSphere( pTarget, vecTarget, 100 ) ) != NULL )
+		{
+			//Check to see if the default relationship is hatred, and if so intensify that
+			if ( pOperator->IRelationType( pTarget ) == D_LI )
+			{
+				return COND_WEAPON_BLOCKED_BY_FRIEND;
+			}
+		}
+	}
+
+	return true;	//TODO
+}
+
 void CWeaponFlashlight::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
 	switch( pEvent->event )
@@ -149,7 +176,7 @@ void CWeaponFlashlight::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseComb
 					GetAttachment( LookupAttachment( "muzzle" ), vecShootOrigin, angShootDir );
 					AngleVectors( angShootDir, &vecShootDir );
 
-					//Create the beam
+					//Create the beam (sprite/dlight is clientside)
 		#if 1
 					m_hFlashlightBeam = CBeam::BeamCreate( "sprites/glow_test01.vmt", 32 );
 

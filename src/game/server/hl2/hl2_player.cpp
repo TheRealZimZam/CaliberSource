@@ -84,8 +84,6 @@ ConVar hl2_single_primary_weapon_mode( "hl2_single_primary_weapon_mode", "0" );
 // 1-weapon limit for each slot -- FIXME; Grenades/anything in bucket 5 shouldnt count
 ConVar hl2_single_weapon_slot( "hl2_single_weapon_slot", "0" );
 
-#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
-
 //-------------------------
 //NOTE; Right now, playertalk just plays sentences like its hl1 - however, since we changed our inheritance
 // to basemultiplayer, the response system can now be used - if its ever done properly it should definitely
@@ -106,11 +104,17 @@ ConVar hl2_runspeed( "player_runspeed", "240", FCVAR_REPLICATED );
 ConVar hl2_sprintspeed( "player_sprintspeed", "300", FCVAR_REPLICATED );
 
 ConVar hl2_darkness_flashlight_factor( "hl2_darkness_flashlight_factor", "1" );
-
+#if 0
 #define	HL2_WALK_SPEED hl2_walkspeed.GetFloat()
 #define	HL2_JOG_SPEED hl2_jogspeed.GetFloat()
 #define	HL2_RUN_SPEED hl2_runspeed.GetFloat()
 #define	HL2_SPRINT_SPEED hl2_sprintspeed.GetFloat()
+#else
+#define	HL2_WALK_SPEED 120
+#define	HL2_JOG_SPEED 170
+#define	HL2_RUN_SPEED 240
+#define	HL2_SPRINT_SPEED 300
+#endif
 #define	HL2_ACCELERATION 1
 #define	HL2_DECELERATION 1
 
@@ -384,6 +388,8 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_FIELD( m_flFlashlightPowerDrainScale, FIELD_FLOAT ),
 	DEFINE_FIELD( m_bFlashlightDisabled, FIELD_BOOLEAN ),
 
+	DEFINE_FIELD( m_iCash, FIELD_INTEGER ),
+
 	DEFINE_FIELD( m_bUseCappedPhysicsDamageTable, FIELD_BOOLEAN ),
 
 	DEFINE_FIELD( m_hLockedAutoAimEntity, FIELD_EHANDLE ),
@@ -437,18 +443,15 @@ CHL2_Player::CHL2_Player()
 	// Probably not going to spend time fixing because the few additional
 	// features arent really worth it - we only need animations so the player
 	// can admire himself in the mirror anyway.
-/*
-		UseClientSideAnimation();
-		// Setup the movement data.
-		MultiPlayerMovementData_t movementData;
-		movementData.m_flRunSpeed = HL2_RUN_SPEED;
-		movementData.m_flWalkSpeed = HL2_WALK_SPEED;
-		movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
+	UseClientSideAnimation();
+	// Setup the movement data.
+	MultiPlayerMovementData_t movementData;
+	movementData.m_flRunSpeed = HL2_RUN_SPEED;
+	movementData.m_flWalkSpeed = HL2_WALK_SPEED;
+	movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
 
-		// Create animation state for this player.
-		CMultiPlayerAnimState *m_PlayerAnimState = new CMultiPlayerAnimState( this, movementData );
-		m_PlayerAnimState->Init( this, movementData );
-*/
+	// Create animation state for this player.
+	m_PlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
 #endif
 	m_angEyeAngles.Init();
 
@@ -642,28 +645,6 @@ void CHL2_Player::HandleArmorReduction( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::PreThink(void)
 {
-	if ( player_showpredictedposition.GetBool() )
-	{
-		Vector	predPos;
-
-		UTIL_PredictedPosition( this, player_showpredictedposition_timestep.GetFloat(), &predPos );
-
-		NDebugOverlay::Box( predPos, NAI_Hull::Mins( GetHullType() ), NAI_Hull::Maxs( GetHullType() ), 0, 255, 0, 0, 0.01f );
-		NDebugOverlay::Line( GetAbsOrigin(), predPos, 0, 255, 0, 0, 0.01f );
-	}
-
-#ifdef HL2_EPISODIC
-	if( m_hLocatorTargetEntity != NULL )
-	{
-		// Keep track of the entity here, the client will pick up the rest of the work
-		m_HL2Local.m_vecLocatorOrigin = m_hLocatorTargetEntity->WorldSpaceCenter();
-	}
-	else
-	{
-		m_HL2Local.m_vecLocatorOrigin = vec3_invalid; // This tells the client we have no locator target.
-	}
-#endif//HL2_EPISODIC
-
 	// Riding a vehicle?
 	if ( IsInAVehicle() )	
 	{
@@ -680,6 +661,26 @@ void CHL2_Player::PreThink(void)
 		WaterMove();	
 		return;
 	}
+
+	BaseClass::PreThink();
+
+	if ( player_showpredictedposition.GetBool() )
+	{
+		Vector	predPos;
+
+		UTIL_PredictedPosition( this, player_showpredictedposition_timestep.GetFloat(), &predPos );
+
+		NDebugOverlay::Box( predPos, NAI_Hull::Mins( GetHullType() ), NAI_Hull::Maxs( GetHullType() ), 0, 255, 0, 0, 0.01f );
+		NDebugOverlay::Line( GetAbsOrigin(), predPos, 0, 255, 0, 0, 0.01f );
+	}
+
+#ifdef HL2_EPISODIC
+	if( m_hLocatorTargetEntity != NULL )
+		// Keep track of the entity here, the client will pick up the rest of the work
+		m_HL2Local.m_vecLocatorOrigin = m_hLocatorTargetEntity->WorldSpaceCenter();
+	else
+		m_HL2Local.m_vecLocatorOrigin = vec3_invalid; // This tells the client we have no locator target.
+#endif//HL2_EPISODIC
 
 	// This is an experiment of mine- autojumping! 
 	// only affects you if sv_autojump is nonzero.
@@ -762,172 +763,24 @@ void CHL2_Player::PreThink(void)
 
 	VPROF_SCOPE_END();
 
-	if ( g_fGameOver || IsPlayerLockedInPlace() )
-		return;         // finale
-
-	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-ItemPreFrame" );
-	ItemPreFrame( );
-	VPROF_SCOPE_END();
-
-	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-WaterMove" );
-	WaterMove();
-	VPROF_SCOPE_END();
-
-	if ( g_pGameRules && g_pGameRules->FAllowFlashlight() )
-		m_Local.m_iHideHUD &= ~HIDEHUD_FLASHLIGHT;
-	else
-		m_Local.m_iHideHUD |= HIDEHUD_FLASHLIGHT;
-
-	
-	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-CommanderUpdate" );
-	CommanderUpdate();
-	VPROF_SCOPE_END();
+#ifdef HL2_EPISODIC
+	CheckFlashlight();
+#endif	// HL2_EPISODIC
 
 	// Operate suit accessories and manage power consumption/charge
 	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-SuitPower_Update" );
 	SuitPower_Update();
 	VPROF_SCOPE_END();
 
-	// checks if new client data (for HUD and view control) needs to be sent to the client
-	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-UpdateClientData" );
-	UpdateClientData();
-	VPROF_SCOPE_END();
-	
-	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-CheckTimeBasedDamage" );
-	CheckTimeBasedDamage();
-	VPROF_SCOPE_END();
-
-	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-CheckSuitUpdate" );
-	CheckSuitUpdate();
-	VPROF_SCOPE_END();
-
-	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-CheckSuitZoom" );
-	CheckSuitZoom();
-	VPROF_SCOPE_END();
-
-	if (m_lifeState >= LIFE_DYING)
+	if (!g_pGameRules->IsMultiplayer() )
 	{
-		PlayerDeathThink();
-		return;
-	}
+		VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-CheckSuitZoom" );
+		CheckSuitZoom();
+		VPROF_SCOPE_END();
 
-#ifdef HL2_EPISODIC
-	CheckFlashlight();
-#endif	// HL2_EPISODIC
-
-	// So the correct flags get sent to client asap.
-	//
-	if ( m_afPhysicsFlags & PFLAG_DIROVERRIDE )
-		AddFlag( FL_ONTRAIN );
-	else 
-		RemoveFlag( FL_ONTRAIN );
-
-	// Train speed control
-	if ( m_afPhysicsFlags & PFLAG_DIROVERRIDE )
-	{
-		CBaseEntity *pTrain = GetGroundEntity();
-		float vel;
-
-		if ( pTrain )
-		{
-			if ( !(pTrain->ObjectCaps() & FCAP_DIRECTIONAL_USE) )
-				pTrain = NULL;
-		}
-		
-		if ( !pTrain )
-		{
-			if ( GetActiveWeapon() && (GetActiveWeapon()->ObjectCaps() & FCAP_DIRECTIONAL_USE) )
-			{
-				m_iTrain = TRAIN_ACTIVE | TRAIN_NEW;
-
-				if ( m_nButtons & IN_FORWARD )
-				{
-					m_iTrain |= TRAIN_FAST;
-				}
-				else if ( m_nButtons & IN_BACK )
-				{
-					m_iTrain |= TRAIN_BACK;
-				}
-				else
-				{
-					m_iTrain |= TRAIN_NEUTRAL;
-				}
-				return;
-			}
-			else
-			{
-				trace_t trainTrace;
-				// Maybe this is on the other side of a level transition
-				UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + Vector(0,0,-38), 
-					MASK_PLAYERSOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &trainTrace );
-
-				if ( trainTrace.fraction != 1.0 && trainTrace.m_pEnt )
-					pTrain = trainTrace.m_pEnt;
-
-
-				if ( !pTrain || !(pTrain->ObjectCaps() & FCAP_DIRECTIONAL_USE) || !pTrain->OnControls(this) )
-				{
-//					Warning( "In train mode with no train!\n" );
-					m_afPhysicsFlags &= ~PFLAG_DIROVERRIDE;
-					m_iTrain = TRAIN_NEW|TRAIN_OFF;
-					return;
-				}
-			}
-		}
-		else if ( !( GetFlags() & FL_ONGROUND ) || pTrain->HasSpawnFlags( SF_TRACKTRAIN_NOCONTROL ) || (m_nButtons & (IN_MOVELEFT|IN_MOVERIGHT) ) )
-		{
-			// Turn off the train if you jump, strafe, or the train controls go dead
-			m_afPhysicsFlags &= ~PFLAG_DIROVERRIDE;
-			m_iTrain = TRAIN_NEW|TRAIN_OFF;
-			return;
-		}
-
-		SetAbsVelocity( vec3_origin );
-		vel = 0;
-		if ( m_afButtonPressed & IN_FORWARD )
-		{
-			vel = 1;
-			pTrain->Use( this, this, USE_SET, (float)vel );
-		}
-		else if ( m_afButtonPressed & IN_BACK )
-		{
-			vel = -1;
-			pTrain->Use( this, this, USE_SET, (float)vel );
-		}
-
-		if (vel)
-		{
-			m_iTrain = TrainSpeed(pTrain->m_flSpeed, ((CFuncTrackTrain*)pTrain)->GetMaxSpeed());
-			m_iTrain |= TRAIN_ACTIVE|TRAIN_NEW;
-		}
-	} 
-	else if (m_iTrain & TRAIN_ACTIVE)
-	{
-		m_iTrain = TRAIN_NEW; // turn off train
-	}
-
-	// THIS CODE DOESN'T SEEM TO DO ANYTHING!!!
-	// WHY IS IT STILL HERE? (sjb)
-/*
-	if (m_nButtons & IN_JUMP)
-	{
-		// If on a ladder, jump off the ladder
-		// else Jump
-		if( IsPullingObject() )
-		{
-			StopPullingObject();
-		}
-
-		Jump();
-	}
-*/
-
-	//
-	// If we're not on the ground, we're falling. Update our falling velocity.
-	//
-	if ( !( GetFlags() & FL_ONGROUND ) )
-	{
-		m_Local.m_flFallVelocity = -GetAbsVelocity().z;
+		VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-CommanderUpdate" );
+		CommanderUpdate();
+		VPROF_SCOPE_END();
 	}
 
 	if ( m_afPhysicsFlags & PFLAG_ONBARNACLE )
@@ -958,7 +811,6 @@ void CHL2_Player::PreThink(void)
 			SetAbsVelocity( vec3_origin );
 		}
 	}
-	// StudioFrameAdvance( );//!!!HACKHACK!!! Can't be hit by traceline when not animating?
 
 	// Update weapon's ready status
 	UpdateWeaponPosture();
@@ -980,12 +832,9 @@ void CHL2_Player::PreThink(void)
 		if ( m_nButtons & IN_ZOOM )
 		{
 			//FIXME: Held weapons like the grenade get sad when this happens
-	#ifdef HL2_EPISODIC
-			// Episodic allows players to zoom while using a func_tank
 			CBaseCombatWeapon* pWep = GetActiveWeapon();
 			if ( !m_hUseEntity || ( pWep && pWep->IsWeaponVisible() ) )
-	#endif
-			m_nButtons &= ~(IN_ATTACK|IN_ATTACK2);
+				m_nButtons &= ~(IN_ATTACK|IN_ATTACK2);
 		}
 	}
 }
@@ -1006,8 +855,6 @@ void CHL2_Player::PostThink( void )
 	{
 		m_PlayerAnimState->Update( m_angEyeAngles[YAW], m_angEyeAngles[PITCH] );
 	}
-	// Dont even bother compiling this if we're using a animstate
-#ifndef SINGLEPLAYER_ANIMSTATE
 	else
 	{
 		// Rudimentary pitch/yaw
@@ -1052,7 +899,6 @@ void CHL2_Player::PostThink( void )
 			SetPoseParameter( GetModelPtr(), "move_yaw", flYaw );
 		}
 	}
-#endif
 }
 
 void CHL2_Player::StartAdmireGlovesAnimation( void )
@@ -2738,11 +2584,13 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 {
 	// Dead SP players use the old system for death
+#if SINGLEPLAYER_ANIMSTATE
 	if ( m_PlayerAnimState )
 	{
 		m_PlayerAnimState->Release();
 		m_PlayerAnimState = NULL;
 	}
+#endif
 
 	BaseClass::Event_Killed( info );
 

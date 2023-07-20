@@ -26,9 +26,9 @@ class CSprite;
 //=========================================================
 //	>> CNPC_Vortigaunt
 //=========================================================
-class CNPC_Vortigaunt : public CNPCSimpleTalker
+class CNPC_Vortigaunt : public CNPC_SimpleTalker
 {
-	DECLARE_CLASS( CNPC_Vortigaunt, CNPCSimpleTalker );
+	DECLARE_CLASS( CNPC_Vortigaunt, CNPC_SimpleTalker );
 
 public:
 	void			Spawn( void );

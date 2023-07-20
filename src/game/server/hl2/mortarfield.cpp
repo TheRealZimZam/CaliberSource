@@ -64,7 +64,7 @@ BEGIN_DATADESC( CFuncMortarField )
 	DEFINE_KEYFIELD( m_flSpread,		FIELD_FLOAT,   "m_flSpread" ),
 	DEFINE_KEYFIELD( m_flDelay,			FIELD_FLOAT,   "m_flDelay" ),
 	DEFINE_KEYFIELD( m_iCount,			FIELD_INTEGER, "m_iCount" ),
-	DEFINE_KEYFIELD(  m_fControl,		FIELD_INTEGER, "m_fControl" ),
+	DEFINE_KEYFIELD( m_fControl,		FIELD_INTEGER, "m_fControl" ),
 
 	DEFINE_INPUTFUNC( FIELD_VOID,		"Trigger",		InputTrigger ),
 	DEFINE_OUTPUT( m_OnFire,			"OnFire" ),
@@ -386,11 +386,16 @@ void CFuncLightningField :: Spawn( void )
 void CFuncLightningField::Precache( void )
 {
 	m_beamIndex = PrecacheModel( "sprites/lgtning.vmt" );
+	PrecacheScriptSound("Weather.Thunder");
+//	PrecacheScriptSound("Weather.ThunderImpact");
 	BaseClass::Precache();
 }
 
 void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
+	DetectInSkybox();
+	bool bInSkybox = IsEFlagSet(EFL_IN_SKYBOX);
+
 	Vector vecStart;
 /*
 	vecStart.x = random->RandomFloat( this->mins.x, this->maxs.x );
@@ -398,6 +403,8 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 	vecStart.z = this->maxs.z;
 */
 	CollisionProp()->RandomPointInBounds( Vector( 0, 0, 1 ), Vector( 1, 1, 1 ), &vecStart );
+
+	Vector StrikePos = vecStart;
 
 	switch( m_fControl )
 	{
@@ -429,9 +436,9 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 					0,			//frame start
 					2.0f,		//framerate
 					random->RandomFloat( 0.05, 0.2 ),	//life
-					4.0,		// width
-					4.0,		// endwidth
-					100,		// fadelength,
+					bInSkybox ? 0.4 : 4.0,		// width
+					bInSkybox ? 0.4 : 4.0,		// endwidth
+					bInSkybox ? 10 : 100,		// fadelength,
 					1,			// noise
 					100,		// red
 					160,		// green
@@ -439,7 +446,19 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 					255,		// bright
 					0			// speed
 					);
+
+		// Add a little bit of Z to the actual endpos, so we dont clip through thin roofs and such
+		StrikePos = (tr.endpos + Vector(0,0,8));
 	}
+
+	// Some token beamdamage at the strikepoint, we should be in the skybox so if this hits anything
+	// its a miracle
+	RadiusDamage( CTakeDamageInfo( this, pActivator ? pActivator : this, 10, DMG_ENERGYBEAM ), StrikePos, 128, CLASS_NONE, NULL );
+
+//	if ( bInSkybox )
+		EmitSound( "Weather.Thunder" );
+//	else
+//		EmitSound( "Weather.ThunderImpact" );
 
 	m_OnFire.FireOutput(pActivator, this);
 }

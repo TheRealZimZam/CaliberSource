@@ -26,6 +26,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+extern ConVar temp_demofixes;	//TEMPTEMP
+
 #define	PISTOL_FASTEST_REFIRE_TIME		sk_pistol_refire_time.GetFloat()	//0.2f
 
 ConVar	sk_pistol_refire_time( "sk_pistol_refire_time",	"0.2");
@@ -202,11 +204,14 @@ void CWeaponPistol::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCh
 			pOperator->DoMuzzleFlash();
 
 			//Temp effect until model is done with CL_EVENT_EJECTBRASS1, like the smg
-			CEffectData data;
-			data.m_vOrigin = pOperator->WorldSpaceCenter() + RandomVector( -4, 4 );
-			data.m_vAngles = QAngle( 90, random->RandomInt( 0, 360 ), 0 );
-			data.m_nEntIndex = entindex();
-			DispatchEffect( "ShellEject", data );
+			if ( temp_demofixes.GetBool() )
+			{
+				CEffectData data;
+				data.m_vOrigin = pOperator->WorldSpaceCenter() + RandomVector( -4, 4 );
+				data.m_vAngles = QAngle( 90, random->RandomInt( 0, 360 ), 0 );
+				data.m_nEntIndex = entindex();
+				DispatchEffect( "ShellEject", data );
+			}
 
 			m_iClip1 = m_iClip1 - 1;
 		}
@@ -271,7 +276,7 @@ void CWeaponPistol::PistolFire( Vector vSpread, float flCycleTime, bool bBurstFi
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 	pPlayer->SetAimTime( 1.0f );
 
-	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, GetOwner() );
+	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, GetOwner() );
 
 	//!!!TEMPTEMP; This needs a proper solution
 	if ( bBurstFire )
@@ -374,6 +379,7 @@ bool CWeaponPistol::Reload( void )
 	if ( fRet )
 	{
 		WeaponSound( RELOAD );
+		CSoundEnt::InsertSound( SOUND_WEAPON, GetAbsOrigin(), 384, 0.2, GetOwner() );
 	}
 	return fRet;
 }

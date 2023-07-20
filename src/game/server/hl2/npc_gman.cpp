@@ -15,7 +15,7 @@
 #include "ai_basenpc.h"
 #include "ai_hull.h"
 #include "ai_behavior_follow.h"
-#include "ai_playerally.h"
+#include "ai_basetalker.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -24,10 +24,10 @@
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-class CNPC_GMan : public CAI_PlayerAlly
+class CNPC_GMan : public CAI_BaseTalker
 {
 public:
-	DECLARE_CLASS( CNPC_GMan, CAI_PlayerAlly );
+	DECLARE_CLASS( CNPC_GMan, CAI_BaseTalker );
 	DECLARE_DATADESC();
 
 	void	Spawn( void );

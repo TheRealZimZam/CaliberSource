@@ -44,6 +44,8 @@ public:
 	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
 
+	bool	Deploy( void );
+
 	void	ItemPostFrame( void );
 	void	ItemPreFrame( void );
 	void	ItemBusyFrame( void );
@@ -64,10 +66,14 @@ public:
 		static Vector npcCone = VECTOR_CONE_3DEGREES;
 		if ( GetOwner() && GetOwner()->IsNPC() )
 			return npcCone;
-			
+
 		static Vector cone;
 
-		cone = VECTOR_CONE_2DEGREES;
+		// In MP first shot is always %100 accurate
+		if ( g_pGameRules->IsMultiplayer() )
+			cone = VECTOR_CONE_PRECALCULATED;
+		else
+			cone = VECTOR_CONE_2DEGREES;
 
 		float ramp = RemapValClamped(	m_flAccuracyPenalty, 
 										0.0f, 
@@ -85,16 +91,9 @@ public:
 	{
 		// This is default fire-rate (primary attack) holding it down, should be about 1 shot a second; TF2 is 0.15
 		if ( GetOwner() && GetOwner()->IsNPC() )
-		{
-			// NPC value
-			return BaseClass::GetFireRate() + 0.25f;	//0.5f
-		}
+			return BaseClass::GetFireRate() + 0.25f;	// NPC value
 		else
-		{
-			// Player(s) value
-			return BaseClass::GetFireRate();	//0.35f
-		}
-
+			return BaseClass::GetFireRate();	// Player(s) value
 	}
 
 	DECLARE_ACTTABLE();
@@ -157,7 +156,25 @@ CWeapon45::CWeapon45( )
 		m_bCanJam			= true;
 	}
 	m_bReloadsSingly	= false;
+	m_bReloadsFullClip	= true;
 	m_bFiresUnderwater	= false;
+	m_bUseProjectile = false;
+}
+
+bool CWeapon45::Deploy( void )
+{
+	// Multiplayer, we dont have that tiny base spread, rep it
+	if ( g_pGameRules->IsMultiplayer() )
+	{
+		// enable laser sight geometry.
+		SetBodygroup( 4, 1 );
+	}
+	else
+	{
+		SetBodygroup( 4, 0 );
+	}
+
+	return BaseClass::Deploy();
 }
 
 //-----------------------------------------------------------------------------
@@ -165,8 +182,6 @@ CWeapon45::CWeapon45( )
 //-----------------------------------------------------------------------------
 void CWeapon45::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
-
 	switch( pEvent->event )
 	{
 		case EVENT_WEAPON_RELOAD:
@@ -176,7 +191,7 @@ void CWeapon45::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharac
 				// Emit six spent shells
 				for ( int i = 0; i < GetDefaultClip1(); i++ )
 				{
-					data.m_vOrigin = pOwner->WorldSpaceCenter() + RandomVector( -4, 4 );
+					data.m_vOrigin = pOperator->WorldSpaceCenter() + RandomVector( -4, 4 );
 					data.m_vAngles = QAngle( 90, random->RandomInt( 0, 360 ), 0 );
 					data.m_nEntIndex = entindex();
 

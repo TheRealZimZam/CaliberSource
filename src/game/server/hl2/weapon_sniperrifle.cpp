@@ -7,7 +7,10 @@
 //
 // TODO: Circular mask around crosshairs when zoomed in.
 // TODO: Finalize kickback.
-// TODO: Animated zoom effect?
+// TODO: Use CSniperBullet - hitscanning with this thing is underwhelming
+// When given to a npc (npc_combine_e), this is to be used mostly as a thematic device,
+// it does represents the real sniper (proto_sniper), but without the laser 
+// and long-range OP-ness of the said sniper.
 // NOTENOTE; This can be used as a baseclass for weapons that have a zoom
 //=============================================================================//
 
@@ -22,6 +25,7 @@
 #include "soundent.h"
 #include "vstdlib/random.h"
 #include "te_effect_dispatch.h"
+#include "proto_sniper.h"			// For SniperBullet
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -83,8 +87,9 @@ CHLSniperRifle::CHLSniperRifle( )
 	m_fNextZoom = gpGlobals->curtime;
 	m_nZoomLevel = 0;
 
-	m_bReloadsSingly = true;
+	m_bReloadsSingly = true;	//Reload one bullet at a time
 	m_bBoltAction = false;	//Bolt-action style firing defaults off
+	m_bUseProjectile = true;	//Projectile defaults on
 
 	m_fMinRange1		= 64;
 	m_fMinRange2		= 64;
@@ -261,6 +266,7 @@ bool CHLSniperRifle::Reload( void )
 			// and otherwise steals channel away from fire sound
 			WeaponSound(RELOAD);
 			SendWeaponAnim( ACT_VM_RELOAD );
+			CSoundEnt::InsertSound( SOUND_WEAPON, GetAbsOrigin(), 256, 0.2, GetOwner() );
 
 			// Play the player's reload animation
 			if ( pOwner->IsPlayer() )
@@ -312,7 +318,9 @@ void CHLSniperRifle::PrimaryAttack( void )
 	// MUST call sound before removing a round from the clip of a CMachineGun dvs: does this apply to the sniper rifle? I don't know.
 	WeaponSound(SINGLE);
 
+	// Register a muzzleflash for the AI.
 	pPlayer->DoMuzzleFlash();
+	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 
 	// player "shoot" animation
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
@@ -326,11 +334,20 @@ void CHLSniperRifle::PrimaryAttack( void )
 	Vector vecSrc	 = pPlayer->Weapon_ShootPosition();
 	Vector vecAiming = pPlayer->GetAutoaimVector( AUTOAIM_5DEGREES );	
 
-	// Fire the bullets
-	pPlayer->FireBullets( SNIPER_BULLET_COUNT_PLAYER, vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, SNIPER_TRACER_FREQUENCY_PLAYER );
+	// Fire the bullet
+	if ( m_bUseProjectile )
+	{
+		//TODO; We need to do a trace here to grab the actual target for the bullet (vecaiming is temp!!)
+		CSniperBullet *pBullet = (CSniperBullet *)Create( "sniperbullet", vecSrc, pPlayer->GetLocalAngles(), NULL );
+		pBullet->SetOwnerEntity( pPlayer );
+		pBullet->Start( vecSrc, vecAiming/*temp!!*/, pPlayer, true );
+	}
+	else
+	{
+		pPlayer->FireBullets( SNIPER_BULLET_COUNT_PLAYER, vecSrc, vecAiming, GetBulletSpread(), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, SNIPER_TRACER_FREQUENCY_PLAYER );
+	}
 
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 600, 0.2 );
-
 	QAngle vecPunch(-SNIPER_KICKBACK, random->RandomFloat( -SNIPER_KICKBACK/2, SNIPER_KICKBACK/2 ), 0);
 	if ( m_nZoomLevel != 0 )
 	{
@@ -343,9 +360,6 @@ void CHLSniperRifle::PrimaryAttack( void )
 	{
 		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
 	}
-
-	// Register a muzzleflash for the AI.
-	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 }
 
 
@@ -415,8 +429,21 @@ void CHLSniperRifle::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 				AngleVectors( pOperator->GetLocalAngles(), &vecShootDir );
 				vecSpread = GetBulletSpread();
 			}
+
 			WeaponSound( SINGLE_NPC );
-			pOperator->FireBullets( SNIPER_BULLET_COUNT_NPC, vecShootOrigin, vecShootDir, vecSpread, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, SNIPER_TRACER_FREQUENCY_NPC );
+
+			// Fire the bullet
+			if ( m_bUseProjectile )
+			{
+				CSniperBullet *pBullet = (CSniperBullet *)Create( "sniperbullet", vecShootOrigin, pOperator->GetLocalAngles(), NULL );
+				pBullet->SetOwnerEntity( pOperator );
+				pBullet->Start( vecShootOrigin, GetEnemy()->WorldSpaceCenter(), pOperator, true );
+			}
+			else
+			{
+				pOperator->FireBullets( SNIPER_BULLET_COUNT_NPC, vecShootOrigin, vecShootDir, vecSpread, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, SNIPER_TRACER_FREQUENCY_NPC );
+			}
+
 			pOperator->DoMuzzleFlash();
 			break;
 		}
@@ -478,6 +505,7 @@ CWeaponSniperRifle::CWeaponSniperRifle( )
 {
 	m_bReloadsSingly = true;
 	m_bBoltAction = true;
+	m_bUseProjectile = false;
 
 	m_fMinRange1		= 64;
 	m_fMaxRange1		= 2048;

@@ -165,8 +165,6 @@ public:
 
 	virtual int		TranslateSchedule( int scheduleType );
 
-//	virtual bool	ShouldPickADeathPose( void );
-
 protected:
 	// Time Variables
 	float			m_flNextPainSoundTime;

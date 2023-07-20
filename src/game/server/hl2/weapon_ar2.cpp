@@ -304,7 +304,7 @@ void CWeaponAR2::PrimaryAttack( void )
 	//Factor in the view kick
 	AddViewKick();
 
-	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_MACHINEGUN, 0.2, pPlayer );
+	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, GetAbsOrigin(), SOUNDENT_VOLUME_MACHINEGUN, 0.2, pPlayer );
 	
 	if (!m_iClip1 && pPlayer->GetAmmoCount(m_iPrimaryAmmoType) <= 0)
 	{
@@ -452,6 +452,8 @@ bool CWeaponAR2::Reload( void )
 	{
 		iActivity = ACT_VM_RELOAD2;
 	}
+
+	CSoundEnt::InsertSound( SOUND_WEAPON, GetAbsOrigin(), 384, 0.4, GetOwner() );
 
 	return DefaultReload( GetMaxClip1(), GetMaxClip2(), iActivity );
 }

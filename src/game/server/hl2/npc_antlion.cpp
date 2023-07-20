@@ -3184,7 +3184,7 @@ void CNPC_Antlion::StartJump( void )
 	{
 		// FIXME: Why must this be true?
 		// Must be jumping at an enemy
-		// if ( GetEnemy() == NULL )
+		//if ( GetEnemy() == NULL )
 		//	return;
 
 		//Don't jump if we're not on the ground
@@ -4151,7 +4151,17 @@ bool CNPC_Antlion::CorpseGib( const CTakeDamageInfo &info )
 		QAngle angBone;
 		GetBonePosition( s_nBodyBone, vecOrigin, angBone );
 
+// Screw that particle effect, the old version is better, period!
+#ifndef HL2_DLL
 		DispatchParticleEffect( "AntlionGib", vecOrigin, QAngle( 0, 0, 0 ) );
+#else
+		CEffectData	data;
+		data.m_vOrigin = vecOrigin;
+		data.m_vNormal = data.m_vOrigin - info.GetDamagePosition();
+		data.m_vAngles = QAngle( 0, 0, 0 );
+
+		DispatchEffect( "AntlionGib", data );
+#endif //HL2_EPISODIC
 	}
 
 	Vector velocity = vec3_origin;
@@ -4161,6 +4171,8 @@ bool CNPC_Antlion::CorpseGib( const CTakeDamageInfo &info )
 	params.defBurstScale = 150.0f;
 	params.defCollisionGroup = COLLISION_GROUP_DEBRIS;
 	PropBreakableCreateAll( GetModelIndex(), NULL, params, this, -1, true, true );
+
+	//CSoundEnt::InsertSound( SOUND_PHYSICS_DANGER, GetAbsOrigin(), 256, 0.5f, this );
 
 	return true;
 }

@@ -28,7 +28,9 @@
 #include "props.h"
 
 //TODO; CAI_BaseActor->CNPC_Combine?
-class CNPC_MetroPolice : public CAI_BaseActor
+//#include "npc_combine.h"
+
+class CNPC_MetroPolice : public CAI_BaseActor	//CNPC_Combine
 {
 	DECLARE_DATADESC();
 	DEFINE_CUSTOM_AI;

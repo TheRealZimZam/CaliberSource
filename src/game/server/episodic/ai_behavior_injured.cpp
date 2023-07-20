@@ -9,7 +9,7 @@
 #include "ai_speech.h"
 #include "ai_behavior.h"
 #include "ai_navigator.h"
-#include "ai_playerally.h"
+#include "ai_basetalker.h"
 #include "ai_behavior_follow.h"
 #include "ai_moveprobe.h"
 

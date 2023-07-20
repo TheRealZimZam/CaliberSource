@@ -379,7 +379,7 @@ bool CGrenadeHopwire::CreateVPhysics()
 void CGrenadeHopwire::Precache( void )
 {
 	// FIXME: Replace
-	//PrecacheSound("NPC_Strider.Shoot");
+	PrecacheSound("NPC_Strider.Shoot");
 	//PrecacheSound("d3_citadel.weapon_zapper_beam_loop2");
 
 	PrecacheModel( GRENADE_MODEL_OPEN );
@@ -490,7 +490,7 @@ void CGrenadeHopwire::CombatThink( void )
 	KillStriders();
 
 	// FIXME: Replace
-	//EmitSound("NPC_Strider.Shoot");
+	EmitSound("NPC_Strider.Shoot");
 	//EmitSound("d3_citadel.weapon_zapper_beam_loop2");
 
 	// Quick screen flash
@@ -514,7 +514,7 @@ void CGrenadeHopwire::CombatThink( void )
 	}
 	else
 	{
-		// Remove us immediately
+		// Create the ropes
 		SetThink( &CBaseEntity::SUB_Remove );
 		SetNextThink( gpGlobals->curtime + 0.1f );
 	}

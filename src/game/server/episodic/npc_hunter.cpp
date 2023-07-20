@@ -3357,7 +3357,7 @@ void CNPC_Hunter::StartTask( const Task_t *pTask )
 
 		case TASK_HUNTER_BEGIN_FLANK:
 		{
-			if ( IsInSquad() && GetSquad()->NumMembers() > 1 )
+			if ( InSquad() && GetSquad()->NumMembers() > 1 )
 			{
 				// Flank relative to the other shooter in our squad.
 				// If there's no other shooter, just flank relative to any squad member.
@@ -4094,12 +4094,12 @@ bool CNPC_Hunter::HandleChargeImpact( Vector vecImpact, CBaseEntity *pEntity )
 	{
 		EmitSound( "NPC_Hunter.ChargeHitEnemy" );
 
-		// dvs: TODO:
-		//if ( !IsPlayingGesture( ACT_HUNTER_CHARGE_HIT ) )
-		//{
-		//	RestartGesture( ACT_HUNTER_CHARGE_HIT );
-		//}
-		
+		// dvs:
+		if ( !IsPlayingGesture( ACT_HUNTER_CHARGE_HIT ) )
+		{
+			RestartGesture( ACT_HUNTER_CHARGE_HIT );
+		}
+
 		ChargeDamage( pEntity );
 
 		if ( !pEntity->IsNPC() )

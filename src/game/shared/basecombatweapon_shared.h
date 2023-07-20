@@ -46,6 +46,7 @@ class CUserCmd;
 #define	SF_WEAPON_START_CONSTRAINED	(1<<0)	
 #define SF_WEAPON_NO_PLAYER_PICKUP	(1<<1)
 #define SF_WEAPON_NO_PHYSCANNON_PUNT (1<<2)
+#define SF_WEAPON_ROTATE (1<<10)
 
 //Percent
 #define	CLIP_PERC_THRESHOLD		0.75f	
@@ -369,6 +370,7 @@ public:
 	DECLARE_DATADESC();
 	virtual void			FallInit( void );						// prepare to fall to the ground
 	virtual void			FallThink( void );						// make the weapon fall to the ground after spawning
+	virtual void			SpinThink( void );						// make the weapon spin around in place
 
 	// Weapon spawning
 	bool					IsConstrained() { return m_pConstraint != NULL; }

@@ -295,13 +295,13 @@ bool CMultiplayRules::Init()
 	//=========================================================
 	void CMultiplayRules::RefreshSkillData( bool forceUpdate )
 	{
-	// load all default values
+		// load all default values
 		BaseClass::RefreshSkillData( forceUpdate );
 
-	// override some values for multiplay.
+		// override some values for multiplay.
 
 		// suitcharger
-#ifndef TF_DLL
+#ifdef TF_DLL
 		ConVarRef suitcharger( "sk_suitcharger" );
 		suitcharger.SetValue( 30 );
 #endif
@@ -508,11 +508,8 @@ bool CMultiplayRules::Init()
 			if ( pPlayer )
 			{
 				FireTargets( "game_playerleave", pPlayer, pPlayer, USE_TOGGLE, 0 );
-
 				pPlayer->RemoveAllItems( true );// destroy all of the players weapons and items
-
-				// Kill off view model entities
-				pPlayer->DestroyViewModels();
+				pPlayer->DestroyViewModels();// Kill off view model entities
 
 				pPlayer->SetConnected( PlayerDisconnected );
 			}
@@ -573,7 +570,6 @@ bool CMultiplayRules::Init()
 		CBaseEntity	*pWeaponEntity = NULL;
 
 		pPlayer->EquipSuit();
-		
 		addDefault = true;
 
 		while ( (pWeaponEntity = gEntList.FindEntityByClassname( pWeaponEntity, "game_player_equip" )) != NULL)
@@ -1002,7 +998,7 @@ bool CMultiplayRules::Init()
 		if ( pl->IsOnLadder() || pl->GetAbsVelocity().Length2D() > 220 )
 			return true;  // only make step sounds in multiplayer if the player is moving fast enough
 
-		return false;
+		return true;
 	}
 
 	bool CMultiplayRules::FAllowFlashlight( void ) 

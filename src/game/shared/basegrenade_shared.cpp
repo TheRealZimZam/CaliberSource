@@ -160,7 +160,7 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 			!( contents & MASK_WATER ) ? g_sModelIndexFireball : g_sModelIndexWExplosion,
 			m_DmgRadius * .03, 
 			40,
-			TE_EXPLFLAG_NONE,
+			TE_EXPLFLAG_ROTATE,
 			m_DmgRadius,
 			m_flDamage );
 	}

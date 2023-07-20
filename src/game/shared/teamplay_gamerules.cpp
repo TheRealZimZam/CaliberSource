@@ -45,6 +45,24 @@ CTeamplayRules::CTeamplayRules()
 	// Copy over the team from the server config
 	m_szTeamList[0] = 0;
 
+#if 0
+	// Cache this because the team code doesn't want to deal with changing this in the middle of a game
+	strncpy( m_szTeamList, teamlist.string, TEAMPLAY_TEAMLISTLENGTH );
+
+	edict_t *pWorld = INDEXENT(0);
+	if ( pWorld && pWorld->v.team )
+	{
+		if ( teamoverride.GetInt() )
+		{
+			const char *pTeamList = STRING(pWorld->v.team);
+			if ( pTeamList && strlen(pTeamList) )
+			{
+				strncpy( m_szTeamList, pTeamList, TEAMPLAY_TEAMLISTLENGTH );
+			}
+		}
+	}
+#endif
+
 	RecountTeams();
 }
 
@@ -69,7 +87,6 @@ void CTeamplayRules::Think ( void )
 	BaseClass::Think();
 
 	///// Check game rules /////
-
 	if ( g_fGameOver )   // someone else quit the game already
 	{
 		BaseClass::Think();
@@ -77,10 +94,9 @@ void CTeamplayRules::Think ( void )
 	}
 
 	float flTimeLimit = mp_timelimit.GetFloat() * 60;
-	
 	if ( flTimeLimit != 0 && gpGlobals->curtime >= flTimeLimit )
 	{
-		ChangeLevel();
+		ChangeLevel();	//GoToIntermission()
 		return;
 	}
 
@@ -92,7 +108,7 @@ void CTeamplayRules::Think ( void )
 		{
 			if ( team_scores[i] >= flFragLimit )
 			{
-				ChangeLevel();
+				ChangeLevel();	//GoToIntermission()
 				return;
 			}
 		}
@@ -150,9 +166,10 @@ const char *CTeamplayRules::SetDefaultPlayerTeam( CBasePlayer *pPlayer )
 			pTeamName = TeamWithFewestPlayers();
 		}
 		pPlayer->SetTeamName( pTeamName );
+		return pPlayer->TeamName();
  	} */
 
-	return team; //pPlayer->TeamName();
+	return team;
 }
 
 
@@ -164,9 +181,8 @@ void CTeamplayRules::InitHUD( CBasePlayer *pPlayer )
 	SetDefaultPlayerTeam( pPlayer );
 	BaseClass::InitHUD( pPlayer );
 
-	RecountTeams();
-
-	/* TODO this has to be rewritten, maybe add a new USERINFO cvar "team"
+	// TODO this has to be rewritten, maybe add a new USERINFO cvar "team"
+	/*
 	const char *team = engine->GetClientConVarValue( pPlayer->entindex(), "cl_team" );
 
 	// update the current player of the team he is joining
@@ -185,7 +201,8 @@ void CTeamplayRules::InitHUD( CBasePlayer *pPlayer )
 	{
 		UTIL_SayText( text, pPlayer );
 	}
-	RecountTeams(); */
+	*/
+	RecountTeams();
 }
 
 
@@ -203,7 +220,6 @@ void CTeamplayRules::ChangePlayerTeam( CBasePlayer *pPlayer, const char *pTeamNa
 		damageFlags |= DMG_ALWAYSGIB;
 	}
 
-
 	// copy out the team name from the model
 	// pPlayer->SetTeamName( pTeamName );
 }
@@ -213,7 +229,7 @@ void CTeamplayRules::ChangePlayerTeam( CBasePlayer *pPlayer, const char *pTeamNa
 //-----------------------------------------------------------------------------
 void CTeamplayRules::ClientDisconnected( edict_t *pClient )
 {
-	// Msg( "CLIENT DISCONNECTED, REMOVING FROM TEAM.\n" );
+	DevMsg( "CLIENT DISCONNECTED, REMOVING FROM TEAM.\n" );
 
 	CBasePlayer *pPlayer = (CBasePlayer *)CBaseEntity::Instance( pClient );
 	if ( pPlayer )
@@ -223,6 +239,7 @@ void CTeamplayRules::ClientDisconnected( edict_t *pClient )
 		// Remove the player from his team
 		if ( pPlayer->GetTeam() )
 		{
+			pPlayer->GetTeam()->RemovePlayer( pPlayer );
 			pPlayer->ChangeTeam( 0 );
 		}
 	}
@@ -235,11 +252,11 @@ void CTeamplayRules::ClientDisconnected( edict_t *pClient )
 //=========================================================
 void CTeamplayRules::ClientSettingsChanged( CBasePlayer *pPlayer )
 {
-	/* TODO: handle skin, model & team changes 
-
+#ifdef HL1_DLL
+	// TODO: handle skin, model & team changes
   	char text[1024];
 
-	// skin/color/model changes
+	// prevent skin/color/model changes
 	int iTeam = Q_atoi( engine->GetClientConVarValue( pPlayer->entindex(), "cl_team" ) );
 	int iClass = Q_atoi( engine->GetClientConVarValue( pPlayer->entindex(), "cl_class" ) );
 
@@ -267,27 +284,9 @@ void CTeamplayRules::ClientSettingsChanged( CBasePlayer *pPlayer )
 
 	ChangePlayerTeam( pPlayer, mdls, true, true );
 	// recound stuff
-	RecountTeams(); */
-
-	const char *pszName = engine->GetClientConVarValue( pPlayer->entindex(), "name" );
-
-	const char *pszOldName = pPlayer->GetPlayerName();
-
-	// msg everyone if someone changes their name,  and it isn't the first time (changing no name to current name)
-	// Note, not using FStrEq so that this is case sensitive
-	if ( pszOldName[0] != 0 && Q_strcmp( pszOldName, pszName ) )
-	{
-		IGameEvent * event = gameeventmanager->CreateEvent( "player_changename" );
-		if ( event )
-		{
-			event->SetInt( "userid", pPlayer->GetUserID() );
-			event->SetString( "oldname", pszOldName );
-			event->SetString( "newname", pszName );
-			gameeventmanager->FireEvent( event );
-		}
-		
-		pPlayer->SetPlayerName( pszName );
-	}
+	RecountTeams();
+#endif
+	BaseClass::ClientSettingsChanged( pPlayer );
 }
 
 //=========================================================

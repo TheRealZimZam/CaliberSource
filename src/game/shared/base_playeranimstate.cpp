@@ -40,7 +40,7 @@ ConVar mp_facefronttime(
 	"After this amount of time of standing in place but aiming to one side, go ahead and move feet to face upper body." );
 
 ConVar mp_ik( "mp_ik", "1", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, "Use IK on in-place turns." );
-
+ConVar mp_slammoveyaw( "mp_slammoveyaw", "0", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, "Force movement yaw along an animation path." );
 
 // Below this many degrees, slow down turning rate linearly
 #define FADE_TURN_DEGREES	45.0f
@@ -224,7 +224,12 @@ bool CBasePlayerAnimState::ShouldUpdateAnimState()
 
 	// By default, don't update their animation state when they're dead because they're
 	// either a ragdoll or they're not drawn.
-	return GetOuter()->IsAlive();
+#ifdef CLIENT_DLL
+	if ( GetOuter()->IsDormant() )
+		return false;
+#endif
+
+	return (GetOuter()->IsAlive() || m_bDying);
 }
 
 bool CBasePlayerAnimState::ShouldChangeSequences( void ) const
@@ -242,10 +247,10 @@ void CBasePlayerAnimState::SetOuterPoseParameter( int iParam, float flValue )
 // Purpose: 
 // Input  : event - 
 //-----------------------------------------------------------------------------
-void CBasePlayerAnimState::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
+void CBasePlayerAnimState::DoAnimationEvent( int PlayerAnimEvent, int nData )
 {
 	//CBasePlayer *pPlayer = m_pOuter;
-	switch( PlayerAnimEvent_t )
+	switch( PlayerAnimEvent )
 	{
 	case PLAYER_JUMP:
 	case PLAYER_SUPERJUMP:
@@ -262,15 +267,19 @@ void CBasePlayerAnimState::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
 	case PLAYER_ATTACK1:
 	case PLAYER_ATTACK2:
 		{
-			// The middle part of the aim layer sequence becomes "shoot" until that animation is complete.
+			// Weapon firing - super important! Uses a special function.
 			m_bFiring = true;
 			m_flFireStartTime = gpGlobals->curtime;
 			break;
 		}
 	case PLAYER_RELOAD:
 		{
-			// Weapon reload.
-			//pPlayer->RestartGesture( ACT_GESTURE_RELOAD );
+			// Weapon reload - not important enough for a dedicated function, but still needed.
+#ifndef CLIENT_DLL
+			m_pOuter->RestartGesture( TranslateActivity( ACT_GESTURE_RELOAD ) );
+#else
+			
+#endif
 			break;
 		}
 	case PLAYER_DIE:
@@ -404,9 +413,9 @@ const char* CBasePlayerAnimState::GetWeaponPrefix()
 {
 	CBaseCombatWeapon *pWeapon = m_pOuter->GetActiveWeapon();
 	if ( pWeapon )
-		return pWeapon->GetWpnData().szAnimationPrefix;
+		return pWeapon->GetWpnData().szAnimationPrefix;	//Get the prefix
 	else
-		return "shotgun";
+		return "shotgun";	//Assume its underhanded shotgun style
 }
 
 int CBasePlayerAnimState::CalcAimLayerSequence( float *flCycle, float *flAimSequenceWeight, bool bForceIdle )
@@ -449,6 +458,7 @@ int CBasePlayerAnimState::CalcAimLayerSequence( float *flCycle, float *flAimSequ
 			default:
 				return CalcSequenceIndex( "%s%s", DEFAULT_IDLE_NAME, pPrefix );
 		}
+		return m_iCurrentAimSequence;
 	}
 #else
 	const char *pWeaponPrefix = GetWeaponPrefix();
@@ -532,8 +542,9 @@ void CBasePlayerAnimState::ComputeMainSequence()
 		return;
 #endif
 
-	if ( animDesired < 0 )
-		 animDesired = 0;
+	// The requested animation isnt available for the model, punt.
+	if ( animDesired <= ACT_INVALID )
+		 animDesired = ACT_IDLE;
 
 	pPlayer->ResetSequence( animDesired );
 
@@ -763,6 +774,45 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 
 	if ( bMoving && CanThePlayerMove() )
 	{
+#ifdef INVASION_DLL
+			if ( bMoving && ( maxspeed > 0.0f ) )
+			{
+			float flFactor = 1.0f;
+
+			// HACK HACK:: Defender backward animation is animated at 0.6 times speed, so scale up animation for this class
+			//  if he's running backward.
+
+			// Not sure if we're really going to do all classes this way.
+			if ( GetOuter()->IsClass( TFCLASS_DEFENDER ) ||
+				 GetOuter()->IsClass( TFCLASS_MEDIC ) )
+			{
+				Vector facing;
+				Vector moving;
+
+				moving = vel;
+				AngleVectors( GetOuter()->GetLocalAngles(), &facing );
+				VectorNormalize( moving );
+
+				float dot = moving.Dot( facing );
+				if ( dot < 0.0f )
+				{
+					float backspeed = sv_backspeed.GetFloat();
+					flFactor = 1.0f - fabs( dot ) * (1.0f - backspeed);
+
+					if ( flFactor > 0.0f )
+					{
+						flFactor = 1.0f / flFactor;
+					}
+				}
+			}
+
+			// Note this gets set back to 1.0 if sequence changes due to ResetSequenceInfo below
+			GetOuter()->SetPlaybackRate( ( speed * flFactor ) / maxspeed );
+
+			// BUG BUG:
+			// This stuff really should be m_flPlaybackRate = speed / m_flGroundSpeed
+		}
+#endif
 		float flGroundSpeed = GetInterpolatedGroundSpeed();
 		if ( flGroundSpeed < 0.001f )
 		{
@@ -901,6 +951,9 @@ void CBasePlayerAnimState::ComputePoseParam_MoveYaw( CStudioHdr *pStudioHdr )
 
 		if ( bIsMoving )
 		{
+			if ( mp_slammoveyaw.GetBool() )
+				flYaw = SnapYawTo( flYaw );
+
 			vCurMovePose.x = cos( DEG2RAD( flYaw ) ) * flPlaybackRate;
 			vCurMovePose.y = -sin( DEG2RAD( flYaw ) ) * flPlaybackRate;
 		}
@@ -975,12 +1028,14 @@ void CBasePlayerAnimState::ComputePoseParam_BodyPitch( CStudioHdr *pStudioHdr )
 	int pitch = GetOuter()->LookupPoseParameter( pStudioHdr, "body_pitch" );
 
 	// Try aim pitch instead
+	/*
 	if ( pitch < 0 )
 		pitch = GetOuter()->LookupPoseParameter( pStudioHdr, "aim_pitch" );
 
 	// Test again
-//	if ( pitch < 0 )
-//		return;
+	if ( pitch < 0 )
+		return;
+	*/
 
 	GetOuter()->SetPoseParameter( pStudioHdr, pitch, flPitch );
 	g_flLastBodyPitch = flPitch;

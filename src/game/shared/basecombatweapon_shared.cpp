@@ -2,7 +2,6 @@
 //
 // Purpose: 
 //
-// TODO; Better weapon spread system
 //=============================================================================//
 #include "cbase.h"
 #include "in_buttons.h"
@@ -11,7 +10,7 @@
 #include "SoundEmitterSystem/isoundemittersystembase.h"
 #include "physics_saverestore.h"
 #include "datacache/imdlcache.h"
-
+#include "gamerules.h"
 
 #if !defined( CLIENT_DLL )
 
@@ -180,7 +179,19 @@ void CBaseCombatWeapon::Spawn( void )
 		AddEffects( EF_ITEM_BLINK );
 	}
 
-	FallInit();
+	if ( HasSpawnFlags( SF_WEAPON_ROTATE ) )
+	{
+		AddSolidFlags( FSOLID_TRIGGER );
+		SetMoveType( MOVETYPE_FLY );
+		SetTouch(&CBaseCombatWeapon::DefaultTouch);
+		SetThink( &CBaseCombatWeapon::SpinThink );
+		SetNextThink( gpGlobals->curtime + 0.1f );
+	}
+	else
+	{
+		FallInit();
+	}
+
 	SetCollisionGroup( COLLISION_GROUP_WEAPON );
 	m_takedamage = DAMAGE_EVENTS_ONLY;
 
@@ -701,7 +712,8 @@ void CBaseCombatWeapon::Drop( const Vector &vecVelocity )
 	FallInit();
 	SetGroundEntity( NULL );
 	SetThink( &CBaseCombatWeapon::SetPickupTouch );
-	SetTouch(NULL);
+	SetTouch(NULL);	//Pickuptouch sets this
+	SetNextThink( gpGlobals->curtime + 1.0f );
 
 	if( hl2_episodic.GetBool() )
 	{
@@ -720,8 +732,6 @@ void CBaseCombatWeapon::Drop( const Vector &vecVelocity )
 	}
 
 	CBaseEntity *pOwner = GetOwnerEntity();
-
-	SetNextThink( gpGlobals->curtime + 1.0f );
 	SetOwnerEntity( NULL );
 	SetOwner( NULL );
 
@@ -822,7 +832,7 @@ void CBaseCombatWeapon::MakeTracer( const Vector &vecTracerSrc, const trace_t &t
 
 	case TRACER_RAIL:
 	case TRACER_BEAM:
-		//UTIL_ParticleTracer( pszTracerName, vNewSrc, tr.endpos, iEntIndex, iAttachment, false );
+		UTIL_ParticleTracer( pszTracerName, vNewSrc, tr.endpos, iEntIndex, iAttachment, false );
 		break;
 
 	case TRACER_LINE_AND_WHIZ:
@@ -968,15 +978,12 @@ void CBaseCombatWeapon::SetPickupTouch( void )
 #if !defined( CLIENT_DLL )
 	SetTouch(&CBaseCombatWeapon::DefaultTouch);
 
-	if ( gpGlobals->maxClients > 1 )
+	if ( g_pGameRules->IsMultiplayer() )
 	{
-		if ( GetSpawnFlags() & SF_NORESPAWN )
-		{
-			SetThink( &CBaseEntity::SUB_Remove );
-			SetNextThink( gpGlobals->curtime + 30.0f );
-		}
+		// Delete this weapon if nobody is going to pick it up
+		SetThink( &CBaseEntity::SUB_Remove );
+		SetNextThink( gpGlobals->curtime + 60.0f );
 	}
-
 #endif
 }
 
@@ -2493,6 +2500,7 @@ BEGIN_DATADESC( CBaseCombatWeapon )
 	// Function pointers
 	DEFINE_ENTITYFUNC( DefaultTouch ),
 	DEFINE_THINKFUNC( FallThink ),
+	DEFINE_THINKFUNC( SpinThink ),
 	DEFINE_THINKFUNC( Materialize ),
 	DEFINE_THINKFUNC( AttemptToMaterialize ),
 	DEFINE_THINKFUNC( DestroyItem ),

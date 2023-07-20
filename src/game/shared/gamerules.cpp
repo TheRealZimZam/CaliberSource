@@ -252,7 +252,6 @@ void CGameRules::RefreshSkillData ( bool forceUpdate )
 	char	szExec[256];
 
 	ConVarRef skill( "skill" );
-
 	SetSkillLevel( skill.IsValid() ? skill.GetInt() : 1 );
 
 #ifdef HL2_DLL

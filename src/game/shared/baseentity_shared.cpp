@@ -1581,6 +1581,39 @@ typedef CTraceFilterSimpleList CBulletsTraceFilter;
 
 void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 {
+	//!!TODO
+	//!!TODO
+	// Here's how the velocity system works;
+	// First, we do the normal, instant trace to find out how far away our impact point is,
+	// how much damage its going to do, etc. Then, All we need to do is some maths to
+	// factor in the velocity and probably TIME_TO_TICKS, then delay the impact by that much.
+	// Once the delay is up, do another trace to check if things have changed 
+	// (npc ran into the bullet, etc.), then allow the actual fuctions to run.
+	// 
+	// As always, the less we can get away with doing in the background the better, and it's 
+	// alot better to just double-run a trace than spawn entities or fill up any queues.
+	//
+	// Max delay should be about a second, anything more than that is going to end up feeling
+	// extremely unrealistic and strange.
+#if 0
+		if ( info.m_flVelocity > 0 )
+		{
+		//!!TODO
+		//!!TODO
+		//	float flBulletDelay = (Something with info.m_vecSrc, vecEnd, and m_flVelocity);
+
+			// Clamp the calculated delay to 1 second, any bullet traveling longer or slower than
+			// that (flak cannon, big shells, etc.) should use an actual simulated projectile.
+			//clamp( flBulletDelay, 0, 1.0 )
+			//
+			// Call the function again but this time its real (exchange velocity for delay)
+			// FireBullets( info, flBulletDelay )
+			//
+			// And stop this one from doing anything else
+			//return;
+		}
+#endif
+
 	static int	tracerCount;
 	trace_t		tr;
 	CAmmoDef*	pAmmoDef	= GetAmmoDef();
@@ -1767,24 +1800,6 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			NDebugOverlay::Line(info.m_vecSrc, vecEnd, 255, 255, 255, false, .1 );
 #endif
 
-		//!!TODO;
-		// This is where the velocity check should come in.
-		// All we need to do is some maths to get how far away the impact point is,
-		// factor in the velocity and probably TIME_TO_TICKS, then delay the impact by that much.
-		// No need for expensive entites and actual simulation.
-		// Max delay should be about a second.
-#if 0
-		if ( info.m_flVelocity > 0 )
-		{
-			//!!TODOTODO;
-		//	float flBulletDelay = (Something with info.m_vecSrc, vecEnd, and m_flVelocity);
-
-			// Clamp the calculated delay to 1 second, any bullet traveling longer or slower than
-			// that (flak cannon, big shells, etc.) should use an actual simulated projectile.
-			//clamp( flBulletDelay, 0, 1.0 )
-		}
-#endif
-
 		// Might have to offload everything below here
 		if ( bStartedInWater )
 		{
@@ -1930,7 +1945,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		{
 #ifdef GAME_DLL
 			surfacedata_t *psurf = physprops->GetSurfaceData( tr.surface.surfaceProps );
-			if ( ( psurf != NULL ) && ( tr.m_pEnt->ClassMatches( "func_breakable" ) ) )	//( psurf->game.material == CHAR_TEX_GLASS || psurf->game.material == CHAR_TEX_GRATE )
+			if ( ( psurf != NULL ) && ( tr.m_pEnt->ClassMatches( "func_breakable" ) || tr.m_pEnt->ClassMatches( "func_wall" ) ) )	//( psurf->game.material == CHAR_TEX_GLASS || psurf->game.material == CHAR_TEX_GRATE )
 			{
 				// Query the func_breakable for whether it wants to allow for bullet penetration
 				if ( tr.m_pEnt->HasSpawnFlags( SF_BREAK_NO_BULLET_PENETRATION ) == false )
@@ -2118,7 +2133,6 @@ void CBaseEntity::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 		AddMultiDamage( info, this );
 
 		int blood = BloodColor();
-		
 		if ( blood != DONT_BLEED )
 		{
 			SpawnBlood( vecOrigin, vecDir, blood, info.GetDamage() );// a little surface blood.

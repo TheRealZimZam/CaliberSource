@@ -862,7 +862,7 @@ void UTIL_BloodImpact( const Vector &pos, const Vector &dir, int color, int amou
 		return;
 
 	if ( g_pGameRules->IsMultiplayer() )
-		amount *= 4;
+		amount *= 2;
 
 	if ( amount > 255 )
 		amount = 255;

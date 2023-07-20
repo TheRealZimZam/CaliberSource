@@ -29,6 +29,10 @@
 #define MOVING_MINIMUM_SPEED 0.5f
 #define MAX_GROUND_SPEED 320
 
+// Speed to blend into next movement layer
+#define RUN_SPEED		160.0f
+#define SPRINT_SPEED	270.0f
+
 #define MAIN_IDLE_SEQUENCE_LAYER 0	// For 8-way blended models, this layer blends an idle on top of the run/walk animation to simulate a 9-way blend.
 									// For 9-way blended models, we don't use this layer.
 
@@ -85,7 +89,7 @@ public:
 	// DoAnimationEvent() receives and triggers all of the incidental animations -
 	// (firing, reloading, etc.)
 	virtual void Update( float eyeYaw, float eyePitch );
-	virtual void DoAnimationEvent( int PlayerAnimEvent_t, int nData );
+	virtual void DoAnimationEvent( int PlayerAnimEvent, int nData );
 
 	// This is called by the client when a new player enters the PVS to clear any events
 	// the dormant version of the entity may have been playing.
@@ -239,6 +243,29 @@ protected:
 	int					m_nTurningInPlace;
 
 	QAngle				m_angRender;
+
+	float SnapYawTo( float flValue )
+	{
+		float flSign = 1.0f;
+		if ( flValue < 0.0f )
+		{
+			flSign = -1.0f;
+			flValue = -flValue;
+		}
+
+		if ( flValue < 23.0f )
+			flValue = 0.0f;
+		else if ( flValue < 67.0f )
+			flValue = 45.0f;
+		else if ( flValue < 113.0f )
+			flValue = 90.0f;
+		else if ( flValue < 157 )
+			flValue = 135.0f;
+		else
+			flValue = 180.0f;
+
+		return ( flValue * flSign );
+	}
 
 private:
 

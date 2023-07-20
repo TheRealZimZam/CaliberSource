@@ -1,6 +1,6 @@
 //====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======//
 //
-// Purpose: 
+// Purpose: MP Animstate - adds gesture support for more versatile animation
 //
 //=============================================================================//
 #ifndef MULTIPLAYER_ANIMSTATE_H
@@ -23,26 +23,34 @@ class CBasePlayer;
 
 enum PlayerAnimEvent_t
 {
+	// Old redefs
+	// DO NOT CHANGE ORDER - REFER TO SHAREDDEFS.H!!!
+	// MUST ALLIGN WITH PLAYER_ANIM ENUM!!!
+	PLAYERANIMEVENT_IDLE,
+	PLAYERANIMEVENT_WALK,
+	PLAYERANIMEVENT_JUMP,
+	PLAYERANIMEVENT_SUPERJUMP,
+	PLAYERANIMEVENT_DIE,
 	PLAYERANIMEVENT_ATTACK_PRIMARY,
 	PLAYERANIMEVENT_ATTACK_SECONDARY,
-	PLAYERANIMEVENT_ATTACK_GRENADE,
+	PLAYERANIMEVENT_IN_VEHICLE,
 	PLAYERANIMEVENT_RELOAD,
+	PLAYERANIMEVENT_ATTACK_PRE,
+	PLAYERANIMEVENT_ATTACK_POST,
+	PLAYERANIMEVENT_SPAWN,
+
+	PLAYERANIMEVENT_ATTACK_GRENADE,
 	PLAYERANIMEVENT_RELOAD_LOOP,
 	PLAYERANIMEVENT_RELOAD_END,
-	PLAYERANIMEVENT_JUMP,
-	PLAYERANIMEVENT_SWIM,
-	PLAYERANIMEVENT_DIE,
 	PLAYERANIMEVENT_FLINCH_CHEST,
 	PLAYERANIMEVENT_FLINCH_HEAD,
 	PLAYERANIMEVENT_FLINCH_LEFTARM,
 	PLAYERANIMEVENT_FLINCH_RIGHTARM,
 	PLAYERANIMEVENT_FLINCH_LEFTLEG,
 	PLAYERANIMEVENT_FLINCH_RIGHTLEG,
-	PLAYERANIMEVENT_DOUBLEJUMP,
 
 	// Cancel.
 	PLAYERANIMEVENT_CANCEL,
-	PLAYERANIMEVENT_SPAWN,
 
 	// Snap to current yaw exactly
 	PLAYERANIMEVENT_SNAP_YAW,
@@ -53,8 +61,6 @@ enum PlayerAnimEvent_t
 	PLAYERANIMEVENT_CUSTOM_GESTURE_SEQUENCE,
 
 	// TF Specific. Here until there's a derived game solution to this.
-	PLAYERANIMEVENT_ATTACK_PRE,
-	PLAYERANIMEVENT_ATTACK_POST,
 	PLAYERANIMEVENT_GRENADE1_DRAW,
 	PLAYERANIMEVENT_GRENADE2_DRAW,
 	PLAYERANIMEVENT_GRENADE1_THROW,
@@ -76,7 +82,6 @@ enum
 	GESTURE_SLOT_ATTACK_AND_RELOAD,
 	GESTURE_SLOT_GRENADE,
 	GESTURE_SLOT_JUMP,
-	GESTURE_SLOT_SWIM,
 	GESTURE_SLOT_FLINCH,
 	GESTURE_SLOT_VCD,
 	GESTURE_SLOT_CUSTOM,
@@ -168,17 +173,21 @@ public:
 	// This is called by both the client and the server in the same way to trigger events for
 	// players firing, jumping, throwing grenades, etc.
 	virtual void ClearAnimationState();
-	virtual void DoAnimationEvent( PlayerAnimEvent_t event, int nData = 0 );
+	virtual void DoAnimationEvent( int PlayerAnimEvent_mp, int nData = 0 );
 	virtual Activity CalcMainActivity();	
 	virtual void Update( float eyeYaw, float eyePitch );
-	virtual void Release( void );
 
 	const QAngle &GetRenderAngles();
 
 	virtual Activity TranslateActivity( Activity actDesired );
 
+	virtual float GetRunSpeed() { return RUN_SPEED; }
 	virtual void SetRunSpeed( float flSpeed ) { m_MovementData.m_flRunSpeed = flSpeed; }
+
+	virtual float GetWalkSpeed() { return m_MovementData.m_flWalkSpeed; }
 	virtual void SetWalkSpeed( float flSpeed ) { m_MovementData.m_flWalkSpeed = flSpeed; }
+
+	virtual float GetSprintSpeed() { return SPRINT_SPEED; }
 	virtual void SetSprintSpeed( float flSpeed ) { m_MovementData.m_flSprintSpeed = flSpeed; }
 
 	// Debug
@@ -199,10 +208,10 @@ public:
 
 protected:
 
-	CBasePlayer *GetBasePlayer( void )				{ return m_pPlayer; }
+	CBasePlayer *GetPlayer( void )				{ return m_pPlayer; }
 
 	// Allow inheriting classes to override SelectWeightedSequence
-	virtual int SelectWeightedSequence( Activity activity ) { return GetBasePlayer()->SelectWeightedSequence( activity ); }
+	virtual int SelectWeightedSequence( Activity activity ) { return GetPlayer()->SelectWeightedSequence( activity ); }
 	virtual void RestartMainSequence();
 
 	virtual bool HandleJumping( Activity &idealActivity );
@@ -228,18 +237,15 @@ protected:
 
 	virtual void PlayFlinchGesture( Activity iActivity );
 
-	//virtual float CalcMovementPlaybackRate( bool *bIsMoving );
-
 	// Pose paramters.
 	bool				SetupPoseParameters( CStudioHdr *pStudioHdr );
 	virtual void		ComputePoseParam_AimPitch( CStudioHdr *pStudioHdr );
-	virtual void		ComputePoseParam_AimYaw( CStudioHdr *pStudioHdr );
-	void				ComputePoseParam_BodyHeight( CStudioHdr *pStudioHdr );
-	void				ConvergeYawAngles( float flGoalYaw, float flYawRate, float flDeltaTime, float &flCurrentYaw );
+	//virtual void		ComputePoseParam_AimYaw( CStudioHdr *pStudioHdr );
+	//void				ConvergeYawAngles( float flGoalYaw, float flYawRate, float flDeltaTime, float &flCurrentYaw );
 
-	const char* GetWeaponPrefix();
+	void UpdateLayerSequenceGeneric( CStudioHdr *pStudioHdr, int iLayer, bool &bEnabled, float &flCurCycle, int &iSequence, bool bWaitAtEnd, float flWeight = 1.0 );
 
-	//virtual float GetCurrentMaxGroundSpeed();
+	virtual float GetCurrentMaxGroundSpeed();
 	virtual void ComputeSequences( CStudioHdr *pStudioHdr );
 	void ComputeMainSequence();
 	void UpdateInterpolators();
@@ -248,8 +254,6 @@ protected:
 
 	void ComputeFireSequence();
 	void ComputeDeployedSequence();
-
-	bool ShouldUpdateAnimState();
 
 	void				DebugShowAnimStateForPlayer( bool bIsServer );
 	void				DebugShowEyeYaw( void );
@@ -315,6 +319,7 @@ private:
 
 };
 
+CMultiPlayerAnimState *CreateMultiPlayerAnimState( CBasePlayer *pPlayer, MultiPlayerMovementData_t &movementData );
 
 // If this is set, then the game code needs to make sure to send player animation events
 // to the local player if he's the one being watched.

@@ -42,6 +42,7 @@ extern ConVar developer;	// developer mode
 #define LANGUAGE_ENGLISH				0
 #define LANGUAGE_GERMAN					1
 #define LANGUAGE_FRENCH					2
+// You fookin wot m8???
 #define LANGUAGE_BRITISH				3
 
 

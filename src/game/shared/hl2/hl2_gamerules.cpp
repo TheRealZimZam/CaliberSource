@@ -1,8 +1,14 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ====
 //
-// Purpose: The Half-Life 2 game rules, such as the relationship tables and ammo
-//			damage cvars.
+// Purpose: Game rules for Caliber.
 //
+// Very much TODO; Only modes supported right now are T/DM
+//
+// Instead of having to (YUCK!) launch a completely seperate client just to play MP,
+// its all gonna be rolled up in one package like any other normal game. To do this
+// in source, we need some ((very)) powerful gamerule code that can dynamically change
+// from SP to MP on the fly, and support multiple gamemodes
+// To do this, we inherit from multiplayer, and patch the singleplayer ONTOP of that.
 //=============================================================================
 
 #include "cbase.h"
@@ -11,17 +17,19 @@
 #include "hl2_shareddefs.h"
 
 #ifdef CLIENT_DLL
-
+	#include "c_basehlplayer.h"
 #else
 	#include "player.h"
 	#include "game.h"
 	#include "gamerules.h"
-	#include "teamplay_gamerules.h"
+	#include "items.h"
+	#include "team.h"
 	#include "hl2_player.h"
 	#include "voice_gamemgr.h"
 	#include "globalstate.h"
 	#include "ai_basenpc.h"
 	#include "weapon_physcannon.h"
+	#include "basegrenade_shared.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -32,8 +40,12 @@ REGISTER_GAMERULES_CLASS( CHalfLife2 );
 
 BEGIN_NETWORK_TABLE_NOBASE( CHalfLife2, DT_HL2GameRules )
 	#ifdef CLIENT_DLL
+		RecvPropInt( RECVINFO( m_iGameMode ) ),
+		RecvPropBool( RECVINFO( m_bTeamPlayEnabled ) ),
 		RecvPropBool( RECVINFO( m_bMegaPhysgun ) ),
 	#else
+		SendPropInt( SENDINFO( m_iGameMode ) ),
+		SendPropBool( SENDINFO( m_bTeamPlayEnabled ) ),
 		SendPropBool( SENDINFO( m_bMegaPhysgun ) ),
 	#endif
 END_NETWORK_TABLE()
@@ -41,7 +53,6 @@ END_NETWORK_TABLE()
 
 LINK_ENTITY_TO_CLASS( hl2_gamerules, CHalfLife2Proxy );
 IMPLEMENT_NETWORKCLASS_ALIASED( HalfLife2Proxy, DT_HalfLife2Proxy )
-
 
 #ifdef CLIENT_DLL
 	void RecvProxy_HL2GameRules( const RecvProp *pProp, void **pOut, void *pData, int objectID )
@@ -68,10 +79,24 @@ IMPLEMENT_NETWORKCLASS_ALIASED( HalfLife2Proxy, DT_HalfLife2Proxy )
 	END_SEND_TABLE()
 #endif
 
+#ifdef GAME_DLL
+BEGIN_DATADESC( CHalfLife2Proxy )
+	// Inputs
+END_DATADESC()
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CHalfLife2Proxy::Activate()
+{
+	HL2GameRules()->Activate();
+
+	BaseClass::Activate();
+}
+#endif
 
 // stupid convar for broken stuff that isnt really broken
 ConVar	temp_demofixes( "temp_demofixes","1", FCVAR_REPLICATED );
-
 ConVar  physcannon_mega_enabled( "physcannon_mega_enabled", "0", FCVAR_CHEAT | FCVAR_REPLICATED );
 
 // Enables a bunch of cheeky stuff
@@ -80,6 +105,14 @@ ConVar	sv_funmode( "sv_funmode","0", FCVAR_SPONLY | FCVAR_REPLICATED, "Enable F(
 // Controls the application of the robus radius damage model.
 ConVar	sv_robust_explosions( "sv_robust_explosions","1", FCVAR_REPLICATED );
 ConVar	r_burningproplight( "r_burningproplight","0", FCVAR_REPLICATED );
+
+// MP convars ripped from hl2mp
+#ifdef GAME_DLL
+ConVar sv_hl2mp_weapon_respawn_time( "sv_hl2mp_weapon_respawn_time", "30", FCVAR_GAMEDLL | FCVAR_NOTIFY );	//FCVAR_GAMEDLL
+ConVar sv_hl2mp_item_respawn_time( "sv_hl2mp_item_respawn_time", "20", FCVAR_GAMEDLL | FCVAR_NOTIFY );	//FCVAR_GAMEDLL
+ConVar sv_hl2mp_player_respawn_time( "sv_hl2mp_player_respawn_time", "10", FCVAR_GAMEDLL | FCVAR_NOTIFY );	//FCVAR_GAMEDLL
+ConVar sv_hl2mp_dead_player_tripmines( "sv_hl2mp_dead_player_tripmines", "0", FCVAR_GAMEDLL, "Can dead players have active tripmines?" );	//FCVAR_GAMEDLL
+#endif
 
 // Damage scale for damage inflicted by the player on each skill level.
 ConVar	sk_dmg_inflict_scale1( "sk_dmg_inflict_scale1", "1.25", FCVAR_REPLICATED );
@@ -209,15 +242,197 @@ ConVar	sk_npc_dmg_gunship_to_plr	( "sk_npc_dmg_gunship_to_plr", "0", FCVAR_REPLI
 ConVar	sk_npc_dmg_strider			( "sk_npc_dmg_strider", "0", FCVAR_REPLICATED );
 ConVar	sk_npc_dmg_strider_to_plr	( "sk_npc_dmg_strider_to_plr", "0", FCVAR_REPLICATED );
 
+// NOTE: the indices here must match TEAM_TERRORIST, TEAM_CT, TEAM_SPECTATOR, etc.
+char *sTeamNames[] =
+{
+	"Unassigned",
+	"Spectator",
+	"Combine",
+	"Rebels",
+};
+
+CHalfLife2::CHalfLife2()
+{
 #ifndef CLIENT_DLL
+	m_bTeamPlayEnabled = teamplay.GetBool();
+	m_iGameMode = 0;
+	m_bMegaPhysgun = false;
+
+	if ( IsTeamplay() )
+	{
+#ifdef HL1_DLL
+		// Create basic server teams
+		CTeam *pTeam = static_cast<CTeam*>(CreateEntityByName( "team_manager" ));
+		pTeam->Init( "Unassigned", 0 );
+		g_Teams.AddToTail( pTeam );
+
+		pTeam = static_cast<CTeam*>(CreateEntityByName( "team_manager" ));
+		pTeam->Init( "Spectator", 1 );
+		g_Teams.AddToTail( pTeam );
+
+		char	*pName;
+		char	szTeamlist[TEAMPLAY_TEAMLISTLENGTH];
+
+		// loop through all teams, recounting everything
+		int num_teams = 0;
+
+		// Copy all of the teams from the teamlist
+		// make a copy because strtok is destructive
+		Q_strncpy( szTeamlist, teamlist.GetString(), sizeof(teamlist) );
+		pName = szTeamlist;
+		pName = strtok( pName, "," );
+		while ( pName != NULL && *pName )
+		{
+			if ( GetTeamIndex( pName ) < 0 )
+			{
+				// create team
+				pTeam = static_cast<CTeam*>(CreateEntityByName( "team_manager" ));
+				pTeam->Init( pName, num_teams + 2 );
+				g_Teams.AddToTail( pTeam );
+
+				num_teams++;
+			}
+			pName = strtok( NULL, "," );
+		}
+
+		// Manually create teams
+		if ( num_teams == 0 )
+		{
+			pTeam = static_cast<CTeam*>(CreateEntityByName( "team_manager" ) );
+			pTeam->Init( "robo", num_teams + 2 );
+			g_Teams.AddToTail( pTeam );
+			num_teams++;
+
+			pTeam = static_cast<CTeam*>(CreateEntityByName( "team_manager" ) );
+			pTeam->Init( "hgrunt", num_teams + 2 );
+			g_Teams.AddToTail( pTeam );
+			num_teams++;
+		}
+#else
+		// Create the team managers
+		for ( int i = 0; i < ARRAYSIZE( sTeamNames ); i++ )
+		{
+			CTeam *pTeam = static_cast<CTeam*>(CreateEntityByName( "team_manager" ));
+			pTeam->Init( sTeamNames[i], i );
+
+			g_Teams.AddToTail( pTeam );
+		}
+#endif
+	}
+
+	m_flLastHealthDropTime = 0.0f;
+	m_flLastGrenadeDropTime = 0.0f;
+
+#endif
+}
+
+CHalfLife2::~CHalfLife2( void )
+{
+#ifndef CLIENT_DLL
+	// Note, don't delete each team since they are in the gEntList and will 
+	// automatically be deleted from there, instead.
+	g_Teams.Purge();
+#endif
+}
+
 const char *CHalfLife2::GetGameDescription( void )
 {
 	if ( IsMultiplayer() )
-		return "Caliber: Deathmatch";
+	{
+		// Only mode that isnt considered team based is deathmatch/FFA,
+		// so we dont need to check all the others if thats the case.
+		if ( IsDeathmatch() )
+		{
+			return "Caliber: Deathmatch";
+		}
+		else
+		{
+			switch(GetGameType())
+			{
+				case TDM:				return "Caliber: Team Deathmatch";
+				case OBJECTIVE:			return "Caliber: Objective";
+				case FLAG:				return "Caliber: Capture the Flag";
+				case ARENA:				return "Caliber: Arena";
+				case LASTMAN:			return "Caliber: Sudden Death";
+
+				default:				return "Caliber: MP";
+			}
+		}
+	}
 	else
-		return "Caliber";
+	{
+		return "Caliber: Source";
+	}
 }
+
+bool CHalfLife2::IsMultiplayer( void )
+{
+	// Caliber can be both mp and sp - if there's more than 1 client in the server, switch to MP
+	return (gpGlobals->maxClients > 1);
+}
+
+bool CHalfLife2::IsTeamplay( void )
+{
+	return IsMultiplayer() && m_bTeamPlayEnabled;
+}
+
+bool CHalfLife2::IsDeathmatch( void )
+{
+	return IsMultiplayer() && !m_bTeamPlayEnabled;
+}
+
+bool CHalfLife2::IsCoOp( void )
+{
+	// TODO; Disabled for now, need some better requirements here
+	// Maybe check the map extension?
+	// Q_stristr( gpGlobals->mapname.ToCStr(), "d2_coast_01" )
+	return false;
+
+	// Any server thats more than 5 max players cannot be co-op, no matter hwhat
+	return (IsMultiplayer() && (gpGlobals->maxClients < 5));
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Server has properly started, set the game type and modifiers
+//-----------------------------------------------------------------------------
+void CHalfLife2::Activate()
+{
+	SetGameType(SINGLEPLAYER);
+
+	if (IsMultiplayer())
+	{
+		// Default to deathmatch
+		SetGameType(DEATHMATCH);
+
+		if ( IsCoOp() )
+			SetGameType(COOP);
+
+		// Every other mode is based on teams, dont need anything fancy here
+		if ( IsTeamplay() )
+		{
+			// Default to TDM
+			SetGameType(TDM);
+
+			// Now we check for special entities - if the map has it, change the game-mode.
+			//TODO;
+#if 0
+			// Objective is lowest priority, since all others are derived from it
+			if ( g_hControlPointMasters.Count() )
+				SetGameType(OBJECTIVE);
+
+			// There's a flag position, change to CTF
+			CCaptureFlag *pFlag = dynamic_cast<CCaptureFlag*> ( gEntList.FindEntityByClassname( NULL, "info_flag_position" ) );
+			if ( pFlag )
+				SetGameType(FLAG);
+
+			// Check for arena last - it overwrites everything else
+			CArenaController *pArena = dynamic_cast<CArenaController*> ( gEntList.FindEntityByClassname( NULL, "arena_controller" ) );
+			if ( pArena )
+				SetGameType(ARENA);
 #endif
+		}
+	}
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -226,12 +441,8 @@ const char *CHalfLife2::GetGameDescription( void )
 //-----------------------------------------------------------------------------
 int CHalfLife2::Damage_GetTimeBased( void )
 {
-#ifdef HL2_EPISODIC
 	int iDamage = ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE );
 	return iDamage;
-#else
-	return BaseClass::Damage_GetTimeBased();
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -242,12 +453,7 @@ int CHalfLife2::Damage_GetTimeBased( void )
 bool CHalfLife2::Damage_IsTimeBased( int iDmgType )
 {
 	// Damage types that are time-based.
-#ifdef HL2_EPISODIC
-	// This makes me think EP2 should have its own rules, but they are #ifdef all over in here.
 	return ( ( iDmgType & ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE ) ) != 0 );
-#else
-	return BaseClass::Damage_IsTimeBased( iDmgType );
-#endif
 }
 
 #ifdef CLIENT_DLL
@@ -264,61 +470,6 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 
 
 #else //}{
-
-	extern bool		g_fGameOver;
-
-#if !(defined( HL2MP ) || defined( PORTAL_MP ))
-	class CVoiceGameMgrHelper : public IVoiceGameMgrHelper
-	{
-	public:
-		virtual bool		CanPlayerHearPlayer( CBasePlayer *pListener, CBasePlayer *pTalker, bool &bProximity )
-		{
-			return true;
-		}
-	};
-	CVoiceGameMgrHelper g_VoiceGameMgrHelper;
-	IVoiceGameMgrHelper *g_pVoiceGameMgrHelper = &g_VoiceGameMgrHelper;
-#endif
-	
-	//-----------------------------------------------------------------------------
-	// Purpose:
-	// Input  :
-	// Output :
-	//-----------------------------------------------------------------------------
-	CHalfLife2::CHalfLife2()
-	{
-		m_bMegaPhysgun = false;
-		
-		m_flLastHealthDropTime = 0.0f;
-		m_flLastGrenadeDropTime = 0.0f;
-	}
-
-	//-----------------------------------------------------------------------------
-	// Purpose: called each time a player uses a "cmd" command
-	// Input  : *pEdict - the player who issued the command
-	//			Use engine.Cmd_Argv,  engine.Cmd_Argv, and engine.Cmd_Argc to get 
-	//			pointers the character string command.
-	//-----------------------------------------------------------------------------
-	bool CHalfLife2::ClientCommand( CBaseEntity *pEdict, const CCommand &args )
-	{
-		if( BaseClass::ClientCommand( pEdict, args ) )
-			return true;
-
-		CHL2_Player *pPlayer = (CHL2_Player *) pEdict;
-
-		if ( pPlayer->ClientCommand( args ) )
-			return true;
-
-		return false;
-	}
-
-	//-----------------------------------------------------------------------------
-	// Purpose: Player has just spawned. Equip them.
-	//-----------------------------------------------------------------------------
-	void CHalfLife2::PlayerSpawn( CBasePlayer *pPlayer )
-	{
-//		pPlayer->EquipSuit();
-	}
 
 	//-----------------------------------------------------------------------------
 	// Purpose: MULTIPLAYER BODY QUE HANDLING
@@ -386,6 +537,133 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 
 		UTIL_SetSize(pHead, pCorpse->WorldAlignMins(), pCorpse->WorldAlignMaxs());
 		g_pBodyQueueHead = (CCorpse *)pHead->GetOwnerEntity();
+	}
+
+	extern bool		g_fGameOver;
+
+#if !(defined( HL2MP ) || defined( PORTAL_MP ))
+	class CVoiceGameMgrHelper : public IVoiceGameMgrHelper
+	{
+	public:
+		virtual bool		CanPlayerHearPlayer( CBasePlayer *pListener, CBasePlayer *pTalker, bool &bProximity )
+		{
+			return true;
+		}
+	};
+	CVoiceGameMgrHelper g_VoiceGameMgrHelper;
+	IVoiceGameMgrHelper *g_pVoiceGameMgrHelper = &g_VoiceGameMgrHelper;
+#endif
+
+	//-----------------------------------------------------------------------------
+	// Purpose: called each time a player uses a "cmd" command
+	// Input  : *pEdict - the player who issued the command
+	//			Use engine.Cmd_Argv,  engine.Cmd_Argv, and engine.Cmd_Argc to get 
+	//			pointers the character string command.
+	//-----------------------------------------------------------------------------
+	bool CHalfLife2::ClientCommand( CBaseEntity *pEdict, const CCommand &args )
+	{
+		if( BaseClass::ClientCommand( pEdict, args ) )
+			return true;
+
+		CHL2_Player *pPlayer = (CHL2_Player *) pEdict;
+
+		if ( pPlayer->ClientCommand( args ) )
+			return true;
+
+		return false;
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: 
+	//-----------------------------------------------------------------------------
+/*
+	void CHalfLife2::SendHudNotification( IRecipientFilter &filter, HudNotification_t iType )
+	{
+		UserMessageBegin( filter, "HudNotify" );
+			WRITE_BYTE( iType );
+		MessageEnd();
+	}
+*/
+
+	//-----------------------------------------------------------------------------
+	// Purpose: 
+	//-----------------------------------------------------------------------------
+	void CHalfLife2::SendHudNotification( IRecipientFilter &filter, const char *pszText, const char *pszIcon, int iTeam /*= TEAM_UNASSIGNED*/ )
+	{
+		UserMessageBegin( filter, "HudNotifyCustom" );
+			WRITE_STRING( pszText );
+			WRITE_STRING( pszIcon );
+			WRITE_BYTE( iTeam );
+		MessageEnd();
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: Player has just spawned. Equip them.
+	//-----------------------------------------------------------------------------
+	void CHalfLife2::PlayerSpawn( CBasePlayer *pPlayer )
+	{
+		if ( IsMultiplayer() )
+			BaseClass::PlayerSpawn(pPlayer);
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: Player died
+	//-----------------------------------------------------------------------------
+	void CHalfLife2::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info )
+	{
+		// Detonate owned tripmines
+		if ( sv_hl2mp_dead_player_tripmines.GetBool() )
+		{
+			//TODO; this is searching every entity for satchels every time somebody dies... there's probably a better way to do this!
+			CBaseGrenade *pTripmine = dynamic_cast<CBaseGrenade*> ( gEntList.FindEntityByClassname( NULL, "npc_tripmine" ) );
+			if ( pTripmine && pTripmine->GetOwnerEntity() == pVictim )
+				pTripmine->Detonate();
+
+			CBaseGrenade *pSatchel = dynamic_cast<CBaseGrenade*> ( gEntList.FindEntityByClassname( NULL, "npc_satchel" ) );
+			if ( pSatchel && pSatchel->GetOwnerEntity() == pVictim )
+				pSatchel->Detonate();
+		}
+
+		BaseClass::PlayerKilled( pVictim, info );
+	}
+
+	//-----------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------
+	bool CHalfLife2::FPlayerCanRespawn( CBasePlayer *pPlayer )
+	{
+	//	if ( IsMultiplayer() )
+	//		return true;
+
+		return true;
+	}
+
+	float CHalfLife2::FlPlayerSpawnTime( CBasePlayer *pPlayer )
+	{
+		// TODO;
+		if ( IsMultiplayer() )
+		{
+			float fRespawnTime = gpGlobals->curtime + sv_hl2mp_player_respawn_time.GetFloat();	//Almost instant
+			switch(GetGameType())
+			{
+				case TDM:
+				case OBJECTIVE:
+				case FLAG:				
+					fRespawnTime = fRespawnTime + 5.0f;
+					break;
+				case ARENA:				
+					fRespawnTime = gpGlobals->curtime + 1.0f;
+					break;
+				case LASTMAN:
+				case RACE:
+					// Cant respawn manually in these modes
+					fRespawnTime = gpGlobals->curtime + 1e9;	//TEMPTEMP
+					break;
+			}
+
+			return fRespawnTime;
+		}
+
+		return gpGlobals->curtime;	//Now!
 	}
 
 	//------------------------------------------------------------------------------
@@ -1363,6 +1641,7 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 
 	void CHalfLife2::PlayerThink( CBasePlayer *pPlayer )
 	{
+		BaseClass::PlayerThink( pPlayer );
 	}
 
 #if 0
@@ -1386,17 +1665,15 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 
 	void CHalfLife2::Think( void )
 	{
-		BaseClass::Think();
+		if (!IsMultiplayer())
+		{
+			if( physcannon_mega_enabled.GetBool() == true )
+				m_bMegaPhysgun = true;
+			else
+				m_bMegaPhysgun = ( GlobalEntity_GetState("super_phys_gun") == GLOBAL_ON );
+		}
 
-		if( physcannon_mega_enabled.GetBool() == true )
-		{
-			m_bMegaPhysgun = true;
-		}
-		else
-		{
-			// FIXME: Is there a better place for this?
-			m_bMegaPhysgun = ( GlobalEntity_GetState("super_phys_gun") == GLOBAL_ON );
-		}
+		BaseClass::Think();
 	}
 
 	//-----------------------------------------------------------------------------
@@ -1679,23 +1956,34 @@ void CHalfLife2::AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo )
 		return;
 	}
 
-	switch( GetSkillLevel() )
+	// Actually no, let the server decide
+#if 0
+	if ( IsMultiplayer() )
 	{
-	case SKILL_EASY:
-		pInfo->ScaleDamage( sk_dmg_take_scale1.GetFloat() );
-		break;
-
-	case SKILL_MEDIUM:
+		// MP never adjusts!
 		pInfo->ScaleDamage( sk_dmg_take_scale2.GetFloat() );
-		break;
+	}
+	else
+#endif
+	{
+		switch( GetSkillLevel() )
+		{
+		case SKILL_EASY:
+			pInfo->ScaleDamage( sk_dmg_take_scale1.GetFloat() );
+			break;
 
-	case SKILL_HARD:
-		pInfo->ScaleDamage( sk_dmg_take_scale3.GetFloat() );
-		break;
+		case SKILL_MEDIUM:
+			pInfo->ScaleDamage( sk_dmg_take_scale2.GetFloat() );
+			break;
 
-	case SKILL_VERYHARD:
-		pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() );
-		break;
+		case SKILL_HARD:
+			pInfo->ScaleDamage( sk_dmg_take_scale3.GetFloat() );
+			break;
+
+		case SKILL_VERYHARD:
+			pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() );
+			break;
+		}
 	}
 }
 
@@ -1707,30 +1995,41 @@ float CHalfLife2::AdjustPlayerDamageInflicted( float damage )
 	if ( sv_funmode.GetBool() )
 	{
 		// Do a random scale
-		return damage * (sk_dmg_inflict_scale4.GetFloat() * random->RandomFloat( 0.85f, 1.25f ));
+		return damage * (sk_dmg_inflict_scale4.GetFloat() * random->RandomFloat( 0.9f, 1.25f ));
 	}
 
-	switch( GetSkillLevel() ) 
+	// Actually no, let the server decide
+#if 0
+	if ( IsMultiplayer() )
 	{
-	case SKILL_EASY:
-		return damage * sk_dmg_inflict_scale1.GetFloat();
-		break;
-
-	case SKILL_MEDIUM:
+		// MP never adjusts!
 		return damage * sk_dmg_inflict_scale2.GetFloat();
-		break;
+	}
+	else
+#endif
+	{
+		switch( GetSkillLevel() ) 
+		{
+		case SKILL_EASY:
+			return damage * sk_dmg_inflict_scale1.GetFloat();
+			break;
 
-	case SKILL_HARD:
-		return damage * sk_dmg_inflict_scale3.GetFloat();
-		break;
-		
-	case SKILL_VERYHARD:
-		return damage * sk_dmg_inflict_scale4.GetFloat();
-		break;
+		case SKILL_MEDIUM:
+			return damage * sk_dmg_inflict_scale2.GetFloat();
+			break;
 
-	default:
-		return damage;
-		break;
+		case SKILL_HARD:
+			return damage * sk_dmg_inflict_scale3.GetFloat();
+			break;
+			
+		case SKILL_VERYHARD:
+			return damage * sk_dmg_inflict_scale4.GetFloat();
+			break;
+
+		default:
+			return damage;
+			break;
+		}
 	}
 }
 #endif//CLIENT_DLL
@@ -1774,6 +2073,16 @@ bool CHalfLife2::ShouldAutoAim( CBasePlayer *pPlayer, edict_t *target )
 
 //---------------------------------------------------------
 //---------------------------------------------------------
+bool CHalfLife2::AllowAutoTargetCrosshair( void )
+{
+	if ( IsMultiplayer() )
+		return ( aimcrosshair.GetInt() != 0 );
+	else
+		return IsSkillLevel(SKILL_EASY);
+}
+
+//---------------------------------------------------------
+//---------------------------------------------------------
 float CHalfLife2::GetAutoAimScale( CBasePlayer *pPlayer )
 {
 #ifdef _X360
@@ -1797,22 +2106,30 @@ float CHalfLife2::GetAutoAimScale( CBasePlayer *pPlayer )
 //---------------------------------------------------------
 float CHalfLife2::GetAmmoQuantityScale( int iAmmoIndex )
 {
-	switch( GetSkillLevel() )
+	if ( IsMultiplayer() )
 	{
-	case SKILL_EASY:
-		return sk_ammo_qty_scale1.GetFloat();
-
-	case SKILL_MEDIUM:
-		return sk_ammo_qty_scale2.GetFloat();
-
-	case SKILL_HARD:
-		return sk_ammo_qty_scale3.GetFloat();
-
-	case SKILL_VERYHARD:
-		return sk_ammo_qty_scale4.GetFloat();
-
-	default:
+		// Always give the same amount in MP
 		return 1.0f;
+	}
+	else
+	{
+		switch( GetSkillLevel() )
+		{
+		case SKILL_EASY:
+			return sk_ammo_qty_scale1.GetFloat();
+
+		case SKILL_MEDIUM:
+			return sk_ammo_qty_scale2.GetFloat();
+
+		case SKILL_HARD:
+			return sk_ammo_qty_scale3.GetFloat();
+
+		case SKILL_VERYHARD:
+			return sk_ammo_qty_scale4.GetFloat();
+
+		default:
+			return 1.0f;
+		}
 	}
 }
 
@@ -1865,7 +2182,6 @@ bool CHalfLife2::ShouldBurningPropsEmitLight()
 // ------------------------------------------------------------------------------------ //
 // Global functions.
 // ------------------------------------------------------------------------------------ //
-
 #ifndef HL2MP
 #ifndef PORTAL
 
@@ -1973,3 +2289,114 @@ CAmmoDef *GetAmmoDef()
 
 #endif
 #endif
+
+
+//=============================================================================
+// MULTIPLAYER
+//=============================================================================
+bool CHalfLife2::FAllowNPCs( void )
+{
+#ifndef CLIENT_DLL
+	if (IsMultiplayer())
+		return ( allowNPCs.GetInt() != 0 );
+	else
+#endif
+		return true;
+}
+
+//=========================================================
+// WeaponShouldRespawn - any conditions inhibiting the
+// respawning of this weapon?
+//=========================================================
+int CHalfLife2::WeaponShouldRespawn( CBaseCombatWeapon *pWeapon )
+{
+#ifndef CLIENT_DLL
+	if ( pWeapon->HasSpawnFlags( SF_NORESPAWN ) )
+		return GR_WEAPON_RESPAWN_NO;
+
+	// Default on in MP, off in SP (duh)
+	return IsMultiplayer() ? GR_WEAPON_RESPAWN_YES : GR_WEAPON_RESPAWN_NO;
+#else
+	// For the client just pass 0
+	return 0;
+#endif
+}
+
+int CHalfLife2::ItemShouldRespawn( CItem *pItem )
+{
+#ifndef CLIENT_DLL
+	if ( pItem->HasSpawnFlags( SF_NORESPAWN ) )
+		return GR_ITEM_RESPAWN_NO;
+
+	// Default on in MP, off in SP (duh)
+	return IsMultiplayer() ? GR_ITEM_RESPAWN_YES : GR_ITEM_RESPAWN_NO;
+#else
+	// For the client just pass 0
+	return 0;
+#endif
+}
+
+//=========================================================
+// FlWeaponRespawnTime - what is the time in the future
+// at which this weapon may spawn?
+//=========================================================
+float CHalfLife2::FlWeaponRespawnTime( CBaseCombatWeapon *pWeapon )
+{
+#ifndef CLIENT_DLL
+	if ( weaponstay.GetInt() > 0 )
+	{
+		// make sure it's only certain weapons
+		if ( !(pWeapon->GetWeaponFlags() & ITEM_FLAG_LIMITINWORLD) )
+		{
+			return 0;		// weapon respawns almost instantly
+		}
+	}
+
+	return gpGlobals->curtime + sv_hl2mp_weapon_respawn_time.GetFloat();
+#else
+	return 0;		// weapon respawns almost instantly
+#endif
+}
+
+float CHalfLife2::FlItemRespawnTime( CItem *pItem )
+{
+#ifndef CLIENT_DLL
+	return gpGlobals->curtime + sv_hl2mp_item_respawn_time.GetFloat();
+#else
+	return 0;		// item respawns almost instantly
+#endif
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Optional loading videos for maps
+//-----------------------------------------------------------------------------
+#ifdef CLIENT_DLL
+const char *CHalfLife2::GetVideoFileForMap( bool bWithExtension /*= true*/ )
+{
+	char mapname[MAX_MAP_NAME];
+
+	Q_FileBase( engine->GetLevelName(), mapname, sizeof( mapname ) );
+	Q_strlower( mapname );
+
+#ifdef _X360
+	// need to remove the .360 extension on the end of the map name
+	char *pExt = Q_stristr( mapname, ".360" );
+	if ( pExt )
+	{
+		*pExt = '\0';
+	}
+#endif
+
+	static char strFullpath[MAX_PATH];
+	Q_strncpy( strFullpath, "media/", MAX_PATH );	// Assume we must play out of the media directory
+	Q_strncat( strFullpath, mapname, MAX_PATH );
+
+	if ( bWithExtension )
+	{
+		Q_strncat( strFullpath, ".bik", MAX_PATH );		// Assume we're a .bik extension type
+	}
+
+	return strFullpath;
+}
+#endif
+

@@ -273,20 +273,21 @@ Vector CBaseHLCombatWeapon::CalculateBulletSpread( WeaponProficiency_t proficien
 
 	if ( sk_realistic_spread.GetBool() )
 	{
-		// This also applies to npcs - shooting on the move is mainly for looks
+		// This also applies to npcs - shooting on the move is penalized
 		if ( GetOwner()->GetAbsVelocity().Length() > 120 )	//walkspeed
 			fSpreadModifier = sk_spread_moving.GetFloat();
 
 		// Player only
 		if ( GetOwner() && GetOwner()->IsPlayer() )
 		{
+			// Only for HL2 players
 			CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(GetOwner());
-
-			if ( !(pPlayer->GetFlags() & FL_ONGROUND) || pPlayer->GetMoveType( ) == MOVETYPE_LADDER )
-				fSpreadModifier = sk_spread_flying.GetFloat();
 
 			if ( pPlayer->GetAbsVelocity().Length2D() > 260 )	//sprintspeed
 				fSpreadModifier = sk_spread_movingfast.GetFloat();
+
+			if ( !(pPlayer->GetFlags() & FL_ONGROUND) || pPlayer->GetMoveType( ) == MOVETYPE_LADDER )
+				fSpreadModifier = sk_spread_flying.GetFloat();
 
 			if ( pPlayer->GetFlags() & FL_DUCKING )
 				fSpreadModifier = sk_spread_crouch.GetFloat();

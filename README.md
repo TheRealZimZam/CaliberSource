@@ -1,7 +1,7 @@
-# CaliberSource
+# Caliber Source
 
 //==========================================================================
-//Caliber Source Sourcecode -- Half-Life but with fancy lightbulbs.
+//Caliber: Source Codebase -- Half-Life but with fancy lightbulbs.
 //==========================================================================
 /*
 

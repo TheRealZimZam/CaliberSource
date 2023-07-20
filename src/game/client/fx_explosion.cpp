@@ -23,7 +23,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-extern ConVar explosion_light;
+extern ConVar fx_explosion_light;
 ConVar perf_explosion_misc( "perf_explosion_misc", "1", FCVAR_ARCHIVE );
 ConVar perf_explosion_scale( "perf_explosion_scale", "1", FCVAR_ARCHIVE );
 
@@ -190,12 +190,14 @@ void C_BaseExplosionEffect::Create( const Vector &position, float force, int mod
 	PlaySound();
 
 	//NOTENOTE; Env_explode clamps at 10 (if enabled), but nothing else does...
+	// Also; median scale for current radii of most explosive weapons is around 5
+	// Maths for radius are (Usually) dmgradius * 0.03
 	if ( scale != 0 )
 	{
 		CreateCore( scale );	//Default explosion
 	}
 
-	CreateDebris();
+	CreateDebris( scale );
 	CreateDynamicLight( scale );
 	CreateMisc();
 }
@@ -286,7 +288,7 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 				//Scale the force down as we fall away from our main direction
 				ScaleForceByDeviation( pParticle->m_vecVelocity, m_vecDirection, spread, &fForce );
 
-				pParticle->m_vecVelocity *= fForce * (scale / 4);	//This needs to also take scale into account, larger explosions need more velocity to cover a wider area
+				pParticle->m_vecVelocity *= fForce * (scale/4);	//This needs to also take scale into account, larger explosions need more velocity to cover a wider area
 				
 				#if __EXPLOSION_DEBUG
 				debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
@@ -337,7 +339,7 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 				//Scale the force down as we fall away from our main direction
 				ScaleForceByDeviation( pParticle->m_vecVelocity, m_vecDirection, spread, &fForce );
 
-				pParticle->m_vecVelocity *= fForce * (scale / 4);	//This needs to also take scale into account, larger explosions need more velocity to cover a wider area
+				pParticle->m_vecVelocity *= fForce * (scale/4);	//This needs to also take scale into account, larger explosions need more velocity to cover a wider area
 				
 				#if __EXPLOSION_DEBUG
 				debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
@@ -400,7 +402,7 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 				//Scale the force down as we fall away from our main direction
 				ScaleForceByDeviation( pParticle->m_vecVelocity, pParticle->m_vecVelocity, spread, &fForce );
 
-				pParticle->m_vecVelocity *= fForce * (scale / 4);	//This needs to also take scale into account, larger explosions need more velocity to cover a wider area
+				pParticle->m_vecVelocity *= fForce * (scale/4);	//This needs to also take scale into account, larger explosions need more velocity to cover a wider area
 				
 				#if __EXPLOSION_DEBUG
 				debugoverlay->AddLineOverlay( m_vecOrigin, m_vecOrigin + pParticle->m_vecVelocity, 255, 0, 0, false, 3 );
@@ -547,7 +549,7 @@ void C_BaseExplosionEffect::CreateCore( float scale )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void C_BaseExplosionEffect::CreateDebris( void )
+void C_BaseExplosionEffect::CreateDebris( float scale )
 {
 	if ( m_fFlags & TE_EXPLFLAG_NOPARTICLES )
 		return;
@@ -559,6 +561,7 @@ void C_BaseExplosionEffect::CreateDebris( void )
 	CSmartPtr<CTrailParticles> pSparkEmitter	= CTrailParticles::Create( "CreateDebris 1" );
 	if ( pSparkEmitter == NULL )
 	{
+		// If we cant get sparks dont even bother with the rest of the debris either
 		assert(0);
 		return;
 	}
@@ -568,9 +571,22 @@ void C_BaseExplosionEffect::CreateDebris( void )
 		m_Material_FireSpark = pSparkEmitter->GetPMaterial( "effects/fire_cloud2" );
 	}
 
+#define EXPLOSION_SPARKTRAIL_MINSPEED (1500 * scale/6)
+#define EXPLOSION_SPARKTRAIL_MAXSPEED (2500 * scale/6)
+
+	pSparkEmitter->Setup( m_vecOrigin, 
+							NULL, 
+							0.0f, 
+							EXPLOSION_SPARKTRAIL_MINSPEED, 
+							EXPLOSION_SPARKTRAIL_MAXSPEED, 
+							200.0f, 
+							0.0f, 
+							bitsPARTICLE_TRAIL_COLLIDE );
+
 	pSparkEmitter->SetSortOrigin( m_vecOrigin );
-	
-	pSparkEmitter->m_ParticleCollision.SetGravity( 200.0f );
+
+	// Take world gravity into account AFTER we are setup/created
+	pSparkEmitter->m_ParticleCollision.SetGravity( ( 200.0f ) );	//UTIL_ScaleForGravity
 	pSparkEmitter->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
 	pSparkEmitter->SetVelocityDampen( 8.0f );
 	
@@ -597,7 +613,7 @@ void C_BaseExplosionEffect::CreateDebris( void )
 			break;
 
 		tParticle->m_flLifetime	= 0.0f;
-		tParticle->m_flDieTime	= random->RandomFloat( 0.1f, 0.15f );
+		tParticle->m_flDieTime	= random->RandomFloat( (0.1f * scale/4), (0.15f * scale/4) );	//Higher scales means we need more time to live to be seen properly
 
 		dir.Random( -spread, spread );
 		dir += m_vecDirection;
@@ -606,10 +622,11 @@ void C_BaseExplosionEffect::CreateDebris( void )
 		tParticle->m_flWidth		= random->RandomFloat( 2.0f, 16.0f );
 		tParticle->m_flLength		= random->RandomFloat( 0.05f, 0.1f );
 		
-		tParticle->m_vecVelocity	= dir * random->RandomFloat( 1500, 2500 );
+		tParticle->m_vecVelocity	= dir * random->RandomFloat( EXPLOSION_SPARKTRAIL_MINSPEED, EXPLOSION_SPARKTRAIL_MAXSPEED );
 
 		Color32Init( tParticle->m_color, 255, 255, 255, 255 );
 	}
+
 
 	//
 	// Chunks
@@ -738,7 +755,7 @@ void C_BaseExplosionEffect::CreateDynamicLight( float scale )
 	if ( m_fFlags & TE_EXPLFLAG_NODLIGHTS )
 		return;
 
-	if ( explosion_light.GetBool() )
+	if ( fx_explosion_light.GetBool() )
 	{
 		float flLightScale;
 		flLightScale = random->RandomFloat( 64.0f, 68.0f ) * scale;
@@ -1100,7 +1117,7 @@ void C_WaterExplosionEffect::CreateCore( float scale )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void C_WaterExplosionEffect::CreateDebris( void )
+void C_WaterExplosionEffect::CreateDebris( float scale )
 {
 	if ( m_fFlags & TE_EXPLFLAG_NOPARTICLES )
 		return;
@@ -1369,7 +1386,7 @@ C_MegaBombExplosionEffect &MegaBombExplosionEffect( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void C_MegaBombExplosionEffect::CreateCore( void )
+void C_MegaBombExplosionEffect::CreateCore( float scale )
 {
 	if ( m_fFlags & TE_EXPLFLAG_NOFIREBALL )
 		return;

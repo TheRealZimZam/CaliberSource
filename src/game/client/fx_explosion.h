@@ -39,7 +39,7 @@ protected:
 	virtual void	PlaySound( void );
 
 	virtual void	CreateCore( float scale );
-	virtual void	CreateDebris( void );
+	virtual void	CreateDebris( float scale );
 	virtual void	CreateMisc( void );
 	virtual void	CreateDynamicLight( float scale );
 
@@ -96,7 +96,7 @@ public:
 
 protected:
 	virtual void	CreateCore( float scale );
-	virtual void	CreateDebris( void );
+	virtual void	CreateDebris( float scale );
 	virtual void	CreateMisc( void );
 	virtual void	PlaySound( void );
 
@@ -122,10 +122,10 @@ public:
 	static	C_MegaBombExplosionEffect &Instance( void )	{	return m_megainstance;	}
 
 protected:
-	virtual void	CreateCore( void );
+	virtual void	CreateCore( float scale );
 
 	//These need to be created??
-	virtual void	CreateDebris( void ) { };
+	virtual void	CreateDebris( float scale ) { };
 	virtual void	CreateMisc( void ) { };
 	virtual void	PlaySound( void ) { };
 

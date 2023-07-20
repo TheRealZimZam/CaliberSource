@@ -38,7 +38,7 @@
 // NOTE: Always include this last!
 #include "tier0/memdbgon.h"
 
-extern ConVar muzzleflash_light;
+extern ConVar fx_muzzleflash_light;
 
 #define TENT_WIND_ACCEL 50
 
@@ -1962,6 +1962,7 @@ void CTempEnts::MuzzleFlash( const Vector& pos1, const QAngle& angles, int type,
 // Input  : *pTemp - 
 //			scale - 
 //			flags - 
+// TODO; Randomly mirror/flip the sprite - variety is needed
 //-----------------------------------------------------------------------------
 void CTempEnts::Sprite_Explode( C_LocalTempEntity *pTemp, float scale, int flags )
 {
@@ -1991,6 +1992,13 @@ void CTempEnts::Sprite_Explode( C_LocalTempEntity *pTemp, float scale, int flags
 	{
 		pTemp->SetLocalAnglesDim( Z_INDEX, random->RandomInt( 0, 360 ) );
 	}
+/*
+	else
+	{
+		// Just flip the sprite sometimes
+		pTemp->SetLocalAnglesDim( Z_INDEX, ( random->RandomInt( 0, 1 ) ) ? 360 : 0 );
+	}
+*/
 
 	pTemp->m_nRenderFX = kRenderFxNone;
 	pTemp->SetVelocity( Vector( 0, 0, 8 ) );
@@ -2742,7 +2750,7 @@ void CTempEnts::MuzzleFlash_Combine_Player( ClientEntityHandle_t hEntity, int at
 	}
 
 	// Muzzlelight
-	if ( muzzleflash_light.GetBool() )
+	if ( fx_muzzleflash_light.GetInt() > 0 )
 	{
 		FX_GetAttachmentTransform( hEntity, attachmentIndex, &origin, &angles ); // set 1 instead "attachment"
  
@@ -2944,7 +2952,7 @@ void CTempEnts::MuzzleFlash_Combine_NPC( ClientEntityHandle_t hEntity, int attac
 		return;
 	}
 
-	if ( muzzleflash_light.GetBool() )
+	if ( fx_muzzleflash_light.GetInt() > 0 )
 	{
 		C_BaseEntity *pEnt = ClientEntityList().GetBaseEntityFromHandle( hEntity );
 		if ( pEnt )

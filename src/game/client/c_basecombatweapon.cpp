@@ -249,13 +249,12 @@ void C_BaseCombatWeapon::DrawCrosshair()
 	// Find out if this weapon's auto-aimed onto a target
 	bool bOnTarget = ( m_iState == WEAPON_IS_ONTARGET );
 	
-	if ( player->GetFOV() >= 90 )
-	{ 
+	if ( player->GetFOV() >= 70 )
+	{
 		// normal crosshairs
 		if ( bOnTarget && GetWpnData().iconAutoaim )
 		{
 			clr[3] = 255;
-
 			crosshair->SetCrosshair( GetWpnData().iconAutoaim, clr );
 		}
 		else if ( GetWpnData().iconCrosshair )
@@ -270,13 +269,12 @@ void C_BaseCombatWeapon::DrawCrosshair()
 	}
 	else
 	{ 
-		Color white( 255, 255, 255, 255 );
-
+		//Color white( 255, 255, 255, 255 );
 		// zoomed crosshairs
 		if (bOnTarget && GetWpnData().iconZoomedAutoaim)
-			crosshair->SetCrosshair(GetWpnData().iconZoomedAutoaim, white);
+			crosshair->SetCrosshair(GetWpnData().iconZoomedAutoaim, clr);
 		else if ( GetWpnData().iconZoomedCrosshair )
-			crosshair->SetCrosshair( GetWpnData().iconZoomedCrosshair, white );
+			crosshair->SetCrosshair( GetWpnData().iconZoomedCrosshair, clr );
 		else
 			crosshair->ResetCrosshair();
 	}

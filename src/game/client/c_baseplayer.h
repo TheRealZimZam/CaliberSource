@@ -190,6 +190,10 @@ public:
 	// Should this object cast shadows?
 	virtual ShadowType_t		ShadowCastType()
 	{
+		// If im not drawing, or im in camo, dont do shadows!
+		if ( !ShouldDraw() )
+			return SHADOWS_NONE;
+
 		if ( !IsVisible() )
 			 return SHADOWS_NONE;
 	
@@ -321,6 +325,8 @@ public:
 
 	virtual void DoMuzzleFlash();
 	virtual void PlayPlayerJingle();
+
+//	virtual void ToggleHeartbeat( void );
 
 	virtual void UpdateStepSound( surfacedata_t *psurface, const Vector &vecOrigin, const Vector &vecVelocity  );
 	virtual void PlayStepSound( Vector &vecOrigin, surfacedata_t *psurface, float fvol, bool force );

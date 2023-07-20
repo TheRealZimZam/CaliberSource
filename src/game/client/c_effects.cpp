@@ -187,7 +187,7 @@ void CClient_Precipitation::OnDataChanged( DataUpdateType_t updateType )
 		}
 	}
 
-	m_flDensity = RemapVal( m_clrRender->a, 0, 255, 0, 0.001 );
+	m_flDensity = RemapVal( m_clrRender->a, 0, 255, 0, s_raindensity.GetFloat() );
 
 	BaseClass::OnDataChanged( updateType );
 }
@@ -1390,8 +1390,10 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 	// FIXME: Compute the precipitation density based on computational power
 	float density = m_flDensity;
 
-	if (density > 0.01f) 
+#if 1
+	if (density > 0.01f)
 		density = 0.01f;
+#endif
 
 	// Compute number of particles to emit based on precip density and emission area and dt
 	float fParticles = size[0] * size[1] * density * fTimeDelta + m_Remainder; 
@@ -1403,7 +1405,7 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 	VectorCopy( s_WindVector, vel );
 	vel[2] -= GetSpeed();
 
-#if 0
+#ifdef HL1_DLL
 	// Emit all the particles
 	for ( int i = 0 ; i < cParticles ; i++ )
 	{
@@ -1432,79 +1434,7 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 		}
 		CreateRainOrSnowParticle( vParticlePos, vel );
 	}
-#endif
-
-#if 0
-	// Emit all the particles
-	for ( int i = 0 ; i < cParticles ; i++ )
-	{
-		// TERROR: moving random velocity out so it can be included in endpos calcs
-		Vector vParticleVel = vel;
-		vParticleVel[ 0 ] += random->RandomFloat(-r_RainSideVel.GetInt(), r_RainSideVel.GetInt());
-		vParticleVel[ 1 ] += random->RandomFloat(-r_RainSideVel.GetInt(), r_RainSideVel.GetInt());
-
-		Vector vParticlePos = org;
-		vParticlePos[ 0 ] += size[ 0 ] * random->RandomFloat(0, 1);
-		vParticlePos[ 1 ] += size[ 1 ] * random->RandomFloat(0, 1);
-
-		// Figure out where the particle should lie in Z by tracing a line from the player's height up to the 
-		// desired height and making sure it doesn't hit a wall.
-		Vector vPlayerHeight = vParticlePos;
-		vPlayerHeight.z = vPlayerCenter.z;
-
-		if ( ParticleIsBlocked( vPlayerHeight, vParticlePos ) )
-		{
-			if ( r_RainDebugDuration.GetBool() )
-			{
-				debugoverlay->AddLineOverlay( vPlayerHeight, vParticlePos, 255, 0, 0, false, r_RainDebugDuration.GetFloat() );
-			}
-			continue;
-		}
-
-		Vector vUnitParticleVel = vParticleVel;
-		float fallHeight = vParticlePos.z - vPlayerHeight.z;
-		vUnitParticleVel /= fallHeight;
-		vPlayerHeight.x += vUnitParticleVel.x * fallHeight;
-		vPlayerHeight.y += vUnitParticleVel.y * fallHeight;
-
-		trace_t trace;
-		UTIL_TraceLine( vPlayerHeight, vParticlePos, MASK_SOLID_BRUSHONLY, NULL, COLLISION_GROUP_NONE, &trace );
-		if ( trace.fraction < 1 )
-		{
-			// If we hit a brush, then don't spawn the particle.
-			if ( trace.surface.flags & SURF_SKY )
-			{
-				vParticlePos = trace.endpos;
-				if ( r_RainDebugDuration.GetBool() )
-				{
-					debugoverlay->AddLineOverlay( vPlayerHeight, trace.endpos, 0, 0, 255, false, r_RainDebugDuration.GetFloat() );
-				}
-			}
-			else
-			{
-				if ( r_RainDebugDuration.GetBool() )
-				{
-					debugoverlay->AddLineOverlay( vPlayerHeight, trace.endpos, 255, 0, 0, false, r_RainDebugDuration.GetFloat() );
-				}
-				continue;
-			}
-		}
-
-		// TERROR: Find an endpos
-		Vector vParticleEndPos( vPlayerHeight );
-		//vParticleEndPos.z -= 256.0f;
-		//UTIL_TraceLine( vPlayerHeight, vParticleEndPos, MASK_SOLID_BRUSHONLY, NULL, COLLISION_GROUP_NONE, &trace );
-		//vParticleEndPos = trace.endpos;
-
-		if ( r_RainDebugDuration.GetBool() )
-		{
-			debugoverlay->AddLineOverlay( vParticlePos, vParticleEndPos, 0, 255, 0, true, r_RainDebugDuration.GetFloat() );
-		}
-
-		CreateRainOrSnowParticle( vParticlePos, vParticleEndPos, vParticleVel );
-	}
-#endif
-
+#else
 	// Emit all the particles
 	for ( int i = 0 ; i < cParticles ; i++ )
 	{
@@ -1562,7 +1492,7 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 
 		CreateRainOrSnowParticle( vParticlePos, vParticleEndPos, vParticleVel );
 	}
-
+#endif
 }
 
 

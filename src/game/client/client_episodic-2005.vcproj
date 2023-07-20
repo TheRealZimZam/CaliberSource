@@ -477,6 +477,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\c_entityfreezing.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\c_entityparticletrail.cpp"
 				>
 			</File>
@@ -3046,6 +3050,10 @@
 			</File>
 			<File
 				RelativePath=".\c_entitydissolve.h"
+				>
+			</File>
+			<File
+				RelativePath=".\c_entityfreezing.h"
 				>
 			</File>
 			<File

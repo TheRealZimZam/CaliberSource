@@ -55,8 +55,8 @@ CLIENTEFFECT_REGISTER_END()
 #endif
 
 //Whether or not we should emit a dynamic light
-ConVar muzzleflash_light( "muzzleflash_light", "1", FCVAR_ARCHIVE );
-ConVar explosion_light( "explosion_light", "1", FCVAR_ARCHIVE );
+ConVar fx_muzzleflash_light( "fx_muzzleflash_light", "1", FCVAR_ARCHIVE );
+ConVar fx_explosion_light( "fx_explosion_light", "1", FCVAR_ARCHIVE );
 
 extern void FX_TracerSound( const Vector &start, const Vector &end, int iTracerType );
 

@@ -307,7 +307,6 @@ void C_TEExplosion::PostDataUpdate( DataUpdateType_t updateType )
 	}
 
 	FX_Explosion( m_vecOrigin, m_vecNormal, m_chMaterialType, m_fScale, m_nFlags );
-
 #else
 	if ( !( m_nFlags & TE_EXPLFLAG_NOFIREBALL ) )
 	{

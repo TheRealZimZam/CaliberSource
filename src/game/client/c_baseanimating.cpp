@@ -3007,36 +3007,50 @@ int C_BaseAnimating::InternalDrawModel( int flags )
 	return bMarkAsDrawn;
 }
 
-extern ConVar muzzleflash_light;
+extern ConVar fx_muzzleflash_light;
 //extern PWeapon;
 
 void C_BaseAnimating::ProcessMuzzleFlashEvent()
 {
 	// If we have an attachment and no muzzleflash data, then stick a default flash on it.
-	if ( muzzleflash_light.GetBool() )
+	if ( fx_muzzleflash_light.GetInt() > 0 )
 	{
 		//!!!TODO: This needs to check if there hasnt been any other muzzle lights applied
-		if ( m_Attachments.Count() > 0 )
+		if ( m_Attachments.Count() > 0 )	//IsEffectActive(EF_MUZZLEFLASH) &&
 		{
-			// Below code courtesy of the VDC
 			Vector vAttachment, vAng;
-			QAngle angles;
+			QAngle dummyAngles;
 #ifdef HL2_EPISODIC
-			GetAttachment( 1, vAttachment, angles ); // set 1 instead "attachment"
+			GetAttachment( 1, vAttachment, dummyAngles ); // set 1 instead "attachment"
 #else
 			GetAttachment( attachment, vAttachment, angles );
 #endif
-			AngleVectors( angles, &vAng );
+			AngleVectors( dummyAngles, &vAng );
 			vAttachment += vAng * 2;
- 
-			dlight_t *dl = effects->CL_AllocDlight ( LIGHT_INDEX_MUZZLEFLASH + index );
+
+			dlight_t *dl;
+			if ( fx_muzzleflash_light.GetInt() == 1 )
+			{
+				//Highperf, light the world
+				dl = effects->CL_AllocDlight( LIGHT_INDEX_MUZZLEFLASH + index );
+				dl->radius = random->RandomInt( 144, 196 );
+			}
+			else
+			{
+				//Lowperf, Make an elight
+				dl = effects->CL_AllocElight( LIGHT_INDEX_MUZZLEFLASH + index );
+				dl->radius = random->RandomInt( 64, 100 ); 
+			}
+
 			dl->origin = vAttachment;
+			dl->decay = dl->radius / 0.05f;
+			dl->die = gpGlobals->curtime + 0.05f;
 			dl->color.r = 255;
 			dl->color.g = 192;
-			dl->color.b = 96;
-			dl->die = gpGlobals->curtime + 0.05f;
-			dl->radius = random->RandomFloat( 232.0f, 256.0f );
-			dl->decay = 512.0f;
+			dl->color.b = 64;
+			dl->color.exponent = 5;
+
+			//ActivateEffect( EF_MUZZLEFLASH, false );
 		}
 	}
 }

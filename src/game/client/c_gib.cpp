@@ -7,6 +7,8 @@
 #include "cbase.h"
 #include "vcollide_parse.h"
 #include "c_gib.h"
+#include "iefx.h"
+#include "decals.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -130,4 +132,7 @@ void C_Gib::StartTouch( C_BaseEntity *pOther )
 void C_Gib::HitSurface( C_BaseEntity *pOther )
 {
 	//TODO: Implement splatter or effects in child versions
+	int index = decalsystem->GetDecalIndexForName( "Blood" );	
+	if (index >= 0 )
+		effects->DecalShoot( index, pOther->entindex(), pOther->GetModel(), pOther->GetAbsOrigin(), pOther->GetAbsAngles(), GetAbsOrigin(), 0, 0 );
 }

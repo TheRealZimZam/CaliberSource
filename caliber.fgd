@@ -2,6 +2,8 @@
 //
 // CSource FGD 
 //
+// Contains some of the more unique additions/ports that arent in base or halflife2.fgd
+// and the multiplayer entities 
 //=============================================================================
 
 @include "base.fgd"
@@ -38,6 +40,8 @@
 ]
 
 // Lightning Field (mortarfield without explosions)
+// NOTENOTE; This is strictly for lightning strikes, from the sky - if you want an actual electric field,
+// use a tesla
 @SolidClass base(Targetname, EnableDisable, Origin, Parentname) = func_lightning_field : "Lightning Field" 
 [
 	m_flSpread(float) : "Spread Radius" : 0 : "Spread of lightning"
@@ -76,14 +80,26 @@
 [
 ]
 
-@NPCClass base(TalkNPC, BaseNPC, PlayerCompanion) studio("models/Conscript.mdl") = npc_german : "German"
+//-----------------------------------------------------------------------------
+// Enemies
+//-----------------------------------------------------------------------------
+@NPCClass base(BaseNPC,RappelNPC) studio("models/Police.mdl") = npc_police : "Police"
 [
-	additionalequipment(choices) : "Weapons" : "weapon_mp40" =
+	additionalequipment(choices) : "Weapons" : "weapon_pistol" =
 	[
-		"weapon_mp40" : "MP40"
+		"weapon_stunstick"  : "Stun Stick"
+		"weapon_swing"  : "Baton"
 		"weapon_pistol" : "Pistol"
-		"weapon_smg1" : "SMG1"
-		"0" : "Nothing"
+		"weapon_smg1"  : "SMG1"
+		"weapon_shotgun"  : "Shotgun"
+		"0"  : "Nothing"
+	]
+
+	manhacks(Choices) : "Number of Drones" : 0 =
+	[
+		0 : "None"
+		1 : "1"
+		2 : "2"
 	]
 
 	NumGrenades(choices) : "Number of Grenades" : "5" =
@@ -96,35 +112,11 @@
 		"5" : "5"
 		"999999" : "Unlimited"
 	]
-	
-	ExpressionOverride(string) : "Facial expression override"
-	input SetExpressionOverride(string) : "Set facial expression override"
 
-	// Outputs
-	output OnPlayerUse(void) : "Fires when a player +USEs Conscript"
-]
-
-
-//-----------------------------------------------------------------------------
-// Enemies
-//-----------------------------------------------------------------------------
-@NPCClass base(BaseNPC,RappelNPC) studio("models/Police.mdl") = npc_police : "Police"
-[
-	additionalequipment(choices) : "Weapons" : "weapon_pistol" =
+	taser(Choices) : "Has a Taser" : 0 =
 	[
-		"weapon_pistol" : "Pistol"
-		"weapon_smg1"  : "SMG1"
-		"weapon_stunstick"  : "Stun Stick"
-		"weapon_shotgun"  : "Shotgun"
-		"weapon_ar2"  : "AR2"
-		"0"  : "Nothing"
-	]
-
-	manhacks(Choices) : "Number of Drones" : 0 =
-	[
-		0 : "None"
-		1 : "1"
-		2 : "2"
+		0 : "No"
+		1 : "Yes"
 	]
 
 	weapondrawn(Choices) : "Pistol starts drawn" : 0 =
@@ -132,14 +124,14 @@
 		0 : "No"
 		1 : "Yes"
 	]
-	
+
 	spawnflags(Flags) =
 	[
 		131072 : "Simple cops" : 0
 		262144 : "Rappel (UNCHECK THIS IF IT IS CHECKED!)" : 0
-		524288 : "Use Stun Grenades" : 0
-		1048576 : "No chatter" : 0
-		2097152 : "Arrest enemies" : 0
+	//	524288 : "Use Stun Grenades" : 0
+		1048576 : "No Chatter" : 0
+		2097152 : "Arrest Enemies" : 0
 		4194304 : "No far stitching" : 0
 		8388608 : "Prevent manhack toss" : 0
 		16777216: "Allowed to respond to thrown objects" : 0
@@ -214,6 +206,43 @@
 	]
 ]
 
+// Wolf/COD bonus level npc
+@NPCClass base(TalkNPC, BaseNPC, PlayerCompanion) studio("models/Wehrmacht.mdl") = npc_german : "German"
+[
+	model(choices) : "Model" : "models/German_Wehrmacht.mdl" =
+	[
+		"models/German_Wehrmacht.mdl" : "Wehrmacht"
+		"models/German_Engineer.mdl" : "Engineer"
+		"models/German_Scientist.mdl" : "Scientist"
+		"models/German_Paratrooper.mdl" : "SS Paratrooper"
+	]
+
+	additionalequipment(choices) : "Weapons" : "weapon_mp40" =
+	[
+		"weapon_mp40" : "MP40"
+		"weapon_pistol" : "Pistol"	//TODO; Need a luger
+		"weapon_ar2" : "AR2"	//TODO; Need a FG42
+		"0" : "Nothing"
+	]
+
+	NumGrenades(choices) : "Number of Grenades" : "5" =
+	[
+		"0" : "None"
+		"1" : "1"
+		"2" : "2"
+		"3" : "3"
+		"4" : "4"
+		"5" : "5"
+		"999999" : "Unlimited"
+	]
+	
+	ExpressionOverride(string) : "Facial expression override"
+	input SetExpressionOverride(string) : "Set facial expression override"
+
+	// Outputs
+	output OnPlayerUse(void) : "Fires when a player +USEs Conscript"
+]
+
 //=============================================================================
 // Weapons
 //=============================================================================
@@ -261,3 +290,77 @@
 @PointClass base(Weapon) studio("models/weapons/w_rpg.mdl") = weapon_flash : "FLASH" []
 @PointClass base(Weapon) studio("models/weapons/w_crossbow.mdl") = weapon_flashlight : "Flashlight" []
 @PointClass base(Weapon) studio("models/weapons/w_45.mdl") = weapon_45 : "45-70" []
+
+
+//=============================================================================
+// Multiplayer
+//=============================================================================
+@BaseClass = GameType
+[
+	GameType(choices) : "Game Type" : 0 : "Type of game this entity will be used for." =
+	[
+		0 : "Co-op"
+		1 : "Deathmatch"
+		2 : "Team Deathmatch"
+		3 : "Objective"
+		4 : "Arena"
+		5 : "Last Team Standing"
+		6 : "Capture the Flag"
+		7 : "Race"
+	]
+]
+
+// TODO; No classes yet!
+@BaseClass = ClassType
+[
+	ClassType(choices) : "Class Type" : 0 : "Type of class this spawnpoint will be used for." =
+	[
+		0 : "Soldier"
+		1 : "Engineer"
+		2 : "Medic"
+		3 : "Covert Ops"
+		4 : "Commander"
+	]
+]
+
+//TODO;
+//@PointClass base(prop_physics) studioprop() sphere(fademindist) sphere(fademaxdist) = prop_physics_respawnable :
+//	"This class is the same as prop_physics, except it respawns after it breaks"
+//[
+//	RespawnTime(float) : "Respawn Time" : 60 : "Ammount in seconds this prop will respawn after it breaks."
+//]
+
+@PointClass base(ClassType, GameType, Angles, Targetname, EnableDisable) studio("models/editor/playerstart.mdl") = info_player_combine :
+	"This entity indicates the position and facing direction at which the player will spawn during a deathmatch map. Any number of "+
+	"info_player_deathmatch entities may be placed in a map."
+[
+]
+
+@PointClass base(ClassType, GameType, Angles, Targetname, EnableDisable) studio("models/editor/playerstart.mdl") = info_player_rebel :
+	"This entity indicates the position and facing direction at which the player will spawn during a deathmatch map. Any number of "+
+	"info_player_deathmatch entities may be placed in a map."
+[
+]
+
+// 3rd team for cheeky stuff, almost never used in normal games
+@PointClass base(ClassType, Angles, Targetname, EnableDisable) studio("models/editor/playerstart.mdl") = info_player_pmc :
+	"This entity indicates the position and facing direction at which the player will spawn during a deathmatch map. Any number of "+
+	"info_player_deathmatch entities may be placed in a map."
+[
+]
+
+@FilterClass base(BaseFilter) size(-8 -8 -8, 8 8 8) = filter_activator_team :
+	"A filter that filters by the team of the activator."
+[
+	filterteam(choices) : "Filter Team Number" : 2 : 
+		"The team number to filter by.  If the filter mode is Allow, only entities whose "+
+		"team number matches the given team will pass the filter. If the filter mode is Disallow, "+
+		"all entities EXCEPT those whose team number matches the given team will pass the filter." =
+	[
+	//	0 : "Unassigned"
+		1 : "Spectator"
+		2 : "Combine"
+		3 : "Rebels"
+		4 : "PMC"
+	]
+]

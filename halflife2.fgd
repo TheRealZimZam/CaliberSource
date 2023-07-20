@@ -2807,22 +2807,25 @@
 // Items
 //
 //-------------------------------------------------------------------------
-@PointClass base(Targetname, Parentname) size(-4 -4 -4, 4 4 4) = env_beverage : 
-	"HL1 Legacy: Beverage Dispenser."
+@PointClass base(Targetname, Angles, Parentname) size(-4 -4 -4, 4 4 4) = env_beverage : 
+	"HL1 Legacy: Beverage Dispenser. When parented to a brush, will update the texture frame of the brush in accordance with the dispenser state."
 [
-	health(integer) : "Capacity" : 10 : "Number of cans in the dispenser."
+	health(integer) : "Capacity" : 10 : "Number of cans in the dispenser. Spawning with 0 cans will put the dispenser into BROKEN state."
 	beveragetype(choices) : "Beverage Type" : 0 = 
 	[
 		0 : "Cola-Coca"
 		1 : "Spirit"
 		2 : "Diet Coca"
-		3 : "Orange"
+		3 : "Lemon-Lime"
 		4 : "Surge"
 		5 : "Moxie"
 		6 : "Random"
 	]
 
-	input Activate(void) : "Enable this dispenser."
+	// Inputs
+	input Activate(void) : "+Use this dispenser."
+	input Break(void) : "Break the dispenser."
+	output OnBreak(void) : "Fired when the dispenser breaks."
 ]
 
 @PointClass base(env_beverage) = env_snacks :
@@ -2840,7 +2843,7 @@
 	]
 ]
 
-@BaseClass color(0 0 200) base(Targetname, Angles, Shadow) sphere(fademindist) sphere(fademaxdist) = Item
+@BaseClass color(0 0 200) base(Targetname, Parentname, Angles, Shadow) sphere(fademindist) sphere(fademaxdist) = Item
 [
 	output OnPlayerTouch(void) : "Fires when the player touches this object"
 
@@ -2850,10 +2853,10 @@
 	fademaxdist(float) : "End Fade Dist/Pixels" : 0 : "Maximum distance at which the prop is visible (0 = don't fade out). If 'Screen Space Fade' is selected, this represents the *minimum* number of pixels wide covered by the prop when it fades."
 	fadescale(float) : "Fade Scale" : 1 : "If you specify a fade in the worldspawn, or if the engine is running under dx7, then the engine will forcibly fade out props even if fademindist/fademaxdist isn't specified." +
 												 " This scale factor gives you some control over the fade. Using 0 here turns off the forcible fades." +
-
 	spawnflags(Flags) =
 	[
 		1 : "Start Constrained" : 1
+		1048576 : "No Respawn in MP" : 0
 	]
 ]
 
@@ -3044,6 +3047,8 @@
 		1 : "Start constrained" : 0
 		2 : "Deny player pickup (reserve for NPC)" : 0
 		4 : "Not puntable by Gravity Gun" : 0
+		1024 : "Rotate" : 0
+		1048576 : "No Respawn in MP" : 0
 	]
 
 	output OnPlayerUse(void) : "Fires when the player +uses this weapon"

@@ -1460,9 +1460,14 @@
 	input SetFadeEndDistance(integer) : "Set fade end distance."
 ]
 
-@SolidClass base(Targetname, RenderFields, Global, Shadow) = func_wall : 
+@SolidClass base(BaseBrush, Targetname, RenderFields, Global, Shadow) = func_wall : 
 	"Legacy support. Slightly cheaper version of func_brush. Cannot be parented or toggled."
 [
+	spawnflags(flags) =
+	[
+		2048: "Don't allow bullet penetration (max penetration depth is 16 units)": 0
+	]
+
 	_minlight(string) : "Minimum Light Level" : : "The minimum level of ambient light that hits this brush."
 ]
 
@@ -1472,7 +1477,7 @@
 	filtername(filterclass) : "Filter Name" : : "Filter to use to see if activator collides with me. See filter_activator_name for more explanation. Allow means 'Allow to Block' for this entity."
 ]
 
-@SolidClass base(Targetname, Parentname, Origin, RenderFields, Global, Inputfilter, EnableDisable, Shadow) = func_brush : 
+@SolidClass base(BaseBrush, Targetname, Parentname, Origin, RenderFields, Global, Inputfilter, EnableDisable, Shadow) = func_brush : 
 	"An brush built entity with various features." 
 [
 	spawnflags(flags) =
@@ -2368,6 +2373,7 @@
 @PointClass base(Targetname, Parentname, Angles) iconsprite("editor/env_spark.vmt") = env_spark : 
 	"An entity used to create sparks at its origin." 
 [
+	rendercolor(color255) : "FX Color (R G B)" : "255 255 255" : "Colour of the sparks."
 	MaxDelay(string) : "Max Delay" : "0" : "The longest delay between sparks (in seconds)."
 	Magnitude(choices) : "Magnitude" : 1 : "The size of the sparks." =
 	[
@@ -2858,6 +2864,12 @@
 	]
 ]
 
+@PointClass base(PlayerClass, Angles) studio("models/editor/playerstart.mdl") = info_player_deathmatch :
+	"This entity indicates the position and facing direction at which the player will spawn during a deathmatch map. Any number of "+
+	"info_player_deathmatch entities may be placed in a map."
+[
+]
+
 @PointClass base(Targetname) size(-1 -1 0, 1 1 1) color(80 150 225) studio("models/editor/overlay_helper.mdl") sphere(fademindist) sphere(fademaxdist) overlay() = info_overlay : 
 	"An entity that places an overlay on the world." 
 [
@@ -3249,7 +3261,7 @@
     style(Choices) : "Appearance" : 0 =
 	[
 		0 : "Normal"
-		10: "Fluorescent flicker"
+
 		2 : "Slow, strong pulse"
 		11: "Slow pulse, noblack"
 		5 : "Gentle pulse"
@@ -3260,6 +3272,12 @@
 		8 : "Candle C"
 		4 : "Fast strobe"
 		9 : "Slow strobe"
+		10: "Fluorescent flicker"
+		12: "Watery Shimmer"
+		
+		// Caliber additions
+		13: "Disco"
+		14: "Warpspeed"
 	]
 	spawnflags(Flags) = 
 	[ 
@@ -6358,6 +6376,7 @@
 	input SetSpeed(float) : "Set the speed of the train, as a ratio of max speed [0, 1]"
 	input SetSpeedDir(float) : "Set the speed of the train, as a ratio of max speed. Negative values reverse the direction [-1, 1]"
 	input SetSpeedReal(float) : "Set the speed of the train. Must be a positive value from 0 to max speed."
+	input Start(void) : "Tells the train to start"
 	input Stop(void) : "Stop the train."
 	input StartForward(void) : "Start the train moving forward."
 	input StartBackward(void) : "Start the train moving backward."
@@ -6383,6 +6402,12 @@
 	"these dimensions in order to operate when the train is near it."
 [
 	_minlight(string) : "Minimum Light Level" : : "The minimum level of ambient light that hits this brush."
+]
+
+@SolidClass base(BaseTrain) = func_train : "OBSOLETE! Use func_tracktrain."
+[
+	// Inputs
+	//input Start(void) : "Tells the train to start"
 ]
 
 @SolidClass base(BaseTrain) = func_tracktrain :

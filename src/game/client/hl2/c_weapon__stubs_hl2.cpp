@@ -8,6 +8,7 @@
 #include "c_weapon__stubs.h"
 #include "basehlcombatweapon_shared.h"
 #include "c_basehlcombatweapon.h"
+#include "basebludgeonweapon_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -29,45 +30,36 @@ STUB_WEAPON_CLASS( weapon_flashlight, WeaponFlashlight, C_BaseHLCombatWeapon );	
 #ifdef HL2_LOSTCOAST
 STUB_WEAPON_CLASS( weapon_oldmanharpoon, WeaponOldManHarpoon, C_WeaponCitizenPackage );
 #endif
-STUB_WEAPON_CLASS( weapon_bottle, WeaponBottle, C_BaseHLBludgeonWeapon );
-STUB_WEAPON_CLASS( weapon_knife, WeaponKnife, C_BaseHLBludgeonWeapon );
-STUB_WEAPON_CLASS( weapon_rebar, WeaponRebar, C_BaseHLBludgeonWeapon );
-STUB_WEAPON_CLASS( weapon_shank, WeaponShank, C_BaseHLBludgeonWeapon );
-
-STUB_WEAPON_CLASS( weapon_bat, WeaponBat, C_BaseHLBludgeonWeapon );
-STUB_WEAPON_CLASS( weapon_crowbar, WeaponCrowbar, C_BaseHLBludgeonWeapon );
-STUB_WEAPON_CLASS( weapon_hammer, WeaponHammer, C_BaseHLBludgeonWeapon );
-STUB_WEAPON_CLASS( weapon_pipe, WeaponPipe, C_BaseHLBludgeonWeapon );
 
 // Weapons that are supported in MP
 #ifndef HL2MP
 STUB_WEAPON_CLASS( weapon_357, Weapon357, C_BaseHLCombatWeapon );						//Super Magnum
-STUB_WEAPON_CLASS( weapon_45, Weapon45, C_HLSniperRifle );								//45 Contender
+//STUB_WEAPON_CLASS( weapon_45, Weapon45, C_HLSniperRifle );								//45 Contender
 //STUB_WEAPON_CLASS( weapon_ar1, WeaponAR1, C_HLMachineGun );								//Assault Rifle
-STUB_WEAPON_CLASS( weapon_ar2, WeaponAR2, C_HLMachineGun );								//Battle Rifle
+//STUB_WEAPON_CLASS( weapon_ar2, WeaponAR2, C_HLMachineGun );								//Battle Rifle
 STUB_WEAPON_CLASS( weapon_crossbow, WeaponCrossbow, C_BaseHLCombatWeapon );				//Hot-Stick Launcher
-STUB_WEAPON_CLASS( weapon_crowbarold, WeaponCrowbarOld, C_BaseHLBludgeonWeapon );
+STUB_WEAPON_CLASS( weapon_crowbarold, WeaponCrowbarOld, C_BaseBludgeonWeapon );
 STUB_WEAPON_CLASS( weapon_flamethrower, WeaponFlamethrower, C_BaseHLCombatWeapon );		//Flamethrower
 STUB_WEAPON_CLASS( weapon_frag, WeaponFrag, C_HLThrowable );							//Frag 'Nade
 STUB_WEAPON_CLASS( weapon_gauss, WeaponGaussGun, C_BaseHLCombatWeapon );
-STUB_WEAPON_CLASS( weapon_gpistol, WeaponGPistol, C_BaseHLCombatWeapon );				//Golden Gun
-STUB_WEAPON_CLASS( weapon_hmg1, WeaponHMG1, C_HLSelectFireMachineGun );					//Medium-Rare-Machine Gun
+//STUB_WEAPON_CLASS( weapon_gpistol, WeaponGPistol, C_BaseHLCombatWeapon );				//Golden Gun
+//STUB_WEAPON_CLASS( weapon_hmg1, WeaponHMG1, C_HLSelectFireMachineGun );					//Medium-Rare-Machine Gun
 STUB_WEAPON_CLASS( weapon_flash, WeaponFlash, C_BaseHLCombatWeapon );					//Rawket Lawnchairx4
 STUB_WEAPON_CLASS( weapon_molotov, WeaponMolotov, C_HLThrowable );						//Finnish Booze
 //!STUB_WEAPON_CLASS( weapon_physcannon, WeaponPhysCannon, C_BaseHLCombatWeapon );			//!!!ALREADY DEFINED
-STUB_WEAPON_CLASS( weapon_pistol, WeaponPistol, C_BaseHLCombatWeapon );					//Pistol
+//STUB_WEAPON_CLASS( weapon_pistol, WeaponPistol, C_BaseHLCombatWeapon );					//Pistol
 STUB_WEAPON_CLASS( weapon_rpg, WeaponRPG, C_BaseHLCombatWeapon );						//Rawket Lawnchair
-STUB_WEAPON_CLASS( weapon_shotgun, WeaponShotgun, C_BaseHLCombatWeapon );				//Elephant Gun
+//STUB_WEAPON_CLASS( weapon_shotgun, WeaponShotgun, C_BaseHLCombatWeapon );				//Elephant Gun
 STUB_WEAPON_CLASS( weapon_slam, Weapon_SLAM, C_BaseHLCombatWeapon );					//SLAM'd
-STUB_WEAPON_CLASS( weapon_smg1, WeaponSMG1, C_HLMachineGun );							//Small-Machine Gun
-STUB_WEAPON_CLASS( weapon_smg2, WeaponSMG2, C_HLSelectFireMachineGun );					//Small-Machine Gun 2
-STUB_WEAPON_CLASS( weapon_sniperrifle, WeaponSniperRifle, C_HLSniperRifle );			//Snooper Rifle
+//STUB_WEAPON_CLASS( weapon_smg1, WeaponSMG1, C_HLMachineGun );							//Small-Machine Gun
+//STUB_WEAPON_CLASS( weapon_smg2, WeaponSMG2, C_HLSelectFireMachineGun );					//Small-Machine Gun 2
+//STUB_WEAPON_CLASS( weapon_sniperrifle, WeaponSniperRifle, C_HLSniperRifle );			//Snooper Rifle
 STUB_WEAPON_CLASS( weapon_emp, WeaponEMP, C_HLThrowable );		//Stun 'Nade
-STUB_WEAPON_CLASS( weapon_supershotgun, WeaponSuperShotgun, C_BaseHLCombatWeapon );		//Auto-Shotgun
+//STUB_WEAPON_CLASS( weapon_supershotgun, WeaponSuperShotgun, C_BaseHLCombatWeapon );		//Auto-Shotgun
 STUB_WEAPON_CLASS( weapon_hopwire, WeaponHopwire, C_BaseHLCombatWeapon );
 STUB_WEAPON_CLASS( weapon_proto1, WeaponProto1, C_BaseHLCombatWeapon );
 
-STUB_WEAPON_CLASS( weapon_stab, WeaponStab, C_BaseHLBludgeonWeapon );
-STUB_WEAPON_CLASS( weapon_swing, WeaponSwing, C_BaseHLBludgeonWeapon );
+//STUB_WEAPON_CLASS( weapon_stab, WeaponStab, C_BaseBludgeonWeapon );
+//STUB_WEAPON_CLASS( weapon_swing, WeaponSwing, C_BaseBludgeonWeapon );
 #endif
 

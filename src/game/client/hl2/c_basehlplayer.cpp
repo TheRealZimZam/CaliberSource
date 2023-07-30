@@ -13,6 +13,8 @@
 #include "collisionutils.h"
 #include "c_basetempentity.h"
 #include "cl_animevent.h"
+#include "prediction.h"
+#include "c_team.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -79,8 +81,24 @@ BEGIN_RECV_TABLE_NOBASE( C_TEPlayerAnimEvent, DT_TEPlayerAnimEvent )
 	RecvPropInt( RECVINFO( m_nData ) )
 END_RECV_TABLE()
 
+BEGIN_RECV_TABLE_NOBASE( C_BaseHLPlayer, DT_HL2LocalPlayerExclusive )
+	RecvPropVector( RECVINFO_NAME( m_vecNetworkOrigin, m_vecOrigin ) ),
+	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
+//	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
+END_RECV_TABLE()
+
+BEGIN_RECV_TABLE_NOBASE( C_BaseHLPlayer, DT_HL2NonLocalPlayerExclusive )
+	RecvPropVector( RECVINFO_NAME( m_vecNetworkOrigin, m_vecOrigin ) ),
+	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
+	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),
+END_RECV_TABLE()
+
 IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropDataTable( RECVINFO_DT(m_HL2Local),0, &REFERENCE_RECV_TABLE(DT_HL2Local) ),
+
+	RecvPropDataTable( "hl2localdata", 0, 0, &REFERENCE_RECV_TABLE(DT_HL2LocalPlayerExclusive) ),
+	RecvPropDataTable( "hl2nonlocaldata", 0, 0, &REFERENCE_RECV_TABLE(DT_HL2NonLocalPlayerExclusive) ),
+
 	RecvPropBool( RECVINFO( m_fIsSprinting ) ),
 	RecvPropFloat( RECVINFO( m_angEyeAngles[0] ) ),
 	RecvPropFloat( RECVINFO( m_angEyeAngles[1] ) ),

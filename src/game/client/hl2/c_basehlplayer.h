@@ -24,9 +24,13 @@ public:
 	DECLARE_CLASS( C_BaseHLPlayer, C_BasePlayer );
 	DECLARE_CLIENTCLASS();
 	DECLARE_PREDICTABLE();
+	DECLARE_INTERPOLATION();
 
 						C_BaseHLPlayer();
 						~C_BaseHLPlayer();
+
+	// Player avoidance
+//	Vector GetAttackSpread( CBaseCombatWeapon *pWeapon, CBaseEntity *pTarget = NULL );
 
 	virtual void		OnDataChanged( DataUpdateType_t updateType );
 	virtual void		PostDataUpdate( DataUpdateType_t updateType );

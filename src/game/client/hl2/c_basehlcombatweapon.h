@@ -12,6 +12,7 @@
 #pragma once
 #endif
 
+#if 0
 class C_HLMachineGun : public C_BaseHLCombatWeapon
 {
 public:
@@ -33,12 +34,13 @@ public:
 	DECLARE_CLIENTCLASS();
 };
 
-class C_BaseHLBludgeonWeapon : public C_BaseHLCombatWeapon
+class C_HLSniperRifle : public C_BaseHLCombatWeapon
 {
 public:
-	DECLARE_CLASS( C_BaseHLBludgeonWeapon, C_BaseHLCombatWeapon );
+	DECLARE_CLASS( C_HLSniperRifle, C_BaseHLCombatWeapon );
 	DECLARE_CLIENTCLASS();
 };
+#endif 
 
 class C_HLThrowable : public C_BaseHLCombatWeapon
 {
@@ -47,11 +49,5 @@ public:
 	DECLARE_CLIENTCLASS();
 };
 
-class C_HLSniperRifle : public C_BaseHLCombatWeapon
-{
-public:
-	DECLARE_CLASS( C_HLSniperRifle, C_BaseHLCombatWeapon );
-	DECLARE_CLIENTCLASS();
-};
 
 #endif // C_BASEHLCOMBATWEAPON_H

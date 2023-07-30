@@ -19,9 +19,9 @@ CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectStunstick )
 CLIENTEFFECT_MATERIAL( "effects/stunstick" )
 CLIENTEFFECT_REGISTER_END()
 
-class C_WeaponStunStick : public C_BaseHLBludgeonWeapon
+class C_WeaponStunStick : public C_BaseBludgeonWeapon
 {
-	DECLARE_CLASS( C_WeaponStunStick, C_BaseHLBludgeonWeapon );
+	DECLARE_CLASS( C_WeaponStunStick, C_BaseBludgeonWeapon );
 public:
 	DECLARE_CLIENTCLASS();
 	DECLARE_PREDICTABLE();

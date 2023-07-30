@@ -341,6 +341,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\shared\basebludgeonweapon_shared.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\baseclientrendertargets.cpp"
 				>
 			</File>
@@ -2676,10 +2680,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\c_weapon_stunstick.cpp"
-					>
-				</File>
-				<File
 					RelativePath="..\shared\hl2\citadel_effects_shared.h"
 					>
 				</File>
@@ -2861,6 +2861,82 @@
 				</File>
 				<File
 					RelativePath=".\hl2\vgui_rootpanel_hl2.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_45.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_ar2.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_ar2.h"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_cguard.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_cguard.h"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_hmg.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_pistol.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_shotgun.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_smg1.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_smg2.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_sniperrifle.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_sniperrifle.h"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_stab.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_stab.h"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_stunstick.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_stunstick.h"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_supershotgun.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_swing.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_swing.h"
 					>
 				</File>
 			</Filter>
@@ -4686,6 +4762,10 @@
 			</File>
 			<File
 				RelativePath="..\shared\base_playeranimstate.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\basebludgeonweapon_shared.h"
 				>
 			</File>
 			<File

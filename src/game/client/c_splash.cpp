@@ -188,6 +188,7 @@ void C_Splash::PlaySplashSound(Vector vPos)
 	if ( !m_bSplashSound )
 		return;
 
+	// TODO; We need to check if its a looping sound here
 	if (gpGlobals->curtime > m_flNextSoundTime)
 	{
 		CLocalPlayerFilter filter;

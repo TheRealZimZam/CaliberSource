@@ -1492,6 +1492,7 @@ void C_BasePlayer::CalcInEyeCamView(Vector& eyeOrigin, QAngle& eyeAngles, float&
 	m_flObserverChaseDistance = 0.0;
 
 	eyeAngles = target->EyeAngles();
+	CalcViewRoll( eyeAngles );
 	eyeOrigin = target->GetAbsOrigin();
 
 	// Apply punch angle
@@ -1523,13 +1524,15 @@ void C_BasePlayer::CalcInEyeCamView(Vector& eyeOrigin, QAngle& eyeAngles, float&
 void C_BasePlayer::CalcDeathCamView(Vector& eyeOrigin, QAngle& eyeAngles, float& fov)
 {
 	CBaseEntity	* pKiller = NULL; 
-
 	if ( mp_forcecamera.GetInt() == OBS_ALLOW_ALL )
 	{
 		// if mp_forcecamera is off let user see killer or look around
 		pKiller = GetObserverTarget();
 		eyeAngles = EyeAngles();
 	}
+
+	// Reset my head roll
+	eyeAngles[ROLL] = 0;
 
 	float interpolation = ( gpGlobals->curtime - m_flDeathTime ) / DEATH_ANIMATION_TIME;
 	interpolation = clamp( interpolation, 0.0f, 1.0f );

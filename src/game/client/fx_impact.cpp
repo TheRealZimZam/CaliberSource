@@ -247,6 +247,7 @@ void LeakEffect( trace_t &tr )
 	VectorAngles( tr.plane.normal, angles );
 	pLeak->SetLocalAngles( angles );
 
+	// TODO; Soundpatch instead? It'd be cool to be able to play steam or fire sounds here
 	IMaterialVar*	pLeakSound = pTraceMaterial->FindVar( "$leaksound", &found );
 	if (found)
 		pLeak->m_bSplashSound	= pLeakSound->GetIntValue();

@@ -9,18 +9,12 @@
 #include "cbase.h"
 #include "npcevent.h"
 #include "in_buttons.h"
-
-#ifdef CLIENT_DLL
-	#include "c_baseplayer.h"
-#else
-	#include "player.h"
-#endif
-
-#include "weapon_hl2mpbase.h"
-#include "weapon_hl2mpbase_machinegun.h"
-
-#ifdef CLIENT_DLL
-#define CWeaponSMG1 C_WeaponSMG1
+#include "basehlcombatweapon_shared.h"
+#include "baseplayer_shared.h"
+#ifndef CLIENT_DLL
+	#include "basecombatcharacter.h"
+	#include "AI_BaseNPC.h"
+	#include "soundent.h"
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -31,6 +25,9 @@
 //ConVar sk_weapon_smg1_lerp( "sk_weapon_smg1_lerp", "6.0" );
 extern ConVar sv_funmode;
 
+#ifdef CLIENT_DLL
+#define CWeaponSMG1 C_WeaponSMG1
+#endif
 class CWeaponSMG1 : public CHLMachineGun
 {
 public:
@@ -43,22 +40,22 @@ public:
 	
 	void	Precache( void );
 	void	AddViewKick( void );
-	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
 	int		GetMinBurst() { return 3; }
 	int		GetMaxBurst() { return 6; }
 
-	virtual float	GetMinRestTime();
-	virtual float	GetMaxRestTime();
-
 	virtual void Equip( CBaseCombatCharacter *pOwner );
 
+#if !defined(CLIENT_DLL)
+	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
+	virtual float	GetMinRestTime();
+	virtual float	GetMaxRestTime();
 	void FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, Vector &vecShootOrigin, Vector &vecShootDir );
 	void Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
 	void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+#endif
 
 	DECLARE_ACTTABLE();
-	DECLARE_DATADESC();
 
 private:
 	CWeaponSMG1( const CWeaponSMG1 & );
@@ -71,9 +68,6 @@ END_NETWORK_TABLE()
 
 BEGIN_PREDICTION_DATA( CWeaponSMG1 )
 END_PREDICTION_DATA()
-
-BEGIN_DATADESC( CWeaponSMG1 )
-END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( weapon_smg1, CWeaponSMG1 );
 PRECACHE_WEAPON_REGISTER(weapon_smg1);
@@ -158,6 +152,39 @@ void CWeaponSMG1::Precache( void )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Give this weapon longer range when wielded by an ally NPC.
+//-----------------------------------------------------------------------------
+void CWeaponSMG1::Equip( CBaseCombatCharacter *pOwner )
+{
+#ifndef CLIENT_DLL
+	if( pOwner->Classify() == CLASS_PLAYER_ALLY )
+	{
+		m_fMinRange1 = 0;	//Temp hack for lack of melee
+		m_fMaxRange1 = 2000;
+	}
+#endif
+	BaseClass::Equip( pOwner );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CWeaponSMG1::AddViewKick( void )
+{
+	#define	SMG1_MAX_VERTICAL_KICK		3.5f	//Degrees TODO; Convar
+	#define	SMG1_SLIDE_LIMIT			3.0f	//Seconds TODO; Convar
+	
+	//Get the view kick
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+
+	if (!pPlayer)
+		return;
+
+	DoMachineGunKick( pPlayer, SMG_EASY_DAMPEN, SMG1_MAX_VERTICAL_KICK, m_fFireDuration, SMG1_SLIDE_LIMIT );
+}
+
+#if !defined(CLIENT_DLL)
+//-----------------------------------------------------------------------------
 // Purpose: Adjust time between bursts for different npc types.
 //-----------------------------------------------------------------------------
 float CWeaponSMG1::GetMinRestTime()
@@ -190,38 +217,6 @@ float CWeaponSMG1::GetMaxRestTime()
 
 	return BaseClass::GetMaxRestTime();
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: Give this weapon longer range when wielded by an ally NPC.
-//-----------------------------------------------------------------------------
-void CWeaponSMG1::Equip( CBaseCombatCharacter *pOwner )
-{
-	if( pOwner->Classify() == CLASS_PLAYER_ALLY )
-	{
-		m_fMinRange1 = 0;	//Temp hack for lack of melee
-		m_fMaxRange1 = 2000;
-	}
-
-	BaseClass::Equip( pOwner );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CWeaponSMG1::AddViewKick( void )
-{
-	#define	SMG1_MAX_VERTICAL_KICK		3.5f	//Degrees TODO; Convar
-	#define	SMG1_SLIDE_LIMIT			3.0f	//Seconds TODO; Convar
-	
-	//Get the view kick
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-
-	if (!pPlayer)
-		return;
-
-	DoMachineGunKick( pPlayer, SMG_EASY_DAMPEN, SMG1_MAX_VERTICAL_KICK, m_fFireDuration, SMG1_SLIDE_LIMIT );
-}
-
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -287,3 +282,5 @@ void CWeaponSMG1::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatChar
 		break;
 	}
 }
+
+#endif

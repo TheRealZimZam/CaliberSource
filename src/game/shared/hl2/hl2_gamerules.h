@@ -169,7 +169,7 @@ private:
 	// Rules change for the mega physgun
 	CNetworkVar( bool, m_bMegaPhysgun );
 
-	int DefaultFOV( void ) { return 85; }
+	int DefaultFOV( void ) { return 80; }
 
 #ifdef CLIENT_DLL
 	DECLARE_CLIENTCLASS_NOBASE(); // This makes datatables able to access our private vars.

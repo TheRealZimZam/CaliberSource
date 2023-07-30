@@ -77,6 +77,30 @@ IMPLEMENT_NETWORKCLASS_ALIASED( HalfLife2Proxy, DT_HalfLife2Proxy )
 	BEGIN_SEND_TABLE( CHalfLife2Proxy, DT_HalfLife2Proxy )
 		SendPropDataTable( "hl2_gamerules_data", 0, &REFERENCE_SEND_TABLE( DT_HL2GameRules ), SendProxy_HL2GameRules )
 	END_SEND_TABLE()
+
+#ifdef DEBUG
+	// Handler for the "bot" command.
+	void Bot_f()
+	{		
+		// Look at -count.
+		int count = 1;
+		count = clamp( count, 1, 16 );
+
+		int iTeam = 0;
+
+		// Look at -frozen.
+		bool bFrozen = false;
+
+		// Ok, spawn all the bots.
+		while ( --count >= 0 )
+		{
+			BotPutInServer( bFrozen, iTeam );
+		}
+	}
+
+	ConCommand cc_Bot( "bot", Bot_f, "Add a bot.", FCVAR_CHEAT );
+#endif
+
 #endif
 
 #ifdef GAME_DLL

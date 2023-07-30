@@ -55,9 +55,10 @@ public:
 	void	Precache( void );
 	void	Spawn( void );
 
-	bool	ShouldGib( const CTakeDamageInfo &info );
 	Class_T Classify( void );
 	Disposition_t	IRelationType( CBaseEntity *pTarget );
+	bool	ShouldGib( const CTakeDamageInfo &info );
+	bool	ShouldMoveAndShoot();
 
 	// Speed/Movement
 	float	GetIdealAccel( void ) const{ return GetIdealSpeed() * 2.0; };
@@ -66,6 +67,8 @@ public:
 	// Hearing
 	int		GetSoundInterests( void );
 	float	HearingSensitivity( void ) { return 1.0; };
+	void	PainSound( const CTakeDamageInfo &info );
+	void	DeathSound( const CTakeDamageInfo &info );
 	// Never go back to idle after we get in a fight
 	virtual bool	ShouldGoToIdleState( void ) { return false; }
 
@@ -77,6 +80,7 @@ public:
 	void	OnKilledNPC( CBaseCombatCharacter *pKilled );
 
 	// Doing
+	void		BuildScheduleTestBits( void );
 	virtual int	SelectSchedule( void );
 	virtual int	TranslateSchedule( int scheduleType );
 
@@ -89,32 +93,28 @@ private:
 	int		m_iWantsSlot;
 
 private:
-#if 0
 	// Conds
 	enum
 	{
-		COND_FAKEBOT_TEST = BaseClass::NEXT_CONDITION,
-		NEXT_CONDITION
+		COND_FAKEBOT_HELP_TEAMMATE = BaseClass::NEXT_CONDITION,
+		NEXT_CONDITION,
 	};
 
 	// Scheds
 	enum
 	{
-		SCHED_FAKEBOT_TEST = BaseClass::NEXT_SCHEDULE,
-		NEXT_SCHEDULE
+		SCHED_FAKEBOT_IDLE = BaseClass::NEXT_SCHEDULE,
+		SCHED_FAKEBOT_TBAG,
+		SCHED_FAKEBOT_RETREAT,
+		SCHED_FAKEBOT_ATTACK,
+		SCHED_FAKEBOT_CHASE,
+		SCHED_FAKEBOT_HELP_TEAMMATE,
+		NEXT_SCHEDULE,
 	};
-
-	// Tasks
-	enum 
-	{
-		TASK_FAKEBOT_TEST = BaseClass::NEXT_TASK,
-		NEXT_TASK
-	};
-#endif
 
 protected:
 	DECLARE_DATADESC();
-//	DEFINE_CUSTOM_AI;
+	DEFINE_CUSTOM_AI;
 };
 
 BEGIN_DATADESC( CFakeBot )
@@ -136,6 +136,8 @@ void CFakeBot::Precache()
 	PrecacheModel( STRING( GetModelName() ) );
 
 	PrecacheScriptSound( "GenericNPC.GunSound" );
+	PrecacheScriptSound( "Player.Pain" );
+	PrecacheScriptSound( "Player.Death" );
 }
 
 //=========================================================
@@ -147,7 +149,6 @@ Class_T	CFakeBot::Classify( void )
 	return	CLASS_PLAYER;
 }
 
-
 //=========================================================
 // MaxYawSpeed - allows each sequence to have a different
 // turn rate associated with it.
@@ -158,6 +159,26 @@ float CFakeBot::MaxYawSpeed( void )
 		return 45;
 	else
 		return 60;
+}
+
+//-----------------------------------------------------------------------------
+bool CFakeBot::ShouldGib( const CTakeDamageInfo &info )
+{
+	// If we're being hoisted, we only want to gib when the barnacle hurts us with his bite!
+	if ( IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) )
+	{
+		if ( info.GetAttacker() && info.GetAttacker()->Classify() != CLASS_BARNACLE )
+			return false;
+
+		return true;
+	}
+
+	return BaseClass::ShouldGib( info );
+}
+
+bool CFakeBot::ShouldMoveAndShoot()
+{
+	return true;
 }
 
 //=========================================================
@@ -181,18 +202,18 @@ int CFakeBot::GetSoundInterests( void )
 			SOUND_WEAPON;
 }
 
-bool CFakeBot::ShouldGib( const CTakeDamageInfo &info )
+void CFakeBot::PainSound( const CTakeDamageInfo &info )
 {
-	// If we're being hoisted, we only want to gib when the barnacle hurts us with his bite!
-	if ( IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) )
-	{
-		if ( info.GetAttacker() && info.GetAttacker()->Classify() != CLASS_BARNACLE )
-			return false;
+	if ( gpGlobals->curtime < m_flNextPainSoundTime )
+		return;
 
-		return true;
-	}
+	EmitSound( "Player.Pain" );
+	m_flNextPainSoundTime = gpGlobals->curtime + 1;
+}
 
-	return BaseClass::ShouldGib( info );
+void CFakeBot::DeathSound( const CTakeDamageInfo &info )
+{
+	EmitSound( "Player.Death" );
 }
 
 //=========================================================
@@ -213,10 +234,11 @@ void CFakeBot::Spawn()
 	Precache();
 	BaseClass::Spawn();
 
+	SetModel( STRING( GetModelName() ) );
 	if ( FStrEq( STRING( GetModelName() ), "models/player.mdl" ) || FStrEq( STRING( GetModelName() ), "models/holo.mdl" ) )
 		UTIL_SetSize(this, VEC_HULL_MIN, VEC_HULL_MAX);
 	else
-		UTIL_SetSize(this, NAI_Hull::Mins(HULL_HUMAN), NAI_Hull::Maxs(HULL_HUMAN));
+		SetHullType(HULL_HUMAN);
 
 	SetHullSizeNormal();
 	SetSolid( SOLID_BBOX );
@@ -232,15 +254,21 @@ void CFakeBot::Spawn()
 	SetSimulatedEveryTick( true );
 	SetAnimatedEveryTick( true );
 
-	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_OPEN_DOORS | bits_CAP_DUCK | bits_CAP_USE );
-	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
+	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP | bits_CAP_DOORS_GROUP | bits_CAP_DUCK | bits_CAP_USE );
+	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_MOVE_SHOOT | bits_CAP_STRAFE );
 
+	NPCInit();
+
+	// Somehow need to hook this into gamerules
+#if 0
 	if ( !HasSpawnFlags(SF_FAKEBOT_SOLID) )
 	{
+		// TODO;
 		CBaseEntity *pPlayer = UTIL_PlayerByIndex( 1 );
 		if ( InSameTeam( pPlayer ) )
 			PhysDisableEntityCollisions( this, pPlayer );
 	}
+#endif
 }
 
 
@@ -276,10 +304,19 @@ void CFakeBot::NPCThink( void )
 {
 	BaseClass::NPCThink();
 
-	if ( GetFlags() & FL_DUCKING )
-		SetCollisionBounds( VEC_DUCK_HULL_MIN, VEC_DUCK_HULL_MAX );
+	if ( IsAlive() )
+	{
+		if ( GetFlags() & FL_DUCKING )
+			SetCollisionBounds( VEC_DUCK_HULL_MIN, VEC_DUCK_HULL_MAX );
+		else
+			SetCollisionBounds( VEC_HULL_MIN, VEC_HULL_MAX );
+
+		// TODO; This is where we would decide what weapon we want
+	}
 	else
-		SetCollisionBounds( VEC_HULL_MIN, VEC_HULL_MAX );
+	{
+		SUB_StartFadeOut();
+	}
 }
 
 void CFakeBot::PrescheduleThink( void )
@@ -287,30 +324,85 @@ void CFakeBot::PrescheduleThink( void )
 	BaseClass::PrescheduleThink();
 }
 
+
+//extern ConVar hl2_playertalk;
 void CFakeBot::OnKilledNPC( CBaseCombatCharacter *pKilled )
 {
+	// Spew some liners, like the player
+//	if ( hl2_playertalk.GetBool() )
+//	{
+//
+//	}
 	BaseClass::OnKilledNPC( pKilled );
 }
 
 //=========================================================
 // Doing
 //=========================================================
+void CFakeBot::BuildScheduleTestBits( void )
+{
+	BaseClass::BuildScheduleTestBits();
+
+	if ( m_NPCState == NPC_STATE_IDLE )
+	{
+		// Almost anything can interrupt me when in idle
+		SetCustomInterruptCondition( COND_LIGHT_DAMAGE );
+		SetCustomInterruptCondition( COND_HEAVY_DAMAGE );
+		SetCustomInterruptCondition( COND_SEE_ENEMY );
+		SetCustomInterruptCondition( COND_HEAR_COMBAT );
+		SetCustomInterruptCondition( COND_HEAR_DANGER );
+		SetCustomInterruptCondition( COND_HEAR_MOVE_AWAY );
+	}
+}
+
 int CFakeBot::SelectSchedule( void )
 {
 	switch( m_NPCState )
 	{
-		//TODO; We should follow a friendly player if we're idle
+		case NPC_STATE_DEAD:
+		case NPC_STATE_PLAYDEAD:
+		case NPC_STATE_PRONE:
+		case NPC_STATE_SCRIPT:
+			return BaseClass::SelectSchedule();
+		break;
+
+		//TODO; We should follow/tag along with a friendly player if we're idle
 		case NPC_STATE_IDLE:
-			return SCHED_RUN_RANDOM;
+			// If its danger in idle, just move away
+			if ( HasCondition( COND_HEAR_DANGER ) )
+				return SCHED_MOVE_AWAY;
+
+			// Always place an emphasis on reloading
+			if ( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_NO_SECONDARY_AMMO ) )
+				return SCHED_HIDE_AND_RELOAD;
+			else
+				return SCHED_FAKEBOT_IDLE;
 		break;
 
 		case NPC_STATE_ALERT:
 		case NPC_STATE_COMBAT:
 		{
-			if ( HasCondition( COND_ENEMY_DEAD ) )
+			if ( HasCondition( COND_HEAR_DANGER ) )
+				return SCHED_TAKE_COVER_FROM_BEST_SOUND;
+
+			if ( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_NO_SECONDARY_AMMO ) )
+				return SCHED_HIDE_AND_RELOAD;
+
+			// Basic Checks, translate does the higher level stuff
+			if ( HasCondition( COND_SEE_ENEMY ) )
 			{
-				return SCHED_VICTORY_DANCE;
+				return SCHED_FAKEBOT_ATTACK;
 			}
+			else if ( HasCondition( COND_ENEMY_OCCLUDED ) )
+			{
+				return SCHED_FAKEBOT_CHASE;
+			}
+			else if ( HasCondition( COND_REPEATED_DAMAGE ) )
+			{
+				return SCHED_FAKEBOT_RETREAT;
+			}
+			else if ( HasCondition( COND_ENEMY_DEAD ) )
+				return SCHED_VICTORY_DANCE;
 		}
 		break;
 
@@ -319,6 +411,7 @@ int CFakeBot::SelectSchedule( void )
 		break;
 	}
 
+	// This should never happen... but just in case
 	return BaseClass::SelectSchedule();
 }
 
@@ -328,13 +421,34 @@ int CFakeBot::TranslateSchedule( int scheduleType )
 {
 	switch( scheduleType )
 	{
+		case SCHED_FAKEBOT_IDLE:
+			{
+				if ( GetEnemy() )
+					return SCHED_FAKEBOT_ATTACK;
+
+				return SCHED_FAKEBOT_IDLE;
+			}
+		case SCHED_FAKEBOT_ATTACK:
+			{
+				// If i'm pissed, attack aggressively
+				if ( GetEnemy() && false )
+					return SCHED_FAKEBOT_CHASE;
+
+				return SCHED_FAKEBOT_ATTACK;
+			}
 		case SCHED_VICTORY_DANCE:
 			{
-				// Only taunt if the game is over
+				// Only thrust if the game is over
 				if ( g_fGameOver )
 					return SCHED_VICTORY_DANCE;
 				else
-					return TranslateSchedule( SCHED_ALERT_FACE );
+				{
+					// Random chance to try and dip-dip-potato-chip
+					if ( random->RandomInt(0,1) )
+						return SCHED_FAKEBOT_TBAG;
+					else
+						return TranslateSchedule( SCHED_FAKEBOT_IDLE );
+				}
 			}
 	}
 
@@ -365,3 +479,162 @@ void CFakeBot::Event_Killed( const CTakeDamageInfo &info )
 	// Let the baseclass kill me
 	BaseClass::Event_Killed( info );
 }
+
+
+//=========================================================
+AI_BEGIN_CUSTOM_NPC( fakebot, CFakeBot )
+
+//DECLARE_TASK( TASK_FAKEBOT_TEST )
+
+DECLARE_CONDITION( COND_FAKEBOT_HELP_TEAMMATE )
+
+
+
+//=========================================================
+// Schedules
+//=========================================================
+
+// 1. Idle - walk around randomly
+DEFINE_SCHEDULE
+(
+	SCHED_FAKEBOT_IDLE,
+
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_IDLE_WANDER"
+	"		TASK_SET_TOLERANCE_DISTANCE		48"
+	"		TASK_SET_ROUTE_SEARCH_TIME		5"
+	"		TASK_GET_PATH_TO_RANDOM_NODE	200"
+	"		TASK_WALK_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_RANDOM				10"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FAKEBOT_IDLE" // keep doing it
+	""
+	"	Interrupts"
+	"	COND_NEW_ENEMY"
+	"	COND_ENEMY_DEAD"
+	"	COND_SEE_ENEMY"
+	"	COND_HEAR_COMBAT"
+	"	COND_HEAR_BULLET_IMPACT"
+	"	COND_HEAR_MOVE_AWAY"
+	"	COND_HEAR_DANGER"
+	"	COND_FAKEBOT_HELP_TEAMMATE"
+)
+
+// 2. TBag - Run up to an enemy and try to T-Bag
+DEFINE_SCHEDULE
+(
+	SCHED_FAKEBOT_TBAG,
+
+	"	Tasks"
+	"		TASK_FACE_ENEMY					0"
+	"		TASK_WAIT						0.5"
+	"		TASK_GET_PATH_TO_ENEMY_CORPSE	0"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT						0.5"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_CROUCHIDLE"
+	"		TASK_WAIT						0.8"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"
+	"		TASK_WAIT						0.8"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_CROUCHIDLE"
+	"		TASK_WAIT						0.8"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"
+	"		TASK_WAIT						0.8"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_CROUCHIDLE"
+	"		TASK_WAIT						0.8"
+	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"
+	"		TASK_WAIT						0.5"
+	"		TASK_WAIT_RANDOM				1"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FAKEBOT_IDLE"
+	""
+	"	Interrupts"
+	"	COND_NEW_ENEMY"
+	"	COND_SEE_ENEMY"
+	"	COND_HEAR_DANGER"
+	"	COND_FAKEBOT_HELP_TEAMMATE"
+)
+
+// Combat Schedules
+
+// 3. Retreat - Run backwards while in combat
+DEFINE_SCHEDULE
+(
+	SCHED_FAKEBOT_RETREAT,
+
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAIL_TAKE_COVER"
+	"		TASK_SET_TOLERANCE_DISTANCE		24"
+	"		TASK_FIND_COVER_FROM_ENEMY		0"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_REMEMBER					MEMORY:INCOVER"
+	"		TASK_FACE_ENEMY					0"
+	"		TASK_WAIT_RANDOM				1"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FAKEBOT_RETREAT"
+	""
+	"	Interrupts"
+	"	COND_NEW_ENEMY"
+	"	COND_ENEMY_DEAD"
+	"	COND_HEAR_DANGER"
+)
+
+// 4. Attack - Run towards enemy/strafe in combat
+DEFINE_SCHEDULE
+(
+	SCHED_FAKEBOT_ATTACK,
+
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAKEBOT_RETREAT"
+	"		TASK_GET_PATH_TO_ENEMY_LOS		0"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_RANDOM				1"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FAKEBOT_ATTACK"
+	""
+	"	Interrupts"
+	"	COND_NEW_ENEMY"
+	"	COND_ENEMY_DEAD"
+	"	COND_HEAR_DANGER"
+	"	COND_FAKEBOT_HELP_TEAMMATE"
+)
+
+// 5. Chase - Charge towards your enemy
+DEFINE_SCHEDULE
+(
+	SCHED_FAKEBOT_CHASE,
+
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAKEBOT_ATTACK"
+	"		TASK_GET_PATH_TO_ENEMY_LKP_LOS	0"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_RANDOM				1"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FAKEBOT_CHASE"
+	""
+	"	Interrupts"
+	"	COND_NEW_ENEMY"
+	"	COND_ENEMY_DEAD"
+	"	COND_HEAR_DANGER"
+	"	COND_FAKEBOT_HELP_TEAMMATE"
+)
+
+// 6. Help Teammate - An allied player/npc is in trouble, run towards him
+DEFINE_SCHEDULE
+(
+	SCHED_FAKEBOT_HELP_TEAMMATE,
+
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAKEBOT_RETREAT"
+	"		TASK_GET_PATH_TO_TARGET			0"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_RANDOM				1"
+	""
+	"	Interrupts"
+	"	COND_NEW_ENEMY"
+	"	COND_ENEMY_DEAD"
+	"	COND_HEAR_DANGER"
+)
+
+AI_END_CUSTOM_NPC()
+//=========================================================

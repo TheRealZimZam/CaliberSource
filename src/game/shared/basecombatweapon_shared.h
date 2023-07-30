@@ -284,8 +284,8 @@ public:
 	void					SetOwner( CBaseCombatCharacter *owner );
 	virtual void			OnPickedUp( CBaseCombatCharacter *pNewOwner );
 
-	virtual void			AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles ) {};
-	virtual float			CalcViewmodelBob( void ) { return 0.0f; };
+	virtual void			AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles );
+	virtual float			CalcViewmodelBob( void );
 
 	// Returns information about the various control panels
 	virtual void 			GetControlPanelInfo( int nPanelIndex, const char *&pPanelName );

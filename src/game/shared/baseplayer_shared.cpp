@@ -1649,11 +1649,32 @@ float CBasePlayer::CalcRoll (const QAngle& angles, const Vector& velocity, float
 //-----------------------------------------------------------------------------
 void CBasePlayer::CalcViewRoll( QAngle& eyeAngles )
 {
-	if ( GetMoveType() == MOVETYPE_NOCLIP )
+	if ( GetMoveType() == (MOVETYPE_NOCLIP|MOVETYPE_OBSERVER) )
+	{
+		eyeAngles[ROLL] = 0;
 		return;
+	}
 
 	float side = CalcRoll( GetAbsAngles(), GetAbsVelocity(), sv_rollangle.GetFloat(), sv_rollspeed.GetFloat() );
 	eyeAngles[ROLL] += side;
+
+	// Old quake code here - should it stay??
+	if ( m_iHealth <= 0 && ( VEC_DEAD_VIEWHEIGHT[2] != 0 ) )
+	{
+		// only roll the view if the player is dead and the viewheight[2] is nonzero 
+		// this is so deadcam in multiplayer will work.
+#if 0
+		if ( eyeAngles[ROLL] < 80 )
+		{
+			//TODO; Smooth it out, overtime
+			Vector vOldAngle = eyeAngles[ROLL];	//Store the old angle
+			eyeAngles[ROLL] = vOldAngle + Vector(0,0,1);
+		}
+#endif
+		eyeAngles[ROLL] = 80;	// dead view angle
+		return;
+	}
+
 }
 
 

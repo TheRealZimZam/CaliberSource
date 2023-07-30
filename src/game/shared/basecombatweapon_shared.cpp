@@ -2368,6 +2368,88 @@ Activity CBaseCombatWeapon::ActivityOverride( Activity baseAct, bool *pRequired 
 	return baseAct;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Quakeworld bob code, this fixes jitters in the mutliplayer 
+// since the clock (pparams->time) isn't quite linear
+//-----------------------------------------------------------------------------
+#define DEFAULT_BOB			0.001	//0.01
+#define DEFAULT_BOBCYCLE	0.8		//0.8
+#define DEFAULT_BOBUP		0.5		//0.5
+
+float CBaseCombatWeapon::CalcViewmodelBob( void )
+{
+#if defined(CLIENT_DLL)
+	static double	bobtime;
+	static float	bob;
+	float			cycle;
+//	static float	lasttime;
+
+	CBasePlayer *player = ToBasePlayer( GetOwner() );
+	if ( !player )
+		return 0.0f;
+
+	if ( ( player->GetGroundEntity() == NULL ) || !gpGlobals->frametime )
+	{
+		return bob;		// just use old value
+	}
+
+//	lasttime = gpGlobals->time;
+	bobtime += gpGlobals->frametime;
+	
+	cycle = bobtime - (int)(bobtime / DEFAULT_BOBCYCLE ) * DEFAULT_BOBCYCLE;
+	cycle /= DEFAULT_BOBCYCLE;
+
+	if ( cycle < DEFAULT_BOBUP )
+	{
+		cycle = M_PI * cycle / DEFAULT_BOBUP;
+	}
+	else
+	{
+		cycle = M_PI + M_PI*(cycle - DEFAULT_BOBUP)/(1.0 - DEFAULT_BOBUP);
+	}
+
+	// bob is proportional to simulated velocity in the xy plane
+	// (don't count Z, or jumping messes it up)
+	bob = player->GetAbsVelocity().Length2D() * DEFAULT_BOB;
+
+	bob = bob*0.3 + bob*0.7*sin(cycle);
+
+	bob = min( 4.0, bob );
+	bob = max( -7.0, bob );
+	return bob;
+#else
+	return 0;
+#endif
+}
+
+void CBaseCombatWeapon::AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles )
+{
+#if defined(CLIENT_DLL)
+	float fIdleScale = 1;
+	float flBob = CalcViewmodelBob();
+
+	// Bias so view models aren't all synced to each other
+	//float curtime = gpGlobals->curtime + ( viewmodelindex * 2 * M_PI / GetViewModelCount() );
+	float curtime = gpGlobals->curtime + ( viewmodel->entindex() * 2 * M_PI );
+
+	origin[ROLL]	-= fIdleScale * sin(curtime*0.5) * 0.1;
+	origin[PITCH]	-= fIdleScale * sin(curtime*1) * (0.3 * 0.5);
+	origin[YAW]		-= fIdleScale * sin(curtime*2) * 0.3;
+
+	Vector	forward;
+	AngleVectors( angles, &forward, NULL, NULL );
+
+	// Apply bob, but scaled down to 40%
+	VectorMA( origin, flBob * 0.4, forward, origin );
+	origin[2] += flBob;
+
+	// throw in a little tilt.
+	angles[ YAW ]	-= flBob * 0.5;
+	angles[ ROLL ]	-= flBob * 1;
+	angles[ PITCH ]	-= flBob * 0.3;
+#endif
+}
+
 
 #if defined( CLIENT_DLL )
 

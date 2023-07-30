@@ -865,6 +865,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\shared\basebludgeonweapon_shared.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\basebludgeonweapon_shared.h"
+				>
+			</File>
+			<File
 				RelativePath=".\basecombatcharacter.cpp"
 				>
 			</File>
@@ -3696,22 +3704,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\basebludgeonweapon.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\basebludgeonweapon.h"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\basehlcombatweapon.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\basehlcombatweapon.h"
-					>
-				</File>
-				<File
 					RelativePath="..\shared\hl2\basehlcombatweapon_shared.cpp"
 					>
 				</File>
@@ -4412,6 +4404,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\caliber\trigger_fall.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\vehicle_airboat.cpp"
 					>
 				</File>
@@ -4464,7 +4460,7 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_45.cpp"
+					RelativePath="..\shared\hl2\weapon_45.cpp"
 					>
 				</File>
 				<File
@@ -4480,15 +4476,23 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_ar2.cpp"
+					RelativePath="..\shared\hl2\weapon_ar2.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_ar2.h"
+					RelativePath="..\shared\hl2\weapon_ar2.h"
 					>
 				</File>
 				<File
 					RelativePath=".\hl2\weapon_bugbait.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_cguard.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_cguard.h"
 					>
 				</File>
 				<File
@@ -4548,7 +4552,7 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_hmg.cpp"
+					RelativePath="..\shared\hl2\weapon_hmg.cpp"
 					>
 				</File>
 				<File
@@ -4564,7 +4568,7 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_pistol.cpp"
+					RelativePath="..\shared\hl2\weapon_pistol.cpp"
 					>
 				</File>
 				<File
@@ -4576,7 +4580,7 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_shotgun.cpp"
+					RelativePath="..\shared\hl2\weapon_shotgun.cpp"
 					>
 				</File>
 				<File
@@ -4588,27 +4592,27 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_smg1.cpp"
+					RelativePath="..\shared\hl2\weapon_smg1.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_smg2.cpp"
+					RelativePath="..\shared\hl2\weapon_smg2.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_sniperrifle.cpp"
+					RelativePath="..\shared\hl2\weapon_sniperrifle.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_sniperrifle.h"
+					RelativePath="..\shared\hl2\weapon_sniperrifle.h"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_stab.cpp"
+					RelativePath="..\shared\hl2\weapon_stab.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_stab.h"
+					RelativePath="..\shared\hl2\weapon_stab.h"
 					>
 				</File>
 				<File
@@ -4620,23 +4624,23 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_stunstick.cpp"
+					RelativePath="..\shared\hl2\weapon_stunstick.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_stunstick.h"
+					RelativePath="..\shared\hl2\weapon_stunstick.h"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_supershotgun.cpp"
+					RelativePath="..\shared\hl2\weapon_supershotgun.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_swing.cpp"
+					RelativePath="..\shared\hl2\weapon_swing.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\weapon_swing.h"
+					RelativePath="..\shared\hl2\weapon_swing.h"
 					>
 				</File>
 				<Filter

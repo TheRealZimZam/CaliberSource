@@ -27,7 +27,7 @@
 #include "globalstate.h"
 #include "props.h"
 #include "movevars_shared.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "te_effect_dispatch.h"
 #include "vphysics/friction.h"
 #include "saverestore_utlvector.h"

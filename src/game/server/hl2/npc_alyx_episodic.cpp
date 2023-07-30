@@ -31,7 +31,7 @@
 #include "scripted.h"
 #include "hl2_player.h"
 #include "env_alyxemp_shared.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "basegrenade_shared.h"
 #include "ai_interactions.h"
 #include "weapon_flaregun.h"

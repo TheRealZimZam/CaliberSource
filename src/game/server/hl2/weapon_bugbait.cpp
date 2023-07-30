@@ -6,7 +6,7 @@
 //=============================================================================//
 
 #include "cbase.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "engine/IEngineSound.h"
 #include "npcevent.h"
 #include "in_buttons.h"

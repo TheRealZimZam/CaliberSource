@@ -73,13 +73,7 @@ private:
 
 public:
 	int		GetDeviceID( void ) const { return m_bitsDeviceID; }
-	float	GetDeviceDrainRate( void ) const
-	{	
-		if( g_pGameRules->GetSkillLevel() == SKILL_EASY && hl2_episodic.GetBool() && !(GetDeviceID()&bits_SUIT_DEVICE_SPRINT) )
-			return m_flDrainRate * 0.5f;
-		else
-			return m_flDrainRate; 
-	}
+	float	GetDeviceDrainRate( void ) const { return m_flDrainRate; }
 };
 
 //=============================================================================
@@ -101,7 +95,7 @@ public:
 
 	CHL2_Player();
 	~CHL2_Player( void );
-	
+
 	static CHL2_Player *CreatePlayer( const char *className, edict_t *ed )
 	{
 		CHL2_Player::s_PlayerEdict = ed;
@@ -110,6 +104,10 @@ public:
 
 	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
+	DECLARE_PREDICTABLE();
+
+	// Player Avoidance
+//	Vector GetAttackSpread( CBaseCombatWeapon *pWeapon, CBaseEntity *pTarget = NULL );
 
 	void				DoAnimationEvent( int PlayerAnimEvent_t, int nData = 0 );
 	virtual void		CreateCorpse( void ) { CopyToBodyQue( this ); };
@@ -157,7 +155,6 @@ public:
 	bool SuitPower_RemoveDevice( const CSuitPowerDevice &device );
 	bool SuitPower_ShouldRecharge( void );
 	float SuitPower_GetCurrentPercentage( void ) { return m_HL2Local.m_flSuitPower; }
-//!	bool m_bHasLongJump;
 	
 	void SetFlashlightEnabled( bool bState );
 
@@ -214,11 +211,6 @@ public:
 	virtual bool		IsDucking( void ) const { return !!( GetFlags() & FL_DUCKING ); }
 
 	virtual bool		PassesDamageFilter( const CTakeDamageInfo &info );
-	void				InputIgnoreFallDamage( inputdata_t &inputdata );
-	void				InputIgnoreFallDamageWithoutReset( inputdata_t &inputdata );
-	void				InputEnableFlashlight( inputdata_t &inputdata );
-	void				InputDisableFlashlight( inputdata_t &inputdata );
-
 	const impactdamagetable_t &GetPhysicsImpactDamageTable();
 	virtual int			OnTakeDamage( const CTakeDamageInfo &info );
 	virtual int			OnTakeDamage_Alive( const CTakeDamageInfo &info );
@@ -234,7 +226,7 @@ public:
 
 	void				SetLocatorTargetEntity( CBaseEntity *pEntity ) { m_hLocatorTargetEntity.Set( pEntity ); }
 
-	virtual int			GiveAmmo( int nCount, int nAmmoIndex, bool bSuppressSound);
+	virtual int			GiveAmmo( int nCount, int nAmmoIndex, bool bSuppressSound = false );
 	virtual bool		BumpWeapon( CBaseCombatWeapon *pWeapon );
 	
 	virtual bool		Weapon_CanUse( CBaseCombatWeapon *pWeapon );
@@ -309,6 +301,12 @@ public:
 
 	CSoundPatch *m_sndLeeches;
 	CSoundPatch *m_sndWaterSplashes;
+
+	// Inputs
+	void				InputIgnoreFallDamage( inputdata_t &inputdata );
+	void				InputIgnoreFallDamageWithoutReset( inputdata_t &inputdata );
+	void				InputEnableFlashlight( inputdata_t &inputdata );
+	void				InputDisableFlashlight( inputdata_t &inputdata );
 
 	// MP
 	virtual void ChangeTeam( int iTeamNum );

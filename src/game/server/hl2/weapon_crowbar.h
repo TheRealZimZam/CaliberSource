@@ -7,7 +7,7 @@
 #ifndef WEAPON_CROWBAR_H
 #define WEAPON_CROWBAR_H
 
-#include "basebludgeonweapon.h"
+#include "basebludgeonweapon_shared.h"
 
 #if defined( _WIN32 )
 #pragma once
@@ -24,10 +24,10 @@
 // CWeaponCrowbarOld
 //-----------------------------------------------------------------------------
 
-class CWeaponCrowbarOld : public CBaseHLBludgeonWeapon
+class CWeaponCrowbarOld : public CBaseBludgeonWeapon
 {
 public:
-	DECLARE_CLASS( CWeaponCrowbarOld, CBaseHLBludgeonWeapon );
+	DECLARE_CLASS( CWeaponCrowbarOld, CBaseBludgeonWeapon );
 
 	DECLARE_SERVERCLASS();
 	DECLARE_ACTTABLE();

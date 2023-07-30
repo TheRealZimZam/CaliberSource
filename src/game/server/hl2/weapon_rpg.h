@@ -12,7 +12,7 @@
 #pragma once
 #endif
 
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "Sprite.h"
 #include "npcevent.h"
 #include "beam_shared.h"

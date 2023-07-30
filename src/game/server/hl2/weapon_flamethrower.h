@@ -11,7 +11,7 @@
 #pragma once
 #endif
 
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "basegrenade_shared.h"
 #include "soundenvelope.h"
 

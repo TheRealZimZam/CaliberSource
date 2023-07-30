@@ -9,7 +9,7 @@
 //=============================================================================//
 
 #include "cbase.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "basecombatcharacter.h"
 #include "movie_explosion.h"
 #include "soundent.h"

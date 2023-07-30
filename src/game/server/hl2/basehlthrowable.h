@@ -11,7 +11,7 @@
 // $Date:         $
 //=============================================================================
 
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 
 #ifndef	BASEHLTHROWABLE_H
 #define	BASEHLTHROWABLE_H

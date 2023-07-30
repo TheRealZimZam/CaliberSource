@@ -7,7 +7,7 @@
 #ifndef WEAPON_ALYXGUN_H
 #define WEAPON_ALYXGUN_H
 
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 
 #if defined( _WIN32 )
 #pragma once

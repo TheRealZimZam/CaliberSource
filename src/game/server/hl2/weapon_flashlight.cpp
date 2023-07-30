@@ -11,7 +11,7 @@
 
 #include "cbase.h"
 #include "NPCEvent.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "basecombatcharacter.h"
 #include "AI_BaseNPC.h"
 #include "player.h"

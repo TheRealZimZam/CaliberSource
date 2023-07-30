@@ -9,7 +9,7 @@
 #include "player.h"
 #include "gamerules.h"
 #include "weapon_flaregun.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "decals.h"
 #include "soundenvelope.h"
 #include "in_buttons.h"

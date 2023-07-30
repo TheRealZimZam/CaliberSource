@@ -4,7 +4,7 @@
 //
 //=============================================================================//
 
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 
 #ifndef WEAPON_FLAREGUN_H
 #define WEAPON_FLAREGUN_H

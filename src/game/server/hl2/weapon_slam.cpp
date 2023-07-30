@@ -5,7 +5,7 @@
 //=============================================================================//
 
 #include "cbase.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "player.h"
 #include "gamerules.h"
 #include "grenade_tripmine.h"

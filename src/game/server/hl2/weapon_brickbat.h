@@ -24,7 +24,7 @@
 #endif
 
 
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 
 enum BrickbatAmmo_t
 {

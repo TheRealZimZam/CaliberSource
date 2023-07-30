@@ -6,7 +6,7 @@
 //=============================================================================//
 
 #include "cbase.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "basehlthrowable.h"
 #include "NPCevent.h"
 #include "basecombatcharacter.h"

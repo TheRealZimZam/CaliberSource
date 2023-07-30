@@ -9,7 +9,7 @@
 #pragma once
 #endif
 
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 
 //=============================================================================
 //

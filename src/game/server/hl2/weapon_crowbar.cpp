@@ -6,14 +6,14 @@
 //=============================================================================//
 
 #include "cbase.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 #include "player.h"
 #include "gamerules.h"
 #include "ammodef.h"
 #include "mathlib/mathlib.h"
 #include "in_buttons.h"
 #include "soundent.h"
-#include "basebludgeonweapon.h"
+#include "basebludgeonweapon_shared.h"
 #include "vstdlib/random.h"
 #include "npcevent.h"
 #include "ai_basenpc.h"

@@ -353,6 +353,8 @@ void CNPC_Combine::Activate()
 //-----------------------------------------------------------------------------
 void CNPC_Combine::Spawn( void )
 {
+	BaseClass::Spawn();
+
 	SetHullType(HULL_HUMAN);
 	SetHullSizeNormal();
 

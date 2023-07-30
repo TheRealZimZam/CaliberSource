@@ -15,7 +15,7 @@
 #define	WEAPONSLAM_H
 
 #include "basegrenade_shared.h"
-#include "basehlcombatweapon.h"
+#include "basehlcombatweapon_shared.h"
 
 enum SlamState_t
 {

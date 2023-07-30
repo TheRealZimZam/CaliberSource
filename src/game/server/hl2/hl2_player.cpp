@@ -28,6 +28,7 @@
 #include "igamemovement.h"
 #include "ai_hull.h"
 #include "hl2_shareddefs.h"
+#include "ammodef.h"
 #include "info_camera_link.h"
 #include "point_camera.h"
 #include "engine/IEngineSound.h"
@@ -66,6 +67,7 @@
 
 extern ConVar weapon_showproficiency;
 extern ConVar autoaim_max_dist;
+extern ConVar sk_player_critical_health;
 
 #define PLAYER_MODEL "models/player.mdl"
 
@@ -90,6 +92,10 @@ ConVar hl2_single_weapon_slot( "hl2_single_weapon_slot", "0" );
 // be done through that system - its a whole lot more powerful.
 ConVar hl2_playertalk( "hl2_playertalk", "0", FCVAR_ARCHIVE, "Enable Dick Kickem Mode (requires map restart)" );
 #define PLAYER_TALK_DELAY				random->RandomFloat( 5.0, 15.0 )
+#define	PLAYER_SENTENCE_VOLUME			1.0
+#define PLAYER_ATTN						SNDLVL_TALKING
+#define PLAYER_PITCH					100
+
 //-------------------------
 
 #define TIME_IGNORE_FALL_DAMAGE 10.0
@@ -104,7 +110,7 @@ ConVar hl2_runspeed( "player_runspeed", "240", FCVAR_REPLICATED );
 ConVar hl2_sprintspeed( "player_sprintspeed", "300", FCVAR_REPLICATED );
 
 ConVar hl2_darkness_flashlight_factor( "hl2_darkness_flashlight_factor", "1" );
-#if 0
+#if 1
 #define	HL2_WALK_SPEED hl2_walkspeed.GetFloat()
 #define	HL2_JOG_SPEED hl2_jogspeed.GetFloat()
 #define	HL2_RUN_SPEED hl2_runspeed.GetFloat()
@@ -489,14 +495,33 @@ CHL2_Player::CHL2_Player()
 CSuitPowerDevice SuitDeviceBreather( bits_SUIT_DEVICE_BREATHER, 6.7f );		// 100 units in 15 seconds (plus three padded seconds)
 
 
+BEGIN_SEND_TABLE_NOBASE( CHL2_Player, DT_HL2LocalPlayerExclusive )
+	// send a hi-res origin to the local player for use in prediction
+	SendPropVector	(SENDINFO(m_vecOrigin), -1,  SPROP_NOSCALE|SPROP_CHANGES_OFTEN, 0.0f, HIGH_DEFAULT, SendProxy_Origin ),
+	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
+//	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
+END_SEND_TABLE()
+
+BEGIN_SEND_TABLE_NOBASE( CHL2_Player, DT_HL2NonLocalPlayerExclusive )
+	// send a lo-res origin to other players
+	SendPropVector	(SENDINFO(m_vecOrigin), -1,  SPROP_COORD_MP_LOWPRECISION|SPROP_CHANGES_OFTEN, 0.0f, HIGH_DEFAULT, SendProxy_Origin ),
+	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
+	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
+END_SEND_TABLE()
+
 IMPLEMENT_SERVERCLASS_ST(CHL2_Player, DT_HL2_Player)
 	SendPropDataTable(SENDINFO_DT(m_HL2Local), &REFERENCE_SEND_TABLE(DT_HL2Local), SendProxy_SendLocalDataTable),
 	SendPropBool( SENDINFO(m_fIsSprinting) ),
 //!	SendPropInt( SENDINFO( m_bHasLongJump ), 1, SPROP_UNSIGNED ),
 
-	SendPropFloat( SENDINFO_VECTORELEM(m_angEyeAngles, 0), 8, SPROP_CHANGES_OFTEN, -90.0f, 90.0f ),
-	SendPropAngle( SENDINFO_VECTORELEM(m_angEyeAngles, 1), 10, SPROP_CHANGES_OFTEN ),
-	
+	SendPropExclude( "DT_BaseEntity", "m_angRotation" ),
+	SendPropExclude( "DT_BaseEntity", "m_vecOrigin" ),
+
+	// Data that only gets sent to the local player.
+	SendPropDataTable( "hl2localdata", 0, &REFERENCE_SEND_TABLE(DT_HL2LocalPlayerExclusive), SendProxy_SendLocalDataTable ),
+	// Data that gets sent to all other players
+	SendPropDataTable( "hl2nonlocaldata", 0, &REFERENCE_SEND_TABLE(DT_HL2NonLocalPlayerExclusive), SendProxy_SendNonLocalDataTable ),
+
 	SendPropInt( SENDINFO( m_iSpawnInterpCounter), 4 ),
 	
 	SendPropExclude( "DT_BaseAnimating", "m_flPlaybackRate" ),
@@ -772,7 +797,7 @@ void CHL2_Player::PreThink(void)
 	SuitPower_Update();
 	VPROF_SCOPE_END();
 
-	if (!g_pGameRules->IsMultiplayer() )
+	if (!g_pGameRules->IsMultiplayer())
 	{
 		VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-CheckSuitZoom" );
 		CheckSuitZoom();
@@ -845,7 +870,21 @@ void CHL2_Player::PostThink( void )
 
 	if ( !g_fGameOver && !IsPlayerLockedInPlace() && IsAlive() )
 	{
-		 HandleAdmireGlovesAnimation();
+		HandleAdmireGlovesAnimation();
+
+		if ( hl2_playertalk.GetBool() && gPrecachedSpeech )
+		{
+			// NOTENOTE; Other non-triggered, dynamic speech could go here too
+			if ( GetHealth() < sk_player_critical_health.GetInt() && m_flIdleTime > 4.0f && random->RandomInt(0,99) == 0 )
+			{
+				// Send it
+				if( m_flNextPlayerTalk <= gpGlobals->curtime )
+				{
+					m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
+					SENTENCEG_PlayRndSz( edict(), "PLAYER_INJURED", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
+				}
+			}
+		}
 	}
 
 	// Store the eye angles pitch so the client can compute its animation state correctly.
@@ -982,7 +1021,7 @@ void CHL2_Player::Activate( void )
 // Input   :
 // Output  :
 //------------------------------------------------------------------------------
-Class_T  CHL2_Player::Classify ( void )
+Class_T  CHL2_Player::Classify( void )
 {
 	// If player controlling another entity?  If so, return this class
 	if (m_nControlClass != CLASS_NONE)
@@ -1121,7 +1160,7 @@ void CHL2_Player::Spawn(void)
 	// Our player movement speed is set once here. This will override the cl_xxxx
 	// cvars unless they are set to be lower than this.
 	//
-	//m_flMaxspeed = 320;
+	//SetMaxSpeed( 320 );
 
 	InitSprinting();
 
@@ -1763,10 +1802,8 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 	switch( iImpulse )
 	{
 	case 50:
-	{
 		CommanderMode();
 		break;
-	}
 
 	case 51:
 	{
@@ -1801,6 +1838,82 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 			DevMsg( 1,"3D Distance: %.4f units  (%.2f feet) --- 2D Distance: %.4f units  (%.2f feet)\n", flDist, flDist / 12.0, flDist2D, flDist2D / 12.0 );
 		}
 
+		break;
+	}
+
+	case 101:
+	{
+		gEvilImpulse101 = true;
+
+		EquipSuit();
+
+		// EV-RY-THIIINNGGGG!
+		GiveAmmo( 255,	GetAmmoDef()->Index("AR2"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("AR2AltFire"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("Pistol"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("SMG1"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("HMG"));
+		GiveAmmo( 32,	GetAmmoDef()->Index("357"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("Buckshot"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("AR2Grenade"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("RPGRound"));
+		GiveAmmo( 24,	GetAmmoDef()->Index("SniperRound"));
+		GiveAmmo( 16,	GetAmmoDef()->Index("XBowBolt"));
+		GiveAmmo( 10,	GetAmmoDef()->Index("FlareRound" ));
+		GiveAmmo( 255,	GetAmmoDef()->Index("Flamethrower"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("Grenade"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("EMPGrenade"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("Slam"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("Molotov"));
+		GiveAmmo( 5,	GetAmmoDef()->Index("Brickbat"));
+#ifdef HL2_EPISODIC
+		GiveAmmo( 5,	GetAmmoDef()->Index("Hopwire"));
+#endif	
+//		GiveNamedItem( "weapon_357" );
+		GiveNamedItem( "weapon_45" );
+//		GiveNamedItem( "weapon_alyxgun" );
+//		GiveNamedItem( "weapon_ar1" );
+		GiveNamedItem( "weapon_ar2" );
+//		GiveNamedItem( "weapon_binoculars" );
+		GiveNamedItem( "weapon_brickbat" );
+		GiveNamedItem( "weapon_bugbait" );
+//		GiveNamedItem( "weapon_cguard" );
+//		GiveNamedItem( "weapon_crossbow" );
+//		GiveNamedItem( "weapon_crowbar" );
+		GiveNamedItem( "weapon_flameprojector" );
+		GiveNamedItem( "weapon_flamethrower" );
+		GiveNamedItem( "weapon_flaregun" );
+		GiveNamedItem( "weapon_frag" );
+//		GiveNamedItem( "weapon_gauss" );
+//!		GiveNamedItem( "weapon_gpistol" );	//Super-secrit
+		GiveNamedItem( "weapon_hmg1" );
+//		GiveNamedItem( "weapon_irifle" );
+		GiveNamedItem( "weapon_flash" );
+		GiveNamedItem( "weapon_molotov" );
+//		GiveNamedItem( "weapon_physcannon" );
+//		GiveNamedItem( "weapon_physgun" );
+		GiveNamedItem( "weapon_pistol" );
+		GiveNamedItem( "weapon_rpg" );
+		GiveNamedItem( "weapon_shotgun" );
+		GiveNamedItem( "weapon_slam" );
+		GiveNamedItem( "weapon_smg1" );
+		GiveNamedItem( "weapon_smg2" );
+		GiveNamedItem( "weapon_sniperrifle" );
+		GiveNamedItem( "weapon_stab" );
+		GiveNamedItem( "weapon_emp" );
+		GiveNamedItem( "weapon_stunstick" );
+		GiveNamedItem( "weapon_supershotgun" );
+		GiveNamedItem( "weapon_swing" );
+#ifdef HL2_EPISODIC
+		GiveNamedItem( "weapon_hopwire" );
+		// GiveNamedItem( "weapon_magnade" );
+#endif
+		if ( GetHealth() < 100 )
+		{
+			TakeHealth( 10, DMG_GENERIC );
+		}
+		
+		gEvilImpulse101		= false;
 		break;
 	}
 
@@ -1884,9 +1997,7 @@ void CHL2_Player::SuitPower_Update( void )
 			{
 				if( FlashlightIsOn() )
 				{
-#ifndef HL2MP
 					FlashlightTurnOff();
-#endif
 				}
 			}
 		}
@@ -1896,9 +2007,7 @@ void CHL2_Player::SuitPower_Update( void )
 			// turn off flashlight a little bit after it hits below one aux power notch (5%)
 			if( m_HL2Local.m_flSuitPower < 4.8f && FlashlightIsOn() )
 			{
-#ifndef HL2MP
 				FlashlightTurnOff();
-#endif
 			}
 		}
 	}
@@ -2304,6 +2413,16 @@ void CHL2_Player::OnSquadMemberKilled( inputdata_t &data )
 	user.MakeReliable();
 	UserMessageBegin( user, "SquadMemberDied" );
 	MessageEnd();
+
+	// Dammit leeroy!
+	if (hl2_playertalk.GetBool() && gPrecachedSpeech)
+	{
+		if( m_flNextPlayerTalk <= gpGlobals->curtime )
+		{
+			m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
+			SENTENCEG_PlayRndSz( edict(), "PLAYER_SQUADMEMBER_DIED", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2511,8 +2630,7 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 	}
 #endif
 
-// Playertalk prototype
-#if 1
+	// Playertalk prototype
 	if ( hl2_playertalk.GetBool() )
 	{
 		if ( !gPrecachedSpeech )
@@ -2524,9 +2642,6 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 			#define PLAYER_BRAG_CHANCE	65
 			if ( random->RandomInt(0, 100) < PLAYER_BRAG_CHANCE )
 			{
-				#define	PLAYER_SENTENCE_VOLUME			1.0
-				#define PLAYER_ATTN						SNDLVL_TALKING
-				#define PLAYER_PITCH					100
 				const char *pSentenceName = "PLAYER_FRAG";
 				switch ( info.GetDamageType() )
 				{
@@ -2576,7 +2691,6 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 			}
 		}
 	}
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -2591,7 +2705,7 @@ void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 		m_PlayerAnimState = NULL;
 	}
 #endif
-
+//	StopPullingObject();
 	BaseClass::Event_Killed( info );
 
 	FirePlayerProxyOutput( "PlayerDied", variant_t(), this, this );
@@ -3109,8 +3223,16 @@ void CHL2_Player::PlayerUse( void )
 			if ( !pUseEntity->MyNPCPointer() )
 				EmitSound( "HL2Player.Use" );
 			//TEST
-//			else
-//				SENTENCEG_PlayRndSz( edict(), "PLAYER_USE_NPC", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
+/*
+			else if (hl2_playertalk.GetBool() && gPrecachedSpeech)
+			{
+				if( m_flNextPlayerTalk <= gpGlobals->curtime )
+				{
+					m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
+					SENTENCEG_PlayRndSz( edict(), "PLAYER_USE_NPC", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
+				}
+			}
+*/
 		}
 
 		if ( ( (m_nButtons & IN_USE) && (caps & FCAP_CONTINUOUS_USE) ) ||

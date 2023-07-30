@@ -14,9 +14,9 @@
 //=========================================================
 //=========================================================
 
-class CNPC_Scientist : public CNPCSimpleTalker
+class CNPC_Scientist : public CNPC_SimpleTalker
 {
-	DECLARE_CLASS( CNPC_Scientist, CNPCSimpleTalker );
+	DECLARE_CLASS( CNPC_Scientist, CNPC_SimpleTalker );
 public:
 	
 //	DECLARE_SERVERCLASS();
@@ -129,7 +129,7 @@ public:
 	
 	void SittingThink( void );
 
-	virtual void SetAnswerQuestion( CNPCSimpleTalker *pSpeaker );
+	virtual void SetAnswerQuestion( CNPC_SimpleTalker *pSpeaker );
 
 	int		FIdleSpeak ( void );
 

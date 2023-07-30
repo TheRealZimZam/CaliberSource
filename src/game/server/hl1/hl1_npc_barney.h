@@ -13,9 +13,9 @@
 
 //=========================================================
 //=========================================================
-class CNPC_OldBarney : public CNPCSimpleTalker
+class CNPC_OldBarney : public CNPC_SimpleTalker
 {
-	DECLARE_CLASS( CNPC_OldBarney, CNPCSimpleTalker );
+	DECLARE_CLASS( CNPC_OldBarney, CNPC_SimpleTalker );
 public:
 	
 	DECLARE_DATADESC();

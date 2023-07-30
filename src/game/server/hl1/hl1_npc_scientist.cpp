@@ -1153,10 +1153,10 @@ void CNPC_SittingScientist::SittingThink( void )
 }
 
 // prepare sitting scientist to answer a question
-void CNPC_SittingScientist::SetAnswerQuestion( CNPCSimpleTalker *pSpeaker )
+void CNPC_SittingScientist::SetAnswerQuestion( CNPC_SimpleTalker *pSpeaker )
 {
 	m_flResponseDelay = gpGlobals->curtime + random->RandomFloat(3, 4);
-	SetSpeechTarget( (CNPCSimpleTalker *)pSpeaker );
+	SetSpeechTarget( (CNPC_SimpleTalker *)pSpeaker );
 }
 
 
@@ -1184,7 +1184,7 @@ int CNPC_SittingScientist::FIdleSpeak ( void )
 
 	if (pentFriend && random->RandomInt(0,1))
 	{
-//		CNPCSimpleTalker *pTalkMonster = (CNPCSimpleTalker *)pentFriend;
+//		CNPC_SimpleTalker *pTalkMonster = (CNPC_SimpleTalker *)pentFriend;
 		//pTalkMonster->SetAnswerQuestion( this );
 
 		SetSchedule( SCHED_TALKER_IDLE_RESPONSE );

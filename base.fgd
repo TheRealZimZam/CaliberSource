@@ -317,69 +317,90 @@
 		2048: "Don't allow bullet penetration (max penetration depth is 16 units)": 0
 	]
 
-	propdata(choices) : "Prop Data" : 0 : "Set to the best approximation of the size and material of this entity's brushes. If set, it will override this entity's health and damage taken from various weapons. See the propdata.txt file in the scripts directory of your MOD to get a detailed list of what each entry specifies." =
-	[
-	// 10/15/2019 Updated categories; All entities that use this will have to be fixed
-		0 : "None"
-		1 : "Cardboard.Small"
-		2 : "Cardboard.Medium"
-		3 : "Cardboard.Large"
-		4 : "Cloth.Small"
-		5 : "Cloth.Medium"
-		6 : "Cloth.Large"
-		7 : "Wooden.Tiny"
-		8 : "Wooden.Small"
-		9 : "Wooden.Medium"
-		10 : "Wooden.Large"
-		11 : "Wooden.ExtraLarge"
-		12 : "Wooden.Huge"
-		13 : "Wooden_Unbreakable.Huge"
-		14 : "Stone.Small"
-		15 : "Stone.Medium"
-		16 : "Stone.Large"
-		17 : "Stone.Huge"
-		18 : "Glass.Small"
-		19 : "Glass.Window"
-		20 : "Glass.Window_Bulletproof"
-		21 : "Glass.Large"
-		22 : "Metal.Small"
-		23 : "Metal.Barrel"
-		// Smol boom
-		24 : "Metal.ExplosiveBarrel"
-		25 : "Metal.Medium"
-		// Beeg BOOM
-		26 : "Metal.ExplosiveContainer"
-		27 : "Metal.Large"
-		28 : "Plastic.Small"
-		29 : "Plastic.Medium"
-		30 : "Plastic.Large"
-		31 : "Pottery.Small"
-		32 : "Pottery.Medium"
-		33 : "Pottery.Large"
-	//	34 : "Pottery.Huge"
-		34 : "ClubOnly"
-		35 : "ExplosiveOnly"
-	]
-
-//	uselegacymaterialtable(integer) :"Legacy Material Table" : 0 : "For backwards compatibility - on by default, use old material assignments" =
+//	uselegacymaterialtable(integer) :"Legacy Material Table" : 0 : "For backwards compatibility - on by default, use old material and propdata assignments" =
 //	[
 //		0: "No"
 //		1: "Yes"
 //	]
+
+	propdata(choices) : "Prop Data" : 0 : "Set to the best approximation of the size and material of this entity's brushes. If set, it will override this entity's shard model, health and damage taken from various weapons. See the propdata.txt file in the scripts directory of your MOD to get a detailed list of what each entry specifies." =
+	[
+		// 3/10/24 Updated categories; All entities that use this will have to be adjusted
+		0 : "None"
+
+		9 : "Cardboard.Small"
+		10 : "Cardboard.Medium"
+		11 : "Cardboard.Large"
+
+		1 : "Wooden.Tiny"
+		2 : "Wooden.Small"
+		3 : "Wooden.Medium"
+		4 : "Wooden.Large"
+		5 : "Wooden.Huge"
+		27 : "Wooden_Unbreakable.Huge"
+
+		12 : "Stone.Small"
+		13 : "Stone.Medium"
+		14 : "Stone.Large"
+		15 : "Stone.Huge"
+
+		6 : "Metal.Small"
+		31 : "Metal.Barrel"
+		// Smol boom
+		32 : "Metal.ExplosiveBarrel"
+		7 : "Metal.Medium"
+		// Beeg BOOM
+		33 : "Metal.ExplosiveContainer"
+		8 : "Metal.Large"
+
+		16 : "Glass.Small"
+		24 : "Glass.Window"
+		35 : "Glass.Window_Bulletproof"
+		34 : "Glass.Large"
+
+		17 : "Plastic.Small"
+		18 : "Plastic.Medium"
+		19 : "Plastic.Large"
+
+		20 : "Pottery.Small"
+		21 : "Pottery.Medium"
+		22 : "Pottery.Large"
+		23 : "Pottery.Huge"
+
+		28 : "Cloth.Small"
+		29 : "Cloth.Medium"
+		30 : "Cloth.Large"
+		
+		36 : "Flesh.Tiny"
+		37 : "Flesh.Small"
+		38 : "Flesh.Medium"
+		39 : "Flesh.Large"
+
+		25 : "ClubOnly"
+		26 : "ExplosiveOnly"
+	]
+
 	material(choices) :"Material Type" : 0 : "Set to the material type of the brush. Used to decide what sounds to make when damaged, and what gibs to produce when broken." =
 	[
 		0: "Glass"
+		7: "Unbreakable Glass"
 		1: "Wood"
-		2: "Metal"		
-		3: "Flesh"
+		2: "Metal"
 		4: "CinderBlock"
+		8: "Rocks"
 		5: "Ceiling Tile"
 		6: "Computer"
-		7: "Unbreakable Glass"
-		8: "Rocks"
+		3: "Flesh"
 		9: "Web(obsolete)"
+
+		11: "Caliber - Dirt"	//CALIBER
+		12: "Caliber - Plaster"	//CALIBER
+		13: "Caliber - Plastic"	//CALIBER
+		14: "Caliber - Ice"		//CALIBER
+
 		10: "None"
 	]
+
 	explosion(choices) : "Gibs Direction" : 0 : "Used to decide which direction to throw gibs when broken." =
 	[
 		0: "Random"
@@ -400,7 +421,7 @@
 	input DisableDamageForces(void) : "Damaging the entity does *not* apply physics forces to it."
 
 	gibmodel(string) : "Gib Model" : "" : "Used by HL1Port to specify a custom gib model to break into, overriding the 'Material Type'."
-	spawnobject(choices) : "Spawn On Break" : 0 : "When broken, an entity of the selected type will be created." =
+	spawnobject(choices) : "Spawn On Break" : 0 : "When broken, an entity of the selected type will be created. This list is only for QOL, any entity can be passed in as a string." =
 	[
 		1:	"item_battery"
 		2:	"item_healthkit"
@@ -444,7 +465,7 @@
 		40:	"item_dynamic_resupply"
 	]
 	explodemagnitude(integer) : "Explode Magnitude" : 0 : "If non-zero, when this entity breaks it will create an explosion that causes the specified amount of damage."
-	pressuredelay(float) : "Pressure Delay" : 0 : "Delay, in seconds, after 'broken' by pressure before breaking apart (allows for sound to play before breaking apart)."
+	pressuredelay(float) : "Pressure Delay/Fade Time" : 0 : "Delay, in seconds, after 'broken' by pressure before breaking apart (allows for sound to play before breaking apart)."
 ]
 
 @BaseClass base(Breakable) = BreakableProp
@@ -727,11 +748,11 @@
 		2 : "Slow, strong pulse"
 		11: "Slow pulse, noblack"
 		5 : "Gentle pulse"
-		1 : "Flicker A"
-		6 : "Flicker B"
-		3 : "Candle A"
-		7 : "Candle B"
-		8 : "Candle C"
+		1 : "Candle A"
+		6 : "Candle B"
+		3 : "Flicker A"
+		7 : "Flicker B"
+		8 : "Flicker C"
 		4 : "Fast strobe"
 		9 : "Slow strobe"
 	]
@@ -1106,6 +1127,7 @@
 	[
 		0 : "Intro Blur"
 		1 : "Waterspray"
+		7 : "Dirtspray"
 		2 : "Raindrops"
 		3 : "Groggy Vision"
 		4 : "Psychedelic"
@@ -1115,7 +1137,7 @@
 
 	// Inputs
 	input	StartEffect(float) : "Start the effect with the duration in seconds as the passed parameter."
-	input   StopEffect(float) : "Stop the effect."
+	input   StopEffect(float) : "Stop the effect with the fade time in seconds as the passed parameter."
 ]
 
 @PointClass base(Targetname, Parentname) size(-4 -4 -4, 4 4 4) color(0 180 0) = env_terrainmorph : 
@@ -1170,7 +1192,7 @@
 	input Use(void) : "Use"
 ]
 
-@PointClass base(Targetname, Angles) = env_splash : 
+@PointClass base(Targetname, Parentname, Angles) size( -8 -8 -8, 8 8 8 ) = env_splash : 
 	"An entity that creates a splash effect at its origin. If the 'find water surface' spawnflag is set, it will instead trace down below itself to find the water surface on which to create splashes."
 [
 	splashtype(choices) : "Splash Type" : 0 : "What kind of splash it is - choices are 0. Impact, 1. Waterfall, 2. Spray" =
@@ -1206,7 +1228,7 @@
 	PSName(string) : "Particle System Entity" : "" : "Set this to the name of the env_smokestack that you want this light to affect."
 ]
 
-@PointClass base(Targetname, Angles) color(255 0 0) = env_sun : 
+@PointClass base(Targetname, Angles) iconsprite("editor/env_sun.vmt") color(255 0 0) = env_sun : 
 	"An entity to control & draw a sun effect in the sky."
 [
 	target(target_destination) : "Viewer entity" : : "Name of an entity used to determine where the sun is in the skybox. The sun should be lined up on a line from this entity to the env_sun entity."
@@ -1461,7 +1483,7 @@
 ]
 
 @SolidClass base(BaseBrush, Targetname, RenderFields, Global, Shadow) = func_wall : 
-	"Legacy support. Slightly cheaper version of func_brush. Cannot be parented or toggled."
+	"Legacy support. Slightly cheaper version of func_brush. Cannot be parented or toggled. Can be penetrated by bullet weapons."
 [
 	spawnflags(flags) =
 	[
@@ -1576,6 +1598,34 @@
 
 	input SetCycleType(integer) : "0 - random, 1 - forward, 2 - backward"
 	input SetNoListRepeat(bool) : "Sets if lists can be randomly picked twice in a row."
+]
+
+@PointClass base(Targetname, Angles, Parentname) studio("models/editor/axis_helper_thick.mdl") = vgui_movie_display : "Movie Display"
+[
+	displaytext(string) : "Display Text" : ""
+	moviefilename(string) : "Movie Filename" : "media/"
+	groupname(string) : "Group Name" : ""
+
+	looping(boolean) : "Loop Movie" : 0
+	stretch(boolean) : "Stretch to Fill" : 0
+	forcedslave(boolean) : "Forced slave" : 0
+
+	width(integer) : "Panel width" : 256 : "Width of the panel in units."
+	height(integer) : "Panel height" : 128 : "Height of the panel in units."
+
+	input Enable(void) : "Make movie visible."
+	input Disable(void) : "Make movie invisible."
+
+	input SetDisplayText(string) : "Sets the display text."
+	input SetMovie(string) : "Sets the movie to display."
+	
+	input SetUseCustomUVs(bool) : "Use custom UVs."
+	input TakeOverAsMaster(void) : "Start using this video as the master of it's group."
+
+	input SetUMin(float) : "Set the minimum U."
+	input SetUMax(float) : "Set the maximum U."
+	input SetVMin(float) : "Set the minimum V."
+	input SetVMax(float) : "Set the maximum V."
 ]
 
 //-------------------------------------------------------------------------
@@ -1714,7 +1764,7 @@
 	]
 ]
 
-@PointClass base(Targetname, Parentname) size(-16 -16 -16, 16 16 16) = env_funnel : 
+@PointClass base(Targetname, Parentname) size(-16 -16 -16, 16 16 16) iconsprite("editor/env_particles.vmt") = env_funnel : 
 	"HL1 Legacy: Large Portal Funnel" 
 [
 	spawnflags(flags) =
@@ -1876,34 +1926,41 @@
 
 
 //  This has been disabled until it can be reimplemented, destroyed, or renamed - jdw
-//@PointClass base(Targetname, Parentname) size(-4 -4 -4, 4 4 4) = env_splash : 
-//	"Can be used to create either a spash effect or a stream of falling or spurting liquid." +
-//	"Will create a splash decal on the collided surface the same color as the liquid"
-//[
-//	spawnrate(float) : "SpawnRate"  : "10" : "How many particles some out"
-//	startcolor(color255) : "StartColor" : "100 100 100" : "Color of particles when the are emitted"
-//	endcolor(color255) : "EndColor" : "240 110 0" : "Color that particles approach"
-//	speed(float) : "Speed" : 3 : "Averate speed of an emitted particles"
-//	speedrange(float) : "SpeedRange" : 1 : "Speed range of an emitted particles"
-//	widthmin(float) : "WidthMin" : 2 : "Width of smallest particle emitted"
-//	widthmax(float) : "WidthMax" : 8 : "Width of largest particle emitted"
-//	noise(float) : "Noise" : "0.1" : "Amount of directional noise in stream"
-//	lifetime(float) : "Lifetime" : 5 : "Lifetime of particles (in secs)"
-//	numdecals(integer) : "Num Decals" : 1 : "Number of decals used (keep small)"
-//	startactive(choices) : "Start On" : 1 =
-//	[
-//		0 : "No"
-//		1 : "Yes"
-//	]
-//
-//	// Inputs
-//	input SetSpawnRate(float) : "Sets how many particles come out"
-//	input SetSpeed(float) : "Sets speed of emitted particle"
-//	input SetNoise(float) : "Sets noise of emitted particle (0-1)"
-//	input SetLifetime(float) : "Sets lifetime of emitted particles (in seconds)"
-//	input TurnOn(void) : "Turns particles on"
-//	input TurnOff(void) : "Turns particles off"
-//]
+@PointClass base(Targetname, Parentname) size(-4 -4 -4, 4 4 4) = env_leak : 
+	"Can be used to create either a spash effect or a stream of falling or spurting liquid." +
+	"Will create a splash decal on the collided surface the same color as the liquid"
+[
+	spawnrate(float) : "SpawnRate"  : "10" : "How many particles come out per think"
+	startcolor(color255) : "StartColor" : "100 100 100" : "Color of particles when they are emitted"
+	endcolor(color255) : "EndColor" : "240 110 0" : "Color that particles approach"
+	speed(float) : "Speed" : 3 : "Averate speed of emitted particles"
+	speedrange(float) : "SpeedRange" : 1 : "Speed range of an emitted particles"
+	widthmin(float) : "WidthMin" : 2 : "Width of smallest particle emitted"
+	widthmax(float) : "WidthMax" : 8 : "Width of largest particle emitted"
+	noise(float) : "Noise" : "0.1" : "Amount of directional noise in stream"
+	lifetime(float) : "Lifetime" : 5 : "Lifetime of particles (in secs)"
+	numdecals(integer) : "Num Decals" : 1 : "Number of decals used (keep small)"
+	splashsound(choices) : "Splash Sound" : 1 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+	startactive(choices) : "Start On" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+
+	// Inputs
+	input SetSpawnRate(float) : "Sets how many particles come out"
+	input SetSpeed(float) : "Sets speed of emitted particle"
+	input SetNoise(float) : "Sets noise of emitted particle (0-1)"
+	input SetLifetime(float) : "Sets lifetime of emitted particles (in seconds)"
+	input TurnOn(void) : "Turns particles on"
+	input TurnOff(void) : "Turns particles off"
+	
+//	output OnSplash(void) : "When this splash turns on"
+]
 
 @PointClass base(Targetname, Parentname, EnableDisable) iconsprite("editor/env_fire") color(0 180 0) = env_fire : 
 	"An entity that handles a single flame at its origin. The flame causes heat 'damage' to other env_fire entities around it, and will eventually ignite non-flaming env_fire entities nearby, causing the fire to spread."
@@ -1926,6 +1983,7 @@
 		32: 	"No glow" : 0
 		128: 	"Delete when out" : 0
 		256: 	"Visible from above" : 1
+		512: 	"Cheap" : 0
 	]
 
 	ignitionpoint(float) : "Ignition Point" : 32 : "Amount of heat 'damage' to take before this flame should ignite."
@@ -1992,6 +2050,7 @@
 	// Inputs
 	input SetStartDist(float) : "Set the fog start distance."
 	input SetEndDist(float) : "Set the fog end distance."
+	input SetMaxDensity(float) : "Set the fog start distance."
 	input TurnOn(void) : "Turn the fog on."
 	input TurnOff(void) : "Turn the fog off."
 	input SetColor(color255) : "Set the primary fog color."
@@ -2160,7 +2219,7 @@
 	spawnflags(flags) =
 	[
 		1: "GlobalShake" : 0
-		//2: "Disrupt player control" : 0 // doesn't work
+		2: "Disrupt Player Control" : 0	// Screw with the player's movement, Unreal style
 		4: "In Air" : 0		// shakes objects even if they are not onground
 		8: "Physics" : 0	// shakes physically as well as the camera
 		16: "Ropes" : 0		// shakes ropes too.
@@ -2419,13 +2478,13 @@
 	[
 		1: "Start on" : 1
 		2: "Play Once" : 0
-		4: "OBSOLETE - use sprite_clientside instead" : 0
+		4: "Clientside - OBSOLETE! use sprite_clientside instead" : 0
 	]
 
 	GlowProxySize(float) : "Size of Glow Proxy Geometry." : "2.0" : "Size of the glow to be rendered for visibility testing. Must be larger than the distance from the sprite center to empty space.  So if this glow is inside geometry (like a light bulb), set this value to be bigger than the bulb's radius. Any time a sphere of this radius would be visible (poking through any nearby geometry), the glow will be rendered."
 
 	HDRColorScale(float) : "HDR color scale." : "1.0" : "float value to multiply sprite color by when running in HDR mode."
-	
+
 	// Inputs
 	input ColorRedValue(float) : "Sets the red color channel's value (0 - 255)."
 	input ColorGreenValue(float) : "Sets the green color channel's value (0 - 255)."
@@ -2436,8 +2495,12 @@
 	input ToggleSprite(void) : "Toggle the sprite between hidden and shown."
 ]
 
+@PointClass base(env_sprite) size(-2 -2 -2, 2 2 2) sprite() color(20 140 20) = env_glow : "OBSOLETE! Use env_sprite." 
+[
+]
+
 @PointClass base(env_sprite, Angles) = env_sprite_oriented :
-    "A env_sprite that allows orientation."
+    "A env_sprite that allows orientation. Used for explosions, muzzleflash, etc."
 [
 	framerate(string) : "Framerate" : "10.0" : "Rate at which the sprite should animate, if at all."
 	model(sprite) : "Sprite Name" : "sprites/glow01.spr" : "Material of the sprite to be drawn."
@@ -2466,6 +2529,7 @@
 	"A env_sprite thats only clientside. Cannot be named or parented, and is always on, but does not use an entity slot."
 [
 	framerate(string) : "Framerate" : "10.0" : "Rate at which the sprite should animate, if at all."
+	frame(float) : "Starting Frame" : "0" : "The frame for the sprite to start on, if it animates."
 	model(sprite) : "Sprite Name" : "sprites/glow01.spr" : "Material of the sprite to be drawn."
 	scale(string) : "Scale" : "" : "Scale multiplier of the sprite."
 
@@ -2476,7 +2540,7 @@
 
 
 @PointClass base(Targetname, Angles) iconsprite("editor/env_wind.vmt") = env_wind : 
-	"An entity to control wind in the map. Partially functional."
+	"An entity to control wind in the map. Affects most particles, and physics."
 [
 	//gustsound(sound) : "Gust Sound Filename" : "" : "Sound to be played to simulate the gusting wind."
 	minwind(integer) : "Min normal speed" : 20 : "Minimum speed of the wind while idling."
@@ -3274,7 +3338,7 @@
 		9 : "Slow strobe"
 		10: "Fluorescent flicker"
 		12: "Watery Shimmer"
-		
+
 		// Caliber additions
 		13: "Disco"
 		14: "Warpspeed"
@@ -3630,7 +3694,7 @@
 	"A brush entity that's designed to be used for a player-useable button. When used by the player, it moves to a pressed position."
 [
 	movedir(angle) : "Move Direction (Pitch Yaw Roll)" : "0 0 0" : "Specifies the direction of motion to move when the button is used."
-	speed(integer) : "Speed" : 5 : "The speed that the button moves, in inches per second."
+	speed(integer) : "Speed" : 99 : "The speed that the button moves, in inches per second."
 	health(integer) : "Health (Obsolete)" : 0 : "Legacy method of specifying whether or not the button can be shot to activate it. Use the 'Damage Activates' spawnflag instead."
 	lip(integer) : "Lip" : 0 : "The amount, in inches, of the button to leave sticking out of the wall it recedes into when pressed. Negative values make the button recede even further into the wall."
 	master(string) : "Master (Obsolete)" : : "Legacy support: The name of a master entity. If the master hasn't been activated, this button cannot be pressed."
@@ -3867,7 +3931,7 @@
 	lip(integer) : "Lip" : 0 : "The amount, in inches, of the button to leave sticking out of the wall it recedes into when pressed. Negative values make the button recede even further into the wall."
 	dmg(integer) : "Blocking Damage" : 0 : "Amount of damage done to entities that block the movement of this door, per frame."
 
-	forceclosed(choices) : "Force Closed" : 0 : "If set, this door will close no matter what. Useful for doors that have to close even if the player tries to block them with objects." =
+	forceclosed(choices) : "Force Closed" : 1 : "If set, this door will close no matter what. Useful for doors that have to close even if the player tries to block them with objects." =
 	[
 		0 : "No"
 		1 : "Yes"
@@ -4124,7 +4188,7 @@
 	Alpha(integer) : "Alpha" : 255
 ]
 
-@SolidClass base( Targetname ) = func_smokevolume : 
+@SolidClass base(Targetname, EnableDisable) = func_smokevolume : 
 	"A brush entity that spawns smoke particles within its volume."
 [
 	spawnflags(flags) =
@@ -4149,7 +4213,7 @@
 	input SetDensity(float) : "Set the particle density. It should be a range from 0 to 1."
 ]
 
-@SolidClass base( Targetname, BModelParticleSpawner ) = func_dustcloud : 
+@SolidClass base(Targetname, BModelParticleSpawner) = func_dustcloud : 
 	"A brush entity that spawns a translucent dust cloud within its volume."
 [
 	Alpha(integer) : "Alpha" : 30
@@ -4158,7 +4222,7 @@
 	SizeMax(string) : "Maximum Particle Size" : 200
 ]
 
-@PointClass base( Targetname, Parentname, Angles ) size( -8 -8 -8, 8 8 8 ) = env_dustpuff : 
+@PointClass base(Targetname, Parentname, Angles) size( -8 -8 -8, 8 8 8 ) = env_dustpuff : 
 	"An entity that can emit dust puffs."
 [
 	scale(float) : "Scale" : 8 : "Size of the dust puff."
@@ -4170,7 +4234,7 @@
 	input SpawnDust(void) : "Spawn a dust puff."
 ]
 
-@PointClass base( Targetname, Parentname, Angles ) size( -8 -8 -8, 8 8 8 ) = env_particlescript : 
+@PointClass base(Targetname, Parentname, Angles) size( -8 -8 -8, 8 8 8 ) iconsprite("editor/env_particles.vmt") = env_particlescript : 
 	"An entity that has special animation events that can be fired by a model with an animation inside its .qc designed for"+
 	"use by this entity."
 [
@@ -4182,7 +4246,7 @@
 
 
 // NEEDHELP
-@PointClass base( Targetname, Parentname, Angles ) size( -8 -8 -8, 8 8 8 ) = env_effectscript : 
+@PointClass base(Targetname, Parentname, Angles) size( -8 -8 -8, 8 8 8 ) = env_effectscript : 
 	"An entity that allows you to script special visual effects via a script file."
 [
 	model(studio) : "Script Model" : "models/Effects/teleporttrail.mdl" : "Model to use for animation sequences."
@@ -4900,6 +4964,22 @@
 	input Disable(void) : "Enable the entity"
 ]
 
+@PointClass base(Targetname) = logic_playmovie : "Plays a movie and allows for various playback options"
+[
+	MovieFilename(string) : "Movie to play" : "" : "Filename of the movie to play"
+	allowskip(boolean) : "Allow User to Skip" : 0 : "Whether or not the user may skip the video with common keys"
+	loopvideo(boolean) : "Loop Video" : 0 : "If set to true, the movie will loop forever"
+	fadeintime(float) : "Fade In Time" : 0 : "Time it takes for the video to fade in"
+
+	input PlayMovie(void) : "Play the movie."
+	input PlayMovieForAllPlayers(void) : "Play the movie for all connected players."
+	input PlayLevelTransitionMovie(string) : "Plays a movie with specific settings used for level transitions.  Pass the name of the movie in the parameters.  To be fired at the end of a level."
+	input FadeAllMovies(void) : "Fade movies out for all players connected."
+
+	// Outputs
+	output OnPlaybackFinished(void) : "Fired when the movie has completed playing back or was skipped by the user."
+]
+
 @PointClass base(Targetname) iconsprite("editor/point_template.vmt")
 	line(255 255 0, targetname, Template01)
 	line(255 255 0, targetname, Template02)
@@ -5332,10 +5412,11 @@
 		8388608: "Prevent motion enable on player bump" : 0
 	]
 
-	extraimpactfx(choices) : "Extra Impact FX" : 1 : "Depending on the material type, do extra impact and destruction fx (metal ricochets, computer sparks, etc.)" =
+	extraimpactfx(choices) : "Extra Impact FX" : 2 : "Depending on the material type, do extra impact and destruction fx (metal ricochets, computer sparks, etc.)" =
 	[
-		0 : "No"
-		1 : "Yes"
+//		0 : "Old breakable - Defaults to Yes"
+		1 : "No"
+		2 : "Yes"
 	]
 
 	Damagetype(choices) : "Impact Damage Type" : 0 =
@@ -5804,17 +5885,20 @@
 
 @BaseClass base(Parentname, Global, Angles, Studiomodel, BreakableProp, DXLevelChoice, BaseFadeProp, RenderFields) = prop_dynamic_base
 [
-	solid(choices) : "Collisions" : 6 =
+	solid(choices) : "Collisions" : 3 =
 	[
 		0: "Not Solid"
-		2: "Use Bounding Box"
+		2: "Use AA Bounding Box"
+		3: "Use Oriented Bounding Box"
 		6: "Use VPhysics"
 	]
 
 	spawnflags(flags) =
 	[
+		1 : "Pushable" : 0
 		64 : "Use Hitboxes for Renderbox" : 0
-		256 : "Start with collision disabled" : 0
+		128 : "No Physics (Motion Disabled)" : 0
+		256 : "Collision disabled" : 0
 	]
 
 	DefaultAnim(string) : "Default Animation" : "" : "The name of the idle animation that this prop will revert to whenever it finishes a random or forced animation."
@@ -5827,13 +5911,19 @@
 	MinAnimTime(float) : "Min Random Anim Time" : "5" : "Minimum time between random animations."
 	MaxAnimTime(float) : "Max Random Anim Time" : "10" : "Maximum time between random animations."
 	SetBodyGroup(integer) : "Body Group" : 0	// NEEDHELP
-	
+
 	DisableBoneFollowers(choices) : "Disable Bone Followers" : 0 : "If set, this prop won't generate bone followers, even if they're listed in the model's .qc" =
 	[
 		0: "No"
 		1: "Yes"
 	]
-	
+
+	disableshadows(choices) : "Disable Shadows" : 0 : "Used to disable dynamic shadows on this entity." =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+
 	// Inputs
 	input SetAnimation(string) : "Force the prop to play an animation. The parameter should be the name of the animation."
 	input SetDefaultAnimation(string) : "Set the Default Animation to the one specified in the parameter."
@@ -5879,7 +5969,7 @@
 	"A prop that can be placed in hierarchy and can play animations. It can also be configured to break when it takes enough damage.\n"+
 	"prop_dynamic_override is a prototyping entity only. It will allow the use of models designed to be used as prop_physics."
 [
-	health(integer) : "Health" : 0 : "Number of points of damage to take before breaking.  0 means don't break."	
+	health(integer) : "Health" : 0 : "Number of points of damage to take before breaking.  0 means don't break."
 ]
 
 @PointClass base(Targetname, Studiomodel, Angles, RenderFields) studioprop() = prop_scalable : "Scalable Prop" 
@@ -5909,6 +5999,11 @@
 	
 	minhealthdmg(integer) : "Min Damage to Hurt" : 0 : "The prop will ignore any damage events if the damage is less than this amount."
 	shadowcastdist(integer) : "Shadow Cast Distance" : 0 : "Use this to override how far this object casts shadows. 0 = default distance."
+	disableshadows(choices) : "Disable Shadows" : 0 : "Used to disable dynamic shadows on this entity." =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
 	physdamagescale(float) : "Physics Impact Damage Scale" : "0.1" : "Scales damage energy when this object is hit by a physics object. NOTE: 0 means this feature is disabled for backwards compatibility.\nSet to 1.0 for materials as strong as flesh, smaller numbers indicate stronger materials."
 	Damagetype(choices) : "Impact damage type" : 0 =
 	[
@@ -5916,7 +6011,7 @@
 		1: "Sharp"
 	]
 
-	nodamageforces(choices) : "Damaging it Doesn't Push It" : 0 : "Used to determine whether or not damage should cause the brush to move." =
+	nodamageforces(choices) : "No Damage Forces" : 0 : "Used to determine whether or not damage should cause the brush to move." =
 	[
 		0: "No"
 		1: "Yes"
@@ -5926,7 +6021,7 @@
 	massScale(float) : "Mass Scale" : "0" : "A scale multiplier for the object's mass."
 	overridescript(string) : "Override Parameters" : "" : "A list of physics key/value pairs that are usually in a physics prop .qc file. Format is 'key,value,key,value,etc'."
 	damagetoenablemotion(integer) : "Health Level to Override Motion" : 0 : "If specified, this object will start motion disabled. Once its health has dropped below this specified amount, it will enable motion."
-	forcetoenablemotion(float) : "Physics Impact Force to Override Motion" : 0 : "If specified, this object will start motion disabled. Any impact that imparts a force greater than this value on the physbox will enable motion."
+	forcetoenablemotion(float) : "Phys Impact Force to Override Motion" : 0 : "If specified, this object will start motion disabled. Any impact that imparts a force greater than this value on the physbox will enable motion."
 	
 	puntsound(sound) : "Sound to make when punted"
 
@@ -5942,6 +6037,11 @@
 	input DisableDamageForces(void) : "Damaging the entity does *not* apply physics forces to it."
 	input EnablePuntSound(void) : "Allow this prop to play its own sound when punted"
 	input DisablePuntSound(void) : "Prevent this prop from playing its own sound when punted"
+
+	input Ignite(void) : "Ignite, burst into flames."
+	input IgniteLifetime(float) : "Ignite, with a parameter lifetime."
+	input IgniteNumHitboxFires(integer) : "Ignite, with a parameternumber of hitbox fires."
+	input IgniteHitboxFireScale(float) : "Ignite, with a parameter hitbox fire scale."
 
 	// Outputs
 	output OnMotionEnabled(void) : "Fired when motion is enabled on this prop, either via 'Health Level to Override Motion' or from the EnableMotion input."
@@ -5960,12 +6060,7 @@
 	"or other constraints. It can also be configured to break when it takes enough damage. Health can be overridden on this version."
 [
 	health(integer) : "Health" : 0 : "Number of points of damage to take before breaking.  0 means don't break."
-	
-	// Inputs
-	input Ignite(void) : "Ignite, burst into flames."
-	input IgniteLifetime(float) : "Ignite, with a parameter lifetime."
-	input IgniteNumHitboxFires(integer) : "Ignite, with a parameternumber of hitbox fires."
-	input IgniteHitboxFireScale(float) : "Ignite, with a parameter hitbox fire scale."
+
 ]
 
 @PointClass base(BasePropPhysics, RenderFields) studioprop() sphere(fademindist) sphere(fademaxdist) = prop_physics :
@@ -5975,11 +6070,14 @@
 	"If the model used by the prop is configured to be used as a prop_dynamic (i.e. it should not be physically simulated) then it CANNOT be "+
 	"used as a prop_physics. Upon level load it will display a warning in the console and remove itself. Use a prop_dynamic instead."
 [
-	// Inputs
-	input Ignite(void) : "Ignite, burst into flames."
-	input IgniteLifetime(float) : "Ignite, with a parameter lifetime."
-	input IgniteNumHitboxFires(integer) : "Ignite, with a parameternumber of hitbox fires."
-	input IgniteHitboxFireScale(float) : "Ignite, with a parameter hitbox fire scale."
+
+]
+
+@PointClass base(BasePropPhysics, RenderFields) studioprop() sphere(fademindist) sphere(fademaxdist) = prop_physics_simple :
+	"A basic prop that physically simulates as a single rigid body. Uses fake QPhysics for movement."
+[
+	health(integer) : "Health" : 0 : "Number of points of damage to take before breaking.  0 means don't break."
+
 ]
 
 @PointClass base(prop_physics) studioprop() sphere(fademindist) sphere(fademaxdist) = prop_physics_multiplayer :
@@ -6020,7 +6118,7 @@
 	solid(choices) : "Collisions" : 0 =
 	[
 		0: "Not Solid"
-	]	
+	]
 
 	InitialOwner(string) : "Target Entity" : : "Name of the entity that this ornament should attach to, at startup."
 	
@@ -6072,12 +6170,19 @@
 	input Toggle(void) : "Toggle the active/inactive state of the occluder."
 ]
 
-@SolidClass base(BreakableBrush, Origin, RenderFields, Shadow) = func_breakable : 
+@SolidClass base(BreakableBrush, Origin, RenderFields, EnableDisable, Shadow) = func_breakable : 
 	"A brush entity that can be broken from damage, or an input." 
 [
 	minhealthdmg(integer) : "Min Damage to Hurt" : 0 : "The prop will ignore any damage events if the damage is less than this amount."
 
-	extraimpactfx(choices) : "Extra Impact FX" : 1 : "Depending on the material type, do unique impact FX" = 
+	extraimpactfx(choices) : "Extra Impact FX" : 2 : "Depending on the material type, do unique impact FX" = 
+	[
+//		0 : "Old breakable - Defaults to Yes"
+		1 : "No"
+		2 : "Yes"
+	]
+
+	deadmodel(choices) : "Use Broken Texture" : 0 : "When broken, this brush will change its texture frame to 1 and slowly fade-out, instead of dying outright. If > 0, PressureDelay will be used as the fade-time." = 
 	[
 		0 : "No"
 		1 : "Yes"
@@ -6108,6 +6213,20 @@
 	input Shatter(vector) : "Shatter the window. Input a vector. First two coordinates are the X,Y center of the shattering (as values from from 0-1). The third coordinate is the radius of the shatter, in inches."
 ]
 
+//WIP;
+//@SolidClass base(func_breakable) = func_breakable_panel : 
+//	"Breakable Panel Surface. Allows multiple brushes to be designated to break apart when the required accumulated damage is met."
+//[
+//	target(target_destination) : "Main Panel" : : "Main Panel Brush - Empty will fallback to self"
+//	target2(target_destination) : "Panel 2" : : "Optional Panel Brush"
+//	target3(target_destination) : "Panel 3" : : "Optional Panel Brush"
+//	target4(target_destination) : "Panel 4" : : "Optional Panel Brush"
+//	target5(target_destination) : "Panel 5" : : "Optional Panel Brush"
+//	target6(target_destination) : "Panel 6" : : "Optional Panel Brush"
+//
+//	fragility(integer) : "Fragility" : 100 : "How much damage needs to be done before breaking all the panels."
+//]
+
 @SolidClass base(BreakableBrush, RenderFields, Shadow) = func_pushable : "Pushable object"
 [
 	size(choices) : "Hull Size" : 0 =
@@ -6123,7 +6242,9 @@
 		256: "Not Usable" : 0
 	]
 	friction(integer) : "Friction (0-400)" : 50
-	buoyancy(integer) : "Buoyancy" : 20
+	buoyancy(integer) : "Buoyancy (0-1000)" : 20
+//	mass(float) : "Mass" : "0" : "Override the actual mass of the object"
+
 	_minlight(string) : "Minimum light level"
 ]
 
@@ -6220,17 +6341,17 @@
 ]
 
 
-//@SolidClass base(Door) = func_water : 
-//	"Liquid"			// NEEDHELP
-//[
-//	spawnflags(flags) =
-//	[
-//		1 : "Starts Open" : 0
-//		256:"Use Only" : 0
-//	]
-//	movedir(angle) : "Move Direction (Pitch Yaw Roll)" : "0 0 0" : "The direction the water will move when it is told to 'Open'."
-//	WaveHeight(string) : "Wave Height" : "3.0"
-//]
+@SolidClass base(Door) = func_water : 
+	"OBSOLETE, USE func_water_analog - Liquid"			// NEEDHELP
+[
+	spawnflags(flags) =
+	[
+		1 : "Starts Open" : 0
+		256:"Use Only" : 0
+	]
+	movedir(angle) : "Move Direction (Pitch Yaw Roll)" : "0 0 0" : "The direction the water will move when it is told to 'Open'."
+	WaveHeight(string) : "Wave Height" : "3.0"
+]
 
 @SolidClass base(Targetname, Parentname, RenderFields, Global) = func_guntarget :
 	"This is a moving target that moves along a path of path_tracks. It can be shot and killed."
@@ -8016,9 +8137,16 @@
 	// Outputs
 	output OnFlashlightOn(float) 			: "Fired when the player turns on his flashlight. This output has the value of how much energy the player had when this happened [0..1]."
 	output OnFlashlightOff(float) 			: "Fired when the player turns off his flashlight. This output has the value of how much energy the player had when this happened [0..1]."
+	output OnDuck(void)						: "When the player crouches."
+	output OnUnDuck(void)					: "When the player stops crouching."
+	output OnJump(void)						: "When the player jumps."
+	output PlayerHasAmmo(void) 				: "Fired by request if the player has any ammo."
+	output PlayerHasNoAmmo(void) 			: "Fired by request if the player doesn't have any ammo."
+	output PlayerDied(void) 				: "Fires when the player dies."
+
 	input RequestPlayerHealth(void) 		: "Requests the current player's health from the proxy. This will fire the PlayerHealth output with the value."
 	output PlayerHealth(integer)			: "The player's current health value."
-	output PlayerMissedAR2AltFire(void)		: "Player fired an AR2 combine ball that didn't kill any enemies."
+//	output PlayerMissedAR2AltFire(void)		: "Player fired an AR2 combine ball that didn't kill any enemies."
 
 	input SetFlashlightSlowDrain(void)		: "Puts the player's flashlight in slow-power-drain mode (for Episodic darkness)"
 	input SetFlashlightNormalDrain(void)		: "Puts the player's flashlight to default power drain"
@@ -8026,17 +8154,12 @@
 	input SetPlayerHealth(integer)			: "Sets the player's health to this value."
 	
 	input RequestAmmoState(void)			: "Request the ammo state of the player. It will fire PlayerHasAmmo or PlayerHasNoAmmo outputs."
-	output PlayerHasAmmo(void) 				: "Fired by request if the player has any ammo."
-	output PlayerHasNoAmmo(void) 			: "Fired by request if the player doesn't have any ammo."
-	
-	output PlayerDied(void) 				: "Fires when the player dies."
 
 	input LowerWeapon(void)					: "Lowers the players weapon."
 	
 	input EnableCappedPhysicsDamage(void) :	 "Cause player to take less damage from physics objects, and never more than 30 points from any individual strike."
 	input DisableCappedPhysicsDamage(void) : "Undo effects of EnableCappedPhysicsDamage"
 	input SetLocatorTargetEntity(string) : "Set the entity that the HUD locator should track. (Usually a vehicle)"
-	
 ]
 
 @PointClass base(Parentname, Targetname) size(-8 -8 -8, 8 8 8 ) = env_spritetrail : 
@@ -8185,30 +8308,4 @@
 	parm10(instance_parm) : "Parm" : : "This is a parameter.  It goes in the form of $variable type."
 ]
 
-//WIP
-@SolidClass base(Targetname, Origin, RenderFields, Global) = func_lightning : 
-	"Fires random lightning in the volume of the brush. The brush shouldnt be taller than 8 units."
-[
-	// Wasteland lightning slightly randomizes the color, and spawns additional bolts that go horizontally
-	spawnflags(flags) =
-	[
-		2:  "Wasteland Lightning" : 0
-	]
 
-	lightningtype(choices) : "Lightning Type" : "0" : "The charge of the lightning. Positive charged lightning strikes once and quickly fades, negative lightning strobes and instantly fades." =
-	[
-		0 : "Random"
-		1 : "Positive"
-		2 : "Negative"
-	]
-
-	MinTime(string) : "Minimum Strike Time" : 1 : "Minimum time between strikes. "
-	MaxTime(string) : "Maximum Strike Time" : 10 : "Maximum time between strikes. Never, ever, EVER set below the minimum time, savvy?"
-	
-	// Inputs
-	input Enable(void) : "Enable the field."
-	input Disable(void) : "Disable the field."
-
-	// Outputs
-	output OnStrike(void) : "Fired when a lightning bolt is created."
-]

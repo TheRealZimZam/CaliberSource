@@ -42,17 +42,51 @@
 // Lightning Field (mortarfield without explosions)
 // NOTENOTE; This is strictly for lightning strikes, from the sky - if you want an actual electric field,
 // use a tesla
-@SolidClass base(Targetname, EnableDisable, Origin, Parentname) = func_lightning_field : "Lightning Field" 
+@SolidClass base(Targetname, EnableDisable, Origin, Parentname) = func_lightning : 
+	"Lightning Field - Fires random lightning in the volume of the brush. The top of the brush will be the startpoint, and bottom endpoint." 
 [
 	m_flSpread(float) : "Spread Radius" : 0 : "Spread of lightning"
-	m_flDelay(float) : "Fire Delay" : 1 : "How much delay there is in-between strikes."
+	m_flDelay(float) : "Min Delay" : 0 : "Minimum delay there is in-between strikes."
+	m_flMaxDelay(float) : "Max Delay" : 1 : "Maximum delay there is in-between strikes."
 	m_iCount(integer) : "Repeat Count" : 1 : "Count of strikes"
+
+	lightningtype(choices) : "Lightning Type" : "0" : "The charge of the lightning. Positive charged lightning strikes once and quickly fades, negative lightning strobes and instantly fades." =
+	[
+		0 : "Random"
+		1 : "Positive"
+		2 : "Negative"
+	]
 
 	// Inputs
 	input Trigger(void) : "Trigger"
 
 	// Outputs
-	output OnFire(void) : "Fires when the lighting field becomes active"
+	output OnFire(void) : "Fired when a lightning bolt is created."
+]
+
+@SolidClass base(Targetname, EnableDisable, Origin) = trigger_fall : 
+	"Falling death trigger - will fade objects/non-living things, will kill living things on contact. Plays sounds/does special animations for players." 
+[
+	// Outputs
+	output OnFallingObject(void) : "Fires when an object makes contact with this trigger."
+]
+
+// WIP; Stupid one-off Trigger for refinery level
+@SolidClass base(Targetname, EnableDisable, Origin) = trigger_gunfire : 
+	"Trigger that outputs when a weapon is fired in its volume. For gasleaks, and other such scenarios." 
+[
+	// Outputs
+	output OnGunFired(void) : "Fires when somebody shoots a gun inside this trigger."
+	output OnBulletPassed(void) : "Fires when a hitscan trace goes through this trigger."
+]
+
+@SolidClass base(Targetname, Parentname, RenderFields, Global, Shadow, Origin) = func_fakedoor : 
+	"A fake locked door. Plays a locked sound when used. Cheaper than real doors."
+[
+	locked_sound(sound) : "Locked Sound" : : "Sound played when the player tries to use the door, and fails because it's locked."
+
+	// Outputs
+	output OnLockedUse(void) : "Fired when the player uses the door, but it is locked."
 ]
 
 //=============================================================================
@@ -63,21 +97,126 @@
 [
 ]
 
+// Logic entity that checks for skill level, otherwise identical to logic_relay
+@PointClass base(Targetname) iconsprite("editor/logic_case.vmt") = logic_skill :
+	"Checks the game's current skill, has outputs for both failing and succeeding the check. Typically used to check for hard/veryhard."
+[
+	devsprite(string) : "Sprite Name" : "editor/logic_case.vmt"	//TEMPSPRITE
+
+	spawnflags(flags) =
+	[
+		1: "Remove on Use" : 0
+	]
+
+	skilllevel(choices) : "Skill Level to Check" : "0" : "Skill to check for." =
+	[
+		1 : "Easy"
+		2 : "Normal"
+		3 : "Hard"
+		4 : "Very Hard"
+		5 : "Hard OR Very Hard"	//Check for the upper difficulties
+		6 : "Easy OR Normal"	//Check for the lower difficulties
+	]
+
+	// Inputs
+	input CheckSkill(void) : "Check the Skill level"
+
+	// Outputs
+	output OnFailed(void) : "Fired when the check fails." 
+	output OnSuccess(void) : "Fired when the check succeeds." 
+]
+
+@PointClass base(Targetname) sphere() iconsprite("editor/env_soundscape.vmt") = env_music : 
+	"Entity used to control a dynamic music track. Up to 5 looping tracks can be selected. NOTE; They must all be the same format! No mixing wavs and mp3s!"
+[
+	health(integer) : "Volume" : 10 : "Sound volume, expressed as a range from 0 to 10, where 10 is the loudest."
+	fadeinsecs(integer) : "Fade in time in seconds (0-10)" : 0	: "Fade-in time of the music"
+	fadeoutsecs(integer) : "Fade out time in seconds (0-10)" : 0 : "Fade-out time of the music when stopped"
+	overlap(float) : "Overlap Time" : "0.1" : "Amount of blending overlap between different loops (0-1)"
+
+	spawnflags(flags) =
+	[
+	// Inheriting from ambient_generic...
+	//	1: "Play everywhere" : 0	//UNUSED
+		16: "Start Silent": 1
+		32: "No Looping (mp3 music)": 0
+		64: "Always start on first track" : 1
+		128: "Half volume during important dialouge" : 1
+	]
+
+	music1(sound) : "Track 1" : "" : "Name of the 1st track to play. Also supports direct .wav filenames."
+	music1weight(integer) : "Track 1 Weighting" : 100 : "How likely from 1-100 this track will play."
+
+	music2(sound) : "Track 2" : "" : "Name of the 2nd track to play. Also supports direct .wav filenames."
+	music2weight(integer) : "Track 2 Weighting" : 75 : "How likely from 1-100 this track will play."
+
+	music3(sound) : "Track 3" : "" : "Name of the 3rd track to play. Also supports direct .wav filenames."
+	music3weight(integer) : "Track 3 Weighting" : 50 : "How likely from 1-100 this track will play."
+
+	music4(sound) : "Track 4" : "" : "Name of the 4th track to play. Also supports direct .wav filenames."
+	music4weight(integer) : "Track 4 Weighting" : 25 : "How likely from 1-100 this track will play."
+
+	music5(sound) : "Track 5" : "" : "Name of the 5th track to play. Also supports direct .wav filenames."
+	music5weight(integer) : "Track 5 Weighting" : 25 : "How likely from 1-100 this track will play."
+
+	// Inputs
+	input ToggleSound(void) : "Toggles the sound between playing and stopping."
+	input PlaySound(void) : "Starts the sound."
+	input StopSound(void) : "Stops the sound if it is playing."
+
+	// Outputs
+	output OnNewTrack(void) : "Fired each time this music plays a new track."
+]
+
+@PointClass base(Item) studio("models/candybar.mdl") = item_candybar : "Candybar"
+[
+]
+
+@PointClass base(Item) studio("models/dintymoore.mdl") = item_sandwich : "Dintymoore"
+[
+]
+
+@PointClass base(Item) studio("models/mre.mdl") = item_hotmeal : "MRE"
+[
+]
+
+@PointClass base(Item) studio("models/items/armourplate.mdl") = item_armourplate : "Big Armor Plate" []
+
 //=============================================================================
 // NPC's
 //=============================================================================
 
 @NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_rebel : "Rebel"
 [
+	citizentype(choices) : "Type" : "Rebel" =
+	[
+		4 : "Rebel"		// City rebels
+		5 : "Unique"	
+	]
 ]
 @NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_worker : "Factory Worker"
 [
+	citizentype(choices) : "Type" : "Downtrodden" =
+	[
+		3 : "Downtrodden"	// City cits
+		5 : "Unique"
+	]
 ]
 @NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_mobster : "Mobster"
 [
+	citizentype(choices) : "Type" : "Criminal" =
+	[
+		2 : "Criminal"	// Oldtown mob
+		5 : "Unique"
+	]
 ]
 @NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_hobo : "Hobo"
 [
+	citizentype(choices) : "Type" : "Refugee" =
+	[
+		1 : "Refugee"	// Oldtown cits
+		5 : "Unique"
+	]
 ]
 
 //-----------------------------------------------------------------------------
@@ -220,8 +359,9 @@
 	additionalequipment(choices) : "Weapons" : "weapon_mp40" =
 	[
 		"weapon_mp40" : "MP40"
-		"weapon_pistol" : "Pistol"	//TODO; Need a luger
-		"weapon_ar2" : "AR2"	//TODO; Need a FG42
+		"weapon_pistol" : "Luger"	//TODO; Need a luger
+		"weapon_ar2" : "FG42"	//TODO; Need a FG42
+		"weapon_sniperrifle" : "Kar98"	//TODO; Need a KAR
 		"0" : "Nothing"
 	]
 
@@ -289,7 +429,7 @@
 @PointClass base(Weapon) studio("models/weapons/w_concgrenade.mdl") = weapon_emp : "Stun Grenade" []
 @PointClass base(Weapon) studio("models/weapons/w_rpg.mdl") = weapon_flash : "FLASH" []
 @PointClass base(Weapon) studio("models/weapons/w_crossbow.mdl") = weapon_flashlight : "Flashlight" []
-@PointClass base(Weapon) studio("models/weapons/w_45.mdl") = weapon_45 : "45-70" []
+@PointClass base(Weapon) studio("models/weapons/w_44.mdl") = weapon_44 : "44 Magnum" []
 
 
 //=============================================================================
@@ -299,7 +439,7 @@
 [
 	GameType(choices) : "Game Type" : 0 : "Type of game this entity will be used for." =
 	[
-		0 : "Co-op"
+		0 : "Co-op/Singleplayer"
 		1 : "Deathmatch"
 		2 : "Team Deathmatch"
 		3 : "Objective"

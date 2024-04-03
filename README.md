@@ -11,6 +11,8 @@ Latest build 4/3/2024 - Alpha Demo Build
 
 Variably compatible with all existing source maps, including Half-Life:Source and PlatinumSrc(hl2beta)
 
+Basic Deathmatch/Multiplayer is possible, but has not been tested
+
 
 All original assets by Valve Software
 

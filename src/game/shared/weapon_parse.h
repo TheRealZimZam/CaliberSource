@@ -87,6 +87,7 @@ public:
 	int						iSlot;									// inventory slot.
 	int						iPosition;								// position in the inventory slot.
 	float					flCycleTime;							// Amount of bullet fired per think
+	float					flReloadTime;							// OBSOLETE - Hardcoded reload time
 	float					flHSpread;								// The horizontal spread of the weapon
 	float					flVSpread;								// The vertical spread of the weapon
 	int						iMaxClip1;								// max primary clip size (-1 if no clip)
@@ -108,6 +109,7 @@ public:
 	int						iAmmoType;
 	int						iAmmo2Type;
 	bool					m_bMeleeWeapon;		// Melee weapons can always "fire" regardless of ammo.
+	bool					m_bCanDrop;			// This weapon can or cant be dropped, once aquired.
 
 	// This tells if the weapon was built right-handed (defaults to true).
 	// This helps cl_righthand make the decision about whether to flip the model or not.

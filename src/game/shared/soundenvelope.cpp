@@ -581,7 +581,7 @@ void CSoundPatch::StartSound( float flStartTime )
 		}
 
 		CBaseEntity::EmitSound( m_Filter, EntIndex(), ep );
-		CBaseEntity::EmitCloseCaption( m_Filter, EntIndex(), STRING( m_iszSoundScriptName ), ep.m_UtlVecSoundOrigin, m_flCloseCaptionDuration, true );
+		CBaseEntity::EmitCloseCaption( m_Filter, EntIndex(), STRING( m_iszSoundScriptName ), ep.m_UtlVecSoundOrigin, m_flCloseCaptionDuration );
 	}
 	m_isPlaying = true;
 }

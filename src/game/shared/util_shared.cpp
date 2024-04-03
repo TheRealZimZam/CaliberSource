@@ -871,10 +871,10 @@ void UTIL_BloodImpact( const Vector &pos, const Vector &dir, int color, int amou
 
 	data.m_vOrigin = pos;
 	data.m_vNormal = dir;
-	data.m_flScale = (float)amount;
+	data.m_flScale = amount;
 	data.m_nColor = (unsigned char)color;
 
-	DispatchEffect( "bloodimpact", data );
+	DispatchEffect( "BloodImpact", data );
 }
 
 bool UTIL_IsSpaceEmpty( CBaseEntity *pMainEnt, const Vector &vMin, const Vector &vMax )

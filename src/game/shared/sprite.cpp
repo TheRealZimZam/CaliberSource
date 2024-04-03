@@ -276,9 +276,15 @@ void CSprite::Spawn( void )
 #endif
 
 #ifndef CLIENT_DLL
+	// If I have this spawnflag, create a sprite_clientside with my info, then kill myself.
+	if ( m_spawnflags & SF_SPRITE_CLIENTSIDE )
+	{
+		//TODO;
+	}
+
 	// Server has no use for client-only entities.
 	// Seems like a waste to create the entity, only to UTIL_Remove it on Spawn, but this pattern works safely...
-	if ( FClassnameIs( this, "env_sprite_clientside" ) || m_spawnflags & SF_SPRITE_CLIENTSIDE )
+	if ( FClassnameIs( this, "env_sprite_clientside" ) || FClassnameIs( this, "env_glow" ) || m_spawnflags & SF_SPRITE_CLIENTSIDE )
 		UTIL_Remove( this );
 #endif // !CLIENT_DLL
 }

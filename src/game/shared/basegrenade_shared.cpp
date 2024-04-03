@@ -489,6 +489,7 @@ void CBaseGrenade::Precache( void )
 	BaseClass::Precache( );
 
 	PrecacheScriptSound( "BaseGrenade.Explode" );
+	AddFlag( FL_GRENADE );
 }
 
 //-----------------------------------------------------------------------------

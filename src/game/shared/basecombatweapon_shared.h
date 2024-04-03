@@ -307,6 +307,7 @@ public:
 	virtual const char		*GetWorldModel( void ) const;
 	virtual const char		*GetAnimPrefix( void ) const;
 	virtual float			GetCycleTime( void ) const;
+	virtual float			GetReloadTime( void ) const;
 	virtual float			GetHSpread( void ) const;
 	virtual float			GetVSpread( void ) const;
 	virtual int				GetMaxClip1( void ) const;
@@ -327,6 +328,7 @@ public:
 	virtual char const		*GetShootSound( int iIndex ) const;
 	virtual int				GetRumbleEffect() const;
 	bool					IsMeleeWeapon() const;
+	bool					CanDrop() const;
 
 	// derive this function if you mod uses encrypted weapon info files
 	virtual const unsigned char *GetEncryptionKey( void );
@@ -432,7 +434,9 @@ public:
 	bool					GetShootPosition( Vector &vOrigin, QAngle &vAngles );
 	virtual void			DrawCrosshair( void );
 	virtual bool			ShouldDrawCrosshair( void ) { return true; }
-	
+	virtual bool			ShouldDrawViewModel( void ) { return true; }
+	virtual bool			ShouldDrawMuzzleFlash( void ) { return true; }
+
 	// Weapon state checking
 	virtual bool			IsCarriedByLocalPlayer( void );
 	virtual bool			IsActiveByLocalPlayer( void );

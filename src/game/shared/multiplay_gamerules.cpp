@@ -75,7 +75,7 @@ ConVar mp_timelimit( "mp_timelimit", "0", FCVAR_NOTIFY|FCVAR_REPLICATED, "game t
 
 #ifdef GAME_DLL
 
-ConVar tv_delaymapchange( "tv_delaymapchange", "0", 0, "Delays map change until broadcast is complete" );
+ConVar tv_delaymapchange( "tv_delaymapchange", "1", 0, "Delays map change until broadcast is complete" );
 
 ConVar mp_restartgame( "mp_restartgame", "0", FCVAR_GAMEDLL, "If non-zero, game will restart in the specified number of seconds" );
 
@@ -154,7 +154,8 @@ int	CMultiplayRules::Damage_GetNoPhysicsForce( void )
 //-----------------------------------------------------------------------------
 int	CMultiplayRules::Damage_GetShouldNotBleed( void )
 {
-	int iDamage = ( DMG_POISON | DMG_ACID );
+	int iTimeBasedDamage = Damage_GetTimeBased();
+	int iDamage = ( iTimeBasedDamage | DMG_SHOCK | DMG_FREEZE );
 	return iDamage;
 }
 
@@ -212,7 +213,8 @@ bool CMultiplayRules::Damage_NoPhysicsForce( int iDmgType )
 bool CMultiplayRules::Damage_ShouldNotBleed( int iDmgType )
 {
 	// Damage types that don't make the player bleed.
-	return ( ( iDmgType & ( DMG_POISON | DMG_ACID ) ) != 0 );
+	int iTimeBasedDamage = Damage_GetTimeBased();
+	return ( ( iDmgType & ( iTimeBasedDamage | DMG_SHOCK | DMG_FREEZE ) ) != 0 );
 }
 
 //*********************************************************
@@ -312,10 +314,7 @@ bool CMultiplayRules::Init()
 	//=========================================================
 	void CMultiplayRules::Think ( void )
 	{
-		BaseClass::Think();
-		
 		///// Check game rules /////
-
 		if ( g_fGameOver )   // someone else quit the game already
 		{
 			// Tony; wait for intermission to end
@@ -326,7 +325,7 @@ bool CMultiplayRules::Init()
 
 		float flTimeLimit = mp_timelimit.GetFloat() * 60;
 		float flFragLimit = fraglimit.GetFloat();
-		
+			
 		if ( flTimeLimit != 0 && gpGlobals->curtime >= flTimeLimit )
 		{
 			GoToIntermission();
@@ -347,6 +346,8 @@ bool CMultiplayRules::Init()
 				}
 			}
 		}
+
+		BaseClass::Think();
 	}
 
 
@@ -508,6 +509,11 @@ bool CMultiplayRules::Init()
 			if ( pPlayer )
 			{
 				FireTargets( "game_playerleave", pPlayer, pPlayer, USE_TOGGLE, 0 );
+
+				// dvsents2: uncomment when removing all FireTargets
+				//variant_t value;
+				//g_EventQueue.AddEvent( "game_playerleave", "Use", value, 0, pPlayer, pPlayer );
+
 				pPlayer->RemoveAllItems( true );// destroy all of the players weapons and items
 				pPlayer->DestroyViewModels();// Kill off view model entities
 
@@ -669,7 +675,7 @@ bool CMultiplayRules::Init()
 
 		// Did the player kill himself?
 		if ( pVictim == pScorer )  
-		{			
+		{
 			if ( UseSuicidePenalty() )
 			{
 				// Players lose a frag for killing themselves
@@ -690,7 +696,7 @@ bool CMultiplayRules::Init()
 			FireTargets( "game_playerkill", pScorer, pScorer, USE_TOGGLE, 0 );
 		}
 		else
-		{  
+		{
 			if ( UseSuicidePenalty() )
 			{
 				// Players lose a frag for letting the world kill them			
@@ -966,12 +972,8 @@ bool CMultiplayRules::Init()
 		CBaseEntity *pentSpawnSpot = BaseClass::GetPlayerSpawnSpot( pPlayer );	
 
 	//!! replace this with an Event
-	/*
-		if ( IsMultiplayer() && pentSpawnSpot->m_target )
-		{
-			FireTargets( STRING(pentSpawnSpot->m_target), pPlayer, pPlayer, USE_TOGGLE, 0 ); // dvsents2: what is this code supposed to do?
-		}
-	*/
+		if ( IsMultiplayer() && pentSpawnSpot->m_target != NULL_STRING )
+			FireTargets( STRING( pentSpawnSpot->m_target ), pPlayer, pPlayer, USE_TOGGLE, 0 ); // dvsents2: what is this code supposed to do?
 
 		return pentSpawnSpot;
 	}
@@ -1041,6 +1043,7 @@ bool CMultiplayRules::Init()
 				continue;
 
 			pPlayer->ShowViewPortPanel( PANEL_SCOREBOARD );
+			pPlayer->AddFlag( FL_FROZEN );
 		}
 	}
 

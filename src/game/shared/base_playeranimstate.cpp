@@ -1,7 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Base anim state
 //
+// TODO; Need gesture support, movement should be separate from the main ACT...
 //=============================================================================//
 
 #include "cbase.h"
@@ -293,6 +294,13 @@ void CBasePlayerAnimState::DoAnimationEvent( int PlayerAnimEvent, int nData )
 			RestartMainSequence();
 			break;
 		}
+	case PLAYER_FALL:
+		{
+			// Hit a trigger_fall, start playing the falling death anim
+			m_bDying = true;
+			RestartMainSequence();
+			break;
+		}
 	default:
 		break;
 	}
@@ -320,19 +328,17 @@ void CBasePlayerAnimState::ClearAnimationLayers()
 //-----------------------------------------------------------------------------
 Activity CBasePlayerAnimState::TranslateActivity( Activity actDesired )
 {
-	Activity translateActivity = actDesired;
+	Activity translatedActivity = actDesired;
 
 	// Just keep the base activity if we're going to use the PREHISTORIC aim sequence system instead.
 	if ( !m_AnimConfig.m_bUseAimSequences )
 	{
 		if ( m_pOuter->GetActiveWeapon() )
-		{
-			translateActivity = m_pOuter->GetActiveWeapon()->ActivityOverride( translateActivity, NULL );
-		}
+			translatedActivity = m_pOuter->GetActiveWeapon()->ActivityOverride( translatedActivity, false );
 	}
 
 	// 99% of the time this is just going to return the original activity
-	return BodyYawTranslateActivity( translateActivity );
+	return BodyYawTranslateActivity( translatedActivity );
 }
 
 void CBasePlayerAnimState::RestartMainSequence()
@@ -362,6 +368,20 @@ void CBasePlayerAnimState::ComputeSequences( CStudioHdr *pStudioHdr )
 Activity CBasePlayerAnimState::CalcMainActivity()
 {
 	Activity idealActivity = ACT_IDLE;
+	if ( m_bDying )
+	{
+		// NOTENOTE; NOT USED IN PLAYER.CPP
+		// Dying is VERY important feedback, thus the server always handles the dying animation
+		// Event_killed destroys the animstate (for caliber) anyway, rendering this unused
+		// This is here for posterity only -M.M
+#ifdef CLIENT_DLL 
+		// Client's not supposed to handle this anyway, but just in case, t-pose;
+		return idealActivity;
+#else
+		// Use basecombatcharacter's GetDeathActivity();
+		return m_pOuter->GetDeathActivity();
+#endif
+	}
 	if ( m_bJumping )
 	{
 		idealActivity = ACT_JUMP;
@@ -463,10 +483,12 @@ int CBasePlayerAnimState::CalcAimLayerSequence( float *flCycle, float *flAimSequ
 #else
 	const char *pWeaponPrefix = GetWeaponPrefix();
 	if ( !pWeaponPrefix )
-		return 0;
+		return -1;
 
+#ifdef HL1_DLL
 	if ( strcmp( pWeaponPrefix, "pistol" ) == 0 )
 		pWeaponPrefix = "onehanded";
+#endif
 
 	// Are we aiming or firing?
 	const char *pAimOrShoot = "aim";
@@ -571,7 +593,7 @@ void CBasePlayerAnimState::UpdateAimSequenceLayers(
 	float flAimSequenceWeight = 1;
 	int iAimSequence = CalcAimLayerSequence( &flCycle, &flAimSequenceWeight, bForceIdle );
 	if ( iAimSequence == -1 )
-		iAimSequence = 0;
+		return;
 
 	// Feed the current state of the animation parameters to the sequence transitioner.
 	// It will hand back either 1 or 2 animations in the queue to set, depending on whether
@@ -774,9 +796,10 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 
 	if ( bMoving && CanThePlayerMove() )
 	{
+		float flGroundSpeed = GetInterpolatedGroundSpeed();
 #ifdef INVASION_DLL
-			if ( bMoving && ( maxspeed > 0.0f ) )
-			{
+		if ( ( maxspeed > 0.0f ) )
+		{
 			float flFactor = 1.0f;
 
 			// HACK HACK:: Defender backward animation is animated at 0.6 times speed, so scale up animation for this class
@@ -807,13 +830,12 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 			}
 
 			// Note this gets set back to 1.0 if sequence changes due to ResetSequenceInfo below
-			GetOuter()->SetPlaybackRate( ( speed * flFactor ) / maxspeed );
+			GetOuter()->SetPlaybackRate( ( flSpeed * flFactor ) / maxspeed );
 
 			// BUG BUG:
 			// This stuff really should be m_flPlaybackRate = speed / m_flGroundSpeed
 		}
 #endif
-		float flGroundSpeed = GetInterpolatedGroundSpeed();
 		if ( flGroundSpeed < 0.001f )
 		{
 			flReturnValue = 0.01;

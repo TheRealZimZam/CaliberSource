@@ -197,7 +197,8 @@ public:
 // Skill Level
 // -----------------------------------------
 #define SKILL_EASY		1
-#define SKILL_MEDIUM	2
+#define SKILL_MEDIUM	2	//Interchangable
+#define SKILL_NORMAL	2	//Interchangable
 #define SKILL_HARD		3
 #define SKILL_VERYHARD	4
 
@@ -301,6 +302,7 @@ enum PLAYER_ANIM
 	PLAYER_START_AIMING,
 	PLAYER_LEAVE_AIMING,
 	PLAYER_SPAWN,
+	PLAYER_FALL,
 
 	PLAYERANIM_COUNT
 };
@@ -369,7 +371,7 @@ enum PLAYER_ANIM
 
 #define DMG_PHYSGUN			(1<<23)		// Hit by manipulator. Usually doesn't do any damage.
 #define DMG_PLASMA			(1<<24)		// Shot by Cremator
-#define DMG_AIRBOAT			(1<<25)		// Hit by the airboat's gun
+#define DMG_AIRBOAT			(1<<25)		// Hit by the airboat's gun, or an armor-piercing shell
 
 #define DMG_DISSOLVE		(1<<26)		// Dissolving!
 #define DMG_BLAST_SURFACE	(1<<27)		// A blast on the surface of water that cannot harm things underwater

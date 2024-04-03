@@ -313,6 +313,7 @@ FileWeaponInfo_t::FileWeaponInfo_t()
 	iSlot = 0;
 	iPosition = 0;
 	flCycleTime = 0;
+	flReloadTime = 0;
 	flHSpread = 0;
 	flVSpread = 0;
 	iMaxClip1 = 0;
@@ -331,6 +332,7 @@ FileWeaponInfo_t::FileWeaponInfo_t()
 	iAmmoType = 0;
 	iAmmo2Type = 0;
 	m_bMeleeWeapon = false;
+	m_bCanDrop = true;
 	iSpriteCount = 0;
 	iconActive = 0;
 	iconInactive = 0;
@@ -376,6 +378,7 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 		iPosition = pKeyValuesData->GetInt( "bucket_position_360", iPosition );
 	}
 	flCycleTime = pKeyValuesData->GetFloat( "cycle_time", flCycleTime );			// How long it takes to fire a boolet
+	flReloadTime = pKeyValuesData->GetFloat( "reload_time", flReloadTime );			// Hardcoded reload time
 	flHSpread = pKeyValuesData->GetFloat( "h_spread", flHSpread );					// The horizontal spread of the weapon
 	flVSpread = pKeyValuesData->GetFloat( "v_spread", flVSpread );					// The vertical spread of the weapon
 	iMaxClip1 = pKeyValuesData->GetInt( "clip_size", WEAPON_NOCLIP );				// Max primary clips gun can hold (assume they don't use clips by default)
@@ -411,6 +414,7 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 	m_bBuiltRightHanded = ( pKeyValuesData->GetInt( "builtrighthanded", 1 ) != 0 ) ? true : false;
 	m_bAllowFlipping = ( pKeyValuesData->GetInt( "allowflipping", 1 ) != 0 ) ? true : false;
 	m_bMeleeWeapon = ( pKeyValuesData->GetInt( "meleeweapon", 0 ) != 0 ) ? true : false;
+	m_bCanDrop = ( pKeyValuesData->GetInt( "candrop", 1 ) != 0 ) ? true : false;;
 
 #if defined(_DEBUG) && defined(HL2_CLIENT_DLL)
 	// make sure two weapons aren't in the same slot & position

@@ -124,9 +124,7 @@ public:
 		int flags = 0;
 		
 		if ( IsTemporary() )
-		{
 			flags = FCAP_DONT_SAVE;
-		}
 		
 		return (BaseClass::ObjectCaps() & ~FCAP_ACROSS_TRANSITION) | flags; 
 	}
@@ -155,6 +153,7 @@ public:
 	{
 		if ( pEntity )
 		{
+		//	pev->skin = ENTINDEX(pEntity);
 			m_hAttachedToEntity = pEntity;
 			m_nAttachment = attachment;
 			FollowEntity( pEntity );
@@ -166,6 +165,13 @@ public:
 	bool IsOn() { return !IsEffectActive( EF_NODRAW ); }
 
 	inline float Frames( void ) { return m_flMaxFrame; }
+	inline void SetFramerate( float framerate )
+	{
+		m_flSpriteFramerate = framerate;
+		SetThink(&CSprite::AnimateThink);
+		SetNextThink( gpGlobals->curtime );
+	}
+
 	inline void SetTransparency( int rendermode, int r, int g, int b, int a, int fx )
 	{
 		SetRenderMode( (RenderMode_t)rendermode );

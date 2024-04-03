@@ -49,15 +49,18 @@ public:
 	virtual Activity	GetSecondaryAttackActivity( void )	{	return	ACT_VM_HITCENTER2;	}
 
 	virtual	float	GetFireRate( void )								{	return	0.2f;	}
-	virtual float	GetRange( void )								{	return	32.0f;	}
+	virtual float	GetRange( void )								{	return	60.0f;	}
 	virtual	int		GetDamageType( void )							{	return	DMG_CLUB;	}
 	virtual	float	GetDamageForActivity( Activity hitActivity )	{	return	1.0f;	}
 
+#ifndef CLIENT_DLL
 	virtual int		CapabilitiesGet( void );
 	virtual	int		WeaponMeleeAttack1Condition( float flDot, float flDist );
+#endif
 
 protected:
 	virtual	void	ImpactEffect( trace_t &trace );
+	virtual void	ImpactSound( CBaseEntity *pHitEntity );
 
 private:
 	bool			ImpactWater( const Vector &start, const Vector &end );

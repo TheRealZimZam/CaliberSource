@@ -84,35 +84,38 @@ void CTeamplayRules::Precache( void )
 //-----------------------------------------------------------------------------
 void CTeamplayRules::Think ( void )
 {
-	BaseClass::Think();
-
 	///// Check game rules /////
-	if ( g_fGameOver )   // someone else quit the game already
+	if (IsTeamplay())
 	{
-		BaseClass::Think();
-		return;
-	}
-
-	float flTimeLimit = mp_timelimit.GetFloat() * 60;
-	if ( flTimeLimit != 0 && gpGlobals->curtime >= flTimeLimit )
-	{
-		ChangeLevel();	//GoToIntermission()
-		return;
-	}
-
-	float flFragLimit = fraglimit.GetFloat();
-	if ( flFragLimit )
-	{
-		// check if any team is over the frag limit
-		for ( int i = 0; i < num_teams; i++ )
+		if ( g_fGameOver )   // someone else quit the game already
 		{
-			if ( team_scores[i] >= flFragLimit )
+			BaseClass::Think();
+			return;
+		}
+
+		float flTimeLimit = mp_timelimit.GetFloat() * 60;
+		if ( flTimeLimit != 0 && gpGlobals->curtime >= flTimeLimit )
+		{
+			ChangeLevel();	//GoToIntermission()
+			return;
+		}
+
+		float flFragLimit = fraglimit.GetFloat();
+		if ( flFragLimit )
+		{
+			// check if any team is over the frag limit
+			for ( int i = 0; i < num_teams; i++ )
 			{
-				ChangeLevel();	//GoToIntermission()
-				return;
+				if ( team_scores[i] >= flFragLimit )
+				{
+					ChangeLevel();	//GoToIntermission()
+					return;
+				}
 			}
 		}
 	}
+
+	BaseClass::Think();
 }
 
 //=========================================================
@@ -124,20 +127,53 @@ bool CTeamplayRules::ClientCommand( CBaseEntity *pEdict, const CCommand &args )
 {
 	if( BaseClass::ClientCommand( pEdict, args ) )
 		return true;
-	
-	if ( FStrEq( args[0], "menuselect" ) )
+
+//	CBasePlayer *pPlayer = ToBasePlayer( pEdict );
+	const char *pcmd = args[0];
+	if ( FStrEq( pcmd, "menuselect" ) )
 	{
 		if ( args.ArgC() < 2 )
 			return true;
 
-		//int slot = atoi( args[1] );
+#if 0
+		int slot = atoi( args[1] );
 
 		// select the item from the current menu
+		if ( pPlayer->m_pCurrentMenu->Input( pPlayer, slot ) == false )
+		{
+			// invalid selection, force menu refresh
+			pPlayer->m_MenuUpdateTime = gpGlobals->curtime;
+			pPlayer->m_MenuRefreshTime = gpGlobals->curtime;
+		}
+#endif
+		return true;
+	}
+	else if ( FStrEq( pcmd, "changeteam" ) )
+	{
+#if 0
+		int iTeam = atoi( args[1] );
+		pPlayer->ChangeTeam(iTeam);
 
+		pPlayer->m_pCurrentMenu = gMenus[MENU_TEAM];
+		pPlayer->m_MenuUpdateTime = gpGlobals->curtime;
+		pPlayer->m_MenuRefreshTime = gpGlobals->curtime;
+#endif
 		return true;
 	}
 
 	return false;
+}
+
+//-----------------------------------------------------------------------------
+void CTeamplayRules::UpdateGameMode( CBasePlayer *pPlayer )
+{
+/*
+	CSingleUserRecipientFilter user( pPlayer );
+	user.MakeReliable();
+	UserMessageBegin( user, "GameMode" );
+		WRITE_BYTE( 1 );  // game mode teamplay
+	MessageEnd();
+*/
 }
 
 const char *CTeamplayRules::SetDefaultPlayerTeam( CBasePlayer *pPlayer )
@@ -145,14 +181,10 @@ const char *CTeamplayRules::SetDefaultPlayerTeam( CBasePlayer *pPlayer )
 	// copy out the team name from the model
 	int clientIndex = pPlayer->entindex();
 	const char *team = (!pPlayer->IsNetClient())?"default":engine->GetClientConVarValue( clientIndex, "cl_team" );
-
-	/* TODO
-
 	pPlayer->SetTeamName( team );
 
 	RecountTeams();
-
-	// update the current player of the team he is joining
+/*
 	if ( (pPlayer->TeamName())[0] == '\0' || !IsValidTeam( pPlayer->TeamName() ) || defaultteam.GetFloat() )
 	{
 		const char *pTeamName = NULL;
@@ -166,10 +198,9 @@ const char *CTeamplayRules::SetDefaultPlayerTeam( CBasePlayer *pPlayer )
 			pTeamName = TeamWithFewestPlayers();
 		}
 		pPlayer->SetTeamName( pTeamName );
-		return pPlayer->TeamName();
- 	} */
-
-	return team;
+	}
+*/
+	return pPlayer->TeamName();
 }
 
 
@@ -181,21 +212,16 @@ void CTeamplayRules::InitHUD( CBasePlayer *pPlayer )
 	SetDefaultPlayerTeam( pPlayer );
 	BaseClass::InitHUD( pPlayer );
 
-	// TODO this has to be rewritten, maybe add a new USERINFO cvar "team"
-	/*
 	const char *team = engine->GetClientConVarValue( pPlayer->entindex(), "cl_team" );
 
 	// update the current player of the team he is joining
 	char text[1024];
-	if ( !strcmp( mdls, pPlayer->TeamName() ) )
-	{
+	if ( !strcmp( team, pPlayer->TeamName() ) )
 		Q_snprintf( text,sizeof(text), "You are on team \'%s\'\n", pPlayer->TeamName() );
-	}
 	else
-	{
 		Q_snprintf( text,sizeof(text), "You were assigned to team %s\n", pPlayer->TeamName() );
-	}
 
+	/*
 	ChangePlayerTeam( pPlayer, pPlayer->TeamName(), false, false );
 	if ( Q_strlen( pPlayer->TeamName() ) > 0 )
 	{
@@ -205,11 +231,10 @@ void CTeamplayRules::InitHUD( CBasePlayer *pPlayer )
 	RecountTeams();
 }
 
-
 void CTeamplayRules::ChangePlayerTeam( CBasePlayer *pPlayer, const char *pTeamName, bool bKill, bool bGib )
 {
 	int damageFlags = DMG_GENERIC;
-	// int clientIndex = pPlayer->entindex();
+	//int clientIndex = pPlayer->entindex();
 
 	if ( !bGib )
 	{
@@ -221,7 +246,9 @@ void CTeamplayRules::ChangePlayerTeam( CBasePlayer *pPlayer, const char *pTeamNa
 	}
 
 	// copy out the team name from the model
-	// pPlayer->SetTeamName( pTeamName );
+	pPlayer->SetTeamName( pTeamName );
+//	engine->SetClientKeyValue( clientIndex, engine->GetInfoKeyBuffer( pPlayer->edict() ), "cl_model", pPlayer->TeamName() );
+//	engine->SetClientKeyValue( clientIndex, engine->GetInfoKeyBuffer( pPlayer->edict() ), "cl_team", pPlayer->TeamName() );
 }
 
 //-----------------------------------------------------------------------------
@@ -240,7 +267,7 @@ void CTeamplayRules::ClientDisconnected( edict_t *pClient )
 		if ( pPlayer->GetTeam() )
 		{
 			pPlayer->GetTeam()->RemovePlayer( pPlayer );
-			pPlayer->ChangeTeam( 0 );
+			pPlayer->ChangeTeam( TEAM_UNASSIGNED );
 		}
 	}
 
@@ -252,27 +279,28 @@ void CTeamplayRules::ClientDisconnected( edict_t *pClient )
 //=========================================================
 void CTeamplayRules::ClientSettingsChanged( CBasePlayer *pPlayer )
 {
-#ifdef HL1_DLL
+#if 0
 	// TODO: handle skin, model & team changes
   	char text[1024];
 
 	// prevent skin/color/model changes
+	char *mdls = engine->InfoKeyValue( infobuffer, "model" );
 	int iTeam = Q_atoi( engine->GetClientConVarValue( pPlayer->entindex(), "cl_team" ) );
 	int iClass = Q_atoi( engine->GetClientConVarValue( pPlayer->entindex(), "cl_class" ) );
 
 	if ( defaultteam.GetBool() )
 	{
-		// int clientIndex = pPlayer->entindex();
+		int clientIndex = pPlayer->entindex();
 
 		// engine->SetClientKeyValue( clientIndex, "model", pPlayer->TeamName() );
-		// engine->SetClientKeyValue( clientIndex, "team", pPlayer->TeamName() );
+		// engine->SetClientKeyValue( clientIndex, "cl_team", pPlayer->TeamName() );
 		UTIL_SayText( "Not allowed to change teams in this game!\n", pPlayer );
 		return;
 	}
 
 	if ( defaultteam.GetFloat() || !IsValidTeam( mdls ) )
 	{
-		// int clientIndex = pPlayer->entindex();
+		int clientIndex = pPlayer->entindex();
 
 		// engine->SetClientKeyValue( clientIndex, "model", pPlayer->TeamName() );
 		Q_snprintf( text,sizeof(text), "Can't change team to \'%s\'\n", mdls );
@@ -282,10 +310,14 @@ void CTeamplayRules::ClientSettingsChanged( CBasePlayer *pPlayer )
 		return;
 	}
 
+//	UTIL_LogPrintf( "\"%s<%i>\" changed to team %s\n", STRING( pPlayer->pl.netname ), engine->GetPlayerUserId( pPlayer->edict() ), mdls );
+
 	ChangePlayerTeam( pPlayer, mdls, true, true );
+
+#endif
 	// recound stuff
 	RecountTeams();
-#endif
+
 	BaseClass::ClientSettingsChanged( pPlayer );
 }
 

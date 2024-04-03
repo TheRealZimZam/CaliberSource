@@ -341,6 +341,19 @@ float CBaseCombatWeapon::GetCycleTime( void ) const
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Default Reload Time
+//-----------------------------------------------------------------------------
+float CBaseCombatWeapon::GetReloadTime( void ) const
+{
+	// This is a tempfix for old/temp models, reload times should always be determined by
+	// the sequence, but incase we need to balance and the animators are on holiday... -MM
+	//
+	// NOTE; Weapons that have a "looping" reload should still use their own code (see shotgun),
+	// as this only applies to players.
+	return GetWpnData().flReloadTime;
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Default Spread
 //-----------------------------------------------------------------------------
 float CBaseCombatWeapon::GetHSpread( void ) const
@@ -396,6 +409,14 @@ bool CBaseCombatWeapon::UsesClipsForAmmo1( void ) const
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+bool CBaseCombatWeapon::UsesClipsForAmmo2( void ) const
+{
+	return ( GetMaxClip2() != WEAPON_NOCLIP );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
 bool CBaseCombatWeapon::IsMeleeWeapon() const
 {
 	return GetWpnData().m_bMeleeWeapon;
@@ -404,9 +425,9 @@ bool CBaseCombatWeapon::IsMeleeWeapon() const
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-bool CBaseCombatWeapon::UsesClipsForAmmo2( void ) const
+bool CBaseCombatWeapon::CanDrop() const
 {
-	return ( GetMaxClip2() != WEAPON_NOCLIP );
+	return GetWpnData().m_bCanDrop;
 }
 
 //-----------------------------------------------------------------------------
@@ -1486,7 +1507,7 @@ bool CBaseCombatWeapon::Holster( CBaseCombatWeapon *pSwitchingTo )
 	MDLCACHE_CRITICAL_SECTION();
 
 	// cancel any reload in progress.
-	m_bInReload = false; 
+	AbortReload();
 
 	// kill any think functions
 	SetThink(NULL);
@@ -1638,7 +1659,7 @@ void CBaseCombatWeapon::ItemPostFrame( void )
 	// Secondary attack has priority
 	if ((pOwner->m_nButtons & IN_ATTACK2) && (m_flNextSecondaryAttack <= gpGlobals->curtime))
 	{
-		if (UsesSecondaryAmmo() && pOwner->GetAmmoCount(m_iSecondaryAmmoType)<=0 )
+		if (UsesSecondaryAmmo() && pOwner->GetAmmoCount(m_iSecondaryAmmoType)<=0 && !m_bUsingSecondaryAmmo)
 		{
 			if (m_flNextEmptySoundTime < gpGlobals->curtime)
 			{
@@ -1992,7 +2013,13 @@ bool CBaseCombatWeapon::DefaultReload( int iClipSize1, int iClipSize2, int iActi
 	}
 
 	MDLCACHE_CRITICAL_SECTION();
-	float flSequenceEndTime = gpGlobals->curtime + SequenceDuration();
+
+	float flSequenceEndTime;
+	if ( GetWpnData().flReloadTime != NULL )
+		flSequenceEndTime = gpGlobals->curtime + GetReloadTime();
+	else
+		flSequenceEndTime = gpGlobals->curtime + SequenceDuration();
+
 	pOwner->SetNextAttack( flSequenceEndTime );
 	m_flNextPrimaryAttack = m_flNextSecondaryAttack = flSequenceEndTime;
 

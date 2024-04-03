@@ -986,6 +986,10 @@ CBaseEntity *CBasePlayer::FindUseEntity()
 	// A button, etc. can be made out of clip brushes, make sure it's +useable via a traceline, too.
 	int useableContents = MASK_SOLID | CONTENTS_DEBRIS | CONTENTS_PLAYERCLIP;
 
+#ifdef PORTAL
+	useableContents = MASK_SOLID | CONTENTS_DEBRIS | CONTENTS_PLAYERCLIP;
+#endif
+
 #ifdef CSTRIKE_DLL
 	useableContents = MASK_NPCSOLID_BRUSHONLY | MASK_OPAQUE_AND_NPCS;
 #endif
@@ -993,6 +997,7 @@ CBaseEntity *CBasePlayer::FindUseEntity()
 #ifdef HL1_DLL
 	useableContents = MASK_SOLID;
 #endif
+
 #ifndef CLIENT_DLL
 	CBaseEntity *pFoundByTrace = NULL;
 #endif
@@ -1264,6 +1269,12 @@ void CBasePlayer::PlayerUse ( void )
 					return;
 				}
 			}
+		}
+
+		// Tracker 3926:  We can't +USE something if we're climbing a ladder
+		if ( GetMoveType() == MOVETYPE_LADDER )
+		{
+			return;
 		}
 	}
 

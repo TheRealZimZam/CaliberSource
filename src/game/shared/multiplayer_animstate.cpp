@@ -676,18 +676,32 @@ bool CMultiPlayerAnimState::HandleMoving( Activity &idealActivity )
 	{
 		if ( GetPlayer()->GetFlags() & FL_DUCKING )
 		{
+#if defined( TF_DLL )
+			idealActivity = ACT_RUN_CROUCH;
+#else
 			if( flSpeed >= GetRunSpeed() )
 				idealActivity = ACT_RUN_CROUCH;
 			else
 				idealActivity = ACT_WALK_CROUCH;
+#endif
 		}
 		else
 		{
+#if defined( TF_DLL )
+			idealActivity = ACT_RUN;
+#else
 			if( flSpeed >= GetRunSpeed() )
 				idealActivity = ACT_RUN;
 			else
 				idealActivity = ACT_WALK;
+#endif
 		}
+
+		// No sprint anims in TF
+#if !defined( TF_DLL )
+		if( flSpeed >= GetSprintSpeed() )
+			idealActivity = ACT_SPRINT;
+#endif
 	}
 
 	return true;

@@ -38,6 +38,7 @@ static ConVar *g_pClosecaption = NULL;
 int LookupStringFromCloseCaptionToken( char const *token );
 const wchar_t *GetStringForIndex( int index );
 #endif
+
 static bool g_bPermitDirectSoundPrecache = false;
 
 #if !defined( CLIENT_DLL )

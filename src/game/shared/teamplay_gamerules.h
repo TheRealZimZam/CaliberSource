@@ -76,6 +76,7 @@ public:
 	virtual void InitHUD( CBasePlayer *pl );
 	virtual void DeathNotice( CBasePlayer *pVictim, const CTakeDamageInfo &info );
 	virtual const char *GetGameDescription( void ) { return "HALF-LIFE TEAMPLAY"; }  // this is the game name that gets seen in the server browser
+	virtual void UpdateGameMode( CBasePlayer *pPlayer );  // the client needs to be informed of the current game mode
 	virtual void PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info );
 	virtual void Think ( void );
 	virtual int GetTeamIndex( const char *pTeamName );

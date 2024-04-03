@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Base anim state
 //
 //=============================================================================//
 
@@ -27,7 +27,7 @@
 // (so he goes to his idle animation at full playback rate rather than his walk 
 // animation at low playback rate).
 #define MOVING_MINIMUM_SPEED 0.5f
-#define MAX_GROUND_SPEED 320
+#define MAX_GROUND_SPEED 300
 
 // Speed to blend into next movement layer
 #define RUN_SPEED		160.0f

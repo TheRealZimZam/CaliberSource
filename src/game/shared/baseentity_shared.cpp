@@ -60,6 +60,8 @@ ConVar hl2_episodic( "hl2_episodic", "0", FCVAR_REPLICATED );
 
 bool CBaseEntity::m_bAllowPrecache = false;
 
+#define FAKE_BULLET_VELOCITY_TEST 0
+#define MAX_HITSCAN_DELAY 0.9
 
 ConVar	ai_shot_bias_min( "ai_shot_bias_min", "-1.0", FCVAR_REPLICATED );
 ConVar	ai_shot_bias_max( "ai_shot_bias_max", "1.0", FCVAR_REPLICATED );
@@ -71,7 +73,11 @@ ConVar	ai_debug_shoot_positions( "ai_debug_shoot_positions", "0", FCVAR_REPLICAT
 //-----------------------------------------------------------------------------
 void SpawnBlood(Vector vecSpot, const Vector &vecDir, int bloodColor, float flDamage)
 {
+#if defined( HL1_DLL )
+	UTIL_BloodDrips( vecSpot, vecDir, bloodColor, (int)flDamage );
+#else
 	UTIL_BloodImpact( vecSpot, vecDir, bloodColor, (int)flDamage );
+#endif
 }
 
 #if !defined( NO_ENTITY_PREDICTION )
@@ -1579,40 +1585,77 @@ public:
 typedef CTraceFilterSimpleList CBulletsTraceFilter;
 #endif
 
-void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
+void CBaseEntity::FireBullets( const FireBulletsInfo_t &info, float flDelay )
 {
-	//!!TODO
-	//!!TODO
-	// Here's how the velocity system works;
+
+	/*
+	//-----------------------------------------------------
+	// Bullshit Bullet Velocity:
+	// A quick n' dirty math hack that tries to simulate bullet speed in the cheapest way possible
+	//
+	// Here's how the velocity system is intended to work;
 	// First, we do the normal, instant trace to find out how far away our impact point is,
 	// how much damage its going to do, etc. Then, All we need to do is some maths to
 	// factor in the velocity and probably TIME_TO_TICKS, then delay the impact by that much.
-	// Once the delay is up, do another trace to check if things have changed 
-	// (npc ran into the bullet, etc.), then allow the actual fuctions to run.
+	// Once the delay is up, we do the real trace for the "bullet", and allow the actual fuctions to run.
 	// 
-	// As always, the less we can get away with doing in the background the better, and it's 
-	// alot better to just double-run a trace than spawn entities or fill up any queues.
+	// Ideally, the delay should match up with the tracer speed and look good.
 	//
-	// Max delay should be about a second, anything more than that is going to end up feeling
-	// extremely unrealistic and strange.
-#if 0
-		if ( info.m_flVelocity > 0 )
-		{
-		//!!TODO
-		//!!TODO
-		//	float flBulletDelay = (Something with info.m_vecSrc, vecEnd, and m_flVelocity);
+	// This is going to double the amount of traces that have to be done,
+	// but its alot better than spawning entities or doing any more advanced calculations.
+	//
+	// Max delay should be just under a second, anything more than that is going to end up being
+	// extremely unrealistic, most likely perceived as lag rather than real speed.
+	// -MM
+	//-----------------------------------------------------
+	*/
 
-			// Clamp the calculated delay to 1 second, any bullet traveling longer or slower than
-			// that (flak cannon, big shells, etc.) should use an actual simulated projectile.
-			//clamp( flBulletDelay, 0, 1.0 )
-			//
-			// Call the function again but this time its real (exchange velocity for delay)
-			// FireBullets( info, flBulletDelay )
-			//
-			// And stop this one from doing anything else
-			//return;
-		}
+	//!!TODO
+	//!!TODO
+	// NOTENOTE; The way this is setup right now could lead to a unstable circular loop, causing leaks...
+	// As long as it works though i cant be bothered, its just a test anyway... -MM
+/*
+#ifdef FAKE_BULLET_VELOCITY_TEST
+	//------------------------------------------------------------------------------------
+	// Calculate bullet delay
+	//------------------------------------------------------------------------------------
+
+	// Clamp the calculated delay to 0.9 seconds, any bullet traveling longer or slower than
+	// that (flak cannon, big shells, etc.) should use an actual simulated projectile.
+	if ( flDelay > MAX_HITSCAN_DELAY )
+		flDelay = MAX_HITSCAN_DELAY;
+
+	// Check if we have a velocity to work with
+	if ( info.m_flVelocity > 0 )
+	{
+		//!!TODO!!
+		// Calculate bullet delay from here to its intended endpoint
+		float flBulletDelay = (Something with info.m_vecSrc, vecEnd, and m_flVelocity);
+
+		// Erase the velocity for the second call
+		FireBulletsInfo_t AdjustedInfo = info;
+		AdjustedInfo.m_flVelocity = 0;
+
+		// And call the function again but this time its real (exchange velocity for delay)
+		FireBullets( AdjustedInfo, flBulletDelay );
+		return;
+	}
+	else if ( flDelay > 0.0 )
+	{
+		// We have a delay, but no velocity - assume this is not the first call...
+
+		// TODO; Something todo with the tickrate...
+		flDelay = flDelay - TICKRATE;
+
+		// Keep calling it until delay is <= 0
+		FireBullets( info, flDelay );
+		return;
+	}
+
+	// If velocity AND delay == 0, now we do the rest of the function...
+	//------------------------------------------------------------------------------------
 #endif
+*/
 
 	static int	tracerCount;
 	trace_t		tr;
@@ -1714,9 +1757,18 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 
 	for (int iShot = 0; iShot < info.m_iShots; iShot++)
 	{
-		bool bHitWater = false;
-		bool bHitGlass = false;
+		// Make sure given a valid bullet type
+		if (info.m_iAmmoType == -1)
+		{
+			Warning("ERROR: %s using undefined ammo type!\n", GetDebugName());
+			return;
+		}
+
 		bool bPenetration = false;
+		bool bHitWater = false;
+#ifdef GAME_DLL
+		bool bHitGlass = false;
+#endif
 
 		// Prediction is only usable on players
 		if ( IsPlayer() )
@@ -1842,13 +1894,6 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		TraceAttackToTriggers( triggerInfo, tr.startpos, tr.endpos, vecDir );
 #endif
 
-		// Make sure given a valid bullet type
-		if (info.m_iAmmoType == -1)
-		{
-			DevMsg("ERROR: Undefined ammo type!\n");
-			return;
-		}
-
 		// do damage, paint decals
 		if (tr.fraction != 1.0)
 		{
@@ -1945,7 +1990,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		{
 #ifdef GAME_DLL
 			surfacedata_t *psurf = physprops->GetSurfaceData( tr.surface.surfaceProps );
-			if ( ( psurf != NULL ) && ( tr.m_pEnt->ClassMatches( "func_breakable" ) || tr.m_pEnt->ClassMatches( "func_wall" ) ) )	//( psurf->game.material == CHAR_TEX_GLASS || psurf->game.material == CHAR_TEX_GRATE )
+			if ( ( psurf != NULL ) && ( tr.m_pEnt->ClassMatches("func_breakable") || tr.m_pEnt->ClassMatches("func_wall*") ) )
 			{
 				// Query the func_breakable for whether it wants to allow for bullet penetration
 				if ( tr.m_pEnt->HasSpawnFlags( SF_BREAK_NO_BULLET_PENETRATION ) == false )
@@ -2137,6 +2182,8 @@ void CBaseEntity::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 		{
 			SpawnBlood( vecOrigin, vecDir, blood, info.GetDamage() );// a little surface blood.
 			TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
+		//! if ( info.GetDamage() >= 20 )
+		//!		SpawnBloodPool( vecOrigin, ptr, info.GetDamageType() );
 		}
 	}
 }
@@ -2304,7 +2351,7 @@ void CBaseEntity::TraceBleed( float flDamage, const Vector &vecDir, trace_t *ptr
 		cCount = 4;
 	}
 
-	float flTraceDist = (bitsDamageType & DMG_AIRBOAT) ? 384 : 172;	//NOTENOTE; Well this seems lame, shouldnt this get the velocity/force of the bullet?? (impulse ammodef)
+	float flTraceDist = (bitsDamageType & DMG_AIRBOAT) ? 256 : 180;	//NOTENOTE; Well this seems lame, shouldnt this get the velocity/force of the bullet?? (impulse ammodef)
 	for ( i = 0 ; i < cCount ; i++ )
 	{
 		vecTraceDir = vecDir * -1;// trace in the opposite direction the shot came from (the direction the shot is going)

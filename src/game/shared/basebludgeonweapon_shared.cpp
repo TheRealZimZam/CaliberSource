@@ -73,37 +73,6 @@ void CBaseBludgeonWeapon::Precache( void )
 	BaseClass::Precache();
 }
 
-int CBaseBludgeonWeapon::CapabilitiesGet()
-{ 
-#ifndef CLIENT_DLL
-	return bits_CAP_WEAPON_MELEE_ATTACK1;
-#else
-	return 0;
-#endif
-}
-
-int CBaseBludgeonWeapon::WeaponMeleeAttack1Condition( float flDot, float flDist )
-{
-#ifndef CLIENT_DLL
-	if (flDist > m_fMaxRange1)
-	{
-		return COND_TOO_FAR_TO_ATTACK;
-	}
-	else if (flDist < m_fMinRange1)
-	{
-		return COND_TOO_CLOSE_TO_ATTACK;
-	}
-	else if (flDot < 0.7)
-	{
-		return COND_NOT_FACING_ATTACK;
-	}
-
-	return COND_CAN_MELEE_ATTACK1;
-#else
-	return 0;
-#endif
-}
-
 //------------------------------------------------------------------------------
 // Purpose : Update weapon
 //------------------------------------------------------------------------------
@@ -171,7 +140,6 @@ void CBaseBludgeonWeapon::Hit( trace_t &traceHit, Activity nHitActivity, bool bI
 	CSoundEnt::InsertSound( SOUND_BULLET_IMPACT, traceHit.endpos, 300, 0.2f, pPlayer );
 	// This isn't great, but it's something for when the crowbar hits.
 	pPlayer->RumbleEffect( RUMBLE_AR2, 0, RUMBLE_FLAG_RESTART );
-#endif
 
 	CBaseEntity	*pHitEntity = traceHit.m_pEnt;
 
@@ -182,7 +150,6 @@ void CBaseBludgeonWeapon::Hit( trace_t &traceHit, Activity nHitActivity, bool bI
 		pPlayer->EyeVectors( &hitDirection, NULL, NULL );
 		VectorNormalize( hitDirection );
 
-#ifndef CLIENT_DLL
 		CTakeDamageInfo info( GetOwner(), GetOwner(), GetDamageForActivity( nHitActivity ), GetDamageType() );
 
 		if( pPlayer && pHitEntity->IsNPC() )
@@ -201,8 +168,11 @@ void CBaseBludgeonWeapon::Hit( trace_t &traceHit, Activity nHitActivity, bool bI
 
 		if ( ToBaseCombatCharacter( pHitEntity ) )
 			gamestats->Event_WeaponHit( pPlayer, !bIsSecondary, GetClassname(), info );
-#endif
+
+		//Play an impact sound	
+		ImpactSound( pHitEntity );
 	}
+#endif
 
 	// Apply an impact effect
 	ImpactEffect( traceHit );
@@ -253,7 +223,6 @@ Activity CBaseBludgeonWeapon::ChooseIntersectionPointAndActivity( trace_t &hitTr
 		hitTrace = tmpTrace;
 	}
 
-
 	return ACT_VM_HITCENTER;
 }
 
@@ -295,7 +264,7 @@ bool CBaseBludgeonWeapon::ImpactWater( const Vector &start, const Vector &end )
 		}
 
 		DispatchEffect( "watersplash", data );
-#endif		
+#endif
 	}
 
 	return true;
@@ -314,6 +283,24 @@ void CBaseBludgeonWeapon::ImpactEffect( trace_t &traceHit )
 	UTIL_ImpactTrace( &traceHit, GetDamageType(), "MeleeImpact" );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Play the impact sound
+// Input  : pHitEntity - entity that we hit
+// assumes pHitEntity is not null
+//-----------------------------------------------------------------------------
+void CBaseBludgeonWeapon::ImpactSound( CBaseEntity *pHitEntity )
+{
+	bool bIsWorld = ( pHitEntity->entindex() == 0 );
+
+	if( bIsWorld )
+	{
+		WeaponSound( MELEE_HIT_WORLD );
+	}
+	else
+	{
+		WeaponSound( MELEE_HIT );
+	}
+}
 
 //------------------------------------------------------------------------------
 // Purpose : Starts the swing of the weapon and determines the animation
@@ -321,12 +308,13 @@ void CBaseBludgeonWeapon::ImpactEffect( trace_t &traceHit )
 //------------------------------------------------------------------------------
 void CBaseBludgeonWeapon::Swing( int bIsSecondary )
 {
-	trace_t traceHit;
-
 	// Try a ray
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 	if ( !pOwner )
 		return;
+
+	//Play swing sound
+	WeaponSound( SINGLE );
 
 #ifndef CLIENT_DLL
 	pOwner->RumbleEffect( RUMBLE_CROWBAR_SWING, 0, RUMBLE_FLAG_RESTART );
@@ -337,6 +325,7 @@ void CBaseBludgeonWeapon::Swing( int bIsSecondary )
 	forward = pOwner->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );
 	//pOwner->EyeVectors( &forward, NULL, NULL );
 
+	trace_t traceHit;
 	Vector swingEnd = swingStart + forward * GetRange();
 	UTIL_TraceLine( swingStart, swingEnd, MASK_SHOT_HULL, pOwner, COLLISION_GROUP_NONE, &traceHit );
 	Activity nHitActivity = ACT_VM_HITCENTER;
@@ -377,15 +366,6 @@ void CBaseBludgeonWeapon::Swing( int bIsSecondary )
 		}
 	}
 
-#ifndef CLIENT_DLL
-//	if ( !bIsSecondary )
-//		m_iPrimaryAttacks++;
-//	else 
-//		m_iSecondaryAttacks++;
-
-	gamestats->Event_WeaponFired( pOwner, !bIsSecondary, GetClassname() );
-#endif
-
 	// -------------------------
 	//	Miss
 	// -------------------------
@@ -407,6 +387,17 @@ void CBaseBludgeonWeapon::Swing( int bIsSecondary )
 	// Send the anim
 	SendWeaponAnim( nHitActivity );
 
+#ifndef CLIENT_DLL
+	pOwner->SetAnimation( PLAYER_ATTACK1 );
+
+//	if ( !bIsSecondary )
+//		m_iPrimaryAttacks++;
+//	else 
+//		m_iSecondaryAttacks++;
+
+	gamestats->Event_WeaponFired( pOwner, !bIsSecondary, GetClassname() );
+#endif
+
 	//Setup our next attack times
 	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
 	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
@@ -414,3 +405,31 @@ void CBaseBludgeonWeapon::Swing( int bIsSecondary )
 	//Play swing sound
 	WeaponSound( SINGLE );
 }
+
+//------------------------------------------------------------------------------
+// Purpose:
+//------------------------------------------------------------------------------
+#ifndef CLIENT_DLL
+int CBaseBludgeonWeapon::CapabilitiesGet()
+{
+	return bits_CAP_WEAPON_MELEE_ATTACK1;
+}
+
+int CBaseBludgeonWeapon::WeaponMeleeAttack1Condition( float flDot, float flDist )
+{
+	if (flDist > m_fMaxRange1)
+	{
+		return COND_TOO_FAR_TO_ATTACK;
+	}
+	else if (flDist < m_fMinRange1)
+	{
+		return COND_TOO_CLOSE_TO_ATTACK;
+	}
+	else if (flDot < 0.7)
+	{
+		return COND_NOT_FACING_ATTACK;
+	}
+
+	return COND_CAN_MELEE_ATTACK1;
+}
+#endif

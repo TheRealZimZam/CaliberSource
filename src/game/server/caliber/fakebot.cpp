@@ -3,13 +3,16 @@
 // Purpose: Fake bot - A npc that runs around and mimics a player
 // Used in SP if we ever need a player-like character, or in MP as a stopgap
 // Cannot cap points or do much of anything a player can do, only for deathmatch.
+// Inherits from simpletalker, for response rules support.
 //
-// TODO; Code this thing!
+// NOTENOTE; If you really want to, you CAN use this as a baseclass, but if you're
+// doing that you SHOULD just use the real bot system (if its implemented)...
+//
 //=============================================================================//
 
 #include "cbase.h"
 #include "ai_basenpc.h"
-#include "ai_baseactor.h"
+#include "fakebot.h"
 #include "ai_senses.h"
 #include "ai_tacticalservices.h"
 #include "ai_interactions.h"
@@ -26,99 +29,27 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-// We normally dont collide with friendly players and phase through like in MP,
-// In-case we want to though, for some odd reason
-#define	SF_FAKEBOT_SOLID					(1 << 16) 
+// Do we actually spawn another fakebot, 
+// OR just fake a respawn by resetting me and zipping me back to a spawnpoint?
+#define FAKEBOT_REAL_RESPAWN 0
 
-#define FAKEBOT_MODEL "models/player.mdl"
-
-// For fake weapon slot switching
+// For fake weapon switching, simulate a real player
 #define FAKEBOT_WANTS_MELEE		1
 #define FAKEBOT_SLOT1			"weapon_swing"
 #define FAKEBOT_WANTS_PISTOL	2
 #define FAKEBOT_SLOT2			"weapon_pistol"
 #define FAKEBOT_WANTS_SMG		3
-#define FAKEBOT_SLOT3			"weapon_smg2"
+#define FAKEBOT_SLOT3			"weapon_smg"
 #define FAKEBOT_WANTS_SHOTGUN	4
 #define FAKEBOT_SLOT4			"weapon_shotgun"
 #define FAKEBOT_WANTS_RPG		5
 #define FAKEBOT_SLOT5			"weapon_rpg"
 
-//=========================================================
-// NPC's Anim Events Go Here
-//=========================================================
-
-class CFakeBot : public CAI_BaseActor
-{
-	DECLARE_CLASS( CFakeBot, CAI_BaseActor );
-public:
-	void	Precache( void );
-	void	Spawn( void );
-
-	Class_T Classify( void );
-	Disposition_t	IRelationType( CBaseEntity *pTarget );
-	bool	ShouldGib( const CTakeDamageInfo &info );
-	bool	ShouldMoveAndShoot();
-
-	// Speed/Movement
-	float	GetIdealAccel( void ) const{ return GetIdealSpeed() * 2.0; };
-	float	MaxYawSpeed( void );
-
-	// Hearing
-	int		GetSoundInterests( void );
-	float	HearingSensitivity( void ) { return 1.0; };
-	void	PainSound( const CTakeDamageInfo &info );
-	void	DeathSound( const CTakeDamageInfo &info );
-	// Never go back to idle after we get in a fight
-	virtual bool	ShouldGoToIdleState( void ) { return false; }
-
-	//void	HandleAnimEvent( animevent_t *pEvent );
-
-	// Thinking
-	void	NPCThink( void );
-	void	PrescheduleThink( void );
-	void	OnKilledNPC( CBaseCombatCharacter *pKilled );
-
-	// Doing
-	void		BuildScheduleTestBits( void );
-	virtual int	SelectSchedule( void );
-	virtual int	TranslateSchedule( int scheduleType );
-
-	// See if we should respawn
-	void	Event_Killed( const CTakeDamageInfo &info );
-
-private:
-	int		m_iFakeTeam;
-	int		m_iActiveSlot;
-	int		m_iWantsSlot;
-
-private:
-	// Conds
-	enum
-	{
-		COND_FAKEBOT_HELP_TEAMMATE = BaseClass::NEXT_CONDITION,
-		NEXT_CONDITION,
-	};
-
-	// Scheds
-	enum
-	{
-		SCHED_FAKEBOT_IDLE = BaseClass::NEXT_SCHEDULE,
-		SCHED_FAKEBOT_TBAG,
-		SCHED_FAKEBOT_RETREAT,
-		SCHED_FAKEBOT_ATTACK,
-		SCHED_FAKEBOT_CHASE,
-		SCHED_FAKEBOT_HELP_TEAMMATE,
-		NEXT_SCHEDULE,
-	};
-
-protected:
-	DECLARE_DATADESC();
-	DEFINE_CUSTOM_AI;
-};
 
 BEGIN_DATADESC( CFakeBot )
-	DEFINE_FIELD( m_iFakeTeam, FIELD_INTEGER ),
+	DEFINE_FIELD( m_bPissed, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_pPissedTarget, FIELD_EHANDLE ),
+
 END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( fakebot, CFakeBot );
@@ -130,7 +61,7 @@ void CFakeBot::Precache()
 {
 	BaseClass::Precache();
 
-	SetModelName( AllocPooledString( FAKEBOT_MODEL ) );
+	SetModelName( AllocPooledString( FAKEBOT_DEFAULT_MODEL ) );
 
 	// TODO; This is where we could grab a couple of the MP models
 	PrecacheModel( STRING( GetModelName() ) );
@@ -146,7 +77,7 @@ void CFakeBot::Precache()
 //=========================================================
 Class_T	CFakeBot::Classify( void )
 {
-	return	CLASS_PLAYER;
+	return	CLASS_PLAYER;	//NOTENOTE; This might be dangerous... -MM
 }
 
 //=========================================================
@@ -207,12 +138,15 @@ void CFakeBot::PainSound( const CTakeDamageInfo &info )
 	if ( gpGlobals->curtime < m_flNextPainSoundTime )
 		return;
 
+	SentenceStop();	//Stop any response rules that are playing
 	EmitSound( "Player.Pain" );
 	m_flNextPainSoundTime = gpGlobals->curtime + 1;
 }
 
 void CFakeBot::DeathSound( const CTakeDamageInfo &info )
 {
+	// Sentences don't play on dead NPCs
+	SentenceStop();
 	EmitSound( "Player.Death" );
 }
 
@@ -249,13 +183,15 @@ void CFakeBot::Spawn()
 	m_iMaxHealth		= m_iHealth;
 	m_flFieldOfView		= 0.766;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
-	m_iFakeTeam			= 0;
+//	m_iFakeTeam			= 0;
+	m_bPissed			= false;
+	m_pPissedTarget		= NULL;
 
 	SetSimulatedEveryTick( true );
 	SetAnimatedEveryTick( true );
 
-	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP | bits_CAP_DOORS_GROUP | bits_CAP_DUCK | bits_CAP_USE );
-	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_MOVE_SHOOT | bits_CAP_STRAFE );
+	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_CLIMB | bits_CAP_DOORS_GROUP | bits_CAP_USE );
+	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_DUCK | bits_CAP_MOVE_SHOOT | bits_CAP_STRAFE );
 
 	NPCInit();
 
@@ -271,11 +207,21 @@ void CFakeBot::Spawn()
 #endif
 }
 
+#if FAKEBOT_REAL_RESPAWN
+CBaseEntity* CFakeBot::Respawn( void )
+{
+	CBaseEntity *pNewBot = CBaseEntity::Create( GetClassname(), GetAbsOrigin(), GetLocalAngles(), GetOwnerEntity() );
+	pNewBot->Wake( false );
+	pNewBot->SetThink( &CAI_BaseNPC::NPCInitThink );
+	pNewBot->SetNextThink( gpGlobals->curtime + 0.01f );
+	return pNewBot;
+}
+#endif
 
 //-----------------------------------------------------------------------------
 Disposition_t CFakeBot::IRelationType( CBaseEntity *pTarget )
 {
-	if ( pTarget->IsPlayer() )
+	if ( pTarget->IsPlayer() || pTarget->Classify() == CLASS_PLAYER )
 	{
 		if ( g_pGameRules->IsDeathmatch() )
 			return D_HT;
@@ -313,10 +259,6 @@ void CFakeBot::NPCThink( void )
 
 		// TODO; This is where we would decide what weapon we want
 	}
-	else
-	{
-		SUB_StartFadeOut();
-	}
 }
 
 void CFakeBot::PrescheduleThink( void )
@@ -324,17 +266,32 @@ void CFakeBot::PrescheduleThink( void )
 	BaseClass::PrescheduleThink();
 }
 
+void CFakeBot::GatherConditions( void )
+{
+	BaseClass::GatherConditions();
+}
 
+#ifdef HL2_DLL
 //extern ConVar hl2_playertalk;
 void CFakeBot::OnKilledNPC( CBaseCombatCharacter *pKilled )
 {
-	// Spew some liners, like the player
+	// Spew some liners/taunts, like the player
 //	if ( hl2_playertalk.GetBool() )
 //	{
+//		// Use special taunts for enemy players
+//		if ( pKilled->IsPlayer() )
+//		{
+//			
+//		}
+//		else
+//		{
+//			// Standard NPC, just use the stock frag lines
 //
+//		}
 //	}
 	BaseClass::OnKilledNPC( pKilled );
 }
+#endif
 
 //=========================================================
 // Doing
@@ -366,7 +323,6 @@ int CFakeBot::SelectSchedule( void )
 			return BaseClass::SelectSchedule();
 		break;
 
-		//TODO; We should follow/tag along with a friendly player if we're idle
 		case NPC_STATE_IDLE:
 			// If its danger in idle, just move away
 			if ( HasCondition( COND_HEAR_DANGER ) )
@@ -375,18 +331,59 @@ int CFakeBot::SelectSchedule( void )
 			// Always place an emphasis on reloading
 			if ( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_NO_SECONDARY_AMMO ) )
 				return SCHED_HIDE_AND_RELOAD;
-			else
-				return SCHED_FAKEBOT_IDLE;
+
+			if ( AI_IsSinglePlayer() )
+			{
+				// In SP, we should follow/tag along with a friendly player if we're idle
+				if ( IRelationType( UTIL_GetLocalPlayer() ) >= D_LI )
+				{
+					m_FollowBehavior.SetFollowTarget( UTIL_GetLocalPlayer() );
+					if ( m_FollowBehavior.CanSelectSchedule() )
+					{
+						DeferSchedulingToBehavior( &m_FollowBehavior );
+						return BaseClass::SelectSchedule();
+					}
+					else
+						// Cant follow, for some odd reason
+						return SCHED_FAKEBOT_IDLE;
+				}
+			}
+			else if ( g_pGameRules->IsDeathmatch() )
+				// If its Deathmatch, Start hunting for enemies
+				return SCHED_IDLE_WANDER;
+			else if ( g_pGameRules->IsTeamplay() )
+				// If its teamplay, start running towards the objective, we'll get interrupted when we get an enemy
+				return SCHED_FORCED_GO_RUN;	//TEMPTEMP
+
+			// Else choose a spot and mess about
+			return SCHED_FAKEBOT_IDLE;
 		break;
 
 		case NPC_STATE_ALERT:
 		case NPC_STATE_COMBAT:
 		{
+			// Turn off following if its on
+			if ( m_FollowBehavior.IsRunning() )
+			{
+				m_FollowBehavior.SetFollowTarget( NULL ); 
+				DeferSchedulingToBehavior( NULL );
+			}
+
 			if ( HasCondition( COND_HEAR_DANGER ) )
 				return SCHED_TAKE_COVER_FROM_BEST_SOUND;
 
 			if ( HasCondition( COND_NO_PRIMARY_AMMO ) || HasCondition( COND_NO_SECONDARY_AMMO ) )
 				return SCHED_HIDE_AND_RELOAD;
+
+			if ( AI_IsSinglePlayer() )
+			{
+				if ( HasCondition( COND_LOST_ENEMY ) || HasCondition( COND_ENEMY_UNREACHABLE ) )
+				{
+					SetEnemy( NULL );
+					SetIdealState( NPC_STATE_IDLE );
+					return SCHED_FAKEBOT_IDLE;
+				}
+			}
 
 			// Basic Checks, translate does the higher level stuff
 			if ( HasCondition( COND_SEE_ENEMY ) )
@@ -423,31 +420,58 @@ int CFakeBot::TranslateSchedule( int scheduleType )
 	{
 		case SCHED_FAKEBOT_IDLE:
 			{
+				// If im still in combat, never idle
 				if ( GetEnemy() )
-					return SCHED_FAKEBOT_ATTACK;
+					return TranslateSchedule(SCHED_FAKEBOT_ATTACK);
 
 				return SCHED_FAKEBOT_IDLE;
 			}
+
+		case SCHED_FAKEBOT_RETREAT:
+			{
+				// Can i help/get help from a teammate?
+				if (HasCondition( COND_FAKEBOT_HELP_TEAMMATE ))
+					return TranslateSchedule(SCHED_FAKEBOT_HELP_TEAMMATE);
+
+				// Am I pissed, and do i have health to spare?
+				if ( GetEnemy() && m_bPissed && m_iHealth > (m_iMaxHealth/2) )
+					return TranslateSchedule(SCHED_FAKEBOT_ATTACK);
+
+				// Else, just run away
+				return SCHED_FAKEBOT_RETREAT;
+			}
+
 		case SCHED_FAKEBOT_ATTACK:
 			{
 				// If i'm pissed, attack aggressively
-				if ( GetEnemy() && false )
-					return SCHED_FAKEBOT_CHASE;
+				if ( m_bPissed && m_iHealth > (m_iMaxHealth-15) )
+					return TranslateSchedule(SCHED_FAKEBOT_CHASE);
 
+				// Attack! Attack! Attack!!!
 				return SCHED_FAKEBOT_ATTACK;
 			}
+
+		case SCHED_FAKEBOT_HELP_TEAMMATE:
+			{
+				// Is my team-mate a friendly-firing douche? Leave him for dead
+
+
+				// Run towards my teammate
+				return SCHED_FAKEBOT_HELP_TEAMMATE;
+			}
+
 		case SCHED_VICTORY_DANCE:
 			{
 				// Only thrust if the game is over
 				if ( g_fGameOver )
-					return SCHED_VICTORY_DANCE;
+					return SCHED_VICTORY_DANCE;	//Use default victory dance sched
 				else
 				{
-					// Random chance to try and dip-dip-potato-chip
-					if ( random->RandomInt(0,1) )
+					// Random chance to try and dip-dip-potato-chip OR if the guy i just killed was my target
+					if ( random->RandomInt(0,2) == 2 /*|| m_pPissedTarget */ )
 						return SCHED_FAKEBOT_TBAG;
 					else
-						return TranslateSchedule( SCHED_FAKEBOT_IDLE );
+						return TranslateSchedule(SCHED_FAKEBOT_IDLE);
 				}
 			}
 	}
@@ -463,20 +487,63 @@ void CFakeBot::Event_Killed( const CTakeDamageInfo &info )
 {
 	// Tell my buddies theres danger here to avoid
 	if ( info.GetDamageType() & DMG_CRUSH )
-	{
 		CSoundEnt::InsertSound( SOUND_PHYSICS_DANGER, GetAbsOrigin(), 384, 0.5f, this );
-	}
 
-	//!!TODO; This is where we create another fakebot thats just like us, at a info_player point
-#if 0
+	//!!TODO; This is where we create another fakebot, invisible and intangible, 
+	// but otherwise thats just like us, at a info_player point - set to activate
+	// after a small respawn period
+#if FAKEBOT_REAL_RESPAWN
 	if (g_pGameRules->IsMultiplayer())
 	{
 		// respawn player
-		pNewBot->Spawn();
+		CBaseEntity *pSpot;
+
+		pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_start" );
+
+		// If startspot is set, (re)spawn there.
+		if ( g_pGameRules->IsDeathmatch() )
+		{
+			// Randomize the start spot
+			for ( int i = random->RandomInt(1,5); i > 0; i-- )
+				pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_deathmatch" );
+			if ( !pSpot )  // skip over the null point
+				pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_deathmatch" );
+		}
+#if 0
+		else if ( g_pGameRules->IsTeamplay() )
+		{
+			if ( GetTeamNumber() == 2 )
+				pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_combine" );
+			else
+				pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_rebel" );
+		}
+#endif
+
+		// Slam back to default class
+		if ( !pSpot )
+			pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_start" );
+
+		// Create a new fakebot
+		CFakeBot *pNewBot = (CBaseEntity *)CreateEntityByName( "fakebot" );
+		if ( pNewBot )
+		{
+			Vector vecOrigin = pSpot->GetAbsOrigin();
+			QAngle vecAngles = pSpot->GetAbsAngles();
+			pNewBot->SetAbsOrigin( vecOrigin );
+			pNewBot->SetAbsAngles( vecAngles );
+			DispatchSpawn( pNewBot );
+
+			// Effectively disable until respawn timer is up
+			pNewBot->AddSolidFlags( FSOLID_NOT_SOLID );
+			pNewBot->AddEffects( EF_NODRAW );
+			pNewBot->SetMoveType( MOVETYPE_NONE );
+			pNewBot->SetThink( &CFakeBot::Respawn );
+			pNewBot->SetNextThink( g_pGameRules->FlPlayerSpawnTime( this ) );
+		}
 	}
 #endif
 
-	// Let the baseclass kill me
+	// Let the baseclass create a corpse
 	BaseClass::Event_Killed( info );
 }
 
@@ -543,8 +610,7 @@ DEFINE_SCHEDULE
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_CROUCHIDLE"
 	"		TASK_WAIT						0.8"
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"
-	"		TASK_WAIT						0.5"
-	"		TASK_WAIT_RANDOM				1"
+	"		TASK_WAIT_RANDOM				2"
 	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FAKEBOT_IDLE"
 	""
 	"	Interrupts"
@@ -555,6 +621,8 @@ DEFINE_SCHEDULE
 )
 
 // Combat Schedules
+// All these schedules are only for movement/nav, thus they loop until cancelled/interrupted.
+// Aiming and shooting is taken care of by the move-shoot behaviour.
 
 // 3. Retreat - Run backwards while in combat
 DEFINE_SCHEDULE

@@ -363,7 +363,7 @@ void CWeaponAR2::Zoom( void )
 
 	//TODO; This might be good to put in the weaponscript?
 #ifndef CLIENT_DLL
-	color32 ScopeGreen = { 85, 100, 75, 64 };	//100, 225, 150, 32
+	color32 ScopeGreen = { 50, 125, 40, 96 };	//100, 225, 150, 32
 #endif
 
 	if ( m_bZoomed )
@@ -394,6 +394,8 @@ void CWeaponAR2::Zoom( void )
 			WeaponSound(SPECIAL1);
 			pPlayer->SetFOV( this, 35, AR2_ZOOM_RATE );
 			m_bZoomed = true;
+
+			// Darken corners of the screen
 #ifndef CLIENT_DLL
 			UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT) );
 #endif
@@ -438,7 +440,7 @@ bool CWeaponAR2::CanHolster( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Override if we're waiting to release a shot
+// Purpose: Reload mercy
 //-----------------------------------------------------------------------------
 bool CWeaponAR2::Reload( void )
 {

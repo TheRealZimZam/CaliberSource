@@ -7,6 +7,12 @@
 // in source, we need some ((very)) powerful gamerule code that can dynamically change
 // from SP to MP on the fly, and support multiple gamemodes
 // To do this, we inherit from multiplayer, and patch the singleplayer ONTOP of that.
+//
+// NOTENOTE; Usually you would inherit from roundbased_gamerules.h, but we
+// arent doing that here. For caliber, after a match ends, the server restarts completely.
+// This is the old way of doing it, which shouldnt break compatibility with non-mp, or older maps.
+// It also has the plus of keeping performance up, and not having to create a bunch of entities
+// constantly. 
 //=============================================================================//
 
 #ifndef HL2_GAMERULES_H
@@ -26,26 +32,28 @@
 #endif
 
 extern ConVar default_fov;
+#define MAX_GAME_MESSAGE_LENGTH	64	// Max length of a game message (start, end, lts, etc.), smaller the better
 
 enum
 {
 	//! - Already defined in shareddef
 //!	TEAM_UNASSIGNED,
 //!	TEAM_SPECTATOR,
-	TEAM_COMBINE = 2,
-	TEAM_REBELS,
-	TEAM_PMC,
+	TEAM_COMBINE = 2,	//Attack
+	TEAM_REBELS,		//Defence
+	TEAM_PMC,			//For 3rd parties, ie. arena
 };
 
 enum GameMode_t
 {
-	//Gamemodes, deathmatch/ffa is default
-	SINGLEPLAYER,
+	//Gamemodes, for mp deathmatch/ffa is default
+	SINGLEPLAYER = 0,
 	COOP,
 	DEATHMATCH,
 	TDM,
 	OBJECTIVE,
 	FLAG,
+	KOTH,
 	ARENA,
 	LASTMAN,
 	RACE,
@@ -54,58 +62,29 @@ enum GameMode_t
 enum GameModifiers_t
 {
 	//Modifiers (big head, always gib, etc.)
-	BIGHEADS,
-	BLOODYMESS,
-	NOAMMO,
-	NOGUNS,
+	// TODO; These need to be rethought - right now, only one modifier can be active at a time
+	NONE = 0,
+	BIGHEADS,	//Walkin talkin bobbleheads
+	BLOODYMESS,	//Always gib!
+	NOAMMO,	//Ammo pickups replaced with health
+	NOGUNS,	//This is a gun-free area!
 	SHOTGUNSONLY,
 	RAILGUNSONLY,
-	TRIPLEDAMAGE,
+	PISTOLSONLY,
+	TRIPLEDAMAGE,	//Pair this with skill4 and its insta-death
 };
 
-// When restarting a round, dont touch these entities
-static const char *s_PreserveEnts[] =
+enum Holiday_t
 {
-	"ai_network",
-	"ai_hint",
-	"hl2_gamerules",
-	"team_manager",
-	"player_manager",
-	"env_soundscape",
-	"env_soundscape_proxy",
-	"env_soundscape_triggerable",
-	"env_sun",
-	"env_wind",
-	"env_fog_controller",
-	"func_brush",
-	"func_wall",
-	"func_buyzone",
-	"func_illusionary",
-	"infodecal",
-	"info_projecteddecal",
-	"info_node",
-	"info_target",
-	"info_node_hint",
-	"info_player_start",
-	"info_player_deathmatch",
-	"info_player_combine",
-	"info_player_rebel",
-	"info_map_parameters",
-	"keyframe_rope",
-	"move_rope",
-	"info_ladder",
-	"player",
-	"point_viewcontrol",
-	"scene_manager",
-	"shadow_control",
-	"sky_camera",
-	"soundent",
-	"trigger_soundscape",
-	"viewmodel",
-	"predicted_viewmodel",
-	"worldspawn",
-	"point_devshot_camera",
-	"", // END Marker
+	//Holidays to celebrate
+	NORMAL = 0,
+	CHRISTMAS,
+	HALLOWEEN,
+	INDEPENDENCE,
+	VETERANS,
+	FATHERS,
+	MOTHERS,
+	EASTER,
 };
 
 class CHalfLife2Proxy : public CGameRulesProxy
@@ -141,22 +120,36 @@ public:
 	virtual bool			IsDeathmatch( void );	//Also known as FFA
 	virtual bool 			IsCoOp( void );
 
+//	virtual bool InIntermission(){ return m_flIntermissionEndTime > gpGlobals->curtime; }
+
+	// Get the view vectors for this mod.
+	virtual const CViewVectors *GetViewVectors() const;
+
 	// Damage Query Overrides.
 	virtual bool			Damage_IsTimeBased( int iDmgType );
 	virtual int				Damage_GetTimeBased( void );
 
 	virtual bool			ShouldCollide( int collisionGroup0, int collisionGroup1 );
 	virtual bool			ShouldUseRobustRadiusDamage(CBaseEntity *pEntity);
-#ifndef CLIENT_DLL
+#ifdef GAME_DLL
+	// Allow servers to set custom msgs
+	//virtual void SetStartMessage( const char *sMsg ){ Q_strncpy(m_pszStartMessage.GetForModify(), sMsg, sizeof(m_pszStartMessage)); }
+	//virtual void SetCountdownMessage( const char *sMsg ){ Q_strncpy(m_pszCountdownMessage.GetForModify(), sMsg, sizeof(m_pszCountdownMessage)); }
+	//virtual void SetEndMessage( const char *sMsg ){ Q_strncpy(m_pszEndMessage.GetForModify(), sMsg, sizeof(m_pszEndMessage)); }
+
+	virtual int GetGameModifier( void ){ return m_iGameModifier; }
+	virtual void SetGameModifier( int GameModifier ){ m_iGameModifier = GameModifier; }
+
+	virtual int GetHoliday( void ){ return m_iHoliday; }
+
 	virtual bool			AllowAutoTargetCrosshair( void );
 	virtual int				GetAutoAimMode(){ return sk_autoaim_mode.GetInt(); }
 	virtual bool			ShouldAutoAim( CBasePlayer *pPlayer, edict_t *target );
 	virtual float			GetAutoAimScale( CBasePlayer *pPlayer );
 	virtual float			GetAmmoQuantityScale( int iAmmoIndex );
-	virtual void			LevelInitPreEntity();
 #endif
 
-	// MP overrides
+	// Declaring these on the client for posterity
 	bool FAllowNPCs( void );
 	int WeaponShouldRespawn( CBaseCombatWeapon *pWeapon );
 	int ItemShouldRespawn( CItem *pItem );
@@ -169,8 +162,13 @@ private:
 	// Rules change for the mega physgun
 	CNetworkVar( bool, m_bMegaPhysgun );
 
+//	CNetworkString( m_pszStartMessage, MAX_GAME_MESSAGE_LENGTH );		// Message to display on game start
+//	CNetworkString( m_pszCountdownMessage, MAX_GAME_MESSAGE_LENGTH );	// "Hurry up" Message for obj
+//	CNetworkString( m_pszEndMessage, MAX_GAME_MESSAGE_LENGTH );			// Message that displays on game end
+
 	int DefaultFOV( void ) { return 80; }
 
+public:
 #ifdef CLIENT_DLL
 	DECLARE_CLIENTCLASS_NOBASE(); // This makes datatables able to access our private vars.
 
@@ -179,41 +177,56 @@ private:
 	DECLARE_SERVERCLASS_NOBASE(); // This makes datatables able to access our private vars.
 #endif
 
-#ifndef CLIENT_DLL
+#ifdef GAME_DLL
 	virtual void			Think( void );
+	virtual void			LevelInitPreEntity();
 
 	virtual bool			ClientCommand( CBaseEntity *pEdict, const CCommand &args );
+	virtual void			PlayerThink( CBasePlayer *pPlayer );
 	virtual void			PlayerSpawn( CBasePlayer *pPlayer );
 	virtual void			PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info );
-	virtual bool			FPlayerCanRespawn( CBasePlayer *pPlayer );
-	virtual float			FlPlayerSpawnTime( CBasePlayer *pPlayer );
 
-	//!virtual void	SendHudNotification( IRecipientFilter &filter, HudNotification_t iType );
-	virtual void	SendHudNotification( IRecipientFilter &filter, const char *pszText, const char *pszIcon, int iTeam = TEAM_UNASSIGNED );
+	// Respawn everyone regardless of state - for debugging/gamemodes
+	inline void RespawnAllPlayers( void ) { RespawnPlayers( true ); }
+	void RespawnPlayers( bool bForceRespawn, bool bTeam = false, int iTeam = TEAM_UNASSIGNED );
+
+//	virtual void			SendHudNotification( IRecipientFilter &filter, HudNotification_t iType );
+	virtual void			SendHudNotification( IRecipientFilter &filter, const char *pszText, const char *pszIcon, int iTeam = TEAM_UNASSIGNED );
 
 	virtual void			InitDefaultAIRelationships( void );
 	virtual const char*		AIClassText(int classType);
 
 	// Ammo
-	virtual void			PlayerThink( CBasePlayer *pPlayer );
 //	virtual bool			CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pWeapon );
 	virtual float			GetAmmoDamage( CBaseEntity *pAttacker, CBaseEntity *pVictim, int nAmmoType );
 
-	virtual bool			ShouldBurningPropsEmitLight();
 public:
-	bool AllowDamage( CBaseEntity *pVictim, const CTakeDamageInfo &info );
+	bool	AllowDamage( CBaseEntity *pVictim, const CTakeDamageInfo &info );
 	bool	NPC_ShouldDropGrenade( CBasePlayer *pRecipient );
 	bool	NPC_ShouldDropHealth( CBasePlayer *pRecipient );
 	void	NPC_DroppedHealth( void );
 	void	NPC_DroppedGrenade( void );
 	bool	MegaPhyscannonActive( void ) { return m_bMegaPhysgun;	}
 
-	virtual bool IsAlyxInDarknessMode();
+	virtual bool	FPlayerCanRespawn( CBasePlayer *pPlayer );
+	virtual float	FlPlayerSpawnTime( CBasePlayer *pPlayer );
+
+	virtual bool	IsAlyxInDarknessMode();
+	virtual bool	ShouldBurningPropsEmitLight();
+	
+	// Killed in a funny way (flaregun, pushing, etc.)
+//	virtual void	PlayerHumiliated( CBasePlayer *pPlayer );
+	// Dominating this guy
+//	virtual void	PlayerDominated( CBasePlayer *pVictim, CBasePlayer *pKiller );
 
 private:
-
 	float	m_flLastHealthDropTime;
 	float	m_flLastGrenadeDropTime;
+
+	int		m_iGameModifier;
+	int		m_iHoliday;	//What holiday is it today? Internally set, use GetHoliday().
+
+	bool	m_bHumiliation;	//Somebody just got humiliated, point and laugh
 
 	void AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo );
 	float AdjustPlayerDamageInflicted( float damage );

@@ -1,9 +1,9 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Magazine-fed auto shotgun used by soldiers.
+// Purpose: Double barrel DOOMGun.
 //
 //			Primary attack: single barrel shot
-//			Secondary attack: change ammo
+//			Secondary attack: Two barrel shot
 //
 //=============================================================================//
 
@@ -28,24 +28,19 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define VECTOR_CONE_SUPERSHOTGUN		Vector( 0.12206, 0.12206, 0.11334 )
-#define SUPERSHOTGUN_KICKBACK			2	// Base kickback
+#define VECTOR_CONE_DOUBLESHOTGUN		Vector( 0.12206, 0.12206, 0.11334 )
+#define DOUBLESHOTGUN_KICKBACK			2.5	// Base kickback
 
-#ifndef CLIENT_DLL
-ConVar sk_weapon_supershotgun_lerp( "sk_weapon_supershotgun_lerp", "5.0" );
-#endif
-
-extern ConVar sk_auto_reload_time;
 extern ConVar sk_plr_num_shotgun_pellets;
 extern ConVar sk_npc_num_shotgun_pellets;
 extern ConVar sv_funmode;
 
 #ifdef CLIENT_DLL
-#define CWeaponSuperShotgun C_WeaponSuperShotgun
+#define CWeaponDoubleShotgun C_WeaponSuperShotgun
 #endif
-class CWeaponSuperShotgun : public CBaseHLCombatWeapon
+class CWeaponDoubleShotgun : public CBaseHLCombatWeapon
 {
-	DECLARE_CLASS( CWeaponSuperShotgun, CBaseHLCombatWeapon );
+	DECLARE_CLASS( CWeaponDoubleShotgun, CBaseHLCombatWeapon );
 public:
 
 	DECLARE_NETWORKCLASS(); 
@@ -56,7 +51,7 @@ public:
 	virtual const Vector& GetBulletSpread( void )
 	{
 		static Vector AllyCone = VECTOR_CONE_4DEGREES;
-		static Vector cone = VECTOR_CONE_SUPERSHOTGUN;
+		static Vector cone = VECTOR_CONE_DOUBLESHOTGUN;
 
 		if ( GetHSpread() != NULL )
 		{
@@ -83,7 +78,6 @@ public:
 	bool	Reload( void );
 //	void	WeaponIdle( void );
 	void	ItemPostFrame( void );
-	void	ItemHolsterFrame( void );
 	void	PrimaryAttack( void );
 	void	SecondaryAttack( void );
 
@@ -102,40 +96,24 @@ public:
 
 	DECLARE_ACTTABLE();
 
-	CWeaponSuperShotgun( void );
+	CWeaponDoubleShotgun( void );
 
-private:
-	CNetworkVar( float, m_flLastAttackTime );
-	CNetworkVar( int, m_nNumShotsFired );
-	CNetworkVar( bool, m_bLastfire );
 };
 
-IMPLEMENT_NETWORKCLASS_ALIASED( WeaponSuperShotgun, DT_WeaponSuperShotgun )
+IMPLEMENT_NETWORKCLASS_ALIASED( WeaponDoubleShotgun, DT_WeaponDoubleShotgun )
 
-BEGIN_NETWORK_TABLE( CWeaponSuperShotgun, DT_WeaponSuperShotgun )
-#ifdef CLIENT_DLL
-	RecvPropFloat( RECVINFO( m_flLastAttackTime ) ),
-	RecvPropInt( RECVINFO( m_nNumShotsFired ) ),
-	RecvPropBool( RECVINFO( m_bLastfire ) ),
-#else
-	SendPropFloat( SENDINFO( m_flLastAttackTime ) ),
-	SendPropInt( SENDINFO( m_nNumShotsFired ) ),
-	SendPropBool( SENDINFO( m_bLastfire ) ),
-#endif
+BEGIN_NETWORK_TABLE( CWeaponDoubleShotgun, DT_WeaponSuperShotgun )
 END_NETWORK_TABLE()
 
 #ifdef CLIENT_DLL
-BEGIN_PREDICTION_DATA( CWeaponSuperShotgun )
-	DEFINE_PRED_FIELD( m_flLastAttackTime, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
-	DEFINE_PRED_FIELD( m_nNumShotsFired, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
-	DEFINE_PRED_FIELD( m_bLastfire, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+BEGIN_PREDICTION_DATA( CWeaponDoubleShotgun )
 END_PREDICTION_DATA()
 #endif
 
-LINK_ENTITY_TO_CLASS( weapon_supershotgun, CWeaponSuperShotgun );
-PRECACHE_WEAPON_REGISTER( weapon_supershotgun );
+LINK_ENTITY_TO_CLASS( weapon_doubleshotgun, CWeaponDoubleShotgun );
+PRECACHE_WEAPON_REGISTER( weapon_doubleshotgun );
 
-acttable_t	CWeaponSuperShotgun::m_acttable[] = 
+acttable_t	CWeaponDoubleShotgun::m_acttable[] = 
 {
 	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_SHOTGUN,			true },		//ACT_RANGE_ATTACK_SUPERSHOTGUN
 	{ ACT_RELOAD,					ACT_RELOAD_SMG1,					false },	// FIXME: hook to shotgun unique
@@ -148,33 +126,6 @@ acttable_t	CWeaponSuperShotgun::m_acttable[] =
 	{ ACT_RUN_AIM,					ACT_RUN_AIM_SHOTGUN,				true },
 	{ ACT_SPRINT,					ACT_RUN_RIFLE_STIMULATED,			true },
 
-// Readiness activities (not aiming)
-	{ ACT_IDLE_RELAXED,				ACT_IDLE_SHOTGUN_RELAXED,		false },//never aims
-	{ ACT_IDLE_STIMULATED,			ACT_IDLE_SHOTGUN_STIMULATED,	false },
-	{ ACT_IDLE_AGITATED,			ACT_IDLE_SHOTGUN_AGITATED,		false },//always aims
-
-	{ ACT_WALK_RELAXED,				ACT_WALK_RIFLE_RELAXED,			false },//never aims
-	{ ACT_WALK_STIMULATED,			ACT_WALK_RIFLE_STIMULATED,		false },
-	{ ACT_WALK_AGITATED,			ACT_WALK_AIM_SHOTGUN,			false },//always aims
-
-	{ ACT_RUN_RELAXED,				ACT_RUN_RIFLE_RELAXED,			false },//never aims
-	{ ACT_RUN_STIMULATED,			ACT_RUN_RIFLE_STIMULATED,		false },
-	{ ACT_RUN_AGITATED,				ACT_RUN_AIM_SHOTGUN,			false },//always aims
-
-// Readiness activities (aiming)
-	{ ACT_IDLE_AIM_RELAXED,			ACT_IDLE_SHOTGUN_RELAXED,		false },//never aims	
-	{ ACT_IDLE_AIM_STIMULATED,		ACT_IDLE_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_IDLE_AIM_AGITATED,		ACT_IDLE_ANGRY_SHOTGUN,			false },//always aims
-
-	{ ACT_WALK_AIM_RELAXED,			ACT_WALK_RIFLE_RELAXED,			false },//never aims
-	{ ACT_WALK_AIM_STIMULATED,		ACT_WALK_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_WALK_AIM_AGITATED,		ACT_WALK_AIM_SHOTGUN,			false },//always aims
-
-	{ ACT_RUN_AIM_RELAXED,			ACT_RUN_RIFLE_RELAXED,			false },//never aims
-	{ ACT_RUN_AIM_STIMULATED,		ACT_RUN_AIM_RIFLE_STIMULATED,	false },
-	{ ACT_RUN_AIM_AGITATED,			ACT_RUN_AIM_SHOTGUN,			false },//always aims
-//End readiness activities
-
 	{ ACT_WALK_CROUCH,				ACT_WALK_CROUCH_RIFLE,				true },
 	{ ACT_WALK_CROUCH_AIM,			ACT_WALK_CROUCH_AIM_RIFLE,			true },
 	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RIFLE,				true },
@@ -185,34 +136,27 @@ acttable_t	CWeaponSuperShotgun::m_acttable[] =
 	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_SMG1,			false },
 };
 
-IMPLEMENT_ACTTABLE(CWeaponSuperShotgun);
+IMPLEMENT_ACTTABLE(CWeaponDoubleShotgun);
 
-void CWeaponSuperShotgun::Precache( void )
+void CWeaponDoubleShotgun::Precache( void )
 {
 	CBaseCombatWeapon::Precache();
 
-	PrecacheScriptSound( "Weapon_SuperShotgun.Lastfire" );
+	PrecacheScriptSound( "Weapon_DOOMShotgun.Open" );
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
-CWeaponSuperShotgun::CWeaponSuperShotgun( void )
+CWeaponDoubleShotgun::CWeaponDoubleShotgun( void )
 {
 	m_bReloadsSingly	= false;
 	m_bUsingSecondaryAmmo = false;
 	if ( sv_funmode.GetBool() )
-	{
-		m_bReloadsFullClip	= true;
-		m_bCanJam			= true;	//Its a prototype after all...
-	}
+		m_bCanJam			= true;
 
 	m_fMinRange1		= 0.0;
 	m_fMaxRange1		= 768;
-	
-	m_nNumShotsFired = 0;
-	m_bLastfire = false;
-	m_flLastAttackTime = gpGlobals->curtime;
 }
 
 //-----------------------------------------------------------------------------
@@ -220,42 +164,33 @@ CWeaponSuperShotgun::CWeaponSuperShotgun( void )
 // Input  : &tr - 
 //			nDamageType - 
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::DoImpactEffect( trace_t &tr, int nDamageType )
+void CWeaponDoubleShotgun::DoImpactEffect( trace_t &tr, int nDamageType )
 {
-	if ( m_bUsingSecondaryAmmo )
-	{
-		//Using ar2 effects for now
-		CEffectData data;
-		data.m_vOrigin = tr.endpos + ( tr.plane.normal * 1.0f );
-		data.m_vNormal = tr.plane.normal;
-		DispatchEffect( "AR2Impact", data );
-	}
+	// Make a DOOM style sprite
+	CEffectData data;
+	data.m_vOrigin = tr.endpos + ( tr.plane.normal * 1.0f );
+	data.m_vNormal = tr.plane.normal;
+	DispatchEffect( "AR2Impact", data );
 
 	BaseClass::DoImpactEffect( tr, nDamageType );
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Time between successive shots in a burst. Also returned for EP2
-//			with an eye to not messing up Alyx in EP1.
+// Purpose:
 //-----------------------------------------------------------------------------
-float CWeaponSuperShotgun::GetFireRate()
+float CWeaponDoubleShotgun::GetFireRate()
 {
-	if ( GetOwner() && GetOwner()->IsNPC() )
-	{
-		// NPC value
-		return BaseClass::GetCycleTime() * 1.25;
-	}
-
-	return BaseClass::GetCycleTime();
+	return 0.1f;
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Reload mercy
+// Purpose: Reload one shell
 //-----------------------------------------------------------------------------
-bool CWeaponSuperShotgun::Reload( void )
+bool CWeaponDoubleShotgun::Reload( void )
 {
 	int iActivity = ACT_VM_RELOAD;
-	if ( m_iClip1 > 1 )
+	// If theres a shell in the gun, only put in one shell
+	if ( m_iClip1 == 1 )
 	{
 		// SLIGHTLY Shorter reload
 		iActivity = ACT_VM_RELOAD2;
@@ -267,15 +202,13 @@ bool CWeaponSuperShotgun::Reload( void )
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::PrimaryAttack( void )
+void CWeaponDoubleShotgun::PrimaryAttack( void )
 {
 	// Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 
 	if ( !pPlayer )
-	{
 		return;
-	}
 
 	if ( m_iClip1 <= 0 )
 	{
@@ -299,12 +232,6 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 	m_flLastAttackTime = gpGlobals->curtime + SequenceDuration();
 	m_iClip1--;
 
-	// Last round in the clip, clang after next shot
-	if ( m_iClip1 == 1 )
-	{
-		m_bLastfire = true;
-	}
-
 	Vector	vecSrc		= pPlayer->Weapon_ShootPosition( );
 	Vector	vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
 
@@ -326,13 +253,13 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 
 	//Disorient the player
-	Vector	recoilForce = pPlayer->BodyDirection2D() * -( SUPERSHOTGUN_KICKBACK + (sk_plr_num_shotgun_pellets.GetInt() * m_nNumShotsFired) );
+	Vector	recoilForce = pPlayer->BodyDirection2D() * -( DOUBLESHOTGUN_KICKBACK + (sk_plr_num_shotgun_pellets.GetInt() * m_nNumShotsFired) );
 	recoilForce[2] += 96.0f;
 	pPlayer->ApplyAbsVelocityImpulse( recoilForce );
 #endif
 
 	//Disorient the player
-	pPlayer->ViewPunch( QAngle( random->RandomFloat( -SUPERSHOTGUN_KICKBACK - m_nNumShotsFired, -1 ), random->RandomFloat( -SUPERSHOTGUN_KICKBACK - m_nNumShotsFired, SUPERSHOTGUN_KICKBACK + m_nNumShotsFired ), 0 ) );
+	pPlayer->ViewPunch( QAngle( random->RandomFloat( -DOUBLESHOTGUN_KICKBACK - m_nNumShotsFired, -1 ), random->RandomFloat( -DOUBLESHOTGUN_KICKBACK - m_nNumShotsFired, DOUBLESHOTGUN_KICKBACK + m_nNumShotsFired ), 0 ) );
 
 	if (!m_iClip1 && pPlayer->GetAmmoCount(GetActiveAmmoType()) <= 0)
 	{
@@ -344,7 +271,7 @@ void CWeaponSuperShotgun::PrimaryAttack( void )
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-Activity CWeaponSuperShotgun::GetPrimaryAttackActivity( void )
+Activity CWeaponDoubleShotgun::GetPrimaryAttackActivity( void )
 {
 	if ( m_nNumShotsFired <= 1 )
 		return ACT_VM_PRIMARYATTACK;
@@ -361,18 +288,76 @@ Activity CWeaponSuperShotgun::GetPrimaryAttackActivity( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Stab
+// Purpose: Double fire
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::SecondaryAttack( void )
+void CWeaponDoubleShotgun::SecondaryAttack( void )
 {
 	// Only the player fires this way so we can cast
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
-	if ( !pOwner )
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+
+	if (!pPlayer)
 		return;
 
-	pOwner->m_flNextAttack = gpGlobals->curtime + 1;
-	SwitchAmmoType();
-	WeaponSound( SPECIAL2 );
+	if ( m_iClip1 <= 1 )
+	{
+		DryFire();
+		return;
+	}
+
+	pPlayer->m_nButtons &= ~IN_ATTACK2;
+	// MUST call sound before removing a round from the clip of a CMachineGun
+	WeaponSound(WPN_DOUBLE);
+
+	//TODO; Do two muzzle flashes OR put some new logic in the fire effect
+	pPlayer->DoMuzzleFlash();
+
+	// player "shoot" animation
+	SendWeaponAnim( ACT_VM_SECONDARYATTACK );
+	pPlayer->SetAnimation( PLAYER_ATTACK1 );
+
+	// Don't fire again until fire animation has completed
+	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+	m_iClip1 -= 2;	// Shotgun uses same clip for primary and secondary attacks
+
+	Vector vecSrc	 = pPlayer->Weapon_ShootPosition();
+	Vector vecAiming = pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
+
+	// Fire the bullets, and force the first shot to be perfectly accuracy
+	int NumPellets = sk_plr_num_shotgun_pellets.GetInt() * 2;
+	FireBulletsInfo_t info;
+	info.m_iShots = NumPellets;
+	info.m_vecSrc = vecSrc;
+	info.m_vecDirShooting = vecAiming;
+	info.m_vecSpread = GetBulletSpread();
+	info.m_flDistance = MAX_TRACE_LENGTH;
+	info.m_iAmmoType = GetActiveAmmoType();
+	info.m_iTracerFreq = 2;
+	pPlayer->FireBullets( info );
+
+	pPlayer->ViewPunch( QAngle( -(NumPellets/2), random->RandomFloat( -(SHOTGUN_KICKBACK + 1), (SHOTGUN_KICKBACK + 1) ), 0 ) );
+#ifndef CLIENT_DLL
+	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 1.0 );
+	pPlayer->SetAimTime( 4.0f );
+
+	//Disorient the player
+	Vector	recoilForce = pPlayer->BodyDirection3D() * -( NumPellets * 5.0f );
+	recoilForce[2] += 128.0f;
+	pPlayer->ApplyAbsVelocityImpulse( recoilForce );
+
+	if ( pPlayer->GetHealth() > 2 )
+		pPlayer->TakeDamage( CTakeDamageInfo( this, this, 1, DMG_CLUB ) );
+#endif
+
+	if (!m_iClip1 && pPlayer->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
+	{
+		// HEV suit - indicate out of ammo condition
+		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
+	}
+
+#ifndef CLIENT_DLL
+	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, GetAbsOrigin(), SOUNDENT_VOLUME_SHOTGUN, 0.2 );
+	gamestats->Event_WeaponFired( pPlayer, false, GetClassname() );
+#endif
 
 	m_iSecondaryAttacks++;
 }
@@ -380,56 +365,9 @@ void CWeaponSuperShotgun::SecondaryAttack( void )
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::ItemPostFrame( void )
+void CWeaponDoubleShotgun::ItemPostFrame( void )
 {
-	// Clang
-	if ( m_bLastfire )
-	{
-		CPASAttenuationFilter filter( GetOwner() );
-		EmitSound( filter, GetOwner()->entindex(), "Weapon_SuperShotgun.Lastfire" ); 
-
-		m_bLastfire = false;
-	}
-
-	// Reset to default kick
-	if ( ( gpGlobals->curtime - m_flLastAttackTime ) > 0.5f )
-	{
-		m_nNumShotsFired = 0;
-	}
-
 	BaseClass::ItemPostFrame();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::ItemHolsterFrame( void )
-{
-	// Must be player held
-	if ( GetOwner() && GetOwner()->IsPlayer() == false )
-		return;
-
-	// We can't be active
-	if ( GetOwner()->GetActiveWeapon() == this )
-		return;
-
-	if ( ( gpGlobals->curtime - m_flHolsterTime ) > sk_auto_reload_time.GetFloat() )
-	{
-		// Reset the timer
-		m_flHolsterTime = gpGlobals->curtime;
-	
-		if ( GetOwner() == NULL )
-			return;
-
-		if ( m_iClip1 == GetMaxClip1() )
-			return;
-
-		// Just load the clip with no animations
-		int ammoFill = min( (GetMaxClip1() - m_iClip1), GetOwner()->GetAmmoCount( GetPrimaryAmmoType() ) );
-		
-		GetOwner()->RemoveAmmo( ammoFill, GetPrimaryAmmoType() );
-		m_iClip1 += ammoFill;
-	}
 }
 
 
@@ -437,7 +375,7 @@ void CWeaponSuperShotgun::ItemHolsterFrame( void )
 // Purpose: 
 //==================================================
 #if 0
-void CWeaponSuperShotgun::WeaponIdle( void )
+void CWeaponDoubleShotgun::WeaponIdle( void )
 {
 	//Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = GetOwner()
@@ -459,38 +397,24 @@ void CWeaponSuperShotgun::WeaponIdle( void )
 
 #ifndef CLIENT_DLL
 //-----------------------------------------------------------------------------
-// Purpose: Cops and gangsters use shot regulator, not conscripts. Conscripts lose accuracy instead.
-// Input  :
-// Output :
+// Purpose:
 //-----------------------------------------------------------------------------
-float CWeaponSuperShotgun::GetMinRestTime()
+float CWeaponDoubleShotgun::GetMinRestTime()
 {
-	Class_T OwnerClass = GetOwner()->Classify();
-
-	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
-		 OwnerClass == CLASS_METROPOLICE	)
-		 return 0.9f;
-
-	return 0.6f;
+	return 0.2f;
 }
 
 //-----------------------------------------------------------------------------
-float CWeaponSuperShotgun::GetMaxRestTime()
+float CWeaponDoubleShotgun::GetMaxRestTime()
 {
-	Class_T OwnerClass = GetOwner()->Classify();
-
-	if ( OwnerClass == CLASS_CITIZEN_PASSIVE	||
-		 OwnerClass == CLASS_METROPOLICE	)
-		 return 1.2f;
-
-	return 0.9f;
+	return 0.5f;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : *pOperator - 
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles )
+void CWeaponDoubleShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, bool bUseWeaponAngles )
 {
 	Vector vecShootOrigin, vecShootDir;
 	CAI_BaseNPC *npc = pOperator->MyNPCPointer();
@@ -498,12 +422,6 @@ void CWeaponSuperShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator,
 	WeaponSound( SINGLE_NPC );
 	pOperator->DoMuzzleFlash();
 	m_iClip1 = m_iClip1 - 1;
-
-	// Last round in the clip, clang after next shot
-	if ( m_iClip1 <= 1 )
-	{
-		m_bLastfire = true;
-	}
 
 	if ( bUseWeaponAngles )
 	{
@@ -524,7 +442,7 @@ void CWeaponSuperShotgun::FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator,
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
+void CWeaponDoubleShotgun::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool bSecondary )
 {
 	// Ensure we have enough rounds in the clip
 	m_iClip1++;
@@ -535,7 +453,7 @@ void CWeaponSuperShotgun::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
+void CWeaponDoubleShotgun::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
 {
 	switch( pEvent->event )
 	{

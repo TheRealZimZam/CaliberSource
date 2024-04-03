@@ -121,7 +121,8 @@ int CWeaponStab::WeaponMeleeAttack1Condition( float flDot, float flDist )
 	Vector vecDelta;
 	VectorSubtract( vecExtrapolatedPos, pNPC->WorldSpaceCenter(), vecDelta );
 
-	if ( fabs( vecDelta.z ) > 70 )
+	// Check if hes under or ontop of me
+	if ( fabs( vecDelta.z ) > (GetRange()+10) )
 	{
 		return COND_TOO_FAR_TO_ATTACK;
 	}
@@ -129,7 +130,7 @@ int CWeaponStab::WeaponMeleeAttack1Condition( float flDot, float flDist )
 	Vector vecForward = pNPC->BodyDirection2D( );
 	vecDelta.z = 0.0f;
 	float flExtrapolatedDist = Vector2DNormalize( vecDelta.AsVector2D() );
-	if ((flDist > 64) && (flExtrapolatedDist > 64))
+	if ((flDist > GetRange()) && (flExtrapolatedDist > GetRange()))
 	{
 		return COND_TOO_FAR_TO_ATTACK;
 	}

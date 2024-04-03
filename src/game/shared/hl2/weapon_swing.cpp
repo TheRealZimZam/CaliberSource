@@ -84,8 +84,8 @@ void CWeaponSwing::AddViewKick( void )
 
 	QAngle punchAng;
 
-	punchAng.x = random->RandomFloat( 1.0f, 2.0f );
-	punchAng.y = random->RandomFloat( -2.0f, -1.0f );
+	punchAng.x = random->RandomFloat( 2.0f, 3.0f );
+	punchAng.y = random->RandomFloat( -3.0f, -2.0f );
 	punchAng.z = 0.0f;
 	
 	pPlayer->ViewPunch( punchAng ); 
@@ -121,7 +121,8 @@ int CWeaponSwing::WeaponMeleeAttack1Condition( float flDot, float flDist )
 	Vector vecDelta;
 	VectorSubtract( vecExtrapolatedPos, pNPC->WorldSpaceCenter(), vecDelta );
 
-	if ( fabs( vecDelta.z ) > 70 )
+	// Check if hes under or ontop of me
+	if ( fabs( vecDelta.z ) > (GetRange()+10) )
 	{
 		return COND_TOO_FAR_TO_ATTACK;
 	}
@@ -129,7 +130,7 @@ int CWeaponSwing::WeaponMeleeAttack1Condition( float flDot, float flDist )
 	Vector vecForward = pNPC->BodyDirection2D( );
 	vecDelta.z = 0.0f;
 	float flExtrapolatedDist = Vector2DNormalize( vecDelta.AsVector2D() );
-	if ((flDist > 64) && (flExtrapolatedDist > 64))
+	if ((flDist > GetRange()) && (flExtrapolatedDist > GetRange()))
 	{
 		return COND_TOO_FAR_TO_ATTACK;
 	}

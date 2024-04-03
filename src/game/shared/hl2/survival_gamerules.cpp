@@ -1,3 +1,9 @@
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ====
+//
+// Purpose: Game rules for Caliber Wave Defence Mode
+//
+//=============================================================================
+
 #include "cbase.h"
 
 #ifdef HL2_EPISODIC
@@ -9,18 +15,18 @@
 #include <KeyValues.h>
 
 #ifdef CLIENT_DLL
-
+	#include "c_basehlplayer.h"
 #else
-#include "player.h"
-#include "game.h"
-#include "gamerules.h"
-#include "teamplay_gamerules.h"
-#include "hl2_player.h"
-#include "voice_gamemgr.h"
-#include "globalstate.h"
-#include "ai_basenpc.h"
-#include "weapon_physcannon.h"
-#include "ammodef.h"
+	#include "player.h"
+	#include "game.h"
+	#include "gamerules.h"
+	#include "items.h"
+	#include "team.h"
+	#include "hl2_player.h"
+	#include "voice_gamemgr.h"
+	#include "globalstate.h"
+	#include "ai_basenpc.h"
+	#include "weapon_physcannon.h"
 #endif
 
 #ifdef CLIENT_DLL

@@ -528,7 +528,7 @@ CWeaponSniperRifle::CWeaponSniperRifle( )
 {
 	m_bReloadsSingly = true;
 	m_bBoltAction = true;
-	m_bUseProjectile = false;
+	m_bUseProjectile = false;	//TODO; True when it works
 
 	m_fMinRange1		= 64;
 	m_fMaxRange1		= 2048;

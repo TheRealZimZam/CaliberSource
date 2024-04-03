@@ -39,6 +39,7 @@ public:
 	void	SecondaryAttack( void );
 
 	const char *GetTracerType( void ) { return "AR2Tracer"; }
+	void	DoImpactEffect( trace_t &tr, int nDamageType );
 
 	void	AddViewKick( void );
 
@@ -70,8 +71,6 @@ public:
 	bool	Reload( void );
 
 	Activity	GetPrimaryAttackActivity( void );
-	
-	void	DoImpactEffect( trace_t &tr, int nDamageType );
 
 	virtual const Vector& GetBulletSpread( void )
 	{

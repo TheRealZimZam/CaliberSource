@@ -9,6 +9,16 @@
 // in source, we need some ((very)) powerful gamerule code that can dynamically change
 // from SP to MP on the fly, and support multiple gamemodes
 // To do this, we inherit from multiplayer, and patch the singleplayer ONTOP of that.
+//
+// NOTENOTE; Usually you would inherit from roundbased_gamerules.h, but we
+// arent doing that here. For caliber, after a match ends, the server restarts completely.
+// This is the old way of doing it, which shouldnt break compatibility with non-mp, or older maps.
+// It also has the plus of keeping performance up, and not having to recreate a bunch of entities
+// constantly. 
+//
+// TODO; This is a dirty as hell file, with #ifdefs all over the place, eventually, 
+// that shit needs to be sorted out and organized. Keep all the shared stuff at the top,
+// then sort one section into the client and the other into the server. -MM
 //=============================================================================
 
 #include "cbase.h"
@@ -36,6 +46,48 @@
 #include "tier0/memdbgon.h"
 
 
+//-----------------------------------------------------------------------------
+// Player hull & eye position for standing, ducking, etc.  This version has a taller
+// player height, but goldsrc-compatible collision bounds.
+//-----------------------------------------------------------------------------
+static CViewVectors g_HL2ViewVectors(
+	// Default vectors for reference
+	/*
+	Vector( 0, 0, 64 ),			//VEC_VIEW (m_vView)
+						
+	Vector(-16, -16, 0 ),		//VEC_HULL_MIN (m_vHullMin)
+	Vector( 16,  16,  72 ),		//VEC_HULL_MAX (m_vHullMax)
+											
+	Vector(-16, -16, 0 ),		//VEC_DUCK_HULL_MIN (m_vDuckHullMin)
+	Vector( 16,  16,  36 ),		//VEC_DUCK_HULL_MAX	(m_vDuckHullMax)
+	Vector( 0, 0, 30 ),			//VEC_DUCK_VIEW		(m_vDuckView)
+											
+	Vector(-10, -10, -10 ),		//VEC_OBS_HULL_MIN	(m_vObsHullMin)
+	Vector( 10,  10,  10 ),		//VEC_OBS_HULL_MAX	(m_vObsHullMax)
+											
+	Vector( 0, 0, 14 )			//VEC_DEAD_VIEWHEIGHT (m_vDeadViewHeight)
+	*/
+
+	Vector( 0, 0, 65 ),			//VEC_VIEW (m_vView) eye position
+
+	Vector(-16, -16, 0 ),		//VEC_HULL_MIN (m_vHullMin) hull min
+	Vector( 16,  16, 72 ),		//VEC_HULL_MAX (m_vHullMax) hull max
+
+	Vector(-16, -16, 0 ),		//VEC_DUCK_HULL_MIN (m_vDuckHullMin) duck hull min
+	Vector( 16,  16, 38 ),		//VEC_DUCK_HULL_MAX	(m_vDuckHullMax) duck hull max
+	Vector( 0, 0, 34 ),			//VEC_DUCK_VIEW		(m_vDuckView) duck view
+
+	Vector( -10, -10, -10 ),	//VEC_OBS_HULL_MIN	(m_vObsHullMin) observer hull min
+	Vector(  10,  10,  10 ),	//VEC_OBS_HULL_MAX	(m_vObsHullMax) observer hull max
+
+	Vector( 0, 0, 14 )			//VEC_DEAD_VIEWHEIGHT (m_vDeadViewHeight) dead view height
+);
+
+const CViewVectors *CHalfLife2::GetViewVectors() const
+{
+	return &g_HL2ViewVectors;
+}
+
 REGISTER_GAMERULES_CLASS( CHalfLife2 );
 
 BEGIN_NETWORK_TABLE_NOBASE( CHalfLife2, DT_HL2GameRules )
@@ -43,10 +95,18 @@ BEGIN_NETWORK_TABLE_NOBASE( CHalfLife2, DT_HL2GameRules )
 		RecvPropInt( RECVINFO( m_iGameMode ) ),
 		RecvPropBool( RECVINFO( m_bTeamPlayEnabled ) ),
 		RecvPropBool( RECVINFO( m_bMegaPhysgun ) ),
+
+//		RecvPropString( RECVINFO( m_pszStartMessage ) ),
+//		RecvPropString( RECVINFO( m_pszCountdownMessage ) ),
+//		RecvPropString( RECVINFO( m_pszEndMessage ) ),
 	#else
 		SendPropInt( SENDINFO( m_iGameMode ) ),
 		SendPropBool( SENDINFO( m_bTeamPlayEnabled ) ),
 		SendPropBool( SENDINFO( m_bMegaPhysgun ) ),
+
+//		SendPropString( SENDINFO( m_pszStartMessage ) ),
+//		SendPropString( SENDINFO( m_pszCountdownMessage ) ),
+//		SendPropString( SENDINFO( m_pszEndMessage ) ),
 	#endif
 END_NETWORK_TABLE()
 
@@ -134,7 +194,8 @@ ConVar	r_burningproplight( "r_burningproplight","0", FCVAR_REPLICATED );
 #ifdef GAME_DLL
 ConVar sv_hl2mp_weapon_respawn_time( "sv_hl2mp_weapon_respawn_time", "30", FCVAR_GAMEDLL | FCVAR_NOTIFY );	//FCVAR_GAMEDLL
 ConVar sv_hl2mp_item_respawn_time( "sv_hl2mp_item_respawn_time", "20", FCVAR_GAMEDLL | FCVAR_NOTIFY );	//FCVAR_GAMEDLL
-ConVar sv_hl2mp_player_respawn_time( "sv_hl2mp_player_respawn_time", "10", FCVAR_GAMEDLL | FCVAR_NOTIFY );	//FCVAR_GAMEDLL
+ConVar sv_hl2mp_player_respawn_time( "sv_hl2mp_player_respawn_time", "5", FCVAR_GAMEDLL | FCVAR_NOTIFY, "Base respawn time." );	//FCVAR_GAMEDLL
+ConVar sv_hl2mp_player_respawn_addtime( "sv_hl2mp_player_respawn_addtime", "5", FCVAR_GAMEDLL | FCVAR_NOTIFY, "The max amount of time that can be added onto the base respawn time." );	//FCVAR_GAMEDLL
 ConVar sv_hl2mp_dead_player_tripmines( "sv_hl2mp_dead_player_tripmines", "0", FCVAR_GAMEDLL, "Can dead players have active tripmines?" );	//FCVAR_GAMEDLL
 #endif
 
@@ -167,9 +228,7 @@ ConVar	sk_ammo_qty_scale3( "sk_ammo_qty_scale3", "1.00", FCVAR_REPLICATED );
 // "Nightmare"
 ConVar	sk_ammo_qty_scale4( "sk_ammo_qty_scale4", "0.85", FCVAR_REPLICATED );
 
-ConVar	sk_plr_health_drop_time		( "sk_plr_health_drop_time", "30", FCVAR_REPLICATED );
-ConVar	sk_plr_grenade_drop_time	( "sk_plr_grenade_drop_time", "30", FCVAR_REPLICATED );
-
+// Weapon CVARS
 ConVar	sk_plr_dmg_ar2			( "sk_plr_dmg_ar2","0", FCVAR_REPLICATED );
 ConVar	sk_npc_dmg_ar2			( "sk_npc_dmg_ar2","0", FCVAR_REPLICATED);
 ConVar	sk_max_ar2				( "sk_max_ar2","0", FCVAR_REPLICATED);
@@ -266,13 +325,21 @@ ConVar	sk_npc_dmg_gunship_to_plr	( "sk_npc_dmg_gunship_to_plr", "0", FCVAR_REPLI
 ConVar	sk_npc_dmg_strider			( "sk_npc_dmg_strider", "0", FCVAR_REPLICATED );
 ConVar	sk_npc_dmg_strider_to_plr	( "sk_npc_dmg_strider_to_plr", "0", FCVAR_REPLICATED );
 
+// Misc. Gameplay
+ConVar	sk_plr_health_drop_time		( "sk_plr_health_drop_time", "30", FCVAR_REPLICATED );
+ConVar	sk_plr_grenade_drop_time	( "sk_plr_grenade_drop_time", "30", FCVAR_REPLICATED );
+
+ConVar	sk_default_freeze_rate		( "sk_default_freeze_rate","0.1", FCVAR_REPLICATED);
+ConVar	sk_default_thaw_rate		( "sk_default_thaw_rate","0.05", FCVAR_REPLICATED);
+
 // NOTE: the indices here must match TEAM_TERRORIST, TEAM_CT, TEAM_SPECTATOR, etc.
 char *sTeamNames[] =
 {
 	"Unassigned",
 	"Spectator",
-	"Combine",
-	"Rebels",
+	"Cops",
+	"Robbers",
+	"Mercenaries",
 };
 
 CHalfLife2::CHalfLife2()
@@ -280,7 +347,13 @@ CHalfLife2::CHalfLife2()
 #ifndef CLIENT_DLL
 	m_bTeamPlayEnabled = teamplay.GetBool();
 	m_iGameMode = 0;
+	m_iGameModifier = 0;
 	m_bMegaPhysgun = false;
+
+	// Default messages
+//	m_pszStartMessage.GetForModify() =			"Get Fragging!";
+//	m_pszCountdownMessage.GetForModify() =		"Hurry Up!";
+//	m_pszEndMessage.GetForModify() =			"Game Over Man!";
 
 	if ( IsTeamplay() )
 	{
@@ -346,6 +419,8 @@ CHalfLife2::CHalfLife2()
 
 	m_flLastHealthDropTime = 0.0f;
 	m_flLastGrenadeDropTime = 0.0f;
+	
+	m_bHumiliation = false;
 
 #endif
 }
@@ -407,13 +482,14 @@ bool CHalfLife2::IsDeathmatch( void )
 
 bool CHalfLife2::IsCoOp( void )
 {
-	// TODO; Disabled for now, need some better requirements here
-	// Maybe check the map extension?
-	// Q_stristr( gpGlobals->mapname.ToCStr(), "d2_coast_01" )
-	return false;
+	// Any server thats more than 4 max players cannot be co-op, no matter hwhat
+	if (IsMultiplayer() && (gpGlobals->maxClients > 4))
+		return false;
 
-	// Any server thats more than 5 max players cannot be co-op, no matter hwhat
-	return (IsMultiplayer() && (gpGlobals->maxClients < 5));
+	// TODO; Disabled for now, need some better requirements here
+	// Maybe check the map extension??
+	// Q_stristr( gpGlobals->mapname.ToCStr(), "coop_sampletext" )
+	return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -425,8 +501,30 @@ void CHalfLife2::Activate()
 
 	if (IsMultiplayer())
 	{
-		// Default to deathmatch
+		// Always default to deathmatch when in MP
 		SetGameType(DEATHMATCH);
+
+		if ( IsDeathmatch() )
+		{
+#ifndef CLIENT_DLL
+			// TODO; Check if we actually have any deathmatch spots - if its a teamplay-only map, then we need to force
+			// an override here...
+			CBaseEntity *pSpot = gEntList.FindEntityByClassname( NULL, "info_player_deathmatch" );
+			if ( !pSpot )
+			{
+				// Try to fall back to teamplay
+				Warning( "CHalfLife2::Activate(); Error! Server or map not configured correctly! Map contains no info_player_deathmatch, and teamplay is off! Forcing teamplay on...\n" );
+				m_bTeamPlayEnabled = true;
+			//	teamplay.SetValue( 1 );
+			}
+			else
+			{
+				// We have at least one deathmatch spot, stomp all the logics that come after this
+				UTIL_ClientPrintAll( HUD_PRINTCONSOLE, "Gamemode initiated: Deathmatch" );
+				return;
+			}
+#endif
+		}
 
 		if ( IsCoOp() )
 			SetGameType(COOP);
@@ -436,26 +534,71 @@ void CHalfLife2::Activate()
 		{
 			// Default to TDM
 			SetGameType(TDM);
+			// TODO; Check if we actually have any teamplay spots
+/*
+			CBaseEntity *pTeamSpot = gEntList.FindEntityByClassname( NULL, "info_player_combine" );
+			if ( !pTeamSpot )
+			{
+				UTIL_ClientPrintAll( HUD_PRINTCONSOLE, "Error! Server or map not configured correctly! Map contains no teamspots, and teamplay is on!" );
+				// Theres no special spots, set to fallback gamemode
+				m_bTeamPlayEnabled = false;
+				teamplay.SetValue( 0 );
+				SetGameType(SINGLEPLAYER);
+				return;
+			}
+*/
 
+			// -----------
+			// LTS
+			// -----------
+			// See if the server wants last-man-standing
+
+			// ---------------------------------------------------------------------------
 			// Now we check for special entities - if the map has it, change the game-mode.
-			//TODO;
+			// ---------------------------------------------------------------------------
 #if 0
-			// Objective is lowest priority, since all others are derived from it
-			if ( g_hControlPointMasters.Count() )
+			// -----------
+			// OBJ
+			// -----------
+			// NOTENOTE; Objective is lowest priority, since all others are derived from it
+			// See if the map has any obj entities
+			if ( gEntList.FindEntityByClassname( NULL, "func_capturezone" ) || gEntList.FindEntityByClassname( NULL, "trigger_controlzone" ) )
+			{
 				SetGameType(OBJECTIVE);
 
-			// There's a flag position, change to CTF
-			CCaptureFlag *pFlag = dynamic_cast<CCaptureFlag*> ( gEntList.FindEntityByClassname( NULL, "info_flag_position" ) );
-			if ( pFlag )
-				SetGameType(FLAG);
+				// -----------
+				// CTF
+				// -----------
+				// There's a flag position, change to CTF
+				// TODO;
+				CCaptureFlag *pFlag = dynamic_cast<CCaptureFlag*> ( gEntList.FindEntityByClassname( NULL, "item_teamflag" ) );
+				if ( pFlag )
+					SetGameType(FLAG);
 
-			// Check for arena last - it overwrites everything else
-			CArenaController *pArena = dynamic_cast<CArenaController*> ( gEntList.FindEntityByClassname( NULL, "arena_controller" ) );
-			if ( pArena )
-				SetGameType(ARENA);
+				// -----------
+				// KOTH
+				// -----------
+				// If theres only one capture-zone, its koth
+				//TODO;
+			}
 #endif
+
+			//TODO; Maybe check for a mixed objective/flag gamemode? One of my maps starts out
+			//As objective then (hopefully) changes to CTF at the very end - M.M
 		}
+#if 0
+		//ARENA
+		// Check for arena last - it overwrites everything else
+		// TODO;
+		CArenaController *pArena = dynamic_cast<CArenaController*> ( gEntList.FindEntityByClassname( NULL, "arena_controller" ) );
+		if ( pArena )
+			SetGameType(ARENA);
+#endif
 	}
+
+#ifndef CLIENT_DLL
+	UTIL_ClientPrintAll( HUD_PRINTCONSOLE, "Gamemode initiated: %s", GetGameTypeName() );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -480,8 +623,175 @@ bool CHalfLife2::Damage_IsTimeBased( int iDmgType )
 	return ( ( iDmgType & ( DMG_PARALYZE | DMG_NERVEGAS | DMG_POISON | DMG_RADIATION | DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | DMG_SLOWFREEZE ) ) != 0 );
 }
 
+// ------------------------------------------------------------------------------------ //
+// Shared CHalfLife2 implementation.
+// ------------------------------------------------------------------------------------ //
+bool CHalfLife2::ShouldCollide( int collisionGroup0, int collisionGroup1 )
+{
+	// The smaller number is always first
+	if ( collisionGroup0 > collisionGroup1 )
+		swap(collisionGroup0,collisionGroup1);	// swap so that lowest is always first
+
+	// For teamplay
+	if ( IsMultiplayer() )
+	{
+		if ( collisionGroup0 == COLLISION_GROUP_PLAYER )
+		{
+			// Players don't collide with objects or other players
+			if ( collisionGroup1 == COLLISION_GROUP_PLAYER )
+				 return false;
+ 		}
+
+		if ( collisionGroup1 == COLLISION_GROUP_PLAYER_MOVEMENT )
+		{
+			// This is only for probing, so it better not be on both sides!!!
+			Assert( collisionGroup0 != COLLISION_GROUP_PLAYER_MOVEMENT );
+
+			// No collide with players any more
+			// Nor with objects or grenades
+			switch ( collisionGroup0 )
+			{
+			default:
+				break;
+			case COLLISION_GROUP_PLAYER:
+				return false;
+			case COLLISION_GROUP_DEBRIS:
+				return false;
+			}
+		}
+	}
+
+	// Prevent the player movement from colliding with spit globs (caused the player to jump on top of globs while in water)
+	if ( collisionGroup0 == COLLISION_GROUP_PLAYER_MOVEMENT && collisionGroup1 == HL2COLLISION_GROUP_SPIT )
+		return false;
+
+	// HL2 treats movement and tracing against players the same, so just remap here
+	if ( collisionGroup0 == COLLISION_GROUP_PLAYER_MOVEMENT )
+	{
+		collisionGroup0 = COLLISION_GROUP_PLAYER;
+	}
+
+	if( collisionGroup1 == COLLISION_GROUP_PLAYER_MOVEMENT )
+	{
+		collisionGroup1 = COLLISION_GROUP_PLAYER;
+	}
+
+	//If collisionGroup0 is not a player then NPC_ACTOR behaves just like an NPC.
+	if ( collisionGroup1 == COLLISION_GROUP_NPC_ACTOR && collisionGroup0 != COLLISION_GROUP_PLAYER )
+	{
+		collisionGroup1 = COLLISION_GROUP_NPC;
+	}
+
+	// This is only for the super physcannon
+	if ( m_bMegaPhysgun )
+	{
+		if ( collisionGroup0 == COLLISION_GROUP_INTERACTIVE_DEBRIS && collisionGroup1 == COLLISION_GROUP_PLAYER )
+			return false;
+	}
+
+	if ( collisionGroup0 == HL2COLLISION_GROUP_COMBINE_BALL )
+	{
+		if ( collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL )
+			return false;
+	}
+
+	if ( collisionGroup0 == HL2COLLISION_GROUP_COMBINE_BALL && collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL_NPC )
+		return false;
+
+	if ( ( collisionGroup0 == COLLISION_GROUP_WEAPON ) ||
+		( collisionGroup0 == COLLISION_GROUP_PLAYER ) ||
+		( collisionGroup0 == COLLISION_GROUP_PROJECTILE ) )
+	{
+		if ( collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL )
+			return false;
+	}
+
+	if ( collisionGroup0 == COLLISION_GROUP_DEBRIS )
+	{
+		if ( collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL )
+			return true;
+	}
+
+	// Missiles dont collide with each other
+	if (collisionGroup0 == HL2COLLISION_GROUP_HOMING_MISSILE && collisionGroup1 == HL2COLLISION_GROUP_HOMING_MISSILE )
+		return false;
+
+	if ( collisionGroup1 == HL2COLLISION_GROUP_CROW )
+	{
+		if ( collisionGroup0 == COLLISION_GROUP_PLAYER || collisionGroup0 == COLLISION_GROUP_NPC ||
+			 collisionGroup0 == HL2COLLISION_GROUP_CROW )
+			return false;
+	}
+
+	if ( ( collisionGroup0 == HL2COLLISION_GROUP_HEADCRAB ) && ( collisionGroup1 == HL2COLLISION_GROUP_HEADCRAB ) )
+		return false;
+
+	// striders don't collide with other striders
+	if ( collisionGroup0 == HL2COLLISION_GROUP_STRIDER && collisionGroup1 == HL2COLLISION_GROUP_STRIDER )
+		return false;
+
+#if 0
+	// gunships don't collide with other gunships
+	if ( collisionGroup0 == HL2COLLISION_GROUP_GUNSHIP && collisionGroup1 == HL2COLLISION_GROUP_GUNSHIP )
+		return false;
+
+	if (collisionGroup0 == HL2COLLISION_GROUP_HOUNDEYE && collisionGroup1 == HL2COLLISION_GROUP_HOUNDEYE )
+		return false;
+#endif
+
+	// weapons and NPCs don't collide
+	if ( collisionGroup0 == COLLISION_GROUP_WEAPON && (collisionGroup1 >= HL2COLLISION_GROUP_FIRST_NPC && collisionGroup1 <= HL2COLLISION_GROUP_LAST_NPC ) )
+		return false;
+
+#ifdef HL2_EPISODIC
+	//players don't collide against NPC Actors.
+	//I could've done this up where I check if collisionGroup0 is NOT a player but I decided to just
+	//do what the other checks are doing in this function for consistency sake.
+	if ( collisionGroup1 == COLLISION_GROUP_NPC_ACTOR && collisionGroup0 == COLLISION_GROUP_PLAYER )
+		return false;
+
+	// In cases where NPCs are playing a script which causes them to interpenetrate while riding on another entity,
+	// such as a train or elevator, you need to disable collisions between the actors so the mover can move them.
+	if ( collisionGroup0 == COLLISION_GROUP_NPC_SCRIPTED && collisionGroup1 == COLLISION_GROUP_NPC_SCRIPTED )
+		return false;
+
+	// Spit doesn't touch other spit
+	if ( collisionGroup0 == HL2COLLISION_GROUP_SPIT && collisionGroup1 == HL2COLLISION_GROUP_SPIT )
+		return false;
+#endif
+
+	return BaseClass::ShouldCollide( collisionGroup0, collisionGroup1 ); 
+}
+
+//---------------------------------------------------------
+//---------------------------------------------------------
+bool CHalfLife2::ShouldUseRobustRadiusDamage(CBaseEntity *pEntity)
+{
 #ifdef CLIENT_DLL
+	return false;
 #else
+	if( !sv_robust_explosions.GetBool() )
+		return false;
+
+	if( !pEntity->IsNPC() )
+	{
+		// Only NPC's
+		return false;
+	}
+
+	CAI_BaseNPC *pNPC = pEntity->MyNPCPointer();
+	if( pNPC->CapabilitiesGet() & bits_CAP_SIMPLE_RADIUS_DAMAGE )
+	{
+		// This NPC only eligible for simple radius damage.
+		return false;
+	}
+
+	return true;
+#endif//CLIENT_DLL
+}
+
+
+#ifndef CLIENT_DLL
 
 #ifdef HL2_EPISODIC
 ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REPLICATED );
@@ -551,7 +861,8 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 
 		pHead->CopyAnimationDataFrom( pCorpse );
 
-		pHead->SetMoveType( MOVETYPE_FLYGRAVITY );
+		pHead->SetSolid( SOLID_NONE );
+		pHead->SetMoveType( MOVETYPE_PUSH );	//MOVETYPE_FLYGRAVITY
 		pHead->SetAbsVelocity( pCorpse->GetAbsVelocity() );
 		pHead->ClearFlags();
 		pHead->m_nReferencePlayer	= ENTINDEX( pCorpse );
@@ -586,15 +897,69 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 	//-----------------------------------------------------------------------------
 	bool CHalfLife2::ClientCommand( CBaseEntity *pEdict, const CCommand &args )
 	{
-		if( BaseClass::ClientCommand( pEdict, args ) )
-			return true;
-
 		CHL2_Player *pPlayer = (CHL2_Player *) pEdict;
+#if 0
+		// Handle some player commands here as they relate more directly to gamerules state
+		if ( FStrEq( pcmd, "nextmap" ) )
+		{
+			if ( pPlayer->m_flNextTimeCheck < gpGlobals->curtime )
+			{
+				char szNextMap[32];
 
+				if ( nextlevel.GetString() && *nextlevel.GetString() && engine->IsMapValid( nextlevel.GetString() ) )
+				{
+					Q_strncpy( szNextMap, nextlevel.GetString(), sizeof( szNextMap ) );
+				}
+				else
+				{
+					GetNextLevelName( szNextMap, sizeof( szNextMap ) );
+				}
+
+				ClientPrint( pPlayer, HUD_PRINTTALK, "#game_nextmap", szNextMap);
+				
+				pPlayer->m_flNextTimeCheck = gpGlobals->curtime + 1;
+			}
+
+			return true;
+		}
+		else if ( FStrEq( pcmd, "timeleft" ) )
+		{
+			if ( pPlayer->m_flNextTimeCheck < gpGlobals->curtime )
+			{
+				if ( mp_timelimit.GetInt() > 0 )
+				{
+					int iTimeLeft = GetTimeLeft();
+
+					char szMinutes[5];
+					char szSeconds[3];
+
+					if ( iTimeLeft <= 0 )
+					{
+						Q_snprintf( szMinutes, sizeof(szMinutes), "0" );
+						Q_snprintf( szSeconds, sizeof(szSeconds), "00" );
+					}
+					else
+					{
+						Q_snprintf( szMinutes, sizeof(szMinutes), "%d", iTimeLeft / 60 );
+						Q_snprintf( szSeconds, sizeof(szSeconds), "%02d", iTimeLeft % 60 );
+					}				
+
+					ClientPrint( pPlayer, HUD_PRINTTALK, "#game_time_left1", szMinutes, szSeconds );
+				}
+				else
+				{
+					ClientPrint( pPlayer, HUD_PRINTTALK, "#game_time_left2" );
+				}
+
+				pPlayer->m_flNextTimeCheck = gpGlobals->curtime + 1;
+			}
+			return true;
+		}
+#endif
 		if ( pPlayer->ClientCommand( args ) )
 			return true;
 
-		return false;
+		return BaseClass::ClientCommand( pEdict, args );
 	}
 
 	//-----------------------------------------------------------------------------
@@ -636,64 +1001,748 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 	void CHalfLife2::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 	{
 		// Detonate owned tripmines
-		if ( sv_hl2mp_dead_player_tripmines.GetBool() )
+		if ( IsMultiplayer() )
 		{
-			//TODO; this is searching every entity for satchels every time somebody dies... there's probably a better way to do this!
-			CBaseGrenade *pTripmine = dynamic_cast<CBaseGrenade*> ( gEntList.FindEntityByClassname( NULL, "npc_tripmine" ) );
-			if ( pTripmine && pTripmine->GetOwnerEntity() == pVictim )
-				pTripmine->Detonate();
+			if ( sv_hl2mp_dead_player_tripmines.GetBool() )
+			{
+				//TODO; this is searching every entity for satchels every time somebody dies... there's probably a better way to do this!
+				CBaseGrenade *pTripmine = dynamic_cast<CBaseGrenade*> ( gEntList.FindEntityByClassname( NULL, "npc_tripmine" ) );
+				if ( pTripmine && pTripmine->GetOwnerEntity() == pVictim )
+					pTripmine->Detonate();
 
-			CBaseGrenade *pSatchel = dynamic_cast<CBaseGrenade*> ( gEntList.FindEntityByClassname( NULL, "npc_satchel" ) );
-			if ( pSatchel && pSatchel->GetOwnerEntity() == pVictim )
-				pSatchel->Detonate();
+				CBaseGrenade *pSatchel = dynamic_cast<CBaseGrenade*> ( gEntList.FindEntityByClassname( NULL, "npc_satchel" ) );
+				if ( pSatchel && pSatchel->GetOwnerEntity() == pVictim )
+					pSatchel->Detonate();
+			}
 		}
 
 		BaseClass::PlayerKilled( pVictim, info );
 	}
 
 	//-----------------------------------------------------------------------------
+	// Purpose: Respawn all players instantly
 	//-----------------------------------------------------------------------------
-	bool CHalfLife2::FPlayerCanRespawn( CBasePlayer *pPlayer )
+	void CHalfLife2::RespawnPlayers( bool bForceRespawn, bool bTeam /* = false */, int iTeam/* = TEAM_UNASSIGNED */ )
 	{
-	//	if ( IsMultiplayer() )
-	//		return true;
+		if ( bTeam )
+		{
+			if ( iTeam == TEAM_COMBINE )
+				DevMsg( 2, "Respawning Cops\n" );
+			else if ( iTeam == TEAM_REBELS )
+				DevMsg( 2, "Respawning Robbers\n" );
+		}
 
+		CBasePlayer *pPlayer;
+		for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+		{
+			pPlayer = ToBasePlayer( UTIL_PlayerByIndex( i ) );
+
+			if ( !pPlayer )
+				continue;
+
+			// Check for team specific spawn
+			if ( bTeam && pPlayer->GetTeamNumber() != iTeam )
+				continue;
+
+			// If we aren't force respawning, don't respawn players that:
+			// - are alive
+			// - are still in the death anim stage of dying
+			if ( !bForceRespawn )
+			{
+				if ( pPlayer->IsAlive() )
+					continue;
+
+				if ( pPlayer->m_lifeState != LIFE_RESPAWNABLE )
+					continue;
+			}
+
+			// Respawn this player
+			pPlayer->ForceRespawn();
+		}
+	}
+
+	void CHalfLife2::PlayerThink( CBasePlayer *pPlayer )
+	{
+		BaseClass::PlayerThink( pPlayer );
+	}
+
+#if 0
+	bool CHalfLife2::CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pWeapon )
+	{
+		if ( FClassnameIs( pWeapon, "weapon_satchel" ) )
+		{
+			CWeaponSatchel *satchel = static_cast< CWeaponSatchel * >( pPlayer->Weapon_OwnsThisType( "weapon_satchel" ) );
+			if ( satchel )
+			{
+				if ( satchel->HasChargeDeployed() )
+				{
+					return false;
+				}
+			}
+		}
+
+		return BaseClass::CanHavePlayerItem(pPlayer, pWeapon);
+	}
+#endif
+
+	// --------------------------------------------------------------------------
+	// THINK - this is where our gamemode logic is handled
+	// --------------------------------------------------------------------------
+	void CHalfLife2::Think( void )
+	{
+		if (!IsMultiplayer())
+		{
+			if( physcannon_mega_enabled.GetBool() == true )
+				m_bMegaPhysgun = true;
+			else
+				m_bMegaPhysgun = ( GlobalEntity_GetState("super_phys_gun") == GLOBAL_ON );
+		}
+		else
+		{
+			///// Check game rules /////
+			if ( GetGameType() == (OBJECTIVE|FLAG) )
+			{
+				//TODO;
+				// Here's where we check the flags/points, and all the other stuff
+				// this is probably gonna be a few hundred lines here...
+			}
+			else if ( GetGameType() == (LASTMAN) )
+			{
+				//TODO;
+				// Lastman is simple, all we have to do is check the amount of players,
+				// and wait until only one is left, or until time has run out.
+				
+				//const char *pszLastManString = "X Is the Last Man Standing!";
+				//UTIL_ClientPrintAll( HUD_PRINTTALK, pszLastManString);
+			}
+
+			// DM/TDM Is handled by the baseclass
+			
+			// Check misc stuff
+			// Humiliations
+			if ( m_bHumiliation )
+			{
+				// TODO; Everybody point and laugh at this numbnuts!
+				const char *pszHumiliationString = "[Mingebag] Just got Pwned!";	//%s
+				UTIL_ClientPrintAll( HUD_PRINTTALK, pszHumiliationString);
+				m_bHumiliation = false;
+			}
+			// Send the start msg
+		}
+
+		// Handle DM/SP
+		BaseClass::Think();
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: Returns how much damage the given ammo type should do to the victim
+	//			when fired by the attacker.
+	// Input  : pAttacker - Dude what shot the gun.
+	//			pVictim - Dude what done got shot.
+	//			nAmmoType - What been shot out.
+	// Output : How much hurt to put on dude what done got shot (pVictim).
+	//-----------------------------------------------------------------------------
+	float CHalfLife2::GetAmmoDamage( CBaseEntity *pAttacker, CBaseEntity *pVictim, int nAmmoType )
+	{
+		float flDamage = 0.0f;
+		CAmmoDef *pAmmoDef = GetAmmoDef();
+
+		#if 0
+		if ( pAmmoDef->DamageType( nAmmoType ) & DMG_SNIPER )
+		{
+			// If this damage is from a SNIPER, we do damage based on what the bullet
+			// HITS, not who fired it. All other bullets have their damage values
+			// arranged according to the owner of the bullet, not the recipient.
+			if ( pVictim->IsPlayer() )
+			{
+				// Player
+				flDamage = pAmmoDef->PlrDamage( nAmmoType );
+			}
+			else
+			{
+				// NPC or breakable
+				flDamage = pAmmoDef->NPCDamage( nAmmoType );
+			}
+		}
+		else
+		#endif
+		flDamage = BaseClass::GetAmmoDamage( pAttacker, pVictim, nAmmoType );
+
+		if( pAttacker->IsPlayer() && pVictim->IsNPC() )
+		{
+			if( pVictim->MyCombatCharacterPointer() )
+			{
+				// Player is shooting an NPC. Adjust the damage! This protects breakables
+				// and other 'non-living' entities from being easier/harder to break
+				// in different skill levels.
+				flDamage = pAmmoDef->PlrDamage( nAmmoType );
+				flDamage = AdjustPlayerDamageInflicted( flDamage );
+			}
+		}
+
+		return flDamage;
+	}
+
+   	//-----------------------------------------------------------------------------
+  	//-----------------------------------------------------------------------------
+ 	bool CHalfLife2::AllowDamage( CBaseEntity *pVictim, const CTakeDamageInfo &info )
+  	{
+		if( (info.GetDamageType() & DMG_CRUSH) && info.GetInflictor() && pVictim->MyNPCPointer() )
+		{
+			if( pVictim->MyNPCPointer()->IsPlayerAlly() )
+			{
+				// A physics object has struck a player ally. Don't allow damage if it
+				// came from the player's physcannon. 
+				CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+				if( pPlayer )
+				{
+					CBaseEntity *pWeapon = pPlayer->HasNamedPlayerItem("weapon_physcannon");
+
+					if( pWeapon )
+					{
+						CBaseCombatWeapon *pCannon = assert_cast <CBaseCombatWeapon*>(pWeapon);
+
+						if( pCannon )
+						{
+							if( PhysCannonAccountableForObject(pCannon, info.GetInflictor() ) )
+							{
+								// Antlions can always be squashed!
+								if ( pVictim->Classify() == CLASS_ANTLION )
+									return true;
+
+								return false;
+							}
+						}
+					}
+				}
+			}
+		}
+  		return true;
+  	}
+	//-----------------------------------------------------------------------------
+	// Purpose: Whether or not the NPC should drop a health vial
+	// Output : Returns true on success, false on failure.
+	//-----------------------------------------------------------------------------
+	bool CHalfLife2::NPC_ShouldDropHealth( CBasePlayer *pRecipient )
+	{
+		// Can only do this every so often
+		if ( m_flLastHealthDropTime > gpGlobals->curtime )
+			return false;
+
+		//Try to throw dynamic health
+		float healthPerc = ( (float) pRecipient->m_iHealth / (float) pRecipient->m_iMaxHealth );
+
+		if ( random->RandomFloat( 0.0f, 1.0f ) > healthPerc*1.5f )
+			return true;
+
+		return false;
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: Whether or not the NPC should drop a grenade
+	// Output : Returns true on success, false on failure.
+	//-----------------------------------------------------------------------------
+	bool CHalfLife2::NPC_ShouldDropGrenade( CBasePlayer *pRecipient )
+	{
+		// Can only do this every so often
+		if ( m_flLastGrenadeDropTime > gpGlobals->curtime )
+			return false;
+		
+		int grenadeIndex = GetAmmoDef()->Index( "grenade" );
+		int numGrenades = pRecipient->GetAmmoCount( grenadeIndex );
+
+		// If we're not maxed out on grenades and we've randomly okay'd it
+		if ( ( numGrenades < GetAmmoDef()->MaxCarry( grenadeIndex ) ) && ( random->RandomInt( 0, 2 ) == 0 ) )
+			return true;
+
+		return false;
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: Update the drop counter for health
+	//-----------------------------------------------------------------------------
+	void CHalfLife2::NPC_DroppedHealth( void )
+	{
+		m_flLastHealthDropTime = gpGlobals->curtime + sk_plr_health_drop_time.GetFloat();
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: Update the drop counter for grenades
+	//-----------------------------------------------------------------------------
+	void CHalfLife2::NPC_DroppedGrenade( void )
+	{
+		m_flLastGrenadeDropTime = gpGlobals->curtime + sk_plr_grenade_drop_time.GetFloat();
+	}
+
+#endif //} !CLIENT_DLL
+
+
+#ifdef GAME_DLL
+//---------------------------------------------------------
+//---------------------------------------------------------
+void CHalfLife2::AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo )
+{
+	if( pInfo->GetDamageType() & (DMG_DROWN|DMG_CRUSH|DMG_FALL|DMG_POISON) )	//DMG_SNIPER
+	{
+		// Skill level doesn't affect these types of damage.
+		return;
+	}
+
+	// Actually no, let the server decide
+#if 0
+	if ( IsMultiplayer() )
+	{
+		// MP never adjusts!
+		pInfo->ScaleDamage( sk_dmg_take_scale2.GetFloat() );
+	}
+	else
+#endif
+	{
+		switch( GetSkillLevel() )
+		{
+		case SKILL_EASY:
+			pInfo->ScaleDamage( sk_dmg_take_scale1.GetFloat() );
+			break;
+
+		case SKILL_MEDIUM:
+			pInfo->ScaleDamage( sk_dmg_take_scale2.GetFloat() );
+			break;
+
+		case SKILL_HARD:
+			pInfo->ScaleDamage( sk_dmg_take_scale3.GetFloat() );
+			break;
+
+		case SKILL_VERYHARD:
+			pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() );
+			break;
+		}
+	}
+
+	// Random crits!
+	if ( sv_funmode.GetBool() )
+	{
+		// Do a random scale
+		pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() * random->RandomFloat( 1.0f, 1.25f ) );
+		return;
+	}
+}
+
+//---------------------------------------------------------
+//---------------------------------------------------------
+float CHalfLife2::AdjustPlayerDamageInflicted( float damage )
+{
+	// Actually no, let the server decide (some servers might want realism/skill4)
+#if 0
+	if ( IsMultiplayer() )
+	{
+		// MP never adjusts!
+		return damage * sk_dmg_inflict_scale2.GetFloat();
+	}
+	else
+#endif
+	{
+		switch( GetSkillLevel() ) 
+		{
+		case SKILL_EASY:
+			return damage * sk_dmg_inflict_scale1.GetFloat();
+			break;
+
+		case SKILL_MEDIUM:
+			return damage * sk_dmg_inflict_scale2.GetFloat();
+			break;
+
+		case SKILL_HARD:
+			return damage * sk_dmg_inflict_scale3.GetFloat();
+			break;
+			
+		case SKILL_VERYHARD:
+			return damage * sk_dmg_inflict_scale4.GetFloat();
+			break;
+
+		default:
+			return damage;
+			break;
+		}
+	}
+
+	// Random crits!
+	if ( sv_funmode.GetBool() )
+	{
+		// Do a random scale
+		return damage * (sk_dmg_inflict_scale4.GetFloat() * random->RandomFloat( 0.9f, 1.25f ));
+	}
+}
+#endif//CLIENT_DLL
+
+#ifdef GAME_DLL
+//---------------------------------------------------------
+//---------------------------------------------------------
+bool CHalfLife2::ShouldAutoAim( CBasePlayer *pPlayer, edict_t *target )
+{
+	return sk_allow_autoaim.GetBool() != 0;
+}
+
+//---------------------------------------------------------
+//---------------------------------------------------------
+bool CHalfLife2::AllowAutoTargetCrosshair( void )
+{
+	if ( IsMultiplayer() )
+		return ( aimcrosshair.GetInt() != 0 );
+	else
+		return IsSkillLevel(SKILL_EASY);
+}
+
+//---------------------------------------------------------
+//---------------------------------------------------------
+float CHalfLife2::GetAutoAimScale( CBasePlayer *pPlayer )
+{
+#ifdef _X360
+	return 1.0f;
+#else
+	switch( GetSkillLevel() )
+	{
+	case SKILL_EASY:
+		return sk_autoaim_scale1.GetFloat();
+
+	case SKILL_MEDIUM:
+		return sk_autoaim_scale2.GetFloat();
+
+	default:
+		return 0.0f;
+	}
+#endif
+}
+
+//---------------------------------------------------------
+//---------------------------------------------------------
+float CHalfLife2::GetAmmoQuantityScale( int iAmmoIndex )
+{
+	if ( IsMultiplayer() )
+	{
+		// Always give the same amount in MP
+		return 1.0f;
+	}
+	else
+	{
+		switch( GetSkillLevel() )
+		{
+		case SKILL_EASY:
+			return sk_ammo_qty_scale1.GetFloat();
+
+		case SKILL_MEDIUM:
+			return sk_ammo_qty_scale2.GetFloat();
+
+		case SKILL_HARD:
+			return sk_ammo_qty_scale3.GetFloat();
+
+		case SKILL_VERYHARD:
+			return sk_ammo_qty_scale4.GetFloat();
+
+		default:
+			return 1.0f;
+		}
+	}
+}
+
+void CHalfLife2::LevelInitPreEntity()
+{
+	// Remove this if you fix the bug in ep1 where the striders need to touch
+	// triggers using their absbox instead of their bbox
+#ifdef HL2_EPISODIC
+	if ( !Q_strnicmp( gpGlobals->mapname.ToCStr(), "ep1_", 4 ) )
+	{
+		// episode 1 maps use the surrounding box trigger behavior
+		CBaseEntity::sm_bAccurateTriggerBboxChecks = false;
+	}
+#endif
+	BaseClass::LevelInitPreEntity();
+}
+
+//-----------------------------------------------------------------------------
+// Returns whether or not Alyx cares about light levels in order to see.
+//-----------------------------------------------------------------------------
+bool CHalfLife2::IsAlyxInDarknessMode()
+{
+	if ( alyx_darkness_force.GetBool() )
+		return true;
+
+	if ( r_burningproplight.GetBool() )
+		return true;
+
+	return ( GlobalEntity_GetState( "ep_alyx_darknessmode" ) == GLOBAL_ON );
+}
+
+
+//-----------------------------------------------------------------------------
+// This takes the long way around to see if a prop should emit a DLIGHT when it
+// ignites, to avoid having Alyx-related code in props.cpp.
+//-----------------------------------------------------------------------------
+bool CHalfLife2::ShouldBurningPropsEmitLight()
+{
+//!!! This should really be a graphics-setting check instead
+#ifdef HL2_EPISODIC
+	return IsAlyxInDarknessMode();
+#else
+	return r_burningproplight.GetBool();
+#endif
+}
+
+#endif//CLIENT_DLL
+
+// ------------------------------------------------------------------------------------ //
+// Global functions.
+// ------------------------------------------------------------------------------------ //
+#ifndef HL2MP
+#ifndef PORTAL
+
+// shared ammo definition
+// JAY: Trying to make a more physical bullet response
+#define BULLET_MASS_GRAINS_TO_LB(grains)	(0.002285*(grains)/16.0f)
+#define BULLET_MASS_GRAINS_TO_KG(grains)	lbs2kg(BULLET_MASS_GRAINS_TO_LB(grains))
+
+// exaggerate all of the forces, but use real numbers to keep them consistent
+#define BULLET_IMPULSE_EXAGGERATION			3	//3.5
+// convert a velocity in ft/sec and a mass in grains to an impulse in kg in/s
+#define BULLET_IMPULSE(grains, ftpersec)	((ftpersec)*12*BULLET_MASS_GRAINS_TO_KG(grains)*BULLET_IMPULSE_EXAGGERATION)
+
+CAmmoDef *GetAmmoDef()
+{
+	static CAmmoDef def;
+	static bool bInitted = false;
+
+	if ( !bInitted )
+	{
+		bInitted = true;
+		def.AddAmmoType("Gravity",			DMG_CLUB,					TRACER_NONE,			0, 0, 8, 0, 0 );	// Newton says; Get PWned NooB
+		def.AddAmmoType("AR2",				DMG_BULLET | DMG_AIRBOAT,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_ar2",			"sk_npc_dmg_ar2",			"sk_max_ar2",			BULLET_IMPULSE(300, 1500), 0 );
+//		def.AddAmmoType("AlyxGun",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_alyxgun",		"sk_npc_dmg_alyxgun",		"sk_max_alyxgun",		BULLET_IMPULSE(200, 1225), 0 );
+		def.AddAmmoType("Pistol",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_pistol",		"sk_npc_dmg_pistol",		"sk_max_pistol",		BULLET_IMPULSE(200, 1225), 0, 2, 4 );
+		def.AddAmmoType("SMG1",				DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_smg1",			"sk_npc_dmg_smg1",			"sk_max_smg1",			BULLET_IMPULSE(200, 1225), 0, 2, 4 );
+		def.AddAmmoType("HMG",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_hmg",			"sk_npc_dmg_hmg",			"sk_max_hmg",			BULLET_IMPULSE(300, 2000), 0 );
+		def.AddAmmoType("357",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_357",			"sk_npc_dmg_357",			"sk_max_357",			BULLET_IMPULSE(800, 5000), 0 );
+		def.AddAmmoType("XBowBolt",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE,			"sk_plr_dmg_crossbow",		"sk_npc_dmg_crossbow",		"sk_max_crossbow",		BULLET_IMPULSE(800, 8000), 0 );
+		def.AddAmmoType("FlareRound",		DMG_BURN,					TRACER_NONE, 			"sk_plr_dmg_flare_round",	"sk_npc_dmg_flare_round",	"sk_max_flare_round",	BULLET_IMPULSE(1500, 600), 0 );
+
+		def.AddAmmoType("Buckshot",			DMG_BULLET | DMG_BUCKSHOT,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_buckshot",		"sk_npc_dmg_buckshot",		"sk_max_buckshot",		BULLET_IMPULSE(400, 1200), 0, 2, 4 );
+		def.AddAmmoType("Fragshot",			DMG_BULLET | DMG_BLAST,		TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_fragshot",		"sk_npc_dmg_fragshot",		"sk_max_fragshot",		BULLET_IMPULSE(300, 2000), 0 );
+		def.AddAmmoType("RPGRound",			DMG_BURN | DMG_BLAST,		TRACER_NONE,			"sk_plr_dmg_rpg_round",		"sk_npc_dmg_rpg_round",		"sk_max_rpg_round",		0, 0 );
+		def.AddAmmoType("AR2Grenade",		DMG_BURN | DMG_BLAST,		TRACER_NONE,			"sk_plr_dmg_smg_grenade",	"sk_npc_dmg_smg_grenade",	"sk_max_smg_grenade",	0, 0 );
+		def.AddAmmoType("SniperRound",		DMG_BULLET | DMG_SNIPER,	TRACER_RAIL,			"sk_plr_dmg_sniper_round",	"sk_npc_dmg_sniper_round",	"sk_max_sniper_round",	BULLET_IMPULSE(650, 6000), 0 );
+		def.AddAmmoType("SniperPenetratedRound", DMG_BULLET | DMG_SNIPER, TRACER_RAIL,			"sk_dmg_sniper_penetrate_plr", "sk_dmg_sniper_penetrate_npc", "sk_max_sniper_round", BULLET_IMPULSE(150, 6000), 0 );
+		def.AddAmmoType("Thumper",			DMG_SONIC,					TRACER_NONE,			10, 10, 2, 0, 0 );
+		def.AddAmmoType("Extinguisher",		DMG_SLOWFREEZE,				TRACER_NONE,			0,	0, 100, 0, 0 );	//DMG_FREEZE
+		def.AddAmmoType("Flamethrower",		DMG_BURN,					TRACER_NONE,			0,	0, 100, 0, 0 );
+		def.AddAmmoType("Battery",			DMG_CLUB,					TRACER_NONE,			NULL, NULL, NULL, 0, 0 );
+		def.AddAmmoType("GaussEnergy",		DMG_SHOCK,					TRACER_BEAM,			"sk_jeep_gauss_damage",		"sk_jeep_gauss_damage", "sk_max_gauss_round", BULLET_IMPULSE(650, 8000), 0 ); // hit like a 10kg weight at 400 in/s
+		def.AddAmmoType("CombineCannon",	DMG_BULLET,					TRACER_LINE,			"sk_npc_dmg_gunship_to_plr", "sk_npc_dmg_gunship", NULL, 1.5 * 750 * 12, 0 ); // hit like a 1.5kg weight at 750 ft/s
+		def.AddAmmoType("AirboatGun",		DMG_BULLET | DMG_AIRBOAT,	TRACER_LINE,			"sk_plr_dmg_airboat",		"sk_npc_dmg_airboat",		NULL,					BULLET_IMPULSE(10, 600), 0 );
+
+		def.AddAmmoType("Grenade",			DMG_BURN | DMG_BLAST,		TRACER_NONE,			"sk_plr_dmg_grenade",		"sk_npc_dmg_grenade",		"sk_max_grenade",		0, 0 );
+		def.AddAmmoType("EMPGrenade",		DMG_SONIC,					TRACER_NONE,			NULL,						NULL,						"sk_max_stun_grenade",	0, 0 );
+		def.AddAmmoType("Molotov",			DMG_BURN,					TRACER_NONE,			"sk_plr_dmg_molotov",		"sk_npc_dmg_molotov",		"sk_max_molotov",		0, 0 );
+		def.AddAmmoType("Brickbat",			DMG_CLUB,					TRACER_NONE, 			"sk_plr_dmg_brickbat",		"sk_npc_dmg_brickbat",		"sk_max_brickbat",		0, 0 );
+
+		//=====================================================================
+		// STRIDER MINIGUN DAMAGE - Pull up a chair and I'll tell you a tale.
+		//
+		// When we shipped Half-Life 2 in 2004, we were unaware of a bug in
+		// CAmmoDef::NPCDamage() which was returning the MaxCarry field of
+		// an ammotype as the amount of damage that should be done to a NPC
+		// by that type of ammo. Thankfully, the bug only affected Ammo Types 
+		// that DO NOT use ConVars to specify their parameters. As you can see,
+		// all of the important ammotypes use ConVars, so the effect of the bug
+		// was limited. The Strider Minigun was affected, though.
+		//
+		// According to my perforce Archeology, we intended to ship the Strider
+		// Minigun ammo type to do 15 points of damage per shot, and we did. 
+		// To achieve this we, unaware of the bug, set the Strider Minigun ammo 
+		// type to have a maxcarry of 15, since our observation was that the 
+		// number that was there before (8) was indeed the amount of damage being
+		// done to NPC's at the time. So we changed the field that was incorrectly
+		// being used as the NPC Damage field.
+		//
+		// The bug was fixed during Episode 1's development. The result of the 
+		// bug fix was that the Strider was reduced to doing 5 points of damage
+		// to NPC's, since 5 is the value that was being assigned as NPC damage
+		// even though the code was returning 15 up to that point.
+		//
+		// Now as we go to ship Orange Box, we discover that the Striders in 
+		// Half-Life 2 are hugely ineffective against citizens, causing big
+		// problems in maps 12 and 13. 
+		//
+		// In order to restore balance to HL2 without upsetting the delicate 
+		// balance of ep2_outland_12, I have chosen to build Episodic binaries
+		// with 5 as the Strider->NPC damage, since that's the value that has
+		// been in place for all of Episode 2's development. Half-Life 2 will
+		// build with 15 as the Strider->NPC damage, which is how HL2 shipped
+		// originally, only this time the 15 is located in the correct field
+		// now that the AmmoDef code is behaving correctly.
+		//
+		//=====================================================================
+#ifdef HL2_EPISODIC
+		def.AddAmmoType("StriderMinigun",		DMG_BULLET,				TRACER_LINE,			10, 15, 15, 1.0 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 1.0kg weight at 750 ft/s
+#else
+		def.AddAmmoType("StriderMinigun",		DMG_BULLET,				TRACER_LINE,			5, 15, 15, 1.0 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 1.0kg weight at 750 ft/s
+#endif
+
+		def.AddAmmoType("StriderMinigunDirect",	DMG_BULLET,				TRACER_LINE,			2, 2, 15, 1.0 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 1.0kg weight at 750 ft/s
+		def.AddAmmoType("HelicopterGun",		DMG_BULLET,				TRACER_LINE_AND_WHIZ,	"sk_npc_dmg_helicopter_to_plr", "sk_npc_dmg_helicopter",	"sk_max_smg1",	BULLET_IMPULSE(400, 1225), AMMO_FORCE_DROP_IF_CARRIED | AMMO_INTERPRET_PLRDAMAGE_AS_DAMAGE_TO_PLAYER, 4, 10 );
+		def.AddAmmoType("AR2AltFire",			DMG_DISSOLVE,			TRACER_NONE,			0, 0, "sk_max_ar2_altfire", 0, 0 );
+		def.AddAmmoType("Slam",					DMG_BLAST,				TRACER_NONE,			NULL, NULL,	"sk_max_slam", 0, 0);
+		def.AddAmmoType("Hopwire",				DMG_BLAST,				TRACER_NONE,			"sk_plr_dmg_grenade", "sk_npc_dmg_grenade", "sk_max_hopwire", 0, 0);
+		def.AddAmmoType("CombineHeavyCannon",	DMG_BULLET,				TRACER_LINE,			40,	40, NULL, 10 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 10 kg weight at 750 ft/s
+		def.AddAmmoType("ammo_proto1",			DMG_BULLET | DMG_PLASMA,	TRACER_BEAM,			0, 0, 10, 0, 0 );
+	}
+
+	return &def;
+}
+
+#endif
+#endif
+
+
+//=============================================================================
+// MULTIPLAYER
+//=============================================================================
+bool CHalfLife2::FAllowNPCs( void )
+{
+#ifdef GAME_DLL
+	if (IsMultiplayer())
+		return ( allowNPCs.GetInt() != 0 );
+	else
+#endif
+	return true;
+}
+
+//=========================================================
+// WeaponShouldRespawn - any conditions inhibiting the
+// respawning of this weapon?
+//=========================================================
+int CHalfLife2::WeaponShouldRespawn( CBaseCombatWeapon *pWeapon )
+{
+#ifdef GAME_DLL
+	if ( pWeapon->HasSpawnFlags( SF_NORESPAWN ) )
+		return GR_WEAPON_RESPAWN_NO;
+
+	// Default on in MP, off in SP (duh)
+	return IsMultiplayer() ? GR_WEAPON_RESPAWN_YES : GR_WEAPON_RESPAWN_NO;
+#else
+	// For the client just pass 0
+	return 0;
+#endif
+}
+
+int CHalfLife2::ItemShouldRespawn( CItem *pItem )
+{
+#ifdef GAME_DLL
+	if ( pItem->HasSpawnFlags( SF_NORESPAWN ) )
+		return GR_ITEM_RESPAWN_NO;
+
+	// Default on in MP, off in SP (duh)
+	return IsMultiplayer() ? GR_ITEM_RESPAWN_YES : GR_ITEM_RESPAWN_NO;
+#else
+	// For the client just pass 0
+	return 0;
+#endif
+}
+
+//=========================================================
+// FlWeaponRespawnTime - what is the time in the future
+// at which this weapon may spawn?
+//=========================================================
+float CHalfLife2::FlWeaponRespawnTime( CBaseCombatWeapon *pWeapon )
+{
+#ifdef GAME_DLL
+	if ( weaponstay.GetInt() > 0 )
+	{
+		// make sure it's only certain weapons
+		if ( !(pWeapon->GetWeaponFlags() & ITEM_FLAG_LIMITINWORLD) )
+		{
+			return 0;		// weapon respawns almost instantly
+		}
+	}
+
+	return gpGlobals->curtime + sv_hl2mp_weapon_respawn_time.GetFloat();
+#else
+	return 0;		// weapon respawns almost instantly
+#endif
+}
+
+float CHalfLife2::FlItemRespawnTime( CItem *pItem )
+{
+#ifdef GAME_DLL
+	return gpGlobals->curtime + sv_hl2mp_item_respawn_time.GetFloat();
+#else
+	return 0;		// item respawns almost instantly
+#endif
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+#ifdef GAME_DLL
+bool CHalfLife2::FPlayerCanRespawn( CBasePlayer *pPlayer )
+{
+	if ( !pPlayer )
+	{
+		Error( "FPlayerCanRespawn: pPlayer=0" );
+		return false;
+	}
+	
+	// TODO; Some gamemodes dont allow respawning normally
+	if ( IsMultiplayer() )
+	{
+		switch(GetGameType())
+		{
+			case LASTMAN:
+			case RACE:
+				// Cant respawn manually in lastman/race
+				return false;
+				break;
+		}
 		return true;
 	}
 
-	float CHalfLife2::FlPlayerSpawnTime( CBasePlayer *pPlayer )
-	{
-		// TODO;
-		if ( IsMultiplayer() )
-		{
-			float fRespawnTime = gpGlobals->curtime + sv_hl2mp_player_respawn_time.GetFloat();	//Almost instant
-			switch(GetGameType())
-			{
-				case TDM:
-				case OBJECTIVE:
-				case FLAG:				
-					fRespawnTime = fRespawnTime + 5.0f;
-					break;
-				case ARENA:				
-					fRespawnTime = gpGlobals->curtime + 1.0f;
-					break;
-				case LASTMAN:
-				case RACE:
-					// Cant respawn manually in these modes
-					fRespawnTime = gpGlobals->curtime + 1e9;	//TEMPTEMP
-					break;
-			}
+	return true;
+}
 
-			return fRespawnTime;
+float CHalfLife2::FlPlayerSpawnTime( CBasePlayer *pPlayer )
+{
+	// TODO; Expand this, do it proper - players that are dominating
+	// are going to have longer spawn times
+	if ( IsMultiplayer() )
+	{
+		float fRespawnTime = gpGlobals->curtime + sv_hl2mp_player_respawn_time.GetFloat();
+		// Apply a random delay by default
+		// TODO; This will be axed once conditions are setup to determine respawn time (killstreaks, lifetime, etc.)
+		fRespawnTime = fRespawnTime + random->RandomFloat( 0.0f, sv_hl2mp_player_respawn_addtime.GetFloat() );
+		switch(GetGameType())
+		{
+			case OBJECTIVE:
+			case FLAG:
+				// Defence spawns a little slower than attackers
+				if ( pPlayer->GetTeamNumber() == TEAM_REBELS )
+					fRespawnTime = fRespawnTime + 3.0f;
+				break;
+			case ARENA:
+				// Override respawn time for arena
+				fRespawnTime = gpGlobals->curtime + 1.0f;	//Just enough time for the headroll
+				break;
 		}
 
-		return gpGlobals->curtime;	//Now!
+		return fRespawnTime;
 	}
 
+	return gpGlobals->curtime;	//Now!
+}
+#endif
+
+#ifdef GAME_DLL
 	//------------------------------------------------------------------------------
 	// Purpose : Initialize all default class relationships
 	// Input   :
 	// Output  :
+	// TODO; This might be cool to export to a script file
 	//------------------------------------------------------------------------------
 	void CHalfLife2::InitDefaultAIRelationships( void )
 	{
@@ -1662,734 +2711,7 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 			default:					return "MISSING CLASS in ClassifyText()";
 		}
 	}
-
-	void CHalfLife2::PlayerThink( CBasePlayer *pPlayer )
-	{
-		BaseClass::PlayerThink( pPlayer );
-	}
-
-#if 0
-	bool CHalfLife2::CanHavePlayerItem( CBasePlayer *pPlayer, CBaseCombatWeapon *pWeapon )
-	{
-		if ( FClassnameIs( pWeapon, "weapon_satchel" ) )
-		{
-			CWeaponSatchel *satchel = static_cast< CWeaponSatchel * >( pPlayer->Weapon_OwnsThisType( "weapon_satchel" ) );
-			if ( satchel )
-			{
-				if ( satchel->HasChargeDeployed() )
-				{
-					return false;
-				}
-			}
-		}
-
-		return BaseClass::CanHavePlayerItem(pPlayer, pWeapon);
-	}
 #endif
-
-	void CHalfLife2::Think( void )
-	{
-		if (!IsMultiplayer())
-		{
-			if( physcannon_mega_enabled.GetBool() == true )
-				m_bMegaPhysgun = true;
-			else
-				m_bMegaPhysgun = ( GlobalEntity_GetState("super_phys_gun") == GLOBAL_ON );
-		}
-
-		BaseClass::Think();
-	}
-
-	//-----------------------------------------------------------------------------
-	// Purpose: Returns how much damage the given ammo type should do to the victim
-	//			when fired by the attacker.
-	// Input  : pAttacker - Dude what shot the gun.
-	//			pVictim - Dude what done got shot.
-	//			nAmmoType - What been shot out.
-	// Output : How much hurt to put on dude what done got shot (pVictim).
-	//-----------------------------------------------------------------------------
-	float CHalfLife2::GetAmmoDamage( CBaseEntity *pAttacker, CBaseEntity *pVictim, int nAmmoType )
-	{
-		float flDamage = 0.0f;
-		CAmmoDef *pAmmoDef = GetAmmoDef();
-
-		#if 0
-		if ( pAmmoDef->DamageType( nAmmoType ) & DMG_SNIPER )
-		{
-			// If this damage is from a SNIPER, we do damage based on what the bullet
-			// HITS, not who fired it. All other bullets have their damage values
-			// arranged according to the owner of the bullet, not the recipient.
-			if ( pVictim->IsPlayer() )
-			{
-				// Player
-				flDamage = pAmmoDef->PlrDamage( nAmmoType );
-			}
-			else
-			{
-				// NPC or breakable
-				flDamage = pAmmoDef->NPCDamage( nAmmoType );
-			}
-		}
-		else
-		#endif
-		flDamage = BaseClass::GetAmmoDamage( pAttacker, pVictim, nAmmoType );
-
-		if( pAttacker->IsPlayer() && pVictim->IsNPC() )
-		{
-			if( pVictim->MyCombatCharacterPointer() )
-			{
-				// Player is shooting an NPC. Adjust the damage! This protects breakables
-				// and other 'non-living' entities from being easier/harder to break
-				// in different skill levels.
-				flDamage = pAmmoDef->PlrDamage( nAmmoType );
-				flDamage = AdjustPlayerDamageInflicted( flDamage );
-			}
-		}
-
-		return flDamage;
-	}
-
-   	//-----------------------------------------------------------------------------
-  	//-----------------------------------------------------------------------------
- 	bool CHalfLife2::AllowDamage( CBaseEntity *pVictim, const CTakeDamageInfo &info )
-  	{
-#ifndef CLIENT_DLL
-	if( (info.GetDamageType() & DMG_CRUSH) && info.GetInflictor() && pVictim->MyNPCPointer() )
-	{
-		if( pVictim->MyNPCPointer()->IsPlayerAlly() )
-		{
-			// A physics object has struck a player ally. Don't allow damage if it
-			// came from the player's physcannon. 
-			CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
-
-			if( pPlayer )
-			{
-				CBaseEntity *pWeapon = pPlayer->HasNamedPlayerItem("weapon_physcannon");
-
-				if( pWeapon )
-				{
-					CBaseCombatWeapon *pCannon = assert_cast <CBaseCombatWeapon*>(pWeapon);
-
-					if( pCannon )
-					{
-						if( PhysCannonAccountableForObject(pCannon, info.GetInflictor() ) )
-						{
-							// Antlions can always be squashed!
-							if ( pVictim->Classify() == CLASS_ANTLION )
-								return true;
-
-  							return false;
-						}
-					}
-				}
-			}
-		}
-	}
-#endif
-  		return true;
-  	}
-	//-----------------------------------------------------------------------------
-	// Purpose: Whether or not the NPC should drop a health vial
-	// Output : Returns true on success, false on failure.
-	//-----------------------------------------------------------------------------
-	bool CHalfLife2::NPC_ShouldDropHealth( CBasePlayer *pRecipient )
-	{
-		// Can only do this every so often
-		if ( m_flLastHealthDropTime > gpGlobals->curtime )
-			return false;
-
-		//Try to throw dynamic health
-		float healthPerc = ( (float) pRecipient->m_iHealth / (float) pRecipient->m_iMaxHealth );
-
-		if ( random->RandomFloat( 0.0f, 1.0f ) > healthPerc*1.5f )
-			return true;
-
-		return false;
-	}
-
-	//-----------------------------------------------------------------------------
-	// Purpose: Whether or not the NPC should drop a grenade
-	// Output : Returns true on success, false on failure.
-	//-----------------------------------------------------------------------------
-	bool CHalfLife2::NPC_ShouldDropGrenade( CBasePlayer *pRecipient )
-	{
-		// Can only do this every so often
-		if ( m_flLastGrenadeDropTime > gpGlobals->curtime )
-			return false;
-		
-		int grenadeIndex = GetAmmoDef()->Index( "grenade" );
-		int numGrenades = pRecipient->GetAmmoCount( grenadeIndex );
-
-		// If we're not maxed out on grenades and we've randomly okay'd it
-		if ( ( numGrenades < GetAmmoDef()->MaxCarry( grenadeIndex ) ) && ( random->RandomInt( 0, 2 ) == 0 ) )
-			return true;
-
-		return false;
-	}
-
-	//-----------------------------------------------------------------------------
-	// Purpose: Update the drop counter for health
-	//-----------------------------------------------------------------------------
-	void CHalfLife2::NPC_DroppedHealth( void )
-	{
-		m_flLastHealthDropTime = gpGlobals->curtime + sk_plr_health_drop_time.GetFloat();
-	}
-
-	//-----------------------------------------------------------------------------
-	// Purpose: Update the drop counter for grenades
-	//-----------------------------------------------------------------------------
-	void CHalfLife2::NPC_DroppedGrenade( void )
-	{
-		m_flLastGrenadeDropTime = gpGlobals->curtime + sk_plr_grenade_drop_time.GetFloat();
-	}
-
-#endif //} !CLIENT_DLL
-
-
-// ------------------------------------------------------------------------------------ //
-// Shared CHalfLife2 implementation.
-// ------------------------------------------------------------------------------------ //
-bool CHalfLife2::ShouldCollide( int collisionGroup0, int collisionGroup1 )
-{
-	// The smaller number is always first
-	if ( collisionGroup0 > collisionGroup1 )
-	{
-		// swap so that lowest is always first
-		int tmp = collisionGroup0;
-		collisionGroup0 = collisionGroup1;
-		collisionGroup1 = tmp;
-	}
-	
-	// Prevent the player movement from colliding with spit globs (caused the player to jump on top of globs while in water)
-	if ( collisionGroup0 == COLLISION_GROUP_PLAYER_MOVEMENT && collisionGroup1 == HL2COLLISION_GROUP_SPIT )
-		return false;
-
-	// HL2 treats movement and tracing against players the same, so just remap here
-	if ( collisionGroup0 == COLLISION_GROUP_PLAYER_MOVEMENT )
-	{
-		collisionGroup0 = COLLISION_GROUP_PLAYER;
-	}
-
-	if( collisionGroup1 == COLLISION_GROUP_PLAYER_MOVEMENT )
-	{
-		collisionGroup1 = COLLISION_GROUP_PLAYER;
-	}
-
-	//If collisionGroup0 is not a player then NPC_ACTOR behaves just like an NPC.
-	if ( collisionGroup1 == COLLISION_GROUP_NPC_ACTOR && collisionGroup0 != COLLISION_GROUP_PLAYER )
-	{
-		collisionGroup1 = COLLISION_GROUP_NPC;
-	}
-
-	// This is only for the super physcannon
-	if ( m_bMegaPhysgun )
-	{
-		if ( collisionGroup0 == COLLISION_GROUP_INTERACTIVE_DEBRIS && collisionGroup1 == COLLISION_GROUP_PLAYER )
-			return false;
-	}
-
-	if ( collisionGroup0 == HL2COLLISION_GROUP_COMBINE_BALL )
-	{
-		if ( collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL )
-			return false;
-	}
-
-	if ( collisionGroup0 == HL2COLLISION_GROUP_COMBINE_BALL && collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL_NPC )
-		return false;
-
-	if ( ( collisionGroup0 == COLLISION_GROUP_WEAPON ) ||
-		( collisionGroup0 == COLLISION_GROUP_PLAYER ) ||
-		( collisionGroup0 == COLLISION_GROUP_PROJECTILE ) )
-	{
-		if ( collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL )
-			return false;
-	}
-
-	if ( collisionGroup0 == COLLISION_GROUP_DEBRIS )
-	{
-		if ( collisionGroup1 == HL2COLLISION_GROUP_COMBINE_BALL )
-			return true;
-	}
-
-#if 0
-	if (collisionGroup0 == HL2COLLISION_GROUP_HOUNDEYE && collisionGroup1 == HL2COLLISION_GROUP_HOUNDEYE )
-		return false;
-#endif
-
-	if (collisionGroup0 == HL2COLLISION_GROUP_HOMING_MISSILE && collisionGroup1 == HL2COLLISION_GROUP_HOMING_MISSILE )
-		return false;
-
-	if ( collisionGroup1 == HL2COLLISION_GROUP_CROW )
-	{
-		if ( collisionGroup0 == COLLISION_GROUP_PLAYER || collisionGroup0 == COLLISION_GROUP_NPC ||
-			 collisionGroup0 == HL2COLLISION_GROUP_CROW )
-			return false;
-	}
-
-	if ( ( collisionGroup0 == HL2COLLISION_GROUP_HEADCRAB ) && ( collisionGroup1 == HL2COLLISION_GROUP_HEADCRAB ) )
-		return false;
-
-	// striders don't collide with other striders
-	if ( collisionGroup0 == HL2COLLISION_GROUP_STRIDER && collisionGroup1 == HL2COLLISION_GROUP_STRIDER )
-		return false;
-
-#if 0
-	// gunships don't collide with other gunships
-	if ( collisionGroup0 == HL2COLLISION_GROUP_GUNSHIP && collisionGroup1 == HL2COLLISION_GROUP_GUNSHIP )
-		return false;
-#endif
-
-	// weapons and NPCs don't collide
-	if ( collisionGroup0 == COLLISION_GROUP_WEAPON && (collisionGroup1 >= HL2COLLISION_GROUP_FIRST_NPC && collisionGroup1 <= HL2COLLISION_GROUP_LAST_NPC ) )
-		return false;
-
-	//players don't collide against NPC Actors.
-	//I could've done this up where I check if collisionGroup0 is NOT a player but I decided to just
-	//do what the other checks are doing in this function for consistency sake.
-	if ( collisionGroup1 == COLLISION_GROUP_NPC_ACTOR && collisionGroup0 == COLLISION_GROUP_PLAYER )
-		return false;
-		
-	// In cases where NPCs are playing a script which causes them to interpenetrate while riding on another entity,
-	// such as a train or elevator, you need to disable collisions between the actors so the mover can move them.
-	if ( collisionGroup0 == COLLISION_GROUP_NPC_SCRIPTED && collisionGroup1 == COLLISION_GROUP_NPC_SCRIPTED )
-		return false;
-
-	// Spit doesn't touch other spit
-	if ( collisionGroup0 == HL2COLLISION_GROUP_SPIT && collisionGroup1 == HL2COLLISION_GROUP_SPIT )
-		return false;
-
-	return BaseClass::ShouldCollide( collisionGroup0, collisionGroup1 ); 
-}
-
-#ifndef CLIENT_DLL
-//---------------------------------------------------------
-//---------------------------------------------------------
-void CHalfLife2::AdjustPlayerDamageTaken( CTakeDamageInfo *pInfo )
-{
-	if( pInfo->GetDamageType() & (DMG_DROWN|DMG_CRUSH|DMG_FALL|DMG_POISON) )	//DMG_SNIPER
-	{
-		// Skill level doesn't affect these types of damage.
-		return;
-	}
-
-	// Random crits!
-	if ( sv_funmode.GetBool() )
-	{
-		// Do a random scale
-		pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() * random->RandomFloat( 1.0f, 1.25f ) );
-		return;
-	}
-
-	// Actually no, let the server decide
-#if 0
-	if ( IsMultiplayer() )
-	{
-		// MP never adjusts!
-		pInfo->ScaleDamage( sk_dmg_take_scale2.GetFloat() );
-	}
-	else
-#endif
-	{
-		switch( GetSkillLevel() )
-		{
-		case SKILL_EASY:
-			pInfo->ScaleDamage( sk_dmg_take_scale1.GetFloat() );
-			break;
-
-		case SKILL_MEDIUM:
-			pInfo->ScaleDamage( sk_dmg_take_scale2.GetFloat() );
-			break;
-
-		case SKILL_HARD:
-			pInfo->ScaleDamage( sk_dmg_take_scale3.GetFloat() );
-			break;
-
-		case SKILL_VERYHARD:
-			pInfo->ScaleDamage( sk_dmg_take_scale4.GetFloat() );
-			break;
-		}
-	}
-}
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-float CHalfLife2::AdjustPlayerDamageInflicted( float damage )
-{
-	// Random crits!
-	if ( sv_funmode.GetBool() )
-	{
-		// Do a random scale
-		return damage * (sk_dmg_inflict_scale4.GetFloat() * random->RandomFloat( 0.9f, 1.25f ));
-	}
-
-	// Actually no, let the server decide
-#if 0
-	if ( IsMultiplayer() )
-	{
-		// MP never adjusts!
-		return damage * sk_dmg_inflict_scale2.GetFloat();
-	}
-	else
-#endif
-	{
-		switch( GetSkillLevel() ) 
-		{
-		case SKILL_EASY:
-			return damage * sk_dmg_inflict_scale1.GetFloat();
-			break;
-
-		case SKILL_MEDIUM:
-			return damage * sk_dmg_inflict_scale2.GetFloat();
-			break;
-
-		case SKILL_HARD:
-			return damage * sk_dmg_inflict_scale3.GetFloat();
-			break;
-			
-		case SKILL_VERYHARD:
-			return damage * sk_dmg_inflict_scale4.GetFloat();
-			break;
-
-		default:
-			return damage;
-			break;
-		}
-	}
-}
-#endif//CLIENT_DLL
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-bool CHalfLife2::ShouldUseRobustRadiusDamage(CBaseEntity *pEntity)
-{
-#ifdef CLIENT_DLL
-	return false;
-#endif
-
-	if( !sv_robust_explosions.GetBool() )
-		return false;
-
-	if( !pEntity->IsNPC() )
-	{
-		// Only NPC's
-		return false;
-	}
-
-#ifndef CLIENT_DLL
-	CAI_BaseNPC *pNPC = pEntity->MyNPCPointer();
-	if( pNPC->CapabilitiesGet() & bits_CAP_SIMPLE_RADIUS_DAMAGE )
-	{
-		// This NPC only eligible for simple radius damage.
-		return false;
-	}
-#endif//CLIENT_DLL
-
-	return true;
-}
-
-#ifndef CLIENT_DLL
-//---------------------------------------------------------
-//---------------------------------------------------------
-bool CHalfLife2::ShouldAutoAim( CBasePlayer *pPlayer, edict_t *target )
-{
-	return sk_allow_autoaim.GetBool() != 0;
-}
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-bool CHalfLife2::AllowAutoTargetCrosshair( void )
-{
-	if ( IsMultiplayer() )
-		return ( aimcrosshair.GetInt() != 0 );
-	else
-		return IsSkillLevel(SKILL_EASY);
-}
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-float CHalfLife2::GetAutoAimScale( CBasePlayer *pPlayer )
-{
-#ifdef _X360
-	return 1.0f;
-#else
-	switch( GetSkillLevel() )
-	{
-	case SKILL_EASY:
-		return sk_autoaim_scale1.GetFloat();
-
-	case SKILL_MEDIUM:
-		return sk_autoaim_scale2.GetFloat();
-
-	default:
-		return 0.0f;
-	}
-#endif
-}
-
-//---------------------------------------------------------
-//---------------------------------------------------------
-float CHalfLife2::GetAmmoQuantityScale( int iAmmoIndex )
-{
-	if ( IsMultiplayer() )
-	{
-		// Always give the same amount in MP
-		return 1.0f;
-	}
-	else
-	{
-		switch( GetSkillLevel() )
-		{
-		case SKILL_EASY:
-			return sk_ammo_qty_scale1.GetFloat();
-
-		case SKILL_MEDIUM:
-			return sk_ammo_qty_scale2.GetFloat();
-
-		case SKILL_HARD:
-			return sk_ammo_qty_scale3.GetFloat();
-
-		case SKILL_VERYHARD:
-			return sk_ammo_qty_scale4.GetFloat();
-
-		default:
-			return 1.0f;
-		}
-	}
-}
-
-void CHalfLife2::LevelInitPreEntity()
-{
-	// Remove this if you fix the bug in ep1 where the striders need to touch
-	// triggers using their absbox instead of their bbox
-#ifdef HL2_EPISODIC
-	if ( !Q_strnicmp( gpGlobals->mapname.ToCStr(), "ep1_", 4 ) )
-	{
-		// episode 1 maps use the surrounding box trigger behavior
-		CBaseEntity::sm_bAccurateTriggerBboxChecks = false;
-	}
-#endif
-	BaseClass::LevelInitPreEntity();
-}
-
-//-----------------------------------------------------------------------------
-// Returns whether or not Alyx cares about light levels in order to see.
-//-----------------------------------------------------------------------------
-bool CHalfLife2::IsAlyxInDarknessMode()
-{
-	if ( alyx_darkness_force.GetBool() )
-		return true;
-
-	if ( r_burningproplight.GetBool() )
-		return true;
-
-	return ( GlobalEntity_GetState( "ep_alyx_darknessmode" ) == GLOBAL_ON );
-}
-
-
-//-----------------------------------------------------------------------------
-// This takes the long way around to see if a prop should emit a DLIGHT when it
-// ignites, to avoid having Alyx-related code in props.cpp.
-//-----------------------------------------------------------------------------
-bool CHalfLife2::ShouldBurningPropsEmitLight()
-{
-//!!! This should really be a graphics-setting check instead
-#ifdef HL2_EPISODIC
-	return IsAlyxInDarknessMode();
-#else
-	return r_burningproplight.GetBool();
-#endif
-}
-
-
-#endif//CLIENT_DLL
-
-// ------------------------------------------------------------------------------------ //
-// Global functions.
-// ------------------------------------------------------------------------------------ //
-#ifndef HL2MP
-#ifndef PORTAL
-
-// shared ammo definition
-// JAY: Trying to make a more physical bullet response
-#define BULLET_MASS_GRAINS_TO_LB(grains)	(0.002285*(grains)/16.0f)
-#define BULLET_MASS_GRAINS_TO_KG(grains)	lbs2kg(BULLET_MASS_GRAINS_TO_LB(grains))
-
-// exaggerate all of the forces, but use real numbers to keep them consistent
-#define BULLET_IMPULSE_EXAGGERATION			3	//3.5
-// convert a velocity in ft/sec and a mass in grains to an impulse in kg in/s
-#define BULLET_IMPULSE(grains, ftpersec)	((ftpersec)*12*BULLET_MASS_GRAINS_TO_KG(grains)*BULLET_IMPULSE_EXAGGERATION)
-
-CAmmoDef *GetAmmoDef()
-{
-	static CAmmoDef def;
-	static bool bInitted = false;
-
-	if ( !bInitted )
-	{
-		bInitted = true;
-		def.AddAmmoType("Gravity",			DMG_CLUB,					TRACER_NONE,			0, 0, 8, 0, 0 );	// Newton says; Get PWned NooB
-		def.AddAmmoType("AR2",				DMG_BULLET | DMG_AIRBOAT,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_ar2",			"sk_npc_dmg_ar2",			"sk_max_ar2",			BULLET_IMPULSE(300, 1500), 0 );
-//		def.AddAmmoType("AlyxGun",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_alyxgun",		"sk_npc_dmg_alyxgun",		"sk_max_alyxgun",		BULLET_IMPULSE(200, 1225), 0 );
-		def.AddAmmoType("Pistol",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_pistol",		"sk_npc_dmg_pistol",		"sk_max_pistol",		BULLET_IMPULSE(200, 1225), 0, 2, 4 );
-		def.AddAmmoType("SMG1",				DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_smg1",			"sk_npc_dmg_smg1",			"sk_max_smg1",			BULLET_IMPULSE(200, 1225), 0, 2, 4 );
-		def.AddAmmoType("HMG",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_hmg",			"sk_npc_dmg_hmg",			"sk_max_hmg",			BULLET_IMPULSE(300, 2000), 0 );
-		def.AddAmmoType("357",				DMG_BULLET,					TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_357",			"sk_npc_dmg_357",			"sk_max_357",			BULLET_IMPULSE(800, 5000), 0 );
-		def.AddAmmoType("XBowBolt",			DMG_BULLET | DMG_NEVERGIB,	TRACER_LINE,			"sk_plr_dmg_crossbow",		"sk_npc_dmg_crossbow",		"sk_max_crossbow",		BULLET_IMPULSE(800, 8000), 0 );
-		def.AddAmmoType("FlareRound",		DMG_BURN,					TRACER_NONE, 			"sk_plr_dmg_flare_round",	"sk_npc_dmg_flare_round",	"sk_max_flare_round",	BULLET_IMPULSE(1500, 600), 0 );
-
-		def.AddAmmoType("Buckshot",			DMG_BULLET | DMG_BUCKSHOT,	TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_buckshot",		"sk_npc_dmg_buckshot",		"sk_max_buckshot",		BULLET_IMPULSE(400, 1200), 0, 2, 4 );
-		def.AddAmmoType("Fragshot",			DMG_BULLET | DMG_BLAST,		TRACER_LINE_AND_WHIZ,	"sk_plr_dmg_fragshot",		"sk_npc_dmg_fragshot",		"sk_max_fragshot",		BULLET_IMPULSE(300, 2000), 0 );
-		def.AddAmmoType("RPGRound",			DMG_BURN | DMG_BLAST,		TRACER_NONE,			"sk_plr_dmg_rpg_round",		"sk_npc_dmg_rpg_round",		"sk_max_rpg_round",		0, 0 );
-		def.AddAmmoType("AR2Grenade",		DMG_BURN | DMG_BLAST,		TRACER_NONE,			"sk_plr_dmg_smg_grenade",	"sk_npc_dmg_smg_grenade",	"sk_max_smg_grenade",	0, 0 );
-		def.AddAmmoType("SniperRound",		DMG_BULLET | DMG_SNIPER,	TRACER_RAIL,			"sk_plr_dmg_sniper_round",	"sk_npc_dmg_sniper_round",	"sk_max_sniper_round",	BULLET_IMPULSE(650, 6000), 0 );
-		def.AddAmmoType("SniperPenetratedRound", DMG_BULLET | DMG_SNIPER, TRACER_RAIL,			"sk_dmg_sniper_penetrate_plr", "sk_dmg_sniper_penetrate_npc", "sk_max_sniper_round", BULLET_IMPULSE(150, 6000), 0 );
-		def.AddAmmoType("Thumper",			DMG_SONIC,					TRACER_NONE,			10, 10, 2, 0, 0 );
-		def.AddAmmoType("Extinguisher",		DMG_SLOWFREEZE,				TRACER_NONE,			0,	0, 100, 0, 0 );	//DMG_FREEZE
-		def.AddAmmoType("Flamethrower",		DMG_BURN,					TRACER_NONE,			0,	0, 299, 0, 0 );
-		def.AddAmmoType("Battery",			DMG_CLUB,					TRACER_NONE,			NULL, NULL, NULL, 0, 0 );
-		def.AddAmmoType("GaussEnergy",		DMG_SHOCK,					TRACER_BEAM,			"sk_jeep_gauss_damage",		"sk_jeep_gauss_damage", "sk_max_gauss_round", BULLET_IMPULSE(650, 8000), 0 ); // hit like a 10kg weight at 400 in/s
-		def.AddAmmoType("CombineCannon",	DMG_BULLET,					TRACER_LINE,			"sk_npc_dmg_gunship_to_plr", "sk_npc_dmg_gunship", NULL, 1.5 * 750 * 12, 0 ); // hit like a 1.5kg weight at 750 ft/s
-		def.AddAmmoType("AirboatGun",		DMG_BULLET | DMG_AIRBOAT,	TRACER_LINE,			"sk_plr_dmg_airboat",		"sk_npc_dmg_airboat",		NULL,					BULLET_IMPULSE(10, 600), 0 );
-
-		def.AddAmmoType("Grenade",			DMG_BURN | DMG_BLAST,		TRACER_NONE,			"sk_plr_dmg_grenade",		"sk_npc_dmg_grenade",		"sk_max_grenade",		0, 0 );
-		def.AddAmmoType("EMPGrenade",		DMG_SONIC,					TRACER_NONE,			NULL,						NULL,						"sk_max_stun_grenade",	0, 0 );
-		def.AddAmmoType("Molotov",			DMG_BURN,					TRACER_NONE,			"sk_plr_dmg_molotov",		"sk_npc_dmg_molotov",		"sk_max_molotov",		0, 0 );
-		def.AddAmmoType("Brickbat",			DMG_CLUB,					TRACER_NONE, 			"sk_plr_dmg_brickbat",		"sk_npc_dmg_brickbat",		"sk_max_brickbat",		0, 0 );
-
-		//=====================================================================
-		// STRIDER MINIGUN DAMAGE - Pull up a chair and I'll tell you a tale.
-		//
-		// When we shipped Half-Life 2 in 2004, we were unaware of a bug in
-		// CAmmoDef::NPCDamage() which was returning the MaxCarry field of
-		// an ammotype as the amount of damage that should be done to a NPC
-		// by that type of ammo. Thankfully, the bug only affected Ammo Types 
-		// that DO NOT use ConVars to specify their parameters. As you can see,
-		// all of the important ammotypes use ConVars, so the effect of the bug
-		// was limited. The Strider Minigun was affected, though.
-		//
-		// According to my perforce Archeology, we intended to ship the Strider
-		// Minigun ammo type to do 15 points of damage per shot, and we did. 
-		// To achieve this we, unaware of the bug, set the Strider Minigun ammo 
-		// type to have a maxcarry of 15, since our observation was that the 
-		// number that was there before (8) was indeed the amount of damage being
-		// done to NPC's at the time. So we changed the field that was incorrectly
-		// being used as the NPC Damage field.
-		//
-		// The bug was fixed during Episode 1's development. The result of the 
-		// bug fix was that the Strider was reduced to doing 5 points of damage
-		// to NPC's, since 5 is the value that was being assigned as NPC damage
-		// even though the code was returning 15 up to that point.
-		//
-		// Now as we go to ship Orange Box, we discover that the Striders in 
-		// Half-Life 2 are hugely ineffective against citizens, causing big
-		// problems in maps 12 and 13. 
-		//
-		// In order to restore balance to HL2 without upsetting the delicate 
-		// balance of ep2_outland_12, I have chosen to build Episodic binaries
-		// with 5 as the Strider->NPC damage, since that's the value that has
-		// been in place for all of Episode 2's development. Half-Life 2 will
-		// build with 15 as the Strider->NPC damage, which is how HL2 shipped
-		// originally, only this time the 15 is located in the correct field
-		// now that the AmmoDef code is behaving correctly.
-		//
-		//=====================================================================
-#ifdef HL2_EPISODIC
-		def.AddAmmoType("StriderMinigun",		DMG_BULLET,				TRACER_LINE,			10, 15, 15, 1.0 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 1.0kg weight at 750 ft/s
-#else
-		def.AddAmmoType("StriderMinigun",		DMG_BULLET,				TRACER_LINE,			5, 15, 15, 1.0 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 1.0kg weight at 750 ft/s
-#endif
-
-		def.AddAmmoType("StriderMinigunDirect",	DMG_BULLET,				TRACER_LINE,			2, 2, 15, 1.0 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 1.0kg weight at 750 ft/s
-		def.AddAmmoType("HelicopterGun",		DMG_BULLET,				TRACER_LINE_AND_WHIZ,	"sk_npc_dmg_helicopter_to_plr", "sk_npc_dmg_helicopter",	"sk_max_smg1",	BULLET_IMPULSE(400, 1225), AMMO_FORCE_DROP_IF_CARRIED | AMMO_INTERPRET_PLRDAMAGE_AS_DAMAGE_TO_PLAYER, 4, 10 );
-		def.AddAmmoType("AR2AltFire",			DMG_DISSOLVE,			TRACER_NONE,			0, 0, "sk_max_ar2_altfire", 0, 0 );
-		def.AddAmmoType("Slam",					DMG_BLAST,				TRACER_NONE,			NULL, NULL,	"sk_max_slam", 0, 0);
-		def.AddAmmoType("Hopwire",				DMG_BLAST,				TRACER_NONE,			"sk_plr_dmg_grenade", "sk_npc_dmg_grenade", "sk_max_hopwire", 0, 0);
-		def.AddAmmoType("CombineHeavyCannon",	DMG_BULLET,				TRACER_LINE,			40,	40, NULL, 10 * 750 * 12, AMMO_FORCE_DROP_IF_CARRIED ); // hit like a 10 kg weight at 750 ft/s
-		def.AddAmmoType("ammo_proto1",			DMG_BULLET | DMG_PLASMA,	TRACER_BEAM,			0, 0, 10, 0, 0 );
-	}
-
-	return &def;
-}
-
-#endif
-#endif
-
-
-//=============================================================================
-// MULTIPLAYER
-//=============================================================================
-bool CHalfLife2::FAllowNPCs( void )
-{
-#ifndef CLIENT_DLL
-	if (IsMultiplayer())
-		return ( allowNPCs.GetInt() != 0 );
-	else
-#endif
-		return true;
-}
-
-//=========================================================
-// WeaponShouldRespawn - any conditions inhibiting the
-// respawning of this weapon?
-//=========================================================
-int CHalfLife2::WeaponShouldRespawn( CBaseCombatWeapon *pWeapon )
-{
-#ifndef CLIENT_DLL
-	if ( pWeapon->HasSpawnFlags( SF_NORESPAWN ) )
-		return GR_WEAPON_RESPAWN_NO;
-
-	// Default on in MP, off in SP (duh)
-	return IsMultiplayer() ? GR_WEAPON_RESPAWN_YES : GR_WEAPON_RESPAWN_NO;
-#else
-	// For the client just pass 0
-	return 0;
-#endif
-}
-
-int CHalfLife2::ItemShouldRespawn( CItem *pItem )
-{
-#ifndef CLIENT_DLL
-	if ( pItem->HasSpawnFlags( SF_NORESPAWN ) )
-		return GR_ITEM_RESPAWN_NO;
-
-	// Default on in MP, off in SP (duh)
-	return IsMultiplayer() ? GR_ITEM_RESPAWN_YES : GR_ITEM_RESPAWN_NO;
-#else
-	// For the client just pass 0
-	return 0;
-#endif
-}
-
-//=========================================================
-// FlWeaponRespawnTime - what is the time in the future
-// at which this weapon may spawn?
-//=========================================================
-float CHalfLife2::FlWeaponRespawnTime( CBaseCombatWeapon *pWeapon )
-{
-#ifndef CLIENT_DLL
-	if ( weaponstay.GetInt() > 0 )
-	{
-		// make sure it's only certain weapons
-		if ( !(pWeapon->GetWeaponFlags() & ITEM_FLAG_LIMITINWORLD) )
-		{
-			return 0;		// weapon respawns almost instantly
-		}
-	}
-
-	return gpGlobals->curtime + sv_hl2mp_weapon_respawn_time.GetFloat();
-#else
-	return 0;		// weapon respawns almost instantly
-#endif
-}
-
-float CHalfLife2::FlItemRespawnTime( CItem *pItem )
-{
-#ifndef CLIENT_DLL
-	return gpGlobals->curtime + sv_hl2mp_item_respawn_time.GetFloat();
-#else
-	return 0;		// item respawns almost instantly
-#endif
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: Optional loading videos for maps

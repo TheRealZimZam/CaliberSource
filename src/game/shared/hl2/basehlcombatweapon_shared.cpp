@@ -77,6 +77,7 @@ BEGIN_PREDICTION_DATA( CBaseHLCombatWeapon )
 END_PREDICTION_DATA()
 
 ConVar sk_auto_reload_time( "sk_auto_reload_time", "12", FCVAR_REPLICATED );
+
 ConVar sk_realistic_spread( "sk_realistic_spread", "0", FCVAR_REPLICATED );
 ConVar sk_spread_moving( "sk_spread_moving", "1.2", FCVAR_REPLICATED );	// Moving/walking
 ConVar sk_spread_movingfast( "sk_spread_movingfast", "1.4", FCVAR_REPLICATED );	// Moving/jogging/sprinting

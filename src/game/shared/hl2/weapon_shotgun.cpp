@@ -29,8 +29,6 @@
 #define VECTOR_CONE_SHOTGUN		Vector( 0.10461, 0.10461, 0.09589 )
 #define SHOTGUN_KICKBACK		4	// Range for punchangle when firing.
 
-//ConVar sk_weapon_shotgun_lerp( "sk_weapon_shotgun_lerp", "3.0" );	//NOT USED
-
 extern ConVar sk_auto_reload_time;
 extern ConVar sk_plr_num_shotgun_pellets;
 extern ConVar sk_npc_num_shotgun_pellets;
@@ -51,7 +49,7 @@ private:
 	CNetworkVar( bool,	m_bNeedPump );		// When emptied completely
 	CNetworkVar( bool,	m_bDelayedFire1 );	// Fire primary when finished reloading
 	CNetworkVar( bool,	m_bDelayedFire2 );	// Fire secondary when finished reloading
-	CNetworkVar( bool,	m_bDelayedReload );	// Reload when finished pump
+//	CNetworkVar( bool,	m_bDelayedReload );	// Reload when finished pump
 
 public:
 	void	Precache( void );
@@ -87,6 +85,7 @@ public:
 	void ItemPostFrame( void );
 	void PrimaryAttack( void );
 	void SecondaryAttack( void );
+	bool CheckFireConditions( void );
 //	void DoImpactEffect( trace_t &tr, int nDamageType );
 
 	const char *GetTracerType( void ) { return "ShotgunTracer"; }
@@ -112,12 +111,12 @@ BEGIN_NETWORK_TABLE( CWeaponShotgun, DT_WeaponShotgun )
 	RecvPropBool( RECVINFO( m_bNeedPump ) ),
 	RecvPropBool( RECVINFO( m_bDelayedFire1 ) ),
 	RecvPropBool( RECVINFO( m_bDelayedFire2 ) ),
-	RecvPropBool( RECVINFO( m_bDelayedReload ) ),
+//	RecvPropBool( RECVINFO( m_bDelayedReload ) ),
 #else
 	SendPropBool( SENDINFO( m_bNeedPump ) ),
 	SendPropBool( SENDINFO( m_bDelayedFire1 ) ),
 	SendPropBool( SENDINFO( m_bDelayedFire2 ) ),
-	SendPropBool( SENDINFO( m_bDelayedReload ) ),
+//	SendPropBool( SENDINFO( m_bDelayedReload ) ),
 #endif
 END_NETWORK_TABLE()
 
@@ -126,7 +125,7 @@ BEGIN_PREDICTION_DATA( CWeaponShotgun )
 	DEFINE_PRED_FIELD( m_bNeedPump, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_bDelayedFire1, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_bDelayedFire2, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
-	DEFINE_PRED_FIELD( m_bDelayedReload, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
+//	DEFINE_PRED_FIELD( m_bDelayedReload, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
 END_PREDICTION_DATA()
 #endif
 
@@ -196,6 +195,7 @@ CWeaponShotgun::CWeaponShotgun( void )
 	m_bNeedPump		= false;
 	m_bDelayedFire1 = false;
 	m_bDelayedFire2 = false;
+//	m_bDelayedReload = false;
 
 	if ( sv_funmode.GetBool() )
 	{
@@ -315,6 +315,7 @@ bool CWeaponShotgun::Reload( void )
 	if (!m_bInReload)
 	{
 		Warning("ERROR: Shotgun Reload called incorrectly!\n");
+		m_bInReload = true;
 	}
 
 	CBaseCombatCharacter *pOwner  = GetOwner();
@@ -516,9 +517,7 @@ void CWeaponShotgun::SecondaryAttack( void )
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 
 	if (!pPlayer)
-	{
 		return;
-	}
 
 	pPlayer->m_nButtons &= ~IN_ATTACK2;
 	// MUST call sound before removing a round from the clip of a CMachineGun
@@ -589,6 +588,7 @@ void CWeaponShotgun::SecondaryAttack( void )
 	
 //-----------------------------------------------------------------------------
 // Purpose: Override so shotgun can do mulitple reloads in a row
+// TODO; Theres way more if/elses than i'd like here - MM
 //-----------------------------------------------------------------------------
 void CWeaponShotgun::ItemPostFrame( void )
 {
@@ -600,28 +600,88 @@ void CWeaponShotgun::ItemPostFrame( void )
 
 	if (m_bInReload)
 	{
-		// If I'm primary firing and have one round stop reloading and fire
-		if ((pOwner->m_nButtons & IN_ATTACK ) && (m_iClip1 >=1))
+		// TODO; switch?
+#if 0
+		switch( pOwner->m_nButtons )
 		{
-			m_bInReload		= false;
-			m_bNeedPump		= false;
-			m_bDelayedFire1 = true;
+			case IN_ATTACK:
+				// If I'm primary firing and have one round stop reloading and fire
+				if (m_iClip1 >=1)
+				{
+					FinishReload();
+				//!	m_bNeedPump		= false;
+					m_bDelayedFire1 = true;
+					return;
+				}
+			break;
+
+			case IN_ATTACK2:
+				// If I'm secondary firing and have two rounds stop reloading and fire
+				if (m_iClip1 >=2)
+				{
+					FinishReload();
+				//!	m_bNeedPump		= false;
+					m_bDelayedFire2 = true;
+					return;
+				}
+			break;
+
+			case IN_RELOAD:
+				// Reload cancelled by owner
+				m_bDelayedStopReload = true;
+				return;
+			break;
+
+			default:
+			if (m_flNextPrimaryAttack <= gpGlobals->curtime)
+			{
+				// Completely out of ammo
+				if ( pOwner->GetAmmoCount(GetPrimaryAmmoType()) <=0)
+				{
+					FinishReload();
+					return;
+				}
+				// If clip not full reload again
+				if (m_iClip1 < GetMaxClip1())
+				{
+					Reload();
+					return;
+				}
+				// Clip full, stop reloading
+				else
+				{
+					FinishReload();
+					return;
+				}
+			}
+			break;
+		}
+#else
+		// If I'm primary firing and have one round stop reloading and fire
+		if ((pOwner->m_nButtons & IN_ATTACK) && (m_iClip1 >=1))
+		{
+			FinishReload();
+		//!	m_bNeedPump		= false;
+		//	m_bDelayedFire1 = true;
+			return;
 		}
 		// If I'm secondary firing and have two rounds stop reloading and fire
-		else if ((pOwner->m_nButtons & IN_ATTACK2 ) && (m_iClip1 >=2))
+		else if ((pOwner->m_nButtons & IN_ATTACK2) && (m_iClip1 >=2))
 		{
-			m_bInReload		= false;
-			m_bNeedPump		= false;
-			m_bDelayedFire2 = true;
+			FinishReload();
+		//!	m_bNeedPump		= false;
+		//	m_bDelayedFire2 = true;
+			return;
 		}
 		else if (m_flNextPrimaryAttack <= gpGlobals->curtime)
 		{
-			// If out of ammo end reload
-			if (pOwner->GetAmmoCount(GetPrimaryAmmoType()) <=0)
+			// Completely out of ammo
+			if ( pOwner->GetAmmoCount(GetPrimaryAmmoType()) <=0)
 			{
 				FinishReload();
 				return;
 			}
+
 			// If clip not full reload again
 			if (m_iClip1 < GetMaxClip1())
 			{
@@ -635,6 +695,7 @@ void CWeaponShotgun::ItemPostFrame( void )
 				return;
 			}
 		}
+#endif
 	}
 	else
 	{			
@@ -642,91 +703,49 @@ void CWeaponShotgun::ItemPostFrame( void )
 		SetBodygroup(1,1);
 	}
 
-	if ((m_bNeedPump) && (m_flNextPrimaryAttack <= gpGlobals->curtime))
+	if ((m_bNeedPump) && (m_flNextPrimaryAttack <= gpGlobals->curtime))	
 	{
 		Pump();
 		return;
 	}
 	
 	// Shotgun uses same timing and ammo for secondary attack
-	if ((m_bDelayedFire2 || pOwner->m_nButtons & IN_ATTACK2)&&(m_flNextPrimaryAttack <= gpGlobals->curtime))
+	if (m_flNextPrimaryAttack <= gpGlobals->curtime)
 	{
-		m_bDelayedFire2 = false;
-		
-		if ( (m_iClip1 <= 1 && UsesClipsForAmmo1()))
+		if ( m_bDelayedFire2 || pOwner->m_nButtons & IN_ATTACK2 )
 		{
-			// If only one shell is left, do a single shot instead	
-			if ( m_iClip1 == 1 )
+			m_bDelayedFire2 = false;
+			// Check if im allowed to fire normally
+			if ( CheckFireConditions() )
 			{
+				// If the firing button was just pressed, reset the firing time
+				if ( pOwner->m_afButtonPressed & IN_ATTACK )
+					 m_flNextPrimaryAttack = gpGlobals->curtime;
+
+				SecondaryAttack();
+			}
+		}
+		else if ( m_bDelayedFire1 || pOwner->m_nButtons & IN_ATTACK )
+		{
+			m_bDelayedFire1 = false;
+			// Check if im allowed to fire normally
+			if ( CheckFireConditions() )
+			{
+				// If the firing button was just pressed, reset the firing time
+				if ( pOwner->m_afButtonPressed & IN_ATTACK )
+					 m_flNextPrimaryAttack = gpGlobals->curtime;
+
 				PrimaryAttack();
 			}
-			else if (!pOwner->GetAmmoCount(GetPrimaryAmmoType()))
-			{
-				DryFire();
-			}
-			else
-			{
-				StartReload();
-			}
-		}
-
-		// Fire underwater?
-		else if (GetOwner()->GetWaterLevel() == 3 && m_bFiresUnderwater == false)
-		{
-			DryFire();
-			m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
-			return;
-		}
-		else
-		{
-			// If the firing button was just pressed, reset the firing time
-			if ( pOwner->m_afButtonPressed & IN_ATTACK )
-			{
-				 m_flNextPrimaryAttack = gpGlobals->curtime;
-			}
-			SecondaryAttack();
-		}
-	}
-	else if ( (m_bDelayedFire1 || pOwner->m_nButtons & IN_ATTACK) && m_flNextPrimaryAttack <= gpGlobals->curtime)
-	{
-		m_bDelayedFire1 = false;
-		if ( (m_iClip1 <= 0 && UsesClipsForAmmo1()) || ( !UsesClipsForAmmo1() && !pOwner->GetAmmoCount(GetPrimaryAmmoType()) ) )
-		{
-			if (!pOwner->GetAmmoCount(GetPrimaryAmmoType()))
-			{
-				DryFire();
-			}
-			else
-			{
-				StartReload();
-			}
-		}
-		// Fire underwater?
-		else if (pOwner->GetWaterLevel() == 3 && m_bFiresUnderwater == false)
-		{
-		//	WeaponSound(EMPTY);
-			DryFire();
-			m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
-			return;
-		}
-		else
-		{
-			// If the firing button was just pressed, reset the firing time
-			CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-			if ( pPlayer && pPlayer->m_afButtonPressed & IN_ATTACK )
-			{
-				 m_flNextPrimaryAttack = gpGlobals->curtime;
-			}
-			PrimaryAttack();
 		}
 	}
 
-	if ( pOwner->m_nButtons & IN_RELOAD && UsesClipsForAmmo1() && !m_bInReload ) 
+	if ( (pOwner->m_nButtons & IN_RELOAD) && UsesClipsForAmmo1() ) 
 	{
-		// reload when reload is pressed, or if no buttons are down and weapon is empty.
-		StartReload();
+		if ( !m_bInReload )
+			StartReload();
 	}
-	else 
+	else
 	{
 		// no fire buttons down
 		m_bFireOnEmpty = false;
@@ -736,7 +755,7 @@ void CWeaponShotgun::ItemPostFrame( void )
 			// weapon isn't useable, switch.
 			if ( !(GetWeaponFlags() & ITEM_FLAG_NOAUTOSWITCHEMPTY) && pOwner->SwitchToNextBestWeapon( this ) )
 			{
-				m_flNextPrimaryAttack = gpGlobals->curtime + 0.3;
+				m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
 				return;
 			}
 		}
@@ -757,6 +776,36 @@ void CWeaponShotgun::ItemPostFrame( void )
 		return;
 	}
 
+}
+
+bool CWeaponShotgun::CheckFireConditions( void )
+{
+	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+	if (!pOwner)
+		return false;
+
+	// Fire underwater?
+	if (pOwner->GetWaterLevel() == 3 && m_bFiresUnderwater == false)
+	{
+		DryFire();
+		m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
+		return false;
+	}
+
+	if ( (m_iClip1 <= 1 && UsesClipsForAmmo1()))
+	{
+		// If only one shell is left, always do a single shot	
+		if ( m_iClip1 == 1 )
+			PrimaryAttack();
+		else if (!pOwner->GetAmmoCount(m_iPrimaryAmmoType))
+			DryFire();
+		else
+			StartReload();
+
+		return false;
+	}
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -909,6 +958,7 @@ void CWeaponShotgun::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 {
 	switch( pEvent->event )
 	{
+		case EVENT_WEAPON_SMG1:
 		case EVENT_WEAPON_SHOTGUN_FIRE:
 		{
 			FireNPCPrimaryAttack( pOperator, false );

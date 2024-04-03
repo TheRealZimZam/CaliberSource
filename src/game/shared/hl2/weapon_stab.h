@@ -56,6 +56,7 @@ private:
 	// Animation event handlers
 	void HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 #endif
+	int m_nModel;
 };
 
 // TODO; Better system needed here, this is just temp for demo

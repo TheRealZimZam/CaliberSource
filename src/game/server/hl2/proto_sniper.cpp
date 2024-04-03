@@ -56,14 +56,6 @@ ConVar sniper_xbox_delay( "sniper_xbox_delay", "1" );
 extern ConVar sk_dmg_sniper_penetrate_plr;
 extern ConVar sk_dmg_sniper_penetrate_npc;
 
-#define SF_SNIPER_HIDDEN		(1 << 16) ///< No model, impervious to damage.
-#define SF_SNIPER_VIEWCONE		(1 << 17) ///< when set, sniper only sees in a small cone around the laser.
-#define SF_SNIPER_NOCORPSE		(1 << 18) ///< when set, no corpse
-#define SF_SNIPER_STARTDISABLED	(1 << 19)
-#define SF_SNIPER_FAST			(1 << 20) ///< This is semi-auto, faster-shooting sniper. Paint time is decreased 25%. Bullet speed increases 150%.
-#define SF_SNIPER_NOSWEEP		(1 << 21) ///< This sniper doesn't sweep to the target or use decoys.
-#define SF_SNIPER_TAKEALLDMG	(1 << 22) ///< This sniper can be counter-sniped.
-
 // Sometimes we may want the sniper to be fully visible (hasty nests, behind barricades, etc.)
 // In that case use a fake model with a couple of animations to sell an illusion that he's
 // actually an npc

@@ -52,7 +52,7 @@ public:
 	virtual bool IsArmed( void ) { return m_bDrawbackFinished == true; }
 
 	// Overwriten by baseclasses
-	virtual float	GetFuseTime( void ) { return 0; }	//Base fuse time
+	virtual float	GetFuseTime( void ) { return 3; }	//Base fuse time
 	virtual float	GetCookedFuseTime( void ) { return 0.1 + m_flCookedFuseTime; }	//Fuse time including cooking
 	virtual float	GetMinAttackDelay( void ) { return 6; }
 	virtual float	GetMaxAttackDelay( void ) { return 8; }

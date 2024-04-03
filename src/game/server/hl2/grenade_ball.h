@@ -12,7 +12,8 @@
 #pragma once
 #endif
 
-#include "basegrenade_shared.h"
+//#include "cbasespriteprojectile.h"
+#include "baseprojectile.h"
 
 enum SpitType_e
 {
@@ -23,21 +24,23 @@ enum SpitType_e
 
 enum SpitSize_e
 {
-	SMALL,
-	MEDIUM,
-	LARGE,
+	SMALL,	//Imp fireballs, small flamelets
+	MEDIUM,	//Fireclouds, flamethrower, explosions
+	LARGE,	//Big explosions,
 };
 
-#define FLAME_GRAVITY 400
-#define ACID_GRAVITY 550
-#define SPIT_GRAVITY 650
+#define FLAME_GRAVITY 250	//Fire has the lowest gravity, try to go in a straightish line
+#define ACID_GRAVITY 400	// Acid drops fast
+#define SPIT_GRAVITY 650	// Spits drops fastest, but is fired in a arc
+
+#define BALL_MAX_DECALS 2	// Maximum amount of decals a single ball can create
 
 class SmokeTrail;
 class CSprite;
 
-abstract_class CGrenadeBall : public CBaseGrenade
+abstract_class CGrenadeBall : public CBaseProjectile
 {
-	DECLARE_CLASS( CGrenadeBall, CBaseGrenade );
+	DECLARE_CLASS( CGrenadeBall, CBaseProjectile );
 	DECLARE_DATADESC();
 
 public:
@@ -52,7 +55,7 @@ public:
 	void 				GrenadeSpitTouch( CBaseEntity *pOther );
 	void				SetSpitType( int nType, int nSize );
 	void				Detonate( void );
-	void				Think( void );
+	void				FlyThink( void );
 	void				InitHissSound( void );
 
 	CHandle<SmokeTrail>	m_hSmokeTrail;
@@ -64,7 +67,7 @@ private:
 	float			m_flNextDamageTime;
 
 	int 			nSpitType;
-	int 			m_iMaxSplatDecals;	//stop decaling surfaces after this many touches
+	int 			m_iSplatDecals;	//stop decaling surfaces after this many touches
 
 	CSoundPatch		*m_pHissSound;
 	const char 		*m_pHitSound;

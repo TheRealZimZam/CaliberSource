@@ -42,8 +42,6 @@ enum SoldierType_t
 
 class CNPC_Combine : public CAI_BaseActor
 {
-	DECLARE_DATADESC();
-	DEFINE_CUSTOM_AI;
 	DECLARE_CLASS( CNPC_Combine, CAI_BaseActor );
 
 public:
@@ -119,6 +117,7 @@ public:
 	void			BuildScheduleTestBits( void );
 	virtual int		SelectSchedule( void );
 	int				SelectScheduleAttack();
+	int				SelectCombatSchedule();
 
 	bool			CreateBehaviors();
 
@@ -265,10 +264,11 @@ private:
 		NEXT_CONDITION
 	};
 
-private:
-	// Select the combat schedule
-	int SelectCombatSchedule();
+public:
+	DECLARE_DATADESC();
+	DEFINE_CUSTOM_AI;
 
+private:
 	// Should we charge the player?
 	bool ShouldChargePlayer();
 

@@ -202,7 +202,7 @@ void CGrenadeShrapnel::Detonate(void)
 		0,
 		0 );
 	// Dont use explosion smoke, use the smaller smoke instead
-	UTIL_Smoke( GetAbsOrigin(), random->RandomInt( 10, 15 ), 10 );
+	UTIL_Smoke( GetAbsOrigin(), random->RandomInt( 15, 20 ), 10 );
 
 	UTIL_Remove( this );
 }

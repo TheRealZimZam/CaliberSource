@@ -139,7 +139,7 @@ void CNPC_Eli::SetupWithoutParent( void )
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_STEP );
 
-	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_OPEN_DOORS | bits_CAP_ANIMATEDFACE | bits_CAP_TURN_HEAD );
+	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_OPEN_DOORS | bits_CAP_USE | bits_CAP_ANIMATEDFACE | bits_CAP_TURN_HEAD );
 	CapabilitiesAdd( bits_CAP_FRIENDLY_DMG_IMMUNE );
 }
 

@@ -136,9 +136,6 @@ void CreateConcussiveBlast( const Vector &origin, const Vector &surfaceNormal, C
 // Purpose: CGrenadeConcussive
 //-----------------------------------------------------------------------------
 BEGIN_DATADESC( CGrenadeConcussive )
-
-	DEFINE_FIELD( m_inSolid, FIELD_BOOLEAN),
-
 	// Function pointers
 //	DEFINE_THINKFUNC( BeamThink ),
 //	DEFINE_ENTITYFUNC( GrenadeConcussiveTouch ),
@@ -162,7 +159,6 @@ void CGrenadeConcussive::Precache( void )
 
 	PrecacheScriptSound( "GrenadeConcussive.Detonate" );
 	PrecacheScriptSound( "GrenadeConcussive.Ringing" );
-	PrecacheScriptSound( "GrenadeConcussive.StopSounds" );	//Shouldnt be needed, but just in case
 
 	PrecacheModel( "sprites/lgtning.vmt" );	//For electric beams that shoot out before det
 
@@ -179,6 +175,8 @@ void CGrenadeConcussive::Spawn( void )
 
 	SetModel( STUNGRENADE_MODEL );
 	UTIL_SetSize(this, Vector( -4, -4, -2), Vector(4, 4, 2));
+
+	SetCollisionGroup( COLLISION_GROUP_WEAPON );
 
 	// 5 dmg = full effects, peter out with less damage
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
@@ -198,6 +196,9 @@ void CGrenadeConcussive::Spawn( void )
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 
 	BaseClass::Spawn();
+
+	SetThink(&CGrenadeConcussive::Detonate);
+	SetNextThink( gpGlobals->curtime + 3.0f );
 }
 
 
@@ -222,24 +223,46 @@ void CGrenadeConcussive::Detonate(void)
 		CBaseCombatCharacter *pBCC = ToBaseCombatCharacter( pEntity );
 		if( pBCC )
 		{
-			if ( pBCC->IsPlayer() )
+			// Trace to the entity, if it hits a wall then dont do anything
+			trace_t tr;
+			UTIL_TraceLine( pBCC->EyePosition(), GetAbsOrigin(), MASK_SOLID, this, COLLISION_GROUP_NONE, &tr );
+			if ( tr.fraction == 1.0f || tr.m_pEnt == pBCC )
 			{
-				//!!TODO; If its a player, check body direction - am I facing the explosion?
-				pBCC->TakeDamage( CTakeDamageInfo( this, this, m_flDamage, DMG_SONIC ) );
-				
-				//Only the affected player can hear this sound
-				CPASAttenuationFilter filter( pBCC, "GrenadeConcussive.Ringing" );
-				EmitSound( filter, pBCC->entindex(), "GrenadeConcussive.Ringing" );
-			}
-			else
-			{
-				pBCC->TakeDamage( CTakeDamageInfo( this, this, m_flDamage, DMG_SONIC ) );
+				CTakeDamageInfo info( this, GetOwnerEntity(), m_flDamage, DMG_SONIC );
+
+				// Make sure it's in front of the player
+				if ( pBCC->IsPlayer() )
+				{
+					CBasePlayer *pPlayer = ToBasePlayer( pBCC );
+					pPlayer->TakeDamage( info );
+
+					Vector vecSrc = pPlayer->EyePosition();
+					Vector vecToTarget = (vecSrc - GetAbsOrigin());
+					Vector forward, right, up;
+					AngleVectors( pPlayer->pl.v_angle, &forward, &right, &up );
+					float flDot = DotProduct( vecToTarget, forward );
+
+					if ( flDot < 0.0f )
+					{
+						// Facing the explosion - white out the screen
+						color32 white = {255,255,255,200};
+						UTIL_ScreenFade( pPlayer, white, 0.2f, 5.0f, (FFADE_IN|FFADE_PURGE) );
+
+						//Only the affected player can hear this sound
+						CPASAttenuationFilter filter( pPlayer, "GrenadeConcussive.Ringing" );
+						EmitSound( filter, pPlayer->entindex(), "GrenadeConcussive.Ringing" );
+					}
+				}
+				else
+				{
+					pBCC->TakeDamage( info );
+				}
 			}
 		}
 		else
 		{
 			// Non living objects take club damage instead, to simulate a psychic whack
-			pEntity->TakeDamage( CTakeDamageInfo( this, GetOwnerEntity(), m_flDamage, DMG_CLUB ) );
+		//	pEntity->TakeDamage( CTakeDamageInfo( this, GetOwnerEntity(), m_flDamage, DMG_CLUB ) );
 		}
 	}
 
@@ -249,7 +272,6 @@ void CGrenadeConcussive::Detonate(void)
 
 	RemoveEffects( EF_NODRAW );
 	SetAbsVelocity( vec3_origin );
-	SetNextThink( gpGlobals->curtime + 0.2 );
-
-	UTIL_Remove( this );
+	SetThink(&CGrenadeConcussive::SUB_Remove);
+	SetNextThink( gpGlobals->curtime + 0.1f );
 }

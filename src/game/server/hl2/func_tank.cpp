@@ -28,7 +28,11 @@
 #include "IEffects.h"
 #include "ai_basenpc.h"
 #include "ai_behavior_functank.h"
+#if 0
 #include "weapon_rpg.h"
+#else
+#include "grenade_homer.h"
+#endif
 #include "effects.h"
 #include "iservervehicle.h"
 #include "soundenvelope.h"
@@ -2720,7 +2724,9 @@ LINK_ENTITY_TO_CLASS( func_tankrocket, CFuncTankRocket );
 
 void CFuncTankRocket::Precache( void )
 {
-	UTIL_PrecacheOther( "rpg_missile" );
+	UTIL_PrecacheOther( "grenade_homer" );
+	PrecacheModel( "models/weapons/w_missile.mdl" );
+	PrecacheScriptSound( "Missile.Accelerate" );
 	CFuncTank::Precache();
 }
 
@@ -2729,8 +2735,8 @@ void CFuncTankRocket::Fire( int bulletCount, const Vector &barrelEnd, const Vect
 	int i;
 	for ( i = 0; i < bulletCount; i++ )
 	{
+#if 0
 		CMissile *pRocket = (CMissile *) CBaseEntity::Create( "missile", barrelEnd, GetAbsAngles(), this );
-
 		pRocket->GuidingDisabled( true );
 		// Skip the accel phase, go straight to cruise
 		//pRocket->SetThink( &CMissile::SeekThink );
@@ -2745,8 +2751,18 @@ void CFuncTankRocket::Fire( int bulletCount, const Vector &barrelEnd, const Vect
 		{
 			pRocket->SetDamage( m_iBulletDamageVsPlayer );
 		}
+#else
+		CGrenadeHomer *pGrenade = CGrenadeHomer::CreateGrenadeHomer( MAKE_STRING("models/weapons/w_missile.mdl"), MAKE_STRING("Missile.Accelerate"), barrelEnd, GetAbsAngles(), edict() );
+		pGrenade->Spawn();
+		pGrenade->SetSpin(1,10);
+		pGrenade->SetHoming(0.0,0,0.0,0,0.0);
+		if ( GetController() && GetController()->IsPlayer() )
+			pGrenade->SetDamage( m_iBulletDamage );
+		else
+			pGrenade->SetDamage( m_iBulletDamageVsPlayer );
+		pGrenade->Launch(this,NULL,(forward*GetShotSpeed()),GetShotSpeed(),0,1);
 	}
-
+#endif
 	CFuncTank::Fire( bulletCount, barrelEnd, forward, this, bIgnoreSpread );
 }
 

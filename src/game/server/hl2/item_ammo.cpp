@@ -855,7 +855,7 @@ public:
 	}
 
 	void Spawn( void )
-	{ 
+	{
 		Precache( );
 		SetModel( "models/items/combine_rifle_cartridge01.mdl");	//TODO;Real model
 		BaseClass::Spawn( );

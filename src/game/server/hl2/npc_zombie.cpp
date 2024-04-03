@@ -21,7 +21,7 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar	sk_czombie_health( "sk_czombie_health","0");
+ConVar	sk_zombie_health( "sk_zombie_health","0");
 
 envelopePoint_t envZombieMoanVolumeFast[] =
 {
@@ -152,6 +152,8 @@ private:
 	Vector				 m_vPositionCharged;
 };
 
+LINK_ENTITY_TO_CLASS( npc_zombie, CClassicZombie );
+LINK_ENTITY_TO_CLASS( npc_zombie_torso, CClassicZombie );
 LINK_ENTITY_TO_CLASS( npc_czombie, CClassicZombie );
 LINK_ENTITY_TO_CLASS( npc_czombie_torso, CClassicZombie );
 #ifndef HL1_DLL
@@ -252,7 +254,7 @@ void CClassicZombie::Spawn( void )
 	Precache();
 
 	// This was placed as an npc_zombie_torso
-	if( FClassnameIs( this, "npc_czombie_torso" ) )
+	if( FClassnameIs( this, "npc_zombie_torso" ) || FClassnameIs( this, "npc_czombie_torso" ) )
 		m_fIsTorso = true;
 	else
 		m_fIsTorso = false;
@@ -265,7 +267,7 @@ void CClassicZombie::Spawn( void )
 	SetBloodColor( BLOOD_COLOR_GREEN );
 #endif // HL2_EPISODIC
 
-	m_iHealth			= sk_czombie_health.GetFloat();
+	m_iHealth			= sk_zombie_health.GetFloat();
 	m_flFieldOfView		= 0.8;
 
 	CapabilitiesClear();

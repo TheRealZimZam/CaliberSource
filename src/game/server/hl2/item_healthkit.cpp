@@ -21,26 +21,71 @@ ConVar	sk_healthvial( "sk_healthvial","0" );
 ConVar	sk_healthcharger( "sk_healthcharger","0" );
 
 //-----------------------------------------------------------------------------
-// Big health pack. Heals the player when picked up.
+// Theres two types of health items, Medkits, and Food.
+// Food gives slightly less health than medkits, but is more abundant,
+// and can be purchased from vending machines or found on tables.
+// Medkits are rare pickups, found in hidden caches and such.
 //-----------------------------------------------------------------------------
-class CHealthBox : public CItem
+class CHealthItem : public CItem
+{
+public:
+	DECLARE_CLASS( CHealthItem, CBaseAnimating );
+	DECLARE_DATADESC();
+
+	void Spawn( void )
+	{
+		Precache();
+
+		// Choose a random skin for candybars
+		if (m_bIsFood)
+			m_nSkin = random->RandomInt( 0, 5 );
+
+		BaseClass::Spawn();
+	}
+
+protected:
+	bool		m_bIsFood;
+};
+
+BEGIN_DATADESC( CHealthItem )
+
+	DEFINE_KEYFIELD( m_bIsFood, FIELD_BOOLEAN, "eatable" ),
+
+END_DATADESC()
+
+//-----------------------------------------------------------------------------
+// Big health pack/Hot Meal. Heals the player when picked up.
+//-----------------------------------------------------------------------------
+class CHealthBox : public CHealthItem
 {
 public:
 	DECLARE_CLASS( CHealthBox, CItem );
 
 	void Spawn( void )
 	{
-		Precache();
-		SetModel( "models/items/healthbox.mdl" );
-
+		if (m_bIsFood)
+			SetModel( "models/mre.mdl" );
+		else
+			SetModel( "models/items/healthbox.mdl" );
+		
 		BaseClass::Spawn();
 	}
 
 	void Precache( void )
 	{
-		PrecacheModel("models/items/healthbox.mdl");
+		if ( FClassnameIs( this, "item_hotmeal" ) )
+			m_bIsFood = true;
 
-		PrecacheScriptSound( "HealthBox.Touch" );
+		if (m_bIsFood)
+		{
+			PrecacheScriptSound( "Player.Eat" );
+			PrecacheModel("models/mre.mdl");
+		}
+		else
+		{
+			PrecacheScriptSound( "HealthBox.Touch" );
+			PrecacheModel("models/items/healthbox.mdl");
+		}
 	}
 
 	bool MyTouch( CBasePlayer *pPlayer )
@@ -54,8 +99,16 @@ public:
 				WRITE_STRING( GetClassname() );
 			MessageEnd();
 
-			CPASAttenuationFilter filter( pPlayer, "HealthBox.Touch" );
-			EmitSound( filter, pPlayer->entindex(), "HealthBox.Touch" );
+			if (m_bIsFood)
+			{
+				CPASAttenuationFilter filter( pPlayer, "Player.Eat" );
+				EmitSound( filter, pPlayer->entindex(), "Player.Eat" );
+			}
+			else
+			{
+				CPASAttenuationFilter filter( pPlayer, "HealthBox.Touch" );
+				EmitSound( filter, pPlayer->entindex(), "HealthBox.Touch" );
+			}
 
 			if ( g_pGameRules->ItemShouldRespawn( this ) )
 			{
@@ -66,38 +119,52 @@ public:
 				UTIL_Remove(this);	
 			}
 
-		return true;
-	}
+			return true;
+		}
 
-	return false;
+		return false;
 	}
 };
 
 LINK_ENTITY_TO_CLASS( item_healthbox, CHealthBox );
+LINK_ENTITY_TO_CLASS( item_hotmeal, CHealthBox );
+
 PRECACHE_REGISTER(item_healthbox);
-
+PRECACHE_REGISTER(item_hotmeal);
 
 //-----------------------------------------------------------------------------
-// Small health kit. Heals the player when picked up.
+// Small health kit/Dintymoore/Sandwich. Heals the player when picked up.
 //-----------------------------------------------------------------------------
-class CHealthKit : public CItem
+class CHealthKit : public CHealthItem
 {
 public:
 	DECLARE_CLASS( CHealthKit, CItem );
 
 	void Spawn( void )
 	{
-		Precache();
-		SetModel( "models/items/healthkit.mdl" );
-
+		if (m_bIsFood)
+			SetModel( "models/dintymoore.mdl" );
+		else
+			SetModel( "models/items/healthkit.mdl" );
+		
 		BaseClass::Spawn();
 	}
 
 	void Precache( void )
 	{
-		PrecacheModel("models/items/healthkit.mdl");
+		if ( FClassnameIs( this, "item_sandwich" ) )
+			m_bIsFood = true;
 
-		PrecacheScriptSound( "HealthKit.Touch" );
+		if (m_bIsFood)
+		{
+			PrecacheScriptSound( "Player.Eat" );
+			PrecacheModel("models/dintymoore.mdl");
+		}
+		else
+		{
+			PrecacheScriptSound( "HealthKit.Touch" );
+			PrecacheModel("models/items/healthkit.mdl");
+		}
 	}
 
 	bool MyTouch( CBasePlayer *pPlayer )
@@ -111,8 +178,16 @@ public:
 				WRITE_STRING( GetClassname() );
 			MessageEnd();
 
-			CPASAttenuationFilter filter( pPlayer, "HealthKit.Touch" );
-			EmitSound( filter, pPlayer->entindex(), "HealthKit.Touch" );
+			if (m_bIsFood)
+			{
+				CPASAttenuationFilter filter( pPlayer, "Player.Eat" );
+				EmitSound( filter, pPlayer->entindex(), "Player.Eat" );
+			}
+			else
+			{
+				CPASAttenuationFilter filter( pPlayer, "HealthKit.Touch" );
+				EmitSound( filter, pPlayer->entindex(), "HealthKit.Touch" );
+			}
 
 			if ( g_pGameRules->ItemShouldRespawn( this ) )
 			{
@@ -123,16 +198,18 @@ public:
 				UTIL_Remove(this);	
 			}
 
-		return true;
-	}
+			return true;
+		}
 
-	return false;
+		return false;
 	}
 };
 
 LINK_ENTITY_TO_CLASS( item_healthkit, CHealthKit );
-PRECACHE_REGISTER(item_healthkit);
+LINK_ENTITY_TO_CLASS( item_sandwich, CHealthKit );
 
+PRECACHE_REGISTER(item_healthkit);
+PRECACHE_REGISTER(item_sandwich);
 
 //-----------------------------------------------------------------------------
 // CHealthVial
@@ -141,25 +218,18 @@ PRECACHE_REGISTER(item_healthkit);
 // I ((think)) this is better perf wise?? All the candybar logic is only done
 // at spawn... -M
 //-----------------------------------------------------------------------------
-class CHealthVial : public CItem
+class CHealthVial : public CHealthItem
 {
 public:
 	DECLARE_CLASS( CHealthVial, CItem );
 
 	void Spawn( void )
 	{
-		Precache();
-
 		if (m_bIsFood)
-		{
 			SetModel( "models/candybar.mdl" );
-			m_nSkin = random->RandomInt( 0, 5 );
-		}
 		else
-		{
 			SetModel( "models/healthvial.mdl" );
-		}
-
+		
 		BaseClass::Spawn();
 	}
 
@@ -216,23 +286,13 @@ public:
 
 		return false;
 	}
-
-	DECLARE_DATADESC();
-
-protected:
-	bool		m_bIsFood;
 };
 
 LINK_ENTITY_TO_CLASS( item_healthvial, CHealthVial );
 LINK_ENTITY_TO_CLASS( item_candybar, CHealthVial );
 
-BEGIN_DATADESC( CHealthVial )
-
-	DEFINE_KEYFIELD( m_bIsFood, FIELD_BOOLEAN, "isfood" ),
-
-END_DATADESC()
-
 PRECACHE_REGISTER( item_healthvial );
+PRECACHE_REGISTER( item_candybar );
 
 //-----------------------------------------------------------------------------
 // Wall mounted health kit. Heals the player when used.

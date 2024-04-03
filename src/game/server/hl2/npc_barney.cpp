@@ -46,7 +46,7 @@ class CNPC_Barney : public CNPC_PlayerCompanion
 {
 public:
 	DECLARE_CLASS( CNPC_Barney, CNPC_PlayerCompanion );
-	DECLARE_SERVERCLASS();
+//	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
 
 	virtual void Precache()
@@ -79,7 +79,8 @@ public:
 
 	void DeathSound( const CTakeDamageInfo &info );
 	void GatherConditions();
-	void UseFunc( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void FollowUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	CAI_FuncTankBehavior		m_FuncTankBehavior;
 	COutputEvent				m_OnPlayerUse;
@@ -92,8 +93,8 @@ LINK_ENTITY_TO_CLASS( npc_barney, CNPC_Barney );
 //---------------------------------------------------------
 // 
 //---------------------------------------------------------
-IMPLEMENT_SERVERCLASS_ST(CNPC_Barney, DT_NPC_Barney)
-END_SEND_TABLE()
+//IMPLEMENT_SERVERCLASS_ST(CNPC_Barney, DT_NPC_Barney)
+//END_SEND_TABLE()
 
 
 //---------------------------------------------------------
@@ -102,7 +103,7 @@ END_SEND_TABLE()
 BEGIN_DATADESC( CNPC_Barney )
 //						m_FuncTankBehavior
 	DEFINE_OUTPUT( m_OnPlayerUse, "OnPlayerUse" ),
-	DEFINE_USEFUNC( UseFunc ),
+	DEFINE_USEFUNC( SimpleUse ),
 END_DATADESC()
 
 //-----------------------------------------------------------------------------
@@ -128,11 +129,12 @@ void CNPC_Barney::Spawn( void )
 
 	BaseClass::Spawn();
 
+	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 	AddEFlags( EFL_NO_DISSOLVE | EFL_NO_MEGAPHYSCANNON_RAGDOLL | EFL_NO_PHYSCANNON_INTERACTION );
 
 	NPCInit();
 
-	SetUse( &CNPC_Barney::UseFunc );
+	SetUse( &CNPC_Barney::SimpleUse );
 }
 
 //-----------------------------------------------------------------------------
@@ -229,13 +231,39 @@ void CNPC_Barney::GatherConditions()
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-void CNPC_Barney::UseFunc( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+void CNPC_Barney::SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	m_bDontUseSemaphore = true;
 	SpeakIfAllowed( TLK_USE );
 	m_bDontUseSemaphore = false;
 
-	m_OnPlayerUse.FireOutput( pActivator, pCaller );
+	if ( AI_IsSinglePlayer() && pActivator == UTIL_GetLocalPlayer() )
+	{
+		FollowUse(pActivator, pCaller, useType, value);
+
+		m_OnPlayerUse.FireOutput( pActivator, pCaller );
+	}
+}
+
+//---------------------------------------------------------
+//---------------------------------------------------------
+void CNPC_Barney::FollowUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	CBaseEntity *pLeader = ( !m_FollowBehavior.GetFollowTarget() ) ? pCaller : NULL;
+	m_FollowBehavior.SetFollowTarget( pLeader );
+
+	if ( m_pSquad && m_pSquad->NumMembers() > 1 )
+	{
+		AISquadIter_t iter;
+		for (CAI_BaseNPC *pSquadMember = m_pSquad->GetFirstMember( &iter ); pSquadMember; pSquadMember = m_pSquad->GetNextMember( &iter ) )
+		{
+			CNPC_Barney *pBarney = dynamic_cast<CNPC_Barney *>(pSquadMember);
+			if ( pBarney && pBarney != this)
+			{
+				pBarney->m_FollowBehavior.SetFollowTarget( pLeader );
+			}
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------

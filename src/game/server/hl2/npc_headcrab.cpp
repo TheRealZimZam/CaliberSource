@@ -1816,7 +1816,7 @@ int CBaseHeadcrab::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 		// Slow down burn damage so that headcrabs live longer while on fire.
 		info.ScaleDamage( 0.25 );
 
-#define HEADCRAB_SCORCH_RATE	5
+#define HEADCRAB_SCORCH_RATE	4
 #define HEADCRAB_SCORCH_FLOOR	30
 
 		if( IsOnFire() )
@@ -2617,6 +2617,7 @@ void CHeadcrab::BiteSound( void )
 	EmitSound( "NPC_HeadCrab.Bite" );
 }
 
+LINK_ENTITY_TO_CLASS( npc_headcrab, CHeadcrab );
 LINK_ENTITY_TO_CLASS( npc_cheadcrab, CHeadcrab );
 #ifndef HL1_DLL
 LINK_ENTITY_TO_CLASS( monster_headcrab, CHeadcrab );
@@ -3021,7 +3022,6 @@ bool CFastHeadcrab::QuerySeeEntity(CBaseEntity *pSightEnt, bool bOnlyHateOrFearI
 	return BaseClass::QuerySeeEntity(pSightEnt, bOnlyHateOrFearIfNPC);
 }
 
-LINK_ENTITY_TO_CLASS( npc_headcrab, CFastHeadcrab );
 LINK_ENTITY_TO_CLASS( npc_headcrab_fast, CFastHeadcrab );
 
 //-----------------------------------------------------------------------------

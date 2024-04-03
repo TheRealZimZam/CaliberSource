@@ -1,12 +1,14 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Your classic malicious-military-marauders.
-// TODO's: Fix sentence prefix - the ifelite check works for now to get the demo out, but its gross and a better system would
+// TODO's: 1. Fix sentence prefix - the ifelite check works for now to get the demo out, but its gross and a better system would
 // be nice if speech was ever expanded to more unique types of soldier (leader, medic, support, etc.). 
 // The minimally invasive way I tried didnt work and I dont know how else to do it without a large re-write.
 // My idea is to have a think function interpret and store the finished sentence, and then play it when given the chance, 
 // rather than on a purely on-call basis as it is right now. I dont know about the perf costs of that, but
 // it shouldnt be too bad if its only updated every other think or something similar. - m.
+// 2. Optimize - This really shouldnt be over 4k lines long, the hl1 hgrunt is maybe 2-1/2k,
+// and pretty much does the same things
 //
 // Auto-squadding, COND_COMBINE_DROP_GRENADE for tripmines, integrate with metrocops somehow??
 //
@@ -354,6 +356,10 @@ void CNPC_Combine::Activate()
 void CNPC_Combine::Spawn( void )
 {
 	BaseClass::Spawn();
+#ifdef _XBOX
+	// Always fade the corpse
+	AddSpawnFlags( SF_NPC_FADE_CORPSE );
+#endif // _XBOX
 
 	SetHullType(HULL_HUMAN);
 	SetHullSizeNormal();
@@ -379,7 +385,7 @@ void CNPC_Combine::Spawn( void )
 #endif
 	}
 
-	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_CLIMB);
+	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_CLIMB | bits_CAP_USE );
 	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_AIM_GUN );
 
 	// Innate range attack for kicking
@@ -1144,17 +1150,7 @@ void CNPC_Combine::StartTask( const Task_t *pTask )
 
 	case TASK_COMBINE_DIE_INSTANTLY:
 		{
-			CTakeDamageInfo info;
-
-			info.SetAttacker( this );
-			info.SetInflictor( this );
-			info.SetDamage( m_iHealth );
-			info.SetDamageType( pTask->flTaskData );
-			info.SetDamageForce( Vector( 0.1, 0.1, 0.1 ) );
-
-			TakeDamage( info );
-
-			TaskComplete();
+			SetCondition( COND_STUNNED );
 		}
 		break;
 
@@ -1200,6 +1196,28 @@ void CNPC_Combine::RunTask( const Task_t *pTask )
 		AutoMovement( );
 		if ( IsActivityFinished() )
 		{
+			TaskComplete();
+		}
+		break;
+
+	case TASK_COMBINE_DIE_INSTANTLY:
+		if ( IsActivityFinished() )
+		{
+			// Fire only kills me in easy mode, otherwise burning just stuns for a few seconds
+			if ( g_pGameRules->IsSkillLevel( SKILL_EASY ) )
+			{
+				CTakeDamageInfo info;
+
+				info.SetAttacker( this );
+				info.SetInflictor( this );
+				info.SetDamage( m_iHealth );
+				info.SetDamageType( pTask->flTaskData );
+				info.SetDamageForce( Vector( 0.1, 0.1, 0.1 ) );
+
+				TakeDamage( info );
+			}
+
+			ClearCondition( COND_STUNNED );
 			TaskComplete();
 		}
 		break;
@@ -1509,14 +1527,6 @@ int CNPC_Combine::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		m_Sentences.Speak( "COMBINE_FRIENDLY_FIRE", SENTENCE_PRIORITY_MEDIUM );
 	}
 
-	//Should this be in here???
-#if 1
-	if( info.GetDamageType() & DMG_BURN )
-	{
-		Scorch( 8, 75 );
-	}
-#endif
-
 	return BaseClass::OnTakeDamage_Alive( info );
 }
 
@@ -1641,8 +1651,8 @@ void CNPC_Combine::BuildScheduleTestBits( void )
 Activity CNPC_Combine::NPC_TranslateActivity( Activity eNewActivity )
 {
 	//Slaming this back to ACT_COMBINE_BUGBAIT since we don't want ANYTHING to change our activity while we burn.
-	if ( HasCondition( COND_ON_FIRE ) )
-		return BaseClass::NPC_TranslateActivity( ACT_COMBINE_BUGBAIT );
+//	if ( IsCurSchedule( SCHED_COMBINE_BURNING_STAND ) )
+//		return BaseClass::NPC_TranslateActivity( ACT_COMBINE_BUGBAIT );
 
 	if ( temp_demofixes.GetBool() )
 	{
@@ -1782,13 +1792,6 @@ int CNPC_Combine::SelectSchedule( void )
 		return BaseClass::SelectSchedule();
 	}
 
-	if ( HasCondition( COND_ON_FIRE ) )
-		return SCHED_COMBINE_BURNING_STAND;
-
-	int nSched = SelectFlinchSchedule();
-	if ( nSched != SCHED_NONE )
-		return nSched;
-
 	if ( m_hForcedGrenadeTarget )
 	{
 		if ( m_flNextGrenadeCheck < gpGlobals->curtime )
@@ -1821,6 +1824,16 @@ int CNPC_Combine::SelectSchedule( void )
 
 	if ( m_NPCState != NPC_STATE_SCRIPT )
 	{
+		int nSched = SelectFlinchSchedule();
+		if ( nSched != SCHED_NONE )
+			return nSched;
+
+		// Only freak out once
+		if ( HasCondition( COND_ON_FIRE ) && !HasCondition( COND_STUNNED ) )
+		{
+			return( SCHED_COMBINE_BURNING_STAND );
+		}
+
 		// If we're hit by bugbait, thrash around
 		if ( HasCondition( COND_COMBINE_HIT_BY_BUGBAIT ) )
 		{
@@ -1919,7 +1932,7 @@ int CNPC_Combine::SelectSchedule( void )
 				// If I see one by myself just avoid it
 
 				// If im in a squad, get the squad away from it, then drop a grenade and run!
-				if ( Tripmine->GetOwner() == pPlayer )
+				if ( pTripmine->GetOwner() == pPlayer )
 				{
 					if( m_pSquad && m_pSquad->GetSquadMemberNearestTo( Tripmine->GetAbsOrigin() ) == this && OccupyStrategySlot( SQUAD_SLOT_INVESTIGATE_SOUND ) )
 					{
@@ -2078,7 +2091,7 @@ int CNPC_Combine::SelectCombatSchedule()
 			// No ammo, run for cover!
 			return SCHED_HIDE_AND_RELOAD;
 		}
-		else if ( HasCondition( COND_LOW_PRIMARY_AMMO ) && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+		else if ( HasCondition( COND_LOW_PRIMARY_AMMO ) && (m_pSquad && OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 )) )
 		{
 			// Low ammo and im attacking, try to find a good spot to reload
 			return SCHED_COMBINE_COVER_AND_RELOAD;
@@ -3129,10 +3142,8 @@ char *CNPC_Combine::GetSentencePrefix( const char *pszSoundName )
 	if( IsDemolition() )
 		Prefix = "COMBINE_LEADER";
 
-#if 0
 	if( IsShock() )
 		Prefix = "COMBINE_SHOCK";
-#endif
 
 	if( IsElite() )
 		Prefix = "COMBINE_ELITE";
@@ -4549,7 +4560,7 @@ DEFINE_SCHEDULE
  "		COND_ENEMY_DEAD"
  "		COND_LIGHT_DAMAGE"
  "		COND_HEAVY_DAMAGE"
- "		COND_LOW_PRIMARY_AMMO"
+ //"		COND_LOW_PRIMARY_AMMO"
  "		COND_NO_PRIMARY_AMMO"
  "		COND_ENEMY_OCCLUDED"
  "		COND_WEAPON_BLOCKED_BY_FRIEND"
@@ -4874,10 +4885,9 @@ DEFINE_SCHEDULE
  "	Tasks"
  "		TASK_SET_ACTIVITY				ACTIVITY:ACT_COMBINE_BUGBAIT"
  "		TASK_RANDOMIZE_FRAMERATE		12"
+ "		TASK_COMBINE_DIE_INSTANTLY		DMG_BURN"
  "		TASK_WAIT						2"
  "		TASK_WAIT_RANDOM				3"
- "		TASK_COMBINE_DIE_INSTANTLY		DMG_BURN"
- "		TASK_WAIT						1.0"
  "	"
  "	Interrupts"
  )

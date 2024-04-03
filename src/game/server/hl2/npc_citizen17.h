@@ -38,6 +38,7 @@ struct SquadCandidate_t;
 //-------------------------------------
 // Animation events
 //-------------------------------------
+#define CITIZEN_AE_HEAL 1
 
 enum CitizenType_t
 {
@@ -132,8 +133,6 @@ public:
 	void 			HandleAnimEvent( animevent_t *pEvent );
 	void			TaskFail( AI_TaskFailureCode_t code );
 
-	void 			PickupItem( CBaseEntity *pItem );
-
 	void 			SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	bool			IgnorePlayerPushing( void );
@@ -151,10 +150,8 @@ public:
 	void 			OnEndMoveAndShoot();
 
 	bool			IsManhackMeleeCombatant();
-	
-	Vector 			GetActualShootPosition( const Vector &shootOrigin );
-	void 			OnChangeActiveWeapon( CBaseCombatWeapon *pOldWeapon, CBaseCombatWeapon *pNewWeapon );
 
+	void 			OnChangeActiveWeapon( CBaseCombatWeapon *pOldWeapon, CBaseCombatWeapon *pNewWeapon );
 	bool			ShouldLookForBetterWeapon();
 
 

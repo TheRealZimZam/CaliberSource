@@ -2,7 +2,7 @@
 //
 // Purpose: Mortar Field
 //
-// TODO; This could use a re-write, the current way works fine but is limited.
+// TODO; This could use a small re-write, the current way works fine but is limited.
 // The field itself needs a think function, for sounds and other niceities.
 //=============================================================================
 
@@ -261,6 +261,7 @@ LINK_ENTITY_TO_CLASS( grenade_mortar, CMortar );
 void CMortar::Precache( )
 {
 	m_spriteTexture = engine->PrecacheModel( "sprites/lgtning.vmt" );
+	// TODO; Need a better sprite here
 	m_flashTexture = engine->PrecacheModel( "sprites/bexplo.vmt" );
 	PrecacheScriptSound( "Weapon_Mortar.Impact" );
 }
@@ -282,16 +283,17 @@ void CMortar::Spawn( )
 	CBaseEntity *pFlashPoint = gEntList.FindEntityByClassname( NULL, "info_offmap_mortar" );
 	if( pFlashPoint != NULL )
 	{
+		// TODO; Assuming a skybox scale of 32 right now, should do a proper check here
 		pFlashPoint->DetectInSkybox();
 		bool bInSkybox = pFlashPoint->IsEFlagSet(EFL_IN_SKYBOX);
 
 		Vector vecOrigin = pFlashPoint->GetAbsOrigin();
 		// This is in the skybox, gotta keep the numbers small
-		float iFlashSpread = bInSkybox ? 16.0 : 160.0;	//Assuming skybox scale of 32
+		float iFlashSpread = bInSkybox ? 16.0 : 160.0;
 		vecOrigin.x += random->RandomFloat( -iFlashSpread, iFlashSpread );
 		vecOrigin.y += random->RandomFloat( -iFlashSpread, iFlashSpread );
 
-		// TEMPTEMP; just using a explosion for now, could use some proper effects
+		// Create the sprite
 		CPASFilter filter( vecOrigin );
 		te->Explosion( filter, random->RandomFloat(0.0,1.0),
 			&vecOrigin,
@@ -301,6 +303,8 @@ void CMortar::Spawn( )
 			TE_EXPLFLAG_NOPARTICLES|TE_EXPLFLAG_NOFIREBALLSMOKE|TE_EXPLFLAG_NOSOUND,
 			0,
 			0 );
+
+		//NOTENOTE; Could put some sound here, OR, leave it up to the map with the m_OnFire output...
 	}
 }
 
@@ -322,6 +326,7 @@ void CMortar::MortarExplode( void )
 	EmitSound( "Weapon_Mortar.Impact" );
 	CSoundEnt::InsertSound(SOUND_COMBAT, tr.endpos, 400, 0.3 );
 
+	// Send shrapnel out
 	//ExplodeModel( pev->origin, 400, g_sModelIndexShrapnel, 30 );
 #endif
 }
@@ -343,11 +348,25 @@ void CMortar::ShootTimed( EVARS *pevOwner, Vector vecStart, float time )
 
 
 #ifdef HL2_DLL
-//-----------------------------------------------------------------------
-// Purpose:	Lightning field (mortarfield but with no boom) 
-// TODO; This could be vastly and improved and customized,
-// maybe in the future...
-//-----------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------
+// Purpose:	Lightning field - easy solution for stormy maps by doing the job of normally
+// 10 other entities. Now, all you need is this and a timer for ambient skybox lightning,
+// or if needed, easy in-map scripted lightning strikes (lightning rods, wet metal stuff, etc.)
+// 
+// Types of lighting;
+// 1. Postive: Positive lightning comes from the top of a supercell, can go 10x the distance
+// of negative lightning, and is 5x more powerful. When it does hit the ground, it usually
+// comes back multiple times (strobes) until it runs out of charge. If you get hit 
+// by this lightning you are 200% dead. Its very rare, and only happens in extreme conditions.
+//
+// 2. Negative: Negative lightning comes from the bottom of the supercell,
+// only strikes once and has a much lower charge. 95% of all strikes are
+// negative charge. This is the kind of lightning that people can survive a hit from, 
+// and maybe get a cool scar or something.
+//
+// Random is a slightly unrealistic 30/70 weighting, use random if you want to screw
+// the player over and make him feel like the unluckiest son-of-a-bitch on the planet.
+//----------------------------------------------------------------------------------------------
 class CFuncLightningField : public CFuncMortarField
 {
 	DECLARE_CLASS( CFuncLightningField, CFuncMortarField );
@@ -360,12 +379,22 @@ public:
 	void EXPORT FieldUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	int	m_beamIndex;
+	int	m_iLightningType;
+
+	enum iLightningType
+	{
+		RANDOM = 0,
+		POSITIVE,
+		NEGATIVE,
+	};
+
 };
 
 LINK_ENTITY_TO_CLASS( func_lightning_field, CFuncMortarField );
 
 BEGIN_DATADESC( CFuncLightningField )
 	DEFINE_FIELD( m_beamIndex, FIELD_INTEGER ),
+	DEFINE_KEYFIELD( m_iLightningType, FIELD_INTEGER, "lightningtype" ),
 END_DATADESC()
 
 // Drop bolts from above
@@ -395,7 +424,6 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 {
 	DetectInSkybox();
 	bool bInSkybox = IsEFlagSet(EFL_IN_SKYBOX);
-
 	Vector vecStart;
 /*
 	vecStart.x = random->RandomFloat( this->mins.x, this->maxs.x );
@@ -403,7 +431,6 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 	vecStart.z = this->maxs.z;
 */
 	CollisionProp()->RandomPointInBounds( Vector( 0, 0, 1 ), Vector( 1, 1, 1 ), &vecStart );
-
 	Vector StrikePos = vecStart;
 
 	switch( m_fControl )
@@ -429,31 +456,67 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 		trace_t tr;
 		UTIL_TraceLine( vecSpot, vecSpot + Vector( 0, 0, -1 ) * MAX_TRACE_LENGTH, MASK_SOLID_BRUSHONLY, this,  COLLISION_GROUP_NONE, &tr );
 
-		UTIL_Beam(  vecStart,
-					tr.endpos,
-					m_beamIndex,
-					0,			//halo index
-					0,			//frame start
-					2.0f,		//framerate
-					random->RandomFloat( 0.05, 0.2 ),	//life
-					bInSkybox ? 0.4 : 4.0,		// width
-					bInSkybox ? 0.4 : 4.0,		// endwidth
-					bInSkybox ? 10 : 100,		// fadelength,
-					1,			// noise
-					100,		// red
-					160,		// green
-					255,		// blue,
-					255,		// bright
-					0			// speed
-					);
+		int iDmg = 40;
+		int iType = m_iLightningType;
+
+		// If its random, change it
+		if ( iType == 0 )
+		{
+			if ( random->RandomInt(0,2) == 2)
+				iType = 1;
+			else
+				iType = 2;
+		}
+
+		switch( iType )
+		{
+		default:
+		case 2: // Negative
+			UTIL_Beam(  vecStart,
+						tr.endpos,
+						m_beamIndex,
+						0,			//halo index
+						0,			//frame start
+						2.0f,		//framerate
+						random->RandomFloat( 0.05, 0.1 ),	//life
+						bInSkybox ? 0.4 : 4.0,		// width
+						bInSkybox ? 0.4 : 4.0,		// endwidth
+						bInSkybox ? 10 : 100,		// fadelength,
+						1,			// noise
+						100,		// red
+						160,		// green
+						255,		// blue,
+						255,		// bright
+						0			// speed
+						);
+			break;
+
+		case 1: // Positive
+			iDmg = 500;	//Insta-gib
+			UTIL_Beam(  vecStart,
+						tr.endpos,
+						m_beamIndex,
+						0,			//halo index
+						0,			//frame start
+						2.0f,		//framerate
+						random->RandomFloat( 0.1, 0.4 ),	//life
+						bInSkybox ? 0.4 : 4.0,		// width
+						bInSkybox ? 0.4 : 4.0,		// endwidth
+						bInSkybox ? 10 : 100,		// fadelength,
+						1,			// noise
+						160,		// red
+						100,		// green
+						255,		// blue,
+						255,		// bright
+						0			// speed
+						);
+			break;
+		}
 
 		// Add a little bit of Z to the actual endpos, so we dont clip through thin roofs and such
 		StrikePos = (tr.endpos + Vector(0,0,8));
+		RadiusDamage( CTakeDamageInfo( this, pActivator ? pActivator : this, iDmg, DMG_ENERGYBEAM ), StrikePos, iDmg, CLASS_NONE, NULL );
 	}
-
-	// Some token beamdamage at the strikepoint, we should be in the skybox so if this hits anything
-	// its a miracle
-	RadiusDamage( CTakeDamageInfo( this, pActivator ? pActivator : this, 10, DMG_ENERGYBEAM ), StrikePos, 128, CLASS_NONE, NULL );
 
 //	if ( bInSkybox )
 		EmitSound( "Weather.Thunder" );

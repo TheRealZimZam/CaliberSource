@@ -6,23 +6,18 @@
 // needs it!
 //=============================================================================//
 
-#ifndef WEAPON_RPG_H
-#define WEAPON_RPG_H
+#ifndef GRENADE_RPG_H
+#define GRENADE_RPG_H
 
 #ifdef _WIN32
 #pragma once
 #endif
 
-#include "basehlcombatweapon_shared.h"
 #include "basegrenade_shared.h"
 #include "Sprite.h"
-#include "npcevent.h"
-#include "beam_shared.h"
+#include "smoke_trail.h"
 
 class CWeaponRPG;
-class CWeaponFlash;
-class CLaserDot;
-class RocketTrail;
 
 #define SF_ROCKET_FLARE			(1 << 16)
 
@@ -114,15 +109,6 @@ private:
 	DECLARE_DATADESC();
 };
 
-
-//-----------------------------------------------------------------------------
-// Laser dot control
-//-----------------------------------------------------------------------------
-CBaseEntity *CreateLaserDot( const Vector &origin, CBaseEntity *pOwner, bool bVisibleDot );
-void SetLaserDotTarget( CBaseEntity *pLaserDot, CBaseEntity *pTarget );
-void EnableLaserDot( CBaseEntity *pLaserDot, bool bEnable );
-
-
 //-----------------------------------------------------------------------------
 // Specialized mizzizzile
 //-----------------------------------------------------------------------------
@@ -178,137 +164,4 @@ private:
 CAPCMissile *FindAPCMissileInCone( const Vector &vecOrigin, const Vector &vecDirection, float flAngle );
 
 
-//-----------------------------------------------------------------------------
-// RPG
-//-----------------------------------------------------------------------------
-class CWeaponRPG : public CBaseHLCombatWeapon
-{
-	DECLARE_CLASS( CWeaponRPG, CBaseHLCombatWeapon );
-public:
-
-	CWeaponRPG();
-	~CWeaponRPG();
-
-	DECLARE_SERVERCLASS();
-
-	void	Precache( void );
-
-	void	PrimaryAttack( void );
-	virtual float GetFireRate( void ) { return 1; };
-	void	ItemPostFrame( void );
-
-	void	Activate( void );
-	void	DecrementAmmo( CBaseCombatCharacter *pOwner );
-
-	bool	Deploy( void );
-	bool	Holster( CBaseCombatWeapon *pSwitchingTo = NULL );
-	bool	Reload( void );
-	bool	WeaponShouldBeLowered( void );
-	bool	Lower( void );
-
-	virtual void Drop( const Vector &vecVelocity );
-
-	int		GetMinBurst() { return 1; }
-	int		GetMaxBurst() { return 1; }
-	float	GetMinRestTime() { return 4.0; }
-	float	GetMaxRestTime() { return 4.0; }
-
-	bool	WeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions );
-	int		WeaponRangeAttack1Condition( float flDot, float flDist );
-
-	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-	void	StartGuiding( void );
-	void	StopGuiding( void );
-	void	ToggleGuiding( void );
-	bool	IsGuiding( void );
-
-	void	NotifyRocketDied( void );
-
-	bool	HasAnyAmmo( void );
-
-	void	SuppressGuiding( bool state = true );
-
-	void	CreateLaserPointer( void );
-	void	UpdateLaserPosition( Vector vecMuzzlePos = vec3_origin, Vector vecEndPos = vec3_origin );
-	Vector	GetLaserPosition( void );
-	void	StartLaserEffects( void );
-	void	StopLaserEffects( void );
-	void	UpdateLaserEffects( void );
-
-	// NPC RPG users cheat and directly set the laser pointer's origin
-	void	UpdateNPCLaserPosition( const Vector &vecTarget );
-	void	SetNPCLaserPosition( const Vector &vecTarget );
-	const Vector &GetNPCLaserPosition( void );
-
-	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
-
-	virtual const Vector& GetBulletSpread( void )
-	{
-		static Vector cone = VECTOR_CONE_1DEGREES;
-		return cone;
-	}
-	
-	CBaseEntity *GetMissile( void ) { return m_hMissile; }
-
-	DECLARE_ACTTABLE();
-	DECLARE_DATADESC();
-	
-protected:
-
-	bool				m_bInitialStateUpdate;
-	bool				m_bGuiding;
-	bool				m_bHideGuiding;		//User to override the player's wish to guide under certain circumstances
-	Vector				m_vecNPCLaserDot;
-	CHandle<CLaserDot>	m_hLaserDot;
-	CHandle<CMissile>	m_hMissile;
-	CHandle<CSprite>	m_hLaserMuzzleSprite;
-	CHandle<CBeam>		m_hLaserBeam;
-};
-
-//-----------------------------------------------------------------------------
-// Dumbfire clip-fed rpg
-//-----------------------------------------------------------------------------
-class CWeaponFlash : public CBaseHLCombatWeapon
-{
-	DECLARE_DATADESC();
-public:
-	DECLARE_CLASS( CWeaponFlash, CBaseHLCombatWeapon );
-
-	CWeaponFlash();
-	~CWeaponFlash();
-
-	DECLARE_SERVERCLASS();
-
-	void	Precache( void );
-
-	void	PrimaryAttack( void );
-	virtual float GetFireRate( void ) { return 0.875f; };
-
-	bool	Reload( void );
-
-	int		GetMinBurst() { return 4; }
-	int		GetMaxBurst() { return 4; }
-	float	GetMinRestTime() { return 1.0; }
-	float	GetMaxRestTime() { return 1.5; }
-
-	bool	WeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions );
-	int		WeaponRangeAttack1Condition( float flDot, float flDist );
-
-	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-
-	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
-
-	virtual const Vector& GetBulletSpread( void )
-	{
-		static Vector cone = VECTOR_CONE_3DEGREES;
-		return cone;
-	}
-
-	DECLARE_ACTTABLE();
-
-protected:
-	CHandle<CMissile>	m_hMissile;
-
-};
-
-#endif // WEAPON_RPG_H
+#endif // GRENADE_RPG_H

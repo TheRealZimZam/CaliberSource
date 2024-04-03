@@ -1,8 +1,10 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: The downtrodden citizens of City 17.
+// Basically a clone of Halo Marines and Kingpin Mob mixed together
 // Todo's: Fix weapon pickup (currently only goes for rpg???), fix healing/ammo supplying, 
-// Make player commands non-suicidal, throwables (rocks, molotovs, etc.), Optimize
+// Make player commands non-suicidal, throwables (rocks, molotovs, etc.),
+// Optimize (absolutely no good reason this class should be more than 3k lines).
 //=============================================================================//
 
 //-----------------------------------------------------------------------------
@@ -24,6 +26,7 @@
 #include "weapon_rpg.h"
 #include "hl2_player.h"
 #include "items.h"
+#include "buttons.h"
 
 #ifdef HL2MP
 #include "hl2mp/weapon_crowbar.h"
@@ -44,22 +47,17 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define INSIGNIA_MODEL "models/chefhat.mdl"
-
-//-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
 #define CIT_INSPECTED_DELAY_TIME 120  //How often I'm allowed to be inspected
 
-extern ConVar sk_healthkit;
-extern ConVar sk_healthvial;
 extern ConVar temp_demofixes;	//TEMPTEMP
 
 const int MAX_PLAYER_SQUAD = 4;
 
 ConVar	sk_citizen_health				( "sk_citizen_health",					"0");
 ConVar	sk_citizen_rebel_health			( "sk_citizen_rebel_health",			"0");
-ConVar	sk_citizen_heal_player			( "sk_citizen_heal_player",				"40");	//Maximum health to heal
+ConVar	sk_citizen_heal_player			( "sk_citizen_heal_player",				"30");	//Maximum health to heal
 ConVar	sk_citizen_heal_player_delay	( "sk_citizen_heal_player_delay",		"20");	//Delay between each heal (for each medic)
 ConVar	sk_citizen_giveammo_player_delay( "sk_citizen_giveammo_player_delay",	"15");
 ConVar	sk_citizen_heal_player_min_pct	( "sk_citizen_heal_player_min_pct",		"0.60");	//Health level to start considering healing
@@ -271,6 +269,11 @@ class CMattsPipe : public CWeaponCrowbarOld
 // Citizen models
 //---------------------------------------------------------
 
+// Default citizen model, if new model system cant find any valid ones
+#define CITIZEN_MODEL "models/citizen.mdl"
+#define INSIGNIA_MODEL "models/chefhat.mdl"
+
+// TODO; This needs to be exported!
 static const char *g_ppszRandomHeads[] = 
 {
 	"male_01.mdl",
@@ -440,7 +443,7 @@ void CNPC_Citizen::Precache()
 
 	PrecacheInstancedScene( "scenes/Expressions/CitizenIdle.vcd" );
 	PrecacheInstancedScene( "scenes/Expressions/CitizenAlert_loop.vcd" );
-	PrecacheInstancedScene( "scenes/Expressions/CitizenCombat_loop.vcd" );
+	PrecacheInstancedScene( "scenes/Expressions/CitizenCombat.vcd" );
 
 	for ( int i = 0; i < STATES_WITH_EXPRESSIONS; i++ )
 	{
@@ -499,7 +502,6 @@ void CNPC_Citizen::PrecacheAllOfType( CitizenType_t type )
 void CNPC_Citizen::Spawn()
 {
 	BaseClass::Spawn();
-
 #ifdef _XBOX
 	// Always fade the corpse
 	AddSpawnFlags( SF_NPC_FADE_CORPSE );
@@ -539,14 +541,18 @@ void CNPC_Citizen::Spawn()
 	}
 	else
 	{
-		m_iHealth = sk_citizen_health.GetFloat();
+		// If no custom health is set, put to default
+		if ( m_iHealth == 0 )
+			m_iHealth = sk_citizen_health.GetFloat();
 	}
+	m_iMaxHealth = GetHealth();
 
 	// Are we on a train? Used in trainstation to have NPCs on trains.
 	if ( GetMoveParent() && FClassnameIs( GetMoveParent(), "func_tracktrain" ) )
 	{
 		CapabilitiesRemove( bits_CAP_MOVE_GROUND );
 		SetMoveType( MOVETYPE_NONE );
+		// Absolutely DISGUSTING
 #ifdef HL2_DLL
 		if ( NameMatches("citizen_train_2") )
 		{
@@ -569,9 +575,6 @@ void CNPC_Citizen::Spawn()
 	m_iszOriginalSquad = m_SquadName;
 
 	m_flNextHealthSearchTime = gpGlobals->curtime;
-
-	// Basic Capabilities are defined in the base AI
-	CapabilitiesAdd( bits_CAP_OPEN_DOORS | bits_CAP_DUCK | bits_CAP_SQUAD );
 
 	CWeaponRPG *pRPG = dynamic_cast<CWeaponRPG*>(GetActiveWeapon());
 	if ( pRPG )
@@ -652,8 +655,6 @@ void CNPC_Citizen::SelectModel()
 		PrecacheAllOfType( CT_REBEL );
 	}
 
-	const char *pszModelName = NULL;
-
 	if ( m_Type == CT_DEFAULT )
 	{
 		struct CitizenTypeMapping
@@ -668,6 +669,7 @@ void CNPC_Citizen::SelectModel()
 			{ "prolouge",		CT_REFUGEE		},
 			{ "city",			CT_REFUGEE		},
 			{ "under",			CT_REFUGEE		},
+			{ "downtown",		CT_CRIMINAL		},
 			{ "refinery",		CT_CRIMINAL		},
 			{ "bridge",			CT_CRIMINAL		},
 			{ "metro",			CT_DOWNTRODDEN	},
@@ -696,6 +698,8 @@ void CNPC_Citizen::SelectModel()
 			m_Type = CT_REFUGEE;
 	}
 
+	const char *pszModelName = NULL;
+
 	if( HasSpawnFlags( SF_CITIZEN_RANDOM_HEAD | SF_CITIZEN_RANDOM_HEAD_MALE | SF_CITIZEN_RANDOM_HEAD_FEMALE ) || GetModelName() == NULL_STRING )
 	{
 		Assert( m_iHead == -1 );
@@ -710,6 +714,8 @@ void CNPC_Citizen::SelectModel()
 		}
 		else
 		{
+			SetModelName(AllocPooledString(CITIZEN_MODEL));
+
 			// Count the heads
 			int headCounts[ARRAYSIZE(g_ppszRandomHeads)] = { 0 };
 			int i;
@@ -787,6 +793,7 @@ void CNPC_Citizen::SelectModel()
 	// Unique citizen models are left alone
 	if ( m_Type != CT_UNIQUE )
 	{
+		// Hard-set depending on class
 		if ( this->ClassMatches("npc_hobo") )
 		{
 			m_Type = CT_REFUGEE;
@@ -825,7 +832,7 @@ void CNPC_Citizen::SelectExpressionType()
 		m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_NERVOUS, CIT_EXP_ANGRY );
 		break;
 	case CT_DOWNTRODDEN:
-		m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_SCARED, CIT_EXP_NORMAL );
+		m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_NERVOUS, CIT_EXP_NORMAL );
 		break;
 	case CT_REBEL:
 		m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_NERVOUS, CIT_EXP_ANGRY );
@@ -843,7 +850,7 @@ void CNPC_Citizen::SelectExpressionType()
 void CNPC_Citizen::FixupMattWeapon()
 {
 	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
-	if ( pWeapon && pWeapon->ClassMatches( "weapon_crowbarold" ) && NameMatches( "matt" ) )
+	if ( pWeapon && pWeapon->ClassMatches( "weapon_crowbar" ) && NameMatches( "matt" ) )
 	{
 		Weapon_Drop( pWeapon );
 		UTIL_Remove( pWeapon );
@@ -893,6 +900,7 @@ string_t CNPC_Citizen::GetModelName() const
 	// If the model refers to an obsolete model, pretend it was blank
 	// so that we pick the new default model.
 	//
+#ifndef HL2_EPISODIC
 	if (!Q_strnicmp(STRING(iszModelName), "models/c17_", 11) ||
 		!Q_strnicmp(STRING(iszModelName), "models/male", 11) ||
 		!Q_strnicmp(STRING(iszModelName), "models/female", 13) ||
@@ -900,6 +908,7 @@ string_t CNPC_Citizen::GetModelName() const
 	{
 		return NULL_STRING;
 	}
+#endif
 
 	return iszModelName;
 }
@@ -1299,17 +1308,19 @@ int CNPC_Citizen::SelectSchedulePriorityAction()
 				}
 			}
 		}
-/*
 		else if ( m_bCanPanic )
 		{
+			// Change my default expression
+			m_ExpressionType = (CitizenExpressionTypes_t)RandomInt( CIT_EXP_SCARED, CIT_EXP_NERVOUS );
+/*
 			// Always defer to the behavior over the old system
 			if ( m_FearBehavior.CanSelectSchedule() )
 			{
 				DeferSchedulingToBehavior( &m_FearBehavior );
 				return BaseClass::SelectSchedule();
 			}
-		}
 */
+		}
 	}
 
 	schedule = BaseClass::SelectSchedulePriorityAction();
@@ -1605,6 +1616,8 @@ void CNPC_Citizen::StartTask( const Task_t *pTask )
 		SetIdealActivity( (Activity) m_nInspectActivity );
 		break;
 
+// Absolutely DREADFUL
+#ifdef HL2_DLL
 	case TASK_CIT_SIT_ON_TRAIN:
 		if ( NameMatches("citizen_train_2") )
 		{
@@ -1630,7 +1643,8 @@ void CNPC_Citizen::StartTask( const Task_t *pTask )
 			SetIdealActivity( ACT_DO_NOT_DISTURB );
 		}
 		break;
-		
+#endif
+
 	case TASK_CIT_HEAL:
 	case TASK_CIT_HEAL_TOSS:
 		if ( IsMedic() )
@@ -1904,7 +1918,7 @@ Activity CNPC_Citizen::NPC_TranslateActivity( Activity activity )
 				activity = ACT_WALK_AIM_RIFLE;
 			break;
 
-			case ACT_MELEE_ATTACK_STAB:	//Absolutly dreadful
+			case ACT_MELEE_ATTACK_STAB:	//Absolutely dreadful
 				activity = ACT_MELEE_ATTACK_SWING;
 			break;
 
@@ -1973,21 +1987,21 @@ void CNPC_Citizen::HandleAnimEvent( animevent_t *pEvent )
 					m_flPlayerGiveAmmoTime = gpGlobals->curtime + sk_citizen_giveammo_player_delay.GetFloat();
 					TossHealthKit( pTarget, Vector(48.0f, 0.0f, 0.0f)  );	//!!TEMPTEMP
 				}
+				return;
 			}
 		}
-		else
 #endif
-		{
-			Heal();
-		}
+
+		Heal();
 		return;
 	}
 
 	switch( pEvent->event )
 	{
-		//!!!TEMPTEMP
-		//!TODO; Material footstep - MaterialFootstepSound( this, true, VOL_NORM * 0.5f );
-		//Its only on the client - has to be through the animations then, cant do it here
+	case CITIZEN_AE_HEAL:		// Heal my target (if within range)
+		Heal();
+		break;
+
 	case NPC_EVENT_LEFTFOOT:
 		{
 			MakeAIFootstepSound( 180.0f );
@@ -2016,32 +2030,6 @@ void CNPC_Citizen::HandleAnimEvent( animevent_t *pEvent )
 	}
 }
 
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-void CNPC_Citizen::PickupItem( CBaseEntity *pItem )
-{
-	Assert( pItem != NULL );
-	if( FClassnameIs( pItem, "item_healthkit" ) )
-	{
-		if ( TakeHealth( sk_healthkit.GetFloat(), DMG_GENERIC ) )
-		{
-			RemoveAllDecals();
-			UTIL_Remove( pItem );
-		}
-	}
-	else if( FClassnameIs( pItem, "item_healthvial" ) )
-	{
-		if ( TakeHealth( sk_healthvial.GetFloat(), DMG_GENERIC ) )
-		{
-			RemoveAllDecals();
-			UTIL_Remove( pItem );
-		}
-	}
-	else
-	{
-		DevMsg("Citizen doesn't know how to pick up %s!\n", pItem->GetClassname() );
-	}
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -2070,15 +2058,15 @@ const char *CNPC_Citizen::SelectRandomExpressionForState( NPC_STATE state )
 	switch ( state )
 	{
 	case NPC_STATE_IDLE:
-		iExpressionState = random->RandomInt( 1, 2 );
+		iExpressionState = 1;
 		break;
 
 	case NPC_STATE_ALERT:
-		iExpressionState = random->RandomInt( 0, 1 );
+		iExpressionState = 2;
 		break;
 
 	case NPC_STATE_COMBAT:
-		iExpressionState = random->RandomInt( 2, 3 );
+		iExpressionState = 3;
 		break;
 
 	default:
@@ -2197,59 +2185,6 @@ bool CNPC_Citizen::IsManhackMeleeCombatant()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Return the actual position the NPC wants to fire at when it's trying
-//			to hit it's current enemy.
-//-----------------------------------------------------------------------------
-Vector CNPC_Citizen::GetActualShootPosition( const Vector &shootOrigin )
-{
-	Vector vecTarget = BaseClass::GetActualShootPosition( shootOrigin );
-
-	CWeaponRPG *pRPG = dynamic_cast<CWeaponRPG*>(GetActiveWeapon());
-	// If we're firing an RPG at a gunship, aim off to it's side, because we'll auger towards it.
-	if ( pRPG && GetEnemy() )
-	{
-		if ( FClassnameIs( GetEnemy(), "npc_combinegunship" ) )
-		{
-			Vector vecRight;
-			GetVectors( NULL, &vecRight, NULL );
-			// Random height
-			vecRight.z = 0;
-
-			// Find a clear shot by checking for clear shots around it
-			float flShotOffsets[] =
-			{
-				512,
-				-512,
-				128,
-				-128
-			};
-			for ( int i = 0; i < ARRAYSIZE(flShotOffsets); i++ )
-			{
-				Vector vecTest = vecTarget + (vecRight * flShotOffsets[i]);
-				// Add some random height to it
-				vecTest.z += RandomFloat( -512, 512 );
-				trace_t tr;
-				AI_TraceLine( shootOrigin, vecTest, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr);
-
-				// If we can see the point, it's a clear shot
-				if ( tr.fraction == 1.0 && tr.m_pEnt != GetEnemy() )
-				{
-					pRPG->SetNPCLaserPosition( vecTest );
-					return vecTest;
-				}
-			}
-		}
-		else
-		{
-			pRPG->SetNPCLaserPosition( vecTarget );
-		}
-
-	}
-
-	return vecTarget;
-}
-
-//-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 void CNPC_Citizen::OnChangeActiveWeapon( CBaseCombatWeapon *pOldWeapon, CBaseCombatWeapon *pNewWeapon )
 {
@@ -2352,23 +2287,12 @@ bool CNPC_Citizen::ShouldLookForBetterWeapon()
 }
 
 //-----------------------------------------------------------------------------
-#define CITIZEN_SCORCH_RATE				7
-#define CITIZEN_SCORCH_MIN_RENDERCOLOR	75
+#define CITIZEN_SCORCH_RATE				4
+#define CITIZEN_SCORCH_MIN_RENDERCOLOR	100
 //-----------------------------------------------------------------------------
 int CNPC_Citizen::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
-	if( info.GetDamageType() & DMG_BURN )	//&& (info.GetDamageType() & DMG_DIRECT)
-	{
-		Scorch( CITIZEN_SCORCH_RATE, CITIZEN_SCORCH_MIN_RENDERCOLOR );
-#if 0
-		// If im not being directly roasted by a flamethrower, let the onfire schedules take care of everything
-		if( IsOnFire() && !(info.GetDamageType() & DMG_DIRECT) )
-		{
-			return 0;
-		}
-#endif
-	}
-	else if( info.GetDamageType() & (DMG_SHOCK|DMG_SONIC|DMG_NERVEGAS|DMG_ACID) )
+	if( info.GetDamageType() & (DMG_SHOCK|DMG_SONIC|DMG_NERVEGAS|DMG_ACID) )
 	{
 		//Agh that burns!
 		if ( info.GetDamage() >= 5 )
@@ -2665,14 +2589,91 @@ bool CNPC_Citizen::SpeakCommandResponse( AIConcept_t concept, const char *modifi
 //-----------------------------------------------------------------------------
 bool CNPC_Citizen::TargetOrder( CBaseEntity *pTarget, CAI_BaseNPC **Allies, int numAllies )
 {
+	// Forget about any move orders
+	ClearFollowTarget();
+	SetCommandGoal( vec3_invalid );
+	if( m_StandoffBehavior.IsRunning() )
+		m_StandoffBehavior.ClearStandoffGoalPosition();
+
+	// First, try to pick up a weapon.
+	CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>( pTarget );
+	if( pWeapon )
+	{
+		// Player is directing me to retrieve a weapon.
+		//if( GetActiveWeapon() )
+		//	Weapon_Drop( GetActiveWeapon() );
+
+		SetTarget( pWeapon );
+		SetSchedule( SCHED_NEW_WEAPON );
+		SpeakCommandResponse( TLK_COMMANDED );
+
+		// Return false so this order isn't given to any more people.
+		return false;
+	}
+
+	// Second, press a button
+	CBaseButton *pButton = dynamic_cast<CBaseButton *>( pTarget );
+	if( pButton )
+	{
+		// Target is a button.
+
+		// Conk out if theres absolutely no way to get to the switch, or im being blasted hugely
+		// TODO;
+		if ( HasCondition(COND_SEE_ENEMY) )
+		{
+			Msg("Can't find safe path to button!\n");
+			return false;
+		}
+
+		SetTarget( pButton );
+		SetSchedule( SCHED_TARGET_CHASE );
+		SpeakCommandResponse( TLK_COMMANDED );
+
+		// Return false so this order isn't given to any more people.
+		return false;
+	}
+
+	// Third, stack up on a door, COD Style
+#if 1
+	CBasePropDoor *pDoor = dynamic_cast<CBasePropDoor *>( pTarget );
+	if( pDoor )
+	{
+		// Target is a door. 
+
+		// Interpret as an assault go-code if I'm in assault, even if not selected.
+		if( m_AssaultBehavior.HasHitRallyPoint() && !m_AssaultBehavior.HasHitAssaultPoint() )
+		{
+			// Send whatever cue assault wants.
+			m_AssaultBehavior.ReceiveAssaultCue( CUE_COMMANDER );
+			return true;
+		}
+
+		// Stack up to assault. IF I'm selected.
+		// Find a free Rallypoint near the door.
+		//if( IsSelected() )
+		{
+			CRallyPoint *pRallyPoint = m_AssaultBehavior.FindBestRallyPointInRadius( pDoor->WorldSpaceCenter(), 256 );
+
+			if( pRallyPoint )
+			{
+				m_AssaultBehavior.SetParameters( pRallyPoint, CUE_COMMANDER );
+			}
+			else
+			{
+				Msg("Can't find rally point near door!\n");
+			}
+		}
+
+		return true;	
+	}
+#endif
+
+	// Lastly, if there is no valid target
 	if ( pTarget->IsPlayer() )
 	{
 		// I'm the target! Toggle follow!
 		if( m_FollowBehavior.GetFollowTarget() != pTarget )
 		{
-			ClearFollowTarget();
-			SetCommandGoal( vec3_invalid );
-
 			// Turn follow on!
 			m_AssaultBehavior.Disable();
 			m_FollowBehavior.SetFollowTarget( pTarget );
@@ -3261,6 +3262,7 @@ void CNPC_Citizen::FixupPlayerSquad()
 			if ( !IsUpgraded() )
 			{
 				m_bIsUpgraded = true;
+				CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
 			}
 			break;
 		}
@@ -3535,6 +3537,11 @@ bool CNPC_Citizen::FValidateHintType( CAI_Hint *pHint )
 	switch( pHint->HintType() )
 	{
 	case HINT_WORLD_VISUALLY_INTERESTING:
+	case HINT_URBAN_STREETCORNER:
+	case HINT_URBAN_STREETLAMP:
+	case HINT_URBAN_DARK_SPOT:
+	case HINT_URBAN_POSTER:
+	case HINT_URBAN_SHELTER:
 		return true;
 		break;
 
@@ -3938,6 +3945,7 @@ void CNPC_Citizen::InputStopPatrolling( inputdata_t &inputdata )
 void CNPC_Citizen::OnGivenWeapon( CBaseCombatWeapon *pNewWeapon )
 {
 	FixupMattWeapon();
+	BaseClass::OnGivenWeapon( pNewWeapon );
 }
 
 //------------------------------------------------------------------------------
@@ -4023,6 +4031,7 @@ void CNPC_Citizen::DeathSound( const CTakeDamageInfo &info )
 
 	EmitSound( pDeathsoundName );
 #endif
+	// TODO; Parameters
 	// Speak a response rule, if we have one
 	Speak( TLK_DEATH );
 }
@@ -4031,7 +4040,6 @@ void CNPC_Citizen::DeathSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CNPC_Citizen::LocateEnemySound( void )
 {
-#if 0
 	if ( !GetEnemy() )
 		return;
 
@@ -4052,10 +4060,9 @@ void CNPC_Citizen::LocateEnemySound( void )
 		else
 		{
 		//	EmitSound( "NPC_Citizen.OverHere" );
-			Speak( TLK_HEARDSOUND, UTIL_VarArgs("sound_is_visible:%d", SoundIsVisible( pSound )) )
+			Speak( TLK_HEARDSOUND );
 		}
 	}
-#endif
 }
 
 //------------------------------------------------------------------------------
@@ -4127,9 +4134,10 @@ AI_BEGIN_CUSTOM_NPC( npc_citizen, CNPC_Citizen )
 		"		TASK_MOVE_TO_TARGET_RANGE			50"
 		"		TASK_STOP_MOVING					0"
 		"		TASK_FACE_IDEAL						0"
-//		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
-		"		TASK_CIT_HEAL							0"
-//		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
+//		"		TASK_SAY_HEAL						0"
+		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_DISARM"
+		"		TASK_CIT_HEAL						0"
+		"		TASK_PLAY_SEQUENCE_FACE_TARGET		ACTIVITY:ACT_ARM"
 		""
 		"	Interrupts"
 	)

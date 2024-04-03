@@ -129,9 +129,7 @@ void CNPC_Bullsquid::Spawn()
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 	SetMoveType( MOVETYPE_STEP );
 	m_bloodColor		= BLOOD_COLOR_GREEN;
-	
-	SetRenderColor( 255, 255, 255, 255 );
-	
+
 	m_iHealth			= sk_bullsquid_health.GetFloat();
 	m_flFieldOfView		= 0.2;// indicates the width of this monster's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
@@ -474,8 +472,6 @@ bool CNPC_Bullsquid::FValidateHintType( CAI_Hint *pHint )
 {
 	if ( pHint->HintType() == HINT_HL1_WORLD_HUMAN_BLOOD )
 		 return true;
-
-	DevMsg( "Couldn't validate hint type" );
 
 	return false;
 }

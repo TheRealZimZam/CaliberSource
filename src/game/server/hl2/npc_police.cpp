@@ -553,6 +553,7 @@ bool CNPC_MetroPolice::CreateComponents()
 void CNPC_MetroPolice::Spawn( void )
 {
 	Precache();
+
 #ifdef _XBOX
 	// Always fade the corpse
 	AddSpawnFlags( SF_NPC_FADE_CORPSE );
@@ -3314,6 +3315,8 @@ void CNPC_MetroPolice::RunTask( const Task_t *pTask )
 // Purpose: 
 // Input  :
 //-----------------------------------------------------------------------------
+#define METROPOLICE_SCORCH_RATE				8
+#define METROPOLICE_SCORCH_MIN_RENDERCOLOR	50
 int CNPC_MetroPolice::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
 	CTakeDamageInfo newInfo = info;
@@ -3321,6 +3324,11 @@ int CNPC_MetroPolice::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	if ( HasSpawnFlags( SF_METROPOLICE_ARREST_ENEMY ) )
 	{
 		EnemyResistingArrest();
+	}
+
+	if( info.GetDamageType() & DMG_BURN )	//&& (info.GetDamageType() & DMG_DIRECT)
+	{
+		Scorch( METROPOLICE_SCORCH_RATE, METROPOLICE_SCORCH_MIN_RENDERCOLOR );
 	}
 
 	if (info.GetAttacker() == GetEnemy())

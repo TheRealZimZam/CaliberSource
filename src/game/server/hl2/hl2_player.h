@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2008, Valve Corporation, All rights reserved. ============//
 //
-// Purpose:		Player for HL2.
+// Purpose:		Player for HL2/Caliber
 //
 // $NoKeywords: $
 //=============================================================================//
@@ -16,13 +16,14 @@
 #include "hl2_player_shared.h"
 #include "simtimer.h"
 #include "soundenvelope.h"
+#include "gamerules.h"
 
 // In HL2MP we need to inherit from  BaseMultiplayerPlayer!
 #if defined ( HL2_EPISODIC )	//HL2MP
 #include "basemultiplayerplayer.h"
 #endif
 
-#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
+#define USE_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
 
 class CAI_Squad;
 
@@ -110,7 +111,7 @@ public:
 //	Vector GetAttackSpread( CBaseCombatWeapon *pWeapon, CBaseEntity *pTarget = NULL );
 
 	void				DoAnimationEvent( int PlayerAnimEvent_t, int nData = 0 );
-	virtual void		CreateCorpse( void ) { CopyToBodyQue( this ); };
+	virtual void		CreateCorpse( void );	//CopyToBodyQue( this );
 
 	virtual void		Precache( void );
 	virtual void		Spawn(void);
@@ -229,7 +230,6 @@ public:
 	virtual int			GiveAmmo( int nCount, int nAmmoIndex, bool bSuppressSound = false );
 	virtual bool		BumpWeapon( CBaseCombatWeapon *pWeapon );
 	
-	virtual bool		Weapon_CanUse( CBaseCombatWeapon *pWeapon );
 	virtual void		Weapon_Equip( CBaseCombatWeapon *pWeapon );
 	virtual bool		Weapon_Lower( void );
 	virtual bool		Weapon_Ready( void );
@@ -308,6 +308,8 @@ public:
 	void				InputEnableFlashlight( inputdata_t &inputdata );
 	void				InputDisableFlashlight( inputdata_t &inputdata );
 
+	void SpeakPlayerSentence( const char *pszSentenceName, float fVolume = 1 );
+
 	// MP
 	virtual void ChangeTeam( int iTeamNum );
 	void SetPlayerModel( void );
@@ -327,10 +329,18 @@ private:
 	CNetworkQAngle( m_angEyeAngles );
 	CNetworkVar( int, m_iSpawnInterpCounter );
 
-#if SINGLEPLAYER_ANIMSTATE
+#if USE_ANIMSTATE
 	IPlayerAnimState	*m_PlayerAnimState;
-#else
-	CMultiPlayerAnimState	*m_PlayerAnimState;
+	CMultiPlayerAnimState	*m_MultiplayerPlayerAnimState;	//BROKEN
+
+	// Determine which animation system we're using
+	IPlayerAnimState	*GetAnimState( void ) 
+	{
+		if ( g_pGameRules->IsMultiplayer() )
+			return m_MultiplayerPlayerAnimState;
+
+		return m_PlayerAnimState;
+	}
 #endif
 
 	float				m_flNextModelChangeTime;
@@ -420,5 +430,18 @@ void CHL2_Player::DisableCappedPhysicsDamage()
 	m_bUseCappedPhysicsDamageTable = false;
 }
 
+
+//-----------------------------------------------------------------------------
+// Purpose: cigarette for idle
+//-----------------------------------------------------------------------------
+class CCigarette : public CBaseAnimating
+{
+public:
+	CCigarette();
+	~CCigarette();
+
+private:
+
+};
 
 #endif	//HL2_PLAYER_H

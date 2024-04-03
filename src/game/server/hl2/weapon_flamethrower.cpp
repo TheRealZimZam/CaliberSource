@@ -3,20 +3,21 @@
 // Purpose:	Flamethrower test
 //
 //			Primary attack: Throw flame
-//			Secondary attack: Eject ignitable gas onto surfaces
-// TODO's: Actually properly code this thing
+//			Secondary attack: Spew ignitable gas onto surfaces
+// TODO's: Half this stuff needs to be moved to the client, grenade_ball is
+// unsustainable as of now (source engine cant handle projectiles), 
+// probably gonna have to do this with tracing like tf2... UGH!
 //=============================================================================
 #include "cbase.h"
-#include "basecombatweapon.h"
 #include "NPCevent.h"
 #include "basecombatcharacter.h"
-#include "AI_BaseNPC.h"
 #include "player.h"
 #include "weapon_flamethrower.h"
 #include "grenade_ball.h"
 #include "gamerules.h"
 #include "game.h"
 #include "in_buttons.h"
+#include "AI_BaseNPC.h"
 #include "AI_Memory.h"
 #include "soundent.h"
 #include "vstdlib/random.h"
@@ -30,9 +31,11 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-extern ConVar sv_funmode;
 
 static const char *g_pFlameThrowerSound = "Weapon_Flamethrower.Flame";
+
+extern ConVar sv_funmode;
+ConVar sk_flamethrower_velocity( "sk_flamethrower_velocity", "450.0", FCVAR_CHEAT | FCVAR_GAMEDLL, "Velocity of flameballs." );
 
 //###########################################################################
 //	>> CWeaponFlameThrower
@@ -40,9 +43,12 @@ static const char *g_pFlameThrowerSound = "Weapon_Flamethrower.Flame";
 
 BEGIN_DATADESC( CWeaponFlameThrower )
 
-	DEFINE_FIELD( m_fDrainRate,	FIELD_FLOAT ),
+	DEFINE_FIELD( m_fDrainRate,	FIELD_TIME ),
 
 	DEFINE_FIELD( m_bSoundOn,	FIELD_BOOLEAN ),
+	
+	DEFINE_FIELD( m_hDripSprite,	FIELD_EHANDLE ),
+	DEFINE_FIELD( m_hPilotSprite,	FIELD_EHANDLE ),
 
 END_DATADESC()
 
@@ -75,7 +81,8 @@ CWeaponFlameThrower::CWeaponFlameThrower( )
 	m_fMaxRange1		= 512;
 	m_fMinRange2		= 512;
 	m_fMaxRange2		= 768;
-	m_fDrainRate		= FLAMETHROWER_DRAINRATE;
+	m_fDrainRate		= gpGlobals->curtime;
+//	m_fPrefireWait		= FLAMETHROWER_PREFIRE_WAIT;
 	m_flNextPrimaryAttack = 0.2;
 
 	if ( sv_funmode.GetBool() )
@@ -83,18 +90,38 @@ CWeaponFlameThrower::CWeaponFlameThrower( )
 		m_bCanJam			= true;
 	}
 
+	// Always toss the whole tank
+	m_bReloadsFullClip	= true;
+
 	// Cannot fire underwater
 	m_bFiresUnderwater	= false;
 	m_bAltFiresUnderwater = false;
+
+	m_hDripSprite = NULL;
+	m_hPilotSprite = NULL;
 }
 
+CWeaponFlameThrower::~CWeaponFlameThrower()
+{
+	StopFlameSound();
+	StopPilotLight();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
 void CWeaponFlameThrower::Precache( void )
 {
 	UTIL_PrecacheOther("grenade_fireball");
-	
+
 	PrecacheScriptSound( g_pFlameThrowerSound );
 
 	BaseClass::Precache();
+}
+
+float CWeaponFlameThrower::GetVelocity( void )
+{
+	return sk_flamethrower_velocity.GetFloat();	//FLAMETHROWER_VELOCITY
 }
 
 //-----------------------------------------------------------------------------
@@ -106,18 +133,25 @@ void CWeaponFlameThrower::ItemPostFrame()
 	if ( !pOwner )
 		return;
 
-	if ( pOwner->IsAlive() && 
-		(pOwner->m_nButtons & IN_ATTACK) &&
-		 pOwner->GetAmmoCount(m_iPrimaryAmmoType) > 0 )
+	if ( pOwner->IsAlive() && (pOwner->m_nButtons & IN_ATTACK) )
 	{
-		StartSound();
 		PrimaryAttack();
-		m_bFiring = true;
+
+		// Drain ammo - seperate from the actual attack function
+		if ( m_fDrainRate <= gpGlobals->curtime )
+		{
+			if (UsesClipsForAmmo1())
+				m_iClip1--;
+			else
+				pOwner->RemoveAmmo( 1, m_iPrimaryAmmoType );
+			
+			m_fDrainRate = gpGlobals->curtime + FLAMETHROWER_DRAINRATE;
+		}
 	}
 	else
 	{
+		StopPilotLight();
 		StopFlameSound();
-		m_flNextPrimaryAttack = gpGlobals->curtime + 0.2f;
 		m_bFiring = false;
 	}
 	
@@ -134,30 +168,71 @@ void CWeaponFlameThrower::PrimaryAttack()
 	if ( !pOwner )
 		return;
 
-	Vector vOrigin = pOwner->Weapon_ShootPosition( );
-	GetAttachment( "muzzle", vOrigin );	//TEMP - using rpg model so yeah
+	if ( (UsesClipsForAmmo1() && m_iClip1 == 0) )
+	{
+		Reload();
+		return;
+	}
+
+	// Ignite!
+	if ( !m_bIgnited )
+	{
+		StartPilotLight();
+		return;
+	}
+
+	StartFlameSound();
+	m_bFiring = true;
 
 	// Fire a new ball.
 	if ( gpGlobals->curtime >= m_flNextPrimaryAttack )
 	{
-		for ( int i = 0; i < 3; i++ )
+		Vector vForward, vRight, vUp;
+		pOwner->EyeVectors( &vForward, &vRight, &vUp );
+		Vector vOrigin = pOwner->Weapon_ShootPosition();
+
+	/*
+		if ( GetAttachment( "muzzle", vMuzzle ) )	//If we have an attachment, dont bother changing
+			vMuzzle = "muzzle";
+		else
+	*/
+		// Else, we have to manually specifiy the smaller details Old style
+		Vector vMuzzle = vOrigin + vForward * FLAMETHROWER_MUZZLEPOS_FORWARD 
+			+ vRight * FLAMETHROWER_MUZZLEPOS_RIGHT + vUp * FLAMETHROWER_MUZZLEPOS_UP;
+
+		QAngle vecAngles;
+		VectorAngles( vForward, vecAngles );
+
+		Vector vVelocity = vForward * GetVelocity() + 
+		(vRight * RandomFloat(-GetHSpread(),GetHSpread())) +	//FLAMETHROWER_SPREAD_ANGLE
+		(vUp * RandomFloat(-GetVSpread(),GetVSpread()));	//FLAMETHROWER_SPREAD_VERTICAL
+
+		// If we have multiple flamethrowers shooting at once, the entity queue is going
+		// to get filled up, real quick. Cut the small/medium balls, just make the
+		// muzzleflash/client-fire-spew effect bigger.
+		int iFireballs = 3;
+		if ( g_pGameRules->IsMultiplayer() )
+			iFireballs = 1;
+
+		for ( int i = 0; i < iFireballs; i++ )
 		{
-			CGrenadeFireball *pGrenade = (CGrenadeFireball*)Create( "grenade_fireball", vOrigin, vec3_angle, pOwner );
+			CGrenadeFireball *pGrenade = (CGrenadeFireball*)Create( "grenade_fireball", vMuzzle, vecAngles, pOwner );
 			DispatchSpawn( pGrenade );
-			
+
+			// 0 is the main fireball
 			if ( i == 0 )
 			{
 				pGrenade->SetSpitType( FIRE, LARGE );
-				pGrenade->SetAbsVelocity( GetVelocity() );
+				pGrenade->SetAbsVelocity( vVelocity );
 			}
 			else
 			{
 				pGrenade->SetSpitType( FIRE, random->RandomInt( SMALL, MEDIUM ) );
-				pGrenade->SetAbsVelocity( GetVelocity() + RandomFloat( -18.0f, 9.0f ) );
+				pGrenade->SetAbsVelocity( vVelocity + RandomFloat( -48.0f, 12.0f ) );
 			}
 
 			pGrenade->SetThrower( pOwner );
-			pGrenade->SetOwnerEntity( GetOwner() );
+			pGrenade->SetOwnerEntity( pOwner );
 
 			// Tumble through the air
 			pGrenade->SetLocalAngularVelocity(
@@ -166,27 +241,57 @@ void CWeaponFlameThrower::PrimaryAttack()
 						random->RandomFloat( -250, -500 ) ) );
 		}
 
-		pOwner->RemoveAmmo( 1, m_iPrimaryAmmoType );
 		SendWeaponAnim( GetPrimaryAttackActivity() );
 		pOwner->SetAnimation( PLAYER_ATTACK1 );
 		pOwner->SetAimTime( 3.0f );
+
+		pOwner->RumbleEffect( RUMBLE_SMG1, 0, RUMBLE_FLAG_RESTART );
+
+		m_iPrimaryAttacks++;
+		gamestats->Event_WeaponFired( pOwner, true, GetClassname() );
 
 		m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
 	}
 }
 
 //-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CWeaponFlameThrower::SecondaryAttack()
+{
+	// Only the player fires this way so we can cast
+	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
+	if ( !pOwner )
+		return;
+
+	if ( (UsesClipsForAmmo1() && m_iClip1 == 0) )
+	{
+		Reload();
+		return;
+	}
+
+	// Unignite!
+	if ( m_bIgnited )
+	{
+		StopPilotLight();
+		return;
+	}
+
+	StopFlameSound();
+	m_bFiring = true;
+
+	//TODO; Spew gas decals and create dormant env_fires
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeaponFlameThrower::StartSound()
+void CWeaponFlameThrower::StartFlameSound()
 {
 	if ( !m_bSoundOn )
 	{
-		WeaponSound( SPECIAL1 );
-
 		CPASAttenuationFilter filter( GetOwner() );
 		EmitSound( filter, GetOwner()->entindex(), g_pFlameThrowerSound ); 
-
 		m_bSoundOn = true;
 	}
 }
@@ -195,23 +300,60 @@ void CWeaponFlameThrower::StopFlameSound()
 {
 	if ( m_bSoundOn )
 	{
-		WeaponSound( EMPTY );
+		if ( m_fFireDuration > 0.5f )	//gpGlobals->curtime + 0.5f
+			WeaponSound( EMPTY );
+
 		StopSound( entindex(), g_pFlameThrowerSound );
 		m_bSoundOn = false;
 	}
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+bool CWeaponFlameThrower::StartPilotLight()
+{
+	if ( !m_bIgnited )
+	{
+		SendWeaponAnim( ACT_VM_FIDGET );
+		m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+		WeaponSound( SPECIAL1 );
+		m_bIgnited = true;
+		return true;
+	}
+
+	return false;
+}
+
+bool CWeaponFlameThrower::StopPilotLight()
+{
+	if ( m_bIgnited )
+	{
+		SendWeaponAnim( ACT_VM_FIDGET );
+		m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+		WeaponSound( SPECIAL2 );
+		m_bIgnited = false;
+		return true;
+	}
+
+	return false;
+}
+
+//-----------------------------------------------------------------------------
 bool CWeaponFlameThrower::CanHolster( void )
 {
-	if ( m_bFiring )
+	// Unignite first
+	if (StopPilotLight())
 		return false;
-	
+
 	return BaseClass::CanHolster();
 }
 
 bool CWeaponFlameThrower::Holster( CBaseCombatWeapon *pSwitchingTo )
 {
+	// Stop all my effects
+	StopFlameSound();
+	StopPilotLight();
 	m_bFiring = false;
 
 	return BaseClass::Holster( pSwitchingTo );
@@ -222,9 +364,11 @@ bool CWeaponFlameThrower::Holster( CBaseCombatWeapon *pSwitchingTo )
 //-----------------------------------------------------------------------------
 bool CWeaponFlameThrower::Reload( void )
 {
-	// No reloading if we're currently spewing, gotta unignite first
-	if ( m_bFiring )
+	// Unignite first
+	if (StopPilotLight())
 		return false;
+
+	StopFlameSound();
 
 	return DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
 }

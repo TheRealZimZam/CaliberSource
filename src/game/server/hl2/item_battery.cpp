@@ -51,12 +51,12 @@ public:
 	void Spawn( void )
 	{
 		Precache( );
-		SetModel( "models/items/battery_aaa.mdl" );
+		SetModel( "models/items/armourplate.mdl" );
 		BaseClass::Spawn( );
 	}
 	void Precache( void )
 	{
-		PrecacheModel ("models/items/battery_aaa.mdl");
+		PrecacheModel ("models/items/armourplate.mdl");
 
 		PrecacheScriptSound( "Battery.Touch" );
 
@@ -64,9 +64,9 @@ public:
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player *>( pPlayer );
-		return ( pHL2Player && pHL2Player->ApplyBattery() );
+		return ( pHL2Player && pHL2Player->ApplyBattery(2) );
 	}
 };
 
-LINK_ENTITY_TO_CLASS(item_bigplate, CItemBigBattery);
-PRECACHE_REGISTER(item_bigplate);
+LINK_ENTITY_TO_CLASS(item_armourplate, CItemBigBattery);
+PRECACHE_REGISTER(item_armourplate);

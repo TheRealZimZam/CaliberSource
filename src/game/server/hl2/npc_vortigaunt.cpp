@@ -1247,10 +1247,12 @@ void CNPC_Vortigaunt::Spawn()
 
 	GetExpresser()->SetVoicePitch( random->RandomInt( 85, 110 ) );
 
-	CapabilitiesAdd( bits_CAP_ANIMATEDFACE | bits_CAP_TURN_HEAD | bits_CAP_MOVE_GROUND | bits_CAP_NO_HIT_PLAYER );
+	if ( !HasSpawnFlags( SF_NPC_START_EFFICIENT ) )
+		CapabilitiesAdd( bits_CAP_ANIMATEDFACE | bits_CAP_TURN_HEAD );
+	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_NO_HIT_PLAYER );
 	CapabilitiesAdd	( bits_CAP_INNATE_RANGE_ATTACK1 );
 	CapabilitiesAdd	( bits_CAP_INNATE_MELEE_ATTACK1 );
-	CapabilitiesAdd	( bits_CAP_DOORS_GROUP );
+	CapabilitiesAdd	( bits_CAP_DOORS_GROUP | bits_CAP_USE );
 //	CapabilitiesAdd( bits_CAP_FRIENDLY_DMG_IMMUNE );
 	
 	m_flNextHealTime		= 0;		// Next time allowed to heal player

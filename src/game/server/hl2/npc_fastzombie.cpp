@@ -13,6 +13,7 @@
 #include "ai_motor.h"
 #include "ai_memory.h"
 #include "ai_route.h"
+#include "ai_squad.h"
 #include "soundent.h"
 #include "game.h"
 #include "npcevent.h"
@@ -343,10 +344,10 @@ public:
 	DECLARE_DATADESC();
 };
 
-LINK_ENTITY_TO_CLASS( npc_zombie, CFastZombie );
-LINK_ENTITY_TO_CLASS( npc_zombie_torso, CFastZombie );
+//LINK_ENTITY_TO_CLASS( npc_zombie, CFastZombie );
+//LINK_ENTITY_TO_CLASS( npc_zombie_torso, CFastZombie );
 LINK_ENTITY_TO_CLASS( npc_fastzombie, CFastZombie );
-
+LINK_ENTITY_TO_CLASS( npc_fastzombie_torso, CFastZombie );
 
 BEGIN_DATADESC( CFastZombie )
 
@@ -474,6 +475,62 @@ int CFastZombie::SelectSchedule ( void )
 			return SCHED_MELEE_ATTACK2;
 		break;
 
+		if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
+			return SCHED_MELEE_ATTACK1;
+		break;
+
+// TODO; Circle/Stalk prey behaviour
+// Only do this for players, or enemies that dont have a gun
+#if 1
+		if ( GetEnemy() && (GetEnemy()->IsPlayer() || !(GetEnemy()->MyNPCPointer()->CapabilitiesGet( ) & bits_CAP_WEAPON_RANGE_ATTACK1)) )
+		{
+			if ( m_pSquad && HasCondition( COND_SEE_ENEMY ) )
+			{
+				#define MELEE_CIRCLE_DISTANCE	288	// If in a pack, pace around an enemy at roughly this dist
+				float flDist = EnemyDistance(GetEnemy());
+
+				// If im within the circle distance, start pacing around the enemy, move in for a swing if possible
+				if ( flDist <= MELEE_CIRCLE_DISTANCE )
+				{
+					// I have the attack slot
+					if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
+					{
+						// If i got an incoming swing, try to dodge
+						if ( IsAllowedToDodge() )
+							return SCHED_DUCK_DODGE;
+
+						// Leap towards enemy
+						if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+							return SCHED_RANGE_ATTACK1;
+
+						// Run towards enemy
+						return SCHED_CHASE_ENEMY;
+					}
+					// I dont have the slot
+					else
+					{
+						// Try to cirlce/stalk the enemy
+						// TODO;
+
+						// If I cant circle, just keep my distance and look scary
+						return SCHED_STANDOFF;
+					}
+				}
+				else
+				{
+					// Get into circle range
+					return SCHED_CHASE_ENEMY;
+				}
+			}
+		}
+		break;
+#endif
+
+		// Jump to the side
+		if ( HasCondition( COND_SEE_ENEMY ) && HasCondition( COND_ENEMY_TARGETTING_ME ) && random->RandomInt( 0, 32 ) == 0 )
+			return SCHED_EVADE;
+		break;
+
 		if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
 		{
 			// Set state to alert and recurse!
@@ -496,6 +553,11 @@ int CFastZombie::SelectSchedule ( void )
 			// Just lost track of our enemy. 
 			// Wander around a bit so we don't look like a dingus.
 			return SCHED_ZOMBIE_WANDER_MEDIUM;
+		}
+		// Duck and turn/scream
+		if ( HasCondition( COND_HEAVY_DAMAGE ) && random->RandomInt( 0, 2 ) == 2 )
+		{
+			return SCHED_ALERT_SMALL_FLINCH;
 		}
 		break;
 	}
@@ -634,7 +696,7 @@ void CFastZombie::SetAngrySoundState( void )
 		return;
 	}
 
-	EmitSound( "NPC_FastZombie.LeapAttack" );
+//	EmitSound( "NPC_FastZombie.LeapAttack" );
 
 	// Main looping sound
 	ENVELOPE_CONTROLLER.SoundChangePitch( m_pMoanSound, FASTZOMBIE_MIN_PITCH, 0.5 );
@@ -660,7 +722,7 @@ void CFastZombie::Spawn( void )
 	m_fIsTorso = m_fIsHeadless = false;
 
 	// This was placed as an npc_zombie_torso
-	if( FClassnameIs( this, "npc_zombie_torso" ) )
+	if( FClassnameIs( this, "npc_zombie_torso" ) || FClassnameIs( this, "npc_fastzombie_torso" ) )
 		m_fIsTorso = true;
 	else
 		m_fIsTorso = false;
@@ -676,11 +738,10 @@ void CFastZombie::Spawn( void )
 
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_GROUND | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
+	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_STRAFE );	//For pack attacks
 
 	if ( m_fIsTorso == true )
-	{
-		CapabilitiesRemove( bits_CAP_MOVE_JUMP | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
-	}
+		CapabilitiesRemove( bits_CAP_MOVE_JUMP | bits_CAP_MOVE_CLIMB | bits_CAP_SQUAD | bits_CAP_STRAFE | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
 
 	m_flNextAttack = gpGlobals->curtime;
 
@@ -708,7 +769,7 @@ void CFastZombie::PostNPCInit( void )
 //-----------------------------------------------------------------------------
 const char *CFastZombie::GetHeadcrabClassname( void )
 {
-	return "npc_headcrab";
+	return "npc_headcrab_fast";
 }
 
 const char *CFastZombie::GetHeadcrabModel( void )

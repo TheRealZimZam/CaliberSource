@@ -270,7 +270,7 @@ void CGrenadeBeam::GrenadeBeamTouch( CBaseEntity *pOther )
 	// --------------------------------------------
 	if (pOther->m_takedamage)
 	{
-		pOther->TakeDamage( CTakeDamageInfo( this, this, m_flDamage, DMG_BURN ) );
+		pOther->TakeDamage( CTakeDamageInfo( this, this, m_flDamage, DMG_AIRBOAT ) );
 		KillBeam();
 		return;
 	}

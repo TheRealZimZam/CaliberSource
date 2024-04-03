@@ -15,10 +15,10 @@
 // A good amount of health and high speed makes it a real threat when alone, 
 // an absolute monster when paired with grunts or other deadly distractions.
 // Has three attacks;
-// 1. Shoot short-range lasers, its "melee" attack.
+// 1. Short-range hitscan lasers, its "melee" attack.
 // 2. Launched homing grenades - they go up abit then come back down on
 // the unfortunate basterds head.
-// 3. If specified, can be given disposable missile pods for a longer range,
+// 3. If specified, can be given disposable missile pods like the chopper for a longer range,
 // direct-fire attack, rather than the slow, easily dodgable homer grenades
 //
 //-----------------------------------------------------------------------------
@@ -438,7 +438,7 @@ void CNPC_ADrone::Spawn(void)
 	NPCInit();
 
 	// Let this guy look far
-	m_flDistTooFar = 99999999.0;
+	m_flDistTooFar = 9999999.0;
 	SetDistLook( 4000.0 );
 	m_flSpeed = ASCANNER_MAX_SPEED;
 
@@ -489,16 +489,14 @@ void CNPC_ADrone::Event_Killed( const CTakeDamageInfo &info )
 		Gib();
 		return;
 	}
-#if 1
 	else
 	{
 		//TODO; convert to physobject, a really heavy one that crushes things
 		ExplosionCreate(GetLocalOrigin(), GetLocalAngles(), this, random->RandomInt(5, 10), 64, true);
 		UTIL_Remove(this);
 	}
-#else
+
 	BaseClass::Event_Killed( info );
-#endif
 }
 
 //------------------------------------------------------------------------------
@@ -509,14 +507,14 @@ int CNPC_ADrone::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	CTakeDamageInfo info = inputInfo;
 
 	// -------------------------------------
-	//  If hit by stalker beam, blow up
+	//  If hit by stalker beam, blow off the wings
 	// -------------------------------------
 	if (info.GetAttacker()->Classify() == CLASS_STALKER)
 	{
 		info.SetDamage( m_iHealth+1 );
 	}
 
-	// Flinch in the direction of the attack
+	// Wobble in the direction of the attack
 #if 0
 	float vAttackYaw = VecToYaw(g_vecAttackDir);
 

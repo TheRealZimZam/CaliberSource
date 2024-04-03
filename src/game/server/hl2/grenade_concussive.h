@@ -61,7 +61,7 @@ public:
 class CGrenadeConcussive : public CBaseGrenade
 {
 	DECLARE_CLASS( CGrenadeConcussive, CBaseGrenade );
-
+	DECLARE_DATADESC();
 public:
 	void	Precache( void );
 	void	Spawn( void );
@@ -69,14 +69,9 @@ public:
 //	bool	CreateVPhysics( void );
 	void		Event_Killed( const CTakeDamageInfo &info );
 
-private:
-	bool	m_inSolid;	//If im stuck in a solid dont do any damage
-
 public:
 	void EXPORT				Detonate(void);
 	CGrenadeConcussive(void);
-
-	DECLARE_DATADESC();
 };
 
 #endif // GRENADE_CONCUSSIVE_H

@@ -57,6 +57,7 @@
 #include "filters.h"
 #include "tier0/icommandline.h"
 #include "team.h"
+#include "logic_playerproxy.h"
 
 #ifdef HL2_EPISODIC
 #include "npc_alyx_episodic.h"
@@ -91,8 +92,10 @@ ConVar hl2_single_weapon_slot( "hl2_single_weapon_slot", "0" );
 // to basemultiplayer, the response system can now be used - if its ever done properly it should definitely
 // be done through that system - its a whole lot more powerful.
 ConVar hl2_playertalk( "hl2_playertalk", "0", FCVAR_ARCHIVE, "Enable Dick Kickem Mode (requires map restart)" );
-#define PLAYER_TALK_DELAY				random->RandomFloat( 5.0, 15.0 )
-#define	PLAYER_SENTENCE_VOLUME			1.0
+ConVar hl2_playertalk_bragchance( "hl2_playertalk_bragchance", "65", FCVAR_CHEAT, "Chance of one-lining on kill (0-100)." );
+#define PLAYER_TALK_DELAY				random->RandomFloat( 5.0, 15.0 )	//TODO; Convar??
+// Defaults... the sentence.txt should be able to override these.
+#define	PLAYER_SENTENCE_VOLUME			1
 #define PLAYER_ATTN						SNDLVL_TALKING
 #define PLAYER_PITCH					100
 
@@ -142,6 +145,7 @@ ConVar hl2_flashlight_charge_time( "hl2_flashlight_charge_time", "50" );	// 100 
 #define	FLASH_DRAIN_TIME	 hl2_flashlight_drain_time.GetFloat()
 #define	FLASH_CHARGE_TIME	 hl2_flashlight_charge_time.GetFloat()
 
+ConVar player_rocketjumping( "player_rocketjumping", "0", FCVAR_CHEAT, "Does the player take half-damage/double-velocity from self inflicted blasts." );
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -440,24 +444,31 @@ static const char * s_szModelPath = "models/player/";
 
 CHL2_Player::CHL2_Player()
 {
-#if SINGLEPLAYER_ANIMSTATE
+#if USE_ANIMSTATE
 	// SP animstate
-	UseClientSideAnimation();
-	m_PlayerAnimState = CreatePlayerAnimState( this );
-#else
-	// FIXME; MP state is extremely broken and WIP, rn it just crashes anyway
-	// Probably not going to spend time fixing because the few additional
-	// features arent really worth it - we only need animations so the player
-	// can admire himself in the mirror anyway.
-	UseClientSideAnimation();
-	// Setup the movement data.
-	MultiPlayerMovementData_t movementData;
-	movementData.m_flRunSpeed = HL2_RUN_SPEED;
-	movementData.m_flWalkSpeed = HL2_WALK_SPEED;
-	movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
+	if ( !g_pGameRules->IsMultiplayer() )
+	{
+		UseClientSideAnimation();
+		m_PlayerAnimState = CreatePlayerAnimState( this );
+	}
+	else
+	{
+		// FIXME; MP state is extremely broken and WIP, rn it just crashes anyway
+		// Probably not going to spend time fixing because the few additional
+		// features arent really worth it - we only need animations so the player
+		// can admire himself in the mirror anyway.
+/*
+		UseClientSideAnimation();
+		// Setup the movement data.
+		MultiPlayerMovementData_t movementData;
+		movementData.m_flRunSpeed = HL2_RUN_SPEED;
+		movementData.m_flWalkSpeed = HL2_WALK_SPEED;
+		movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
 
-	// Create animation state for this player.
-	m_PlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
+		// Create animation state for this player.
+		m_MultiplayerPlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
+*/
+	}
 #endif
 	m_angEyeAngles.Init();
 
@@ -550,6 +561,24 @@ void CHL2_Player::Precache( void )
 		enginesound->PrecacheSentenceGroup( "PLAYER" );
 		gPrecachedSpeech = 1;
 	}
+}
+
+void CHL2_Player::CreateCorpse( void )
+{
+	// NOTENOTE;
+	// The bodyqueue is the old system used to manage dead
+	// players, by creating a separate corpse entity and
+	// getting rid of old ones after a certain threshold is reached.
+	// Source uses ragdolls for the most part, so this system
+	// is redundant - however, for old models that dont have
+	// valid ragdoll animations, we can keep this on
+
+	// Check if my playermodel has a ragdoll animation,
+	// if it does, I dont need to do this
+	if ( CanBecomeRagdoll() )
+		return;
+
+	CopyToBodyQue( this );
 }
 
 //-----------------------------------------------------------------------------
@@ -872,18 +901,13 @@ void CHL2_Player::PostThink( void )
 	{
 		HandleAdmireGlovesAnimation();
 
-		if ( hl2_playertalk.GetBool() && gPrecachedSpeech )
+		// NOTENOTE; Other non-triggered, dynamic speech could go here too
+		if ( GetHealth() < sk_player_critical_health.GetInt() && m_flIdleTime > 3.0f && random->RandomInt(0,99) == 0 )
 		{
-			// NOTENOTE; Other non-triggered, dynamic speech could go here too
-			if ( GetHealth() < sk_player_critical_health.GetInt() && m_flIdleTime > 4.0f && random->RandomInt(0,99) == 0 )
-			{
-				// Send it
-				if( m_flNextPlayerTalk <= gpGlobals->curtime )
-				{
-					m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
-					SENTENCEG_PlayRndSz( edict(), "PLAYER_INJURED", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
-				}
-			}
+			SpeakPlayerSentence( "PLAYER_INJURED" );	// OBSOLETE - USE RESPONSE SYSTEM!!
+#ifdef HL2_EPISODIC
+			SpeakConceptIfAllowed( MP_CONCEPT_HURT );
+#endif
 		}
 	}
 
@@ -1376,6 +1400,9 @@ void CHL2_Player::StopWalking( void )
 //-----------------------------------------------------------------------------
 bool CHL2_Player::CanZoom( CBaseEntity *pRequester )
 {
+	if ( g_pGameRules->IsMultiplayer() )
+		return false;
+
 	if ( IsZooming() )
 		return false;
 
@@ -1855,6 +1882,7 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		GiveAmmo( 255,	GetAmmoDef()->Index("HMG"));
 		GiveAmmo( 32,	GetAmmoDef()->Index("357"));
 		GiveAmmo( 255,	GetAmmoDef()->Index("Buckshot"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("Fragshot"));
 		GiveAmmo( 5,	GetAmmoDef()->Index("AR2Grenade"));
 		GiveAmmo( 5,	GetAmmoDef()->Index("RPGRound"));
 		GiveAmmo( 24,	GetAmmoDef()->Index("SniperRound"));
@@ -1870,7 +1898,7 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		GiveAmmo( 5,	GetAmmoDef()->Index("Hopwire"));
 #endif	
 //		GiveNamedItem( "weapon_357" );
-		GiveNamedItem( "weapon_45" );
+		GiveNamedItem( "weapon_44" );
 //		GiveNamedItem( "weapon_alyxgun" );
 //		GiveNamedItem( "weapon_ar1" );
 		GiveNamedItem( "weapon_ar2" );
@@ -2142,7 +2170,6 @@ bool CHL2_Player::SuitPower_ShouldRecharge( void )
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 ConVar	sk_battery( "sk_battery","0" );			
-ConVar	sk_bigbattery( "sk_bigbattery","0" );	
 
 bool CHL2_Player::ApplyBattery( float powerMultiplier )
 {
@@ -2415,14 +2442,10 @@ void CHL2_Player::OnSquadMemberKilled( inputdata_t &data )
 	MessageEnd();
 
 	// Dammit leeroy!
-	if (hl2_playertalk.GetBool() && gPrecachedSpeech)
-	{
-		if( m_flNextPlayerTalk <= gpGlobals->curtime )
-		{
-			m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
-			SENTENCEG_PlayRndSz( edict(), "PLAYER_SQUADMEMBER_DIED", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
-		}
-	}
+	SpeakPlayerSentence( "PLAYER_SQUADMEMBER_DIED" );	// OBSOLETE - USE RESPONSE SYSTEM!!
+#ifdef HL2_EPISODIC
+	SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_NEGATIVE );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -2502,11 +2525,18 @@ int	CHL2_Player::OnTakeDamage( const CTakeDamageInfo &info )
 	// Should we run this damage through the skill level adjustment?
 	bool bAdjustForSkillLevel = true;
 
-	if( info.GetDamageType() == DMG_GENERIC && info.GetAttacker() == this && info.GetInflictor() == this )
+	if ( info.GetInflictor() == this )
 	{
 		// Only do a skill level adjustment if the player isn't his own attacker AND inflictor.
 		// This prevents damage from SetHealth() inputs from being adjusted for skill level.
-		bAdjustForSkillLevel = false;
+		if ( info.GetAttacker() == this && info.GetDamageType() == DMG_GENERIC )
+			bAdjustForSkillLevel = false;
+
+		if ( info.GetDamageType() & DMG_BLAST && player_rocketjumping.GetBool() )
+		{
+			playerDamage.ScaleDamage( 0.5f );
+			playerDamage.ScaleDamageForce( 2.0f );
+		}
 	}
 
 	if ( GetVehicleEntity() != NULL && GlobalEntity_GetState("gordon_protect_driver") == GLOBAL_ON )
@@ -2630,17 +2660,14 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 	}
 #endif
 
-	// Playertalk prototype
-	if ( hl2_playertalk.GetBool() )
+	// Killed a npc
+	if ( pVictim->IsNPC() )
 	{
-		if ( !gPrecachedSpeech )
+		// Playertalk prototype
+		if ( hl2_playertalk.GetBool() )
 		{
-			Msg( "You must now restart to use dick-kickem mode.\n");
-		}
-		else
-		{
-			#define PLAYER_BRAG_CHANCE	65
-			if ( random->RandomInt(0, 100) < PLAYER_BRAG_CHANCE )
+			#define PLAYER_BRAG_CHANCE	hl2_playertalk_bragchance.GetInt()
+			if ( random->RandomInt(0, 100) <= PLAYER_BRAG_CHANCE )
 			{
 				const char *pSentenceName = "PLAYER_FRAG";
 				switch ( info.GetDamageType() )
@@ -2683,13 +2710,14 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 				//TODO; Dominations
 
 				//Send it
-				if( m_flNextPlayerTalk <= gpGlobals->curtime )
-				{
-					m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
-					SENTENCEG_PlayRndSz( edict(), pSentenceName, PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
-				}
+				SpeakPlayerSentence( pSentenceName );	// OBSOLETE - USE RESPONSE SYSTEM!!
 			}
 		}
+	}
+	else
+	{
+		// Killed a objekt
+
 	}
 }
 
@@ -2698,14 +2726,30 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 {
 	// Dead SP players use the old system for death
-#if SINGLEPLAYER_ANIMSTATE
-	if ( m_PlayerAnimState )
+	if ( m_PlayerAnimState && !g_pGameRules->IsMultiplayer() )
 	{
 		m_PlayerAnimState->Release();
 		m_PlayerAnimState = NULL;
 	}
+
+#ifdef HL2_EPISODIC
+	SpeakConceptIfAllowed( MP_CONCEPT_DIED );
 #endif
+
 //	StopPullingObject();
+	if ( g_pGameRules->IsMultiplayer() )
+	{
+		// Drop what you got in your hands
+		if ( GetActiveWeapon() && GetActiveWeapon()->CanDrop() )
+		{
+			GetActiveWeapon()->SendWeaponAnim( ACT_IDLE );
+			Weapon_Drop( GetActiveWeapon(), NULL, NULL );
+			SetActiveWeapon( NULL );
+		}
+		// Then remove everything else
+		RemoveAllItems( true );
+	}
+
 	BaseClass::Event_Killed( info );
 
 	FirePlayerProxyOutput( "PlayerDied", variant_t(), this, this );
@@ -2871,22 +2915,6 @@ int CHL2_Player::GiveAmmo( int nCount, int nAmmoIndex, bool bSuppressSound)
 }
 
 //-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-bool CHL2_Player::Weapon_CanUse( CBaseCombatWeapon *pWeapon )
-{
-#ifndef HL2MP	
-	if ( pWeapon->ClassMatches( "weapon_stunstick" ) )
-	{
-		if ( ApplyBattery( 0.5 ) )
-			UTIL_Remove( pWeapon );
-		return false;
-	}
-#endif
-
-	return BaseClass::Weapon_CanUse( pWeapon );
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : *pWeapon - 
 //-----------------------------------------------------------------------------
@@ -2999,7 +3027,7 @@ bool CHL2_Player::BumpWeapon( CBaseCombatWeapon *pWeapon )
 				// TODO; This only seems to consider weapons of the same type,
 				// This isnt bad for weapons with differing ammo types, but for similar weapons
 				// that share ammotype (smg1,smg2) this is not working at all.
-				// Fix it??? Pls.
+				// Fix it??? Pls. - M.M
 				if( Weapon_EquipAmmoOnly( pWeapon ) )
 				{
 					EmitSound( "HL2Player.PickupAmmo" );
@@ -3045,8 +3073,8 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	//Drop primary weapon
 	if ( !Q_stricmp( args[0], "DropPrimary" ) )
 	{
-		// Dont go around dropping exhaustibles
-		if ( !(GetActiveWeapon()->GetWpnData().iFlags & ITEM_FLAG_EXHAUSTIBLE) )
+		// To work with the old system; cant drop exhaustibles
+		if ( GetActiveWeapon()->CanDrop() && !(GetActiveWeapon()->GetWpnData().iFlags & ITEM_FLAG_EXHAUSTIBLE) )
 		{
 			if( hl2_single_primary_weapon_mode.GetBool() )
 			{
@@ -3058,6 +3086,9 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 			}
 			return true;
 		}
+
+		DevMsg( "Cannot drop this weapon!\n" );
+		return true;
 	}
 
 	if ( FStrEq( args[0], "spectate" ) )
@@ -4050,19 +4081,6 @@ void CHL2_Player::StopWaterDeathSounds( void )
 }
 
 //-----------------------------------------------------------------------------
-// 
-//-----------------------------------------------------------------------------
-#if 0
-void CHL2_Player::MissedAR2AltFire()
-{
-	if( GetPlayerProxy() != NULL )
-	{
-		GetPlayerProxy()->m_PlayerMissedAR2AltFire.FireOutput( this, this );
-	}
-}
-#endif
-
-//-----------------------------------------------------------------------------
 //
 //-----------------------------------------------------------------------------
 void CHL2_Player::DisplayLadderHudHint()
@@ -4140,7 +4158,7 @@ void CHL2_Player::Splash( void )
 	}
 
 	float flSpeed = GetAbsVelocity().Length();
-	if ( flSpeed < 300 )
+	if ( flSpeed < HL2_RUN_SPEED )
 	{
 		data.m_flScale = random->RandomFloat( 10, 12 );
 		DispatchEffect( "waterripple", data );
@@ -4151,44 +4169,6 @@ void CHL2_Player::Splash( void )
 		DispatchEffect( "watersplash", data );
 	}
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: Used to relay outputs/inputs from the player to the world and viceversa
-//-----------------------------------------------------------------------------
-class CLogicPlayerProxy : public CLogicalEntity
-{
-	DECLARE_CLASS( CLogicPlayerProxy, CLogicalEntity );
-
-private:
-
-	DECLARE_DATADESC();
-
-public:
-
-	COutputEvent m_OnFlashlightOn;
-	COutputEvent m_OnFlashlightOff;
-	COutputEvent m_PlayerHasAmmo;
-	COutputEvent m_PlayerHasNoAmmo;
-	COutputEvent m_PlayerDied;
-
-	COutputInt m_RequestedPlayerHealth;
-
-	void InputRequestPlayerHealth( inputdata_t &inputdata );
-	void InputSetFlashlightSlowDrain( inputdata_t &inputdata );
-	void InputSetFlashlightNormalDrain( inputdata_t &inputdata );
-	void InputSetPlayerHealth( inputdata_t &inputdata );
-	void InputRequestAmmoState( inputdata_t &inputdata );
-	void InputLowerWeapon( inputdata_t &inputdata );
-	void InputEnableCappedPhysicsDamage( inputdata_t &inputdata );
-	void InputDisableCappedPhysicsDamage( inputdata_t &inputdata );
-	void InputSetLocatorTargetEntity( inputdata_t &inputdata );
-
-	void Activate ( void );
-
-	bool PassesDamageFilter( const CTakeDamageInfo &info );
-
-	EHANDLE m_hPlayer;
-};
 
 CLogicPlayerProxy *CHL2_Player::GetPlayerProxy( void )
 {
@@ -4216,157 +4196,37 @@ void CHL2_Player::FirePlayerProxyOutput( const char *pszOutputName, variant_t va
 	GetPlayerProxy()->FireNamedOutput( pszOutputName, variant, pActivator, pCaller );
 }
 
-LINK_ENTITY_TO_CLASS( logic_playerproxy, CLogicPlayerProxy);
-
-BEGIN_DATADESC( CLogicPlayerProxy )
-	DEFINE_OUTPUT( m_OnFlashlightOn, "OnFlashlightOn" ),
-	DEFINE_OUTPUT( m_OnFlashlightOff, "OnFlashlightOff" ),
-	DEFINE_OUTPUT( m_RequestedPlayerHealth, "PlayerHealth" ),
-	DEFINE_OUTPUT( m_PlayerHasAmmo, "PlayerHasAmmo" ),
-	DEFINE_OUTPUT( m_PlayerHasNoAmmo, "PlayerHasNoAmmo" ),
-	DEFINE_OUTPUT( m_PlayerDied,	"PlayerDied" ),
-//	DEFINE_OUTPUT( m_PlayerMissedAR2AltFire, "PlayerMissedAR2AltFire" ),
-	DEFINE_INPUTFUNC( FIELD_VOID,	"RequestPlayerHealth",	InputRequestPlayerHealth ),
-	DEFINE_INPUTFUNC( FIELD_VOID,	"SetFlashlightSlowDrain",	InputSetFlashlightSlowDrain ),
-	DEFINE_INPUTFUNC( FIELD_VOID,	"SetFlashlightNormalDrain",	InputSetFlashlightNormalDrain ),
-	DEFINE_INPUTFUNC( FIELD_INTEGER, "SetPlayerHealth",	InputSetPlayerHealth ),
-	DEFINE_INPUTFUNC( FIELD_VOID,	"RequestAmmoState", InputRequestAmmoState ),
-	DEFINE_INPUTFUNC( FIELD_VOID,	"LowerWeapon", InputLowerWeapon ),
-	DEFINE_INPUTFUNC( FIELD_VOID,	"EnableCappedPhysicsDamage", InputEnableCappedPhysicsDamage ),
-	DEFINE_INPUTFUNC( FIELD_VOID,	"DisableCappedPhysicsDamage", InputDisableCappedPhysicsDamage ),
-	DEFINE_INPUTFUNC( FIELD_STRING,	"SetLocatorTargetEntity", InputSetLocatorTargetEntity ),
-	DEFINE_FIELD( m_hPlayer, FIELD_EHANDLE ),
-END_DATADESC()
-
-void CLogicPlayerProxy::Activate( void )
+//-----------------------------------------------------------------------------
+// Purpose: OBSOL77T player sentences - replaced by response system
+//-----------------------------------------------------------------------------
+void CHL2_Player::SpeakPlayerSentence( const char *pszSentenceName, float fVolume )
 {
-	BaseClass::Activate();
-
-	if ( m_hPlayer == NULL )
+	if ( hl2_playertalk.GetBool() )
 	{
-		m_hPlayer = AI_GetSinglePlayer();
-	}
-}
-
-bool CLogicPlayerProxy::PassesDamageFilter( const CTakeDamageInfo &info )
-{
-	if (m_hDamageFilter)
-	{
-		CBaseFilter *pFilter = (CBaseFilter *)(m_hDamageFilter.Get());
-		return pFilter->PassesDamageFilter(info);
-	}
-
-	return true;
-}
-
-void CLogicPlayerProxy::InputSetPlayerHealth( inputdata_t &inputdata )
-{
-	if ( m_hPlayer == NULL )
-		return;
-
-	m_hPlayer->SetHealth( inputdata.value.Int() );
-
-}
-
-void CLogicPlayerProxy::InputRequestPlayerHealth( inputdata_t &inputdata )
-{
-	if ( m_hPlayer == NULL )
-		return;
-
-	m_RequestedPlayerHealth.Set( m_hPlayer->GetHealth(), inputdata.pActivator, inputdata.pCaller );
-}
-
-void CLogicPlayerProxy::InputSetFlashlightSlowDrain( inputdata_t &inputdata )
-{
-	if( m_hPlayer == NULL )
-		return;
-
-	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
-
-	if( pPlayer )
-		pPlayer->SetFlashlightPowerDrainScale( hl2_darkness_flashlight_factor.GetFloat() );
-}
-
-void CLogicPlayerProxy::InputSetFlashlightNormalDrain( inputdata_t &inputdata )
-{
-	if( m_hPlayer == NULL )
-		return;
-
-	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
-
-	if( pPlayer )
-		pPlayer->SetFlashlightPowerDrainScale( 1.0f );
-}
-
-void CLogicPlayerProxy::InputRequestAmmoState( inputdata_t &inputdata )
-{
-	if( m_hPlayer == NULL )
-		return;
-
-	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
-
-	for ( int i = 0 ; i < pPlayer->WeaponCount(); ++i )
-	{
-		CBaseCombatWeapon* pCheck = pPlayer->GetWeapon( i );
-
-		if ( pCheck )
+		if ( !gPrecachedSpeech )
 		{
-			if ( pCheck->HasAnyAmmo() && (pCheck->UsesPrimaryAmmo() || pCheck->UsesSecondaryAmmo()))
-			{
-				m_PlayerHasAmmo.FireOutput( this, this, 0 );
-				return;
-			}
+			Msg( "You must now restart to use dick-kickem mode.\n");
+			return;
+		}
+
+		float fExtraDelay = 0;
+		if (g_pGameRules->IsMultiplayer())
+		{
+			// Limit amount of talking when there's a shitload of players in a match
+			// TODO; Actually get the amount of players connected, not just the maximum amount
+			fExtraDelay = 3;
+			if ( gpGlobals->maxClients > 8 )
+				fExtraDelay = 6;
+		}
+
+		if( m_flNextPlayerTalk <= gpGlobals->curtime )
+		{
+			m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY + fExtraDelay;
+			SENTENCEG_PlayRndSz( edict(), pszSentenceName, PLAYER_SENTENCE_VOLUME*fVolume, PLAYER_ATTN, 0, PLAYER_PITCH);
 		}
 	}
-
-	m_PlayerHasNoAmmo.FireOutput( this, this, 0 );
 }
-
-void CLogicPlayerProxy::InputLowerWeapon( inputdata_t &inputdata )
-{
-	if( m_hPlayer == NULL )
-		return;
-
-	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
-
-	pPlayer->Weapon_Lower();
-}
-
-void CLogicPlayerProxy::InputEnableCappedPhysicsDamage( inputdata_t &inputdata )
-{
-	if( m_hPlayer == NULL )
-		return;
-
-	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
-	pPlayer->EnableCappedPhysicsDamage();
-}
-
-void CLogicPlayerProxy::InputDisableCappedPhysicsDamage( inputdata_t &inputdata )
-{
-	if( m_hPlayer == NULL )
-		return;
-
-	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
-	pPlayer->DisableCappedPhysicsDamage();
-}
-
-void CLogicPlayerProxy::InputSetLocatorTargetEntity( inputdata_t &inputdata )
-{
-	if( m_hPlayer == NULL )
-		return;
-
-	CBaseEntity *pTarget = NULL; // assume no target
-	string_t iszTarget = MAKE_STRING( inputdata.value.String() );
-
-	if( iszTarget != NULL_STRING )
-	{
-		pTarget = gEntList.FindEntityByName( NULL, iszTarget );
-	}
-
-	CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(m_hPlayer.Get());
-	pPlayer->SetLocatorTargetEntity(pTarget);
-}
-
+	
 //-----------------------------------------------------------------------------
 // MP Stuff
 //-----------------------------------------------------------------------------

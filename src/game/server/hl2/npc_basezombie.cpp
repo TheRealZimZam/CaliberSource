@@ -825,7 +825,7 @@ HeadcrabRelease_t CNPC_BaseZombie::ShouldReleaseHeadcrab( const CTakeDamageInfo 
 //			bitsDamageType - 
 // Output : int
 //-----------------------------------------------------------------------------
-#define ZOMBIE_SCORCH_RATE		8
+#define ZOMBIE_SCORCH_RATE		6
 #define ZOMBIE_MIN_RENDERCOLOR	50
 int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 {
@@ -1284,13 +1284,6 @@ bool CNPC_BaseZombie::ShouldIgnite( const CTakeDamageInfo &info )
 void CNPC_BaseZombie::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bool bCalledByLevelDesigner )
 {
 	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
-
-#ifdef HL2_EPISODIC
-	if ( HL2GameRules()->IsAlyxInDarknessMode() == true && GetEffectEntity() != NULL )
-	{
-		GetEffectEntity()->AddEffects( EF_DIMLIGHT );
-	}
-#endif // HL2_EPISODIC
 
 	// Set the zombie up to burn to death in about ten seconds.
 	SetHealth( min( m_iHealth, FLAME_DIRECT_DAMAGE_PER_SEC * (ZOMBIE_BURN_TIME + random->RandomFloat( -ZOMBIE_BURN_TIME_NOISE, ZOMBIE_BURN_TIME_NOISE)) ) );

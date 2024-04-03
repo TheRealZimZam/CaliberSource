@@ -25,6 +25,14 @@ enum HomerRocketTrail_t
 	HOMER_SMOKE_TRAIL_ALIEN,		// Alien colors on smoke trail
 };
 
+enum MissileType_t
+{
+	EXPLOSIVE,				// Default
+	EXPLOSIVEINCENDIARY,	// Explode + Incendiary
+	INCENDIARY,				// Incendiary Only
+	ARMORPIERCING,			// Does full damage to hit entity, half to everything else
+};
+
 class CGrenadeHomer : public CBaseGrenade
 {
 public:
@@ -37,6 +45,8 @@ public:
 	void		Launch( CBaseEntity *pOwner, CBaseEntity *pTarget, const Vector &vInitVelocity, float m_flHomingSpeed, float fFallSpeed, int nRocketTrailType);
 	void		SetSpin(float flSpinMagnitude, float flSpinSpeed);
 	void		SetHoming(float flStrength, float flDelay, float flRampUp, float flDuration, float flRampDown);
+
+	void		SetRocketType(int iRocketType) { m_nRocketType = iRocketType; }
 
 	CHandle<RocketTrail>	m_hRocketTrail[3];
 
@@ -55,6 +65,7 @@ private:
 	float		m_flSpinMagnitude;
 	float		m_flSpinSpeed;
 	int			m_nRocketTrailType;
+	int			m_nRocketType;
 	int			m_spriteTexture;
 
 	// In flight data
@@ -66,9 +77,10 @@ private:
 	EHANDLE		m_hTarget;
 
 	void		AimThink( void );
-	void		StartRocketTrail(void);
+	void		StartRocketTrail(bool bTrail1 = true, bool bTrail2 = true, bool bTrail3 = true);
 	void		UpdateRocketTrail(float fScale);
 	void		StopRocketTrail(void);
+	void		StopCosmeticTrails(bool bTrail1 = true, bool bTrail2 = true);
 	void		PlayFlySound( void );
 	void 		GrenadeHomerTouch( CBaseEntity *pOther );
 	void		Event_Killed( const CTakeDamageInfo &info );

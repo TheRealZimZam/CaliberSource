@@ -49,15 +49,28 @@ void ClientActive( edict_t *pEdict, bool bLoadGame )
 	Assert( pPlayer );
 
 	if ( !pPlayer )
-	{
 		return;
-	}
 
 	pPlayer->InitialSpawn();
-
 	if ( !bLoadGame )
-	{
 		pPlayer->Spawn();
+
+	if ( g_pGameRules->IsMultiplayer() || gpGlobals->deathmatch || gpGlobals->teamplay )
+	{
+		char sName[128];
+		Q_strncpy( sName, pPlayer->GetPlayerName(), sizeof( sName ) );
+
+		// First parse the name and remove any %'s
+		for ( char *pApersand = sName; pApersand != NULL && *pApersand != 0; pApersand++ )
+		{
+			// Replace it with a space
+			if ( *pApersand == '%' )
+					*pApersand = ' ';
+		}
+
+		// notify other clients of player joining the game
+		if ( !pPlayer->IsFakeClient() )
+			UTIL_ClientPrintAll( HUD_PRINTNOTIFY, "#Game_connected", sName[0] != 0 ? sName : "<unconnected>" );
 	}
 }
 
@@ -66,7 +79,7 @@ void ClientActive( edict_t *pEdict, bool bLoadGame )
 ===============
 const char *GetGameDescription()
 
-Returns the descriptive name of this .dll.  E.g., Half-Life, or Team Fortress 2
+Returns the descriptive name of this .dll.  E.g., Half-Life, or Team Fortress
 ===============
 */
 const char *GetGameDescription()
@@ -74,7 +87,7 @@ const char *GetGameDescription()
 	if ( g_pGameRules ) // this function may be called before the world has spawned, and the game rules initialized
 		return g_pGameRules->GetGameDescription();
 	else
-		return "Half-Life 2";
+		return "Half-Life";
 }
 
 //-----------------------------------------------------------------------------
@@ -104,7 +117,7 @@ void ClientGamePrecache( void )
 
 	if ( !pValues->LoadFromFile( filesystem, pFilename, "GAME" ) )
 	{
-		Error( "Can't open %s for client precache info.", pFilename );
+		Error( "Can't open %s for client precache info. Resorting to hard-coded list.", pFilename );
 
 		// Do the default list
 		CBaseEntity::PrecacheModel("sprites/hud1.vmt");
@@ -154,7 +167,7 @@ void ClientGamePrecache( void )
 // called by ClientKill and DeadThink
 void respawn( CBaseEntity *pEdict, bool fCopyCorpse )
 {
-	if (gpGlobals->coop || gpGlobals->deathmatch || teamplay.GetInt() > 0)
+	if ( g_pGameRules->IsMultiplayer() || gpGlobals->coop || gpGlobals->deathmatch || gpGlobals->teamplay )
 	{
 		if ( fCopyCorpse )
 		{
@@ -201,7 +214,7 @@ void InstallGameRules()
 {
 #ifdef HL2_DLL
 	if ( gamerules_survival.GetBool() )
-		// Survival mode
+		// Survival wave defense mode
 		CreateGameRulesObject( "CHalfLife2Survival" );
 	else
 		// Caliber All-in-one
@@ -221,8 +234,15 @@ void InstallGameRules()
 		}
 		else
 		{
-			// vanilla deathmatch??
 			teamplay.SetValue( 0 );
+/*
+			const char *szMapName = (STRING(gpGlobals->mapname));
+			if ( strncmp(szMapName, "coop_", 3) == 0 )
+				// Co-op
+				CreateGameRulesObject( "CMultiplayRules" );
+			else
+*/
+			// Fall back to deathmatch
 			CreateGameRulesObject( "CMultiplayRules" );
 		}
 	}

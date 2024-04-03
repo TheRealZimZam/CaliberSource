@@ -2309,31 +2309,6 @@ bool CNPC_Alyx::HandleInteraction(int interactionType, void *data, CBaseCombatCh
 		return true;
 	}
 
-	if( interactionType == g_interactionPlayerPuntedHeavyObject )
-	{
-		// Try to get Alyx out of the way when player is punting cars around.
-		CBaseEntity *pProp = (CBaseEntity*)(data);
-
-		if( pProp )
-		{
-			float distToProp = pProp->WorldSpaceCenter().DistTo( GetAbsOrigin() );
-			float distToPlayer = sourceEnt->WorldSpaceCenter().DistTo( GetAbsOrigin() );
-
-			// Do this if the prop is within 60 feet, and is closer to me than the player is.
-			if( distToProp < (60.0f * 12.0f) && (distToProp < distToPlayer) )
-			{
-				if( fabs(pProp->WorldSpaceCenter().z - WorldSpaceCenter().z) <= 120.0f )
-				{
-					if( sourceEnt->FInViewCone(this) )
-					{
-						CSoundEnt::InsertSound( SOUND_MOVE_AWAY, EarPosition(), 16, 1.0f, pProp );
-					}
-				}
-			}
-		}
-		return true;
-	}
-
 	return BaseClass::HandleInteraction( interactionType, data, sourceEnt );
 }
 

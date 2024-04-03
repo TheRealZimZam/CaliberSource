@@ -1,7 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 // This class should really be renamed
 //
-// Purpose: Base class for humanoid NPCs intended to fight along side player.
+// Purpose: Base class for advanced humanoid NPCs that can fight along side the player.
+//
 // For the most part, squads are not needed as each entity has most of its AI act independently
 //
 //=============================================================================//
@@ -108,7 +109,6 @@ public:
 	virtual void	DoCustomSpeechAI( void );
 
 	//---------------------------------
-	int 			ObjectCaps();
 	bool 			ShouldAlwaysThink();
 	float			MaxYawSpeed( void );
 
@@ -146,7 +146,7 @@ public:
 	bool			IsValidReasonableFacing( const Vector &vecSightDir, float sightDist );
 	
 	int 			TranslateSchedule( int scheduleType );
-	
+
 	void 			StartTask( const Task_t *pTask );
 	void 			RunTask( const Task_t *pTask );
 	
@@ -158,6 +158,7 @@ public:
 	int				GetSoundInterests();
 	
 	void 			Touch( CBaseEntity *pOther );
+	void 			PickupItem( CBaseEntity *pItem );
 
 	virtual bool	IgnorePlayerPushing( void );
 
@@ -294,7 +295,7 @@ public:
 	//---------------------------------
 	// Hints
 	//---------------------------------
-	bool			FValidateHintType ( CAI_Hint *pHint );
+	bool			FValidateHintType( CAI_Hint *pHint );
 
 	//---------------------------------
 	// Navigation
@@ -318,7 +319,7 @@ public:
 	void			InputSetReadinessHigh( inputdata_t &inputdata );
 	void			InputLockReadiness( inputdata_t &inputdata );
 #if HL2_EPISODIC
-	void			InputClearAllOuputs( inputdata_t &inputdata ); ///< annihilate every output on this npc
+	void			InputClearAllOutputs( inputdata_t &inputdata ); ///< annihilate every output on this npc
 #endif
 
 	bool			AllowReadinessValueChange( void );
@@ -337,7 +338,7 @@ protected:
 		SCHED_PC_COWER = BaseClass::NEXT_SCHEDULE,
 		SCHED_PC_MOVE_TOWARDS_COVER_FROM_BEST_SOUND,
 		SCHED_PC_TAKE_COVER_FROM_BEST_SOUND,
-//!		SCHED_PC_DIVE_TOWARDS_COVER,
+		SCHED_PC_DIVE_TOWARDS_COVER,
 		SCHED_PC_FLEE_FROM_BEST_SOUND,
 		SCHED_PC_FAIL_TAKE_COVER_TURRET,
 		SCHED_PC_FAKEOUT_MORTAR,
@@ -416,12 +417,6 @@ protected:
 	//-----------------------------------------------------
 
 	float m_flBoostSpeed;
-
-	//-----------------------------------------------------
-	
-//	CSimpleSimTimer m_AnnounceAttackTimer;
-
-	//-----------------------------------------------------
 
 	EHANDLE m_hAimTarget;
 

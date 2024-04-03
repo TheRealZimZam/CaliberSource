@@ -127,7 +127,7 @@ void CNPC_Assassin::Spawn( void )
 
 	SetModel( STRING( GetModelName() ) );
 
-	SetHullType(HULL_HUMAN);
+	SetHullType(HULL_MEDIUM_TALL);
 	SetHullSizeNormal();
 
 	SetSolid( SOLID_BBOX );
@@ -142,6 +142,7 @@ void CNPC_Assassin::Spawn( void )
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP );
 	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_USE_WEAPONS | bits_CAP_AIM_GUN | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_RANGE_ATTACK2 | bits_CAP_INNATE_MELEE_ATTACK1 );
+	CapabilitiesAdd( bits_CAP_DOORS_GROUP | bits_CAP_USE );
 
 	//Turn on our guns
 	SetBodygroup( 1, 1 );
@@ -867,7 +868,7 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 			{
 				EmitSound( "NPC_Assassin.Smoke" );
 				m_flNextSmokeTime = gpGlobals->curtime + 20.0f;
-				SetWait( 0.5 );
+				SetWait( 0.2 );
 				break;
 			}
 			else
@@ -945,7 +946,7 @@ bool CNPC_Assassin::FValidateHintType ( CAI_Hint *pHint )
 		break;
 	}
 
-	return FALSE;
+	return BaseClass::FValidateHintType( pHint );
 }
 
 //-----------------------------------------------------------------------------

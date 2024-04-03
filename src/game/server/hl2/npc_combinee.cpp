@@ -280,8 +280,8 @@ void CNPC_CombineE::StartTask( const Task_t *pTask )
 				GetSentences()->Speak( "COMBINE_ELITE_THROW", SENTENCE_PRIORITY_HIGH );
 				SetActivity(ACT_IDLE);
 
-				// Wait two seconds
-				SetWait( 2.0 );
+				// Wait one second
+				SetWait( 1.0 );
 			}
 			break;
 		}

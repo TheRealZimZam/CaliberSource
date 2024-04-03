@@ -2680,18 +2680,9 @@ int CNPC_Antlion::SelectSchedule( void )
 	return BaseClass::SelectSchedule();
 }
 
-void CNPC_Antlion::Ignite ( float flFlameLifetime, bool bNPCOnly, float flSize, bool bCalledByLevelDesigner )
+void CNPC_Antlion::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bool bCalledByLevelDesigner )
 {
-#ifdef HL2_EPISODIC
-	float flDamage = m_iHealth + 1;
-
-	CTakeDamageInfo	dmgInfo( this, this, flDamage, DMG_GENERIC );
-	GuessDamageForce( &dmgInfo, Vector( 0, 0, 8 ), GetAbsOrigin() );
-	TakeDamage( dmgInfo );
-#else
 	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
-#endif
-
 }
 
 
@@ -3227,7 +3218,7 @@ bool CNPC_Antlion::FValidateHintType( CAI_Hint *pHint )
 		break;
 	}
 
-	return true;
+	return BaseClass::FValidateHintType( pHint );
 }
 
 //-----------------------------------------------------------------------------

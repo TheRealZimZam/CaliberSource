@@ -12,9 +12,11 @@
 #include "decals.h"
 #include "shake.h"
 #include "smoke_trail.h"
+#include "fire.h"
 #include "ar2_explosion.h"
 #include "mathlib/mathlib.h" 
-#include "game.h"			
+#include "game.h"
+#include "gamerules.h"		
 #include "ndebugoverlay.h"
 #include "hl2_shareddefs.h"
 #include "vstdlib/random.h"
@@ -24,9 +26,9 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	HOMER_TRAIL0_LIFE	0.1
-#define	HOMER_TRAIL1_LIFE	0.2
-#define	HOMER_TRAIL2_LIFE	3.0	//1.0
+#define	HOMER_TRAIL0_LIFE	0.2	//Exhaust
+#define	HOMER_TRAIL1_LIFE	2.0	//Smoketrail
+#define	HOMER_TRAIL2_LIFE	0.1	//Fire
 #define	BUBBLE_WARNING		1	//Should the danger be issued once, or over a period in a cone?
 
 extern short	g_sModelIndexFireball;			// (in combatweapon.cpp) holds the index for the smoke cloud
@@ -52,6 +54,7 @@ BEGIN_DATADESC( CGrenadeHomer )
 	DEFINE_FIELD( m_flSpinMagnitude,			FIELD_FLOAT),
 	DEFINE_FIELD( m_flSpinSpeed,				FIELD_FLOAT),
 	DEFINE_FIELD( m_nRocketTrailType,			FIELD_INTEGER),
+	DEFINE_FIELD( m_nRocketType,				FIELD_INTEGER),
 
 //	DEFINE_FIELD( m_spriteTexture,				FIELD_INTEGER),
 
@@ -69,7 +72,6 @@ BEGIN_DATADESC( CGrenadeHomer )
 END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( grenade_homer, CGrenadeHomer );
-
 
 ///------------------------------------------------------------------------------
 // Purpose :
@@ -102,7 +104,7 @@ void CGrenadeHomer::Precache( void )
 	m_spriteTexture = PrecacheModel( "sprites/lgtning.vmt" );
 
 	PrecacheScriptSound( "GrenadeHomer.StopSounds" );
-	if ( NULL_STRING != m_sFlySound )
+	if ( m_sFlySound != NULL_STRING )
 		PrecacheScriptSound( STRING(m_sFlySound) );
 }
 
@@ -121,8 +123,8 @@ void CGrenadeHomer::Spawn( void )
 
 	UTIL_SetSize(this, Vector(0, 0, 0), Vector(0, 0, 0));
 
-	m_flDamage		= sk_dmg_homer_grenade.GetFloat();
-	m_DmgRadius		= sk_homer_grenade_radius.GetFloat();
+	SetDamage(sk_dmg_homer_grenade.GetFloat());
+	SetDamageRadius(sk_homer_grenade_radius.GetFloat());
 	m_takedamage	= DAMAGE_YES;
 	m_iHealth		= 1;
 
@@ -168,51 +170,54 @@ void CGrenadeHomer::SetHoming(float flStrength, float flDelay, float flRampUp, f
 // Input   :
 // Output  :
 //------------------------------------------------------------------------------
-void CGrenadeHomer::StartRocketTrail(void)
+void CGrenadeHomer::StartRocketTrail(bool bTrail1, bool bTrail2, bool bTrail3)
 {
+	//!!!TODO
+	// TODO; This is destroying the entlimit!!!
+
+	// Exhaust
+	// Always show this at any distance - the other two can
+	// be safely turned off if needed for perf - MM
 	RocketTrail *pRocketTrail =  RocketTrail::CreateRocketTrail();
-	if(pRocketTrail)
+
+	if(bTrail1 && pRocketTrail)
 	{
-		pRocketTrail->m_SpawnRate = 80;
+		pRocketTrail->m_SpawnRate = 60;
 		pRocketTrail->m_ParticleLifetime = HOMER_TRAIL0_LIFE;
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
-		{
-			pRocketTrail->m_StartColor.Init(0.5, 0.0, 0.5);
-		}
+			pRocketTrail->m_StartColor.Init(0.2, 0.0, 0.5);
 		else
-		{
-			pRocketTrail->m_StartColor.Init(0.75, 0.75, 0.75);
-		}
+			pRocketTrail->m_StartColor.Init(0.5, 0.5, 0.2);
+
 		pRocketTrail->m_Opacity = 0.35f;
-		pRocketTrail->m_EndColor.Init(0.4,0.4,0.4);
+		pRocketTrail->m_EndColor.Init(0.6,0.6,0.5);
 		pRocketTrail->m_StartSize = 8;
 		pRocketTrail->m_EndSize = 16;
 		pRocketTrail->m_SpawnRadius = 3;
-		pRocketTrail->m_MinSpeed = 2;
-		pRocketTrail->m_MaxSpeed = 10;
+		pRocketTrail->m_MinSpeed = 10;
+		pRocketTrail->m_MaxSpeed = 20;
 		pRocketTrail->SetLifetime(120);
 		pRocketTrail->FollowEntity(this);
 
 		m_hRocketTrail[0] = pRocketTrail;
 	}
 
+	// Smoketrail
 	pRocketTrail = RocketTrail::CreateRocketTrail();
-	if(pRocketTrail)
+	if(bTrail2 && pRocketTrail)
 	{
-		pRocketTrail->m_SpawnRate = 100;
+		pRocketTrail->m_SpawnRate = 50;
 		pRocketTrail->m_ParticleLifetime = HOMER_TRAIL1_LIFE;
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
-		{
-			pRocketTrail->m_StartColor.Init(0.0, 0.0, 0.5);
-		}
+			pRocketTrail->m_StartColor.Init(0.1, 0.0, 0.1);
 		else
-		{
-			pRocketTrail->m_StartColor.Init(0.5, 0.5, 0.0);
-		}
+			pRocketTrail->m_StartColor.Init(0.1, 0.1, 0.1);
+
+		pRocketTrail->m_Opacity = 0.6f;
 		pRocketTrail->m_EndColor.Init(0.5,0.5,0.5);
-		pRocketTrail->m_StartSize = 3;
-		pRocketTrail->m_EndSize = 6;
-		pRocketTrail->m_SpawnRadius = 1;
+		pRocketTrail->m_StartSize = 8;
+		pRocketTrail->m_EndSize = 20;
+		pRocketTrail->m_SpawnRadius = 2;
 		pRocketTrail->m_MinSpeed = 15;
 		pRocketTrail->m_MaxSpeed = 25;
 		pRocketTrail->SetLifetime(120);
@@ -221,30 +226,31 @@ void CGrenadeHomer::StartRocketTrail(void)
 		m_hRocketTrail[1] = pRocketTrail;
 	}
 
+#if 0
+	// Fire
 	pRocketTrail = RocketTrail::CreateRocketTrail();
-	if(pRocketTrail)
+	if(bTrail3 && pRocketTrail)
 	{
-		pRocketTrail->m_SpawnRate = 50;
+		pRocketTrail->m_SpawnRate = 80;
 		pRocketTrail->m_ParticleLifetime = HOMER_TRAIL2_LIFE;
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
-		{
-			pRocketTrail->m_StartColor.Init(0.1, 0.0, 0.1);
-		}
+			pRocketTrail->m_StartColor.Init(0.0, 0.5, 0.5);
 		else
-		{
-			pRocketTrail->m_StartColor.Init(0.1, 0.1, 0.1);
-		}
-		pRocketTrail->m_EndColor.Init(0.5,0.5,0.5);
-		pRocketTrail->m_StartSize = 8;
-		pRocketTrail->m_EndSize = 20;
+			pRocketTrail->m_StartColor.Init(0.75, 0.75, 0.5);
+
+		pRocketTrail->m_Opacity = 0.7f;
+		pRocketTrail->m_EndColor.Init(0.4,0.4,0.4);
+		pRocketTrail->m_StartSize = 3;
+		pRocketTrail->m_EndSize = 6;
 		pRocketTrail->m_SpawnRadius = 1;
-		pRocketTrail->m_MinSpeed = 15;
-		pRocketTrail->m_MaxSpeed = 25;
+		pRocketTrail->m_MinSpeed = 2;
+		pRocketTrail->m_MaxSpeed = 10;
 		pRocketTrail->SetLifetime(120);
 		pRocketTrail->FollowEntity(this);
 
 		m_hRocketTrail[2] = pRocketTrail;
 	}
+#endif
 }
 
 //------------------------------------------------------------------------------
@@ -256,27 +262,44 @@ void CGrenadeHomer::UpdateRocketTrail(float fScale)
 {
 	if (m_hRocketTrail[0] == NULL)
 	{
-		StartRocketTrail();
+		StartRocketTrail(true, false, false);
 	}
 
+	// 0 is always the exhaust trail (important!!)
 	if (m_hRocketTrail[0]) 
+		m_hRocketTrail[0]->m_ParticleLifetime = fScale*HOMER_TRAIL0_LIFE + HOMER_TRAIL0_LIFE;
+
+	// In SP, if im far away from the player, dont show the extra trails
+	if (!g_pGameRules->IsMultiplayer())
 	{
-		m_hRocketTrail[0]->m_ParticleLifetime = fScale*HOMER_TRAIL0_LIFE;
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+		float flPlayerDist = pPlayer->GetAbsOrigin().DistToSqr(GetAbsOrigin());
+		if ( pPlayer && flPlayerDist > 4000 )	//TODO; Magic Number//
+		{
+			// Stop the smoketrail at 6k, extra fire at 4k
+			StopCosmeticTrails( (flPlayerDist > 6000) ? true : false, true );
+			return;
+		}
+		else
+		{
+			if (m_hRocketTrail[1] == NULL)
+				StartRocketTrail(false, true, false);
+
+			if (m_hRocketTrail[2] == NULL)
+				StartRocketTrail(false, false, true);
+		}
 	}
+	
 	if (m_hRocketTrail[1])
-	{
 		m_hRocketTrail[1]->m_ParticleLifetime = fScale*HOMER_TRAIL1_LIFE;
-	}
 
 	if (m_hRocketTrail[2]) 
-	{
 		m_hRocketTrail[2]->m_ParticleLifetime = fScale*HOMER_TRAIL2_LIFE;
-	}
 }
 
 void CGrenadeHomer::StopRocketTrail()
 {
-	// Stop emitting smoke
+	// Stop all the trails
 	for (int i=0;i<3;i++)
 	{
 		if(m_hRocketTrail[i])
@@ -286,6 +309,24 @@ void CGrenadeHomer::StopRocketTrail()
 			m_hRocketTrail[i] = NULL;
 		}
 	}	
+}
+
+void CGrenadeHomer::StopCosmeticTrails(bool bTrail1, bool bTrail2)
+{
+	// Stop the cosmetic trails
+	if (m_hRocketTrail[1])
+	{
+		m_hRocketTrail[1]->SetEmit(false);
+		UTIL_Remove( m_hRocketTrail[1] );
+		m_hRocketTrail[1] = NULL;
+	}
+
+	if (m_hRocketTrail[2])
+	{
+		m_hRocketTrail[2]->SetEmit(false);
+		UTIL_Remove( m_hRocketTrail[2] );
+		m_hRocketTrail[2] = NULL;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -317,6 +358,8 @@ void CGrenadeHomer::Launch( CBaseEntity*		pOwner,
 	// -------------
 	if ( (m_nRocketTrailType == HOMER_SMOKE_TRAIL_ON) || (m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN) )
 	{
+		// TODO; Get the current amount of entities
+		// Close to the Entlimit? Dont start the cosmetic trails...
 		StartRocketTrail();
 	}
 
@@ -361,6 +404,10 @@ void CGrenadeHomer::GrenadeHomerTouch( CBaseEntity *pOther )
 		return;
 	}
 
+	// AP rocket? Take full direct damage
+	if (m_nRocketType == ARMORPIERCING && pOther->m_takedamage)
+		pOther->TakeDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), (DMG_BLAST|DMG_DIRECT) ) );
+
 	// ----------------------------------
 	// If I hit the sky, don't explode
 	// ----------------------------------
@@ -368,11 +415,7 @@ void CGrenadeHomer::GrenadeHomerTouch( CBaseEntity *pOther )
 	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + GetAbsVelocity(),  MASK_SOLID_BRUSHONLY, 
 		this, COLLISION_GROUP_NONE, &tr);
 
-	// We got sent flying off into the distance
-//	if (tr.surface.flags & SURF_SKY)
-		Detonate( (tr.surface.flags & SURF_SKY ? true : false) );
-//	else
-//		Detonate();
+	Detonate( (tr.surface.flags & SURF_SKY ? true : false) );
 }
 
 void CGrenadeHomer::Detonate( bool bToSpace )
@@ -380,23 +423,25 @@ void CGrenadeHomer::Detonate( bool bToSpace )
 	StopRocketTrail();
 	StopSound(entindex(), CHAN_BODY, STRING(m_sFlySound));
 
-	m_takedamage	= DAMAGE_NO;	
+	m_takedamage = DAMAGE_NO;	
 
 	if ( !bToSpace )
 	{
-		CPASFilter filter( GetAbsOrigin() );
-		te->Explosion( filter, 0.0,
-			&GetAbsOrigin(), 
-			g_sModelIndexFireball,
-			2.0, 
-			40,
-			TE_EXPLFLAG_NONE,
-			m_DmgRadius,
-			m_flDamage );
+		if (m_nRocketType != INCENDIARY)
+		{
+			CPASFilter filter( GetAbsOrigin() );
+			te->Explosion( filter, 0.0,
+				&GetAbsOrigin(), 
+				g_sModelIndexFireball,
+				2.0, 
+				40,
+				TE_EXPLFLAG_NONE,
+				GetDamageRadius(),
+				GetDamage());
+		}
 
 	//	int magnitude = 1.0;
 	//	int	colorRamp = random->RandomInt( 128, 255 );
-
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
 		{
 			// Add a shockring
@@ -446,11 +491,30 @@ void CGrenadeHomer::Detonate( bool bToSpace )
 		VectorNormalize(vecForward);
 		trace_t		tr;
 		UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward,  MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, & tr);
-
 		UTIL_DecalTrace( &tr, "Scorch" );
-		UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
 
-		RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), m_flDamage, DMG_BLAST ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
+		switch(m_nRocketType)
+		{
+			case EXPLOSIVE:
+				UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
+				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), DMG_BLAST ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, NULL );
+			break;
+
+			case EXPLOSIVEINCENDIARY:
+				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), DMG_BURN ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, NULL );
+			case INCENDIARY:
+			int i;
+			for( i = 0 ; i < (GetDamageRadius()/10) ; i++ )
+			{
+				FireSystem_StartFire( GetAbsOrigin(), (16.0f + GetDamage()), 0.2f, 10.0f, (SF_FIRE_START_ON|SF_FIRE_SMOKELESS|SF_FIRE_NO_GLOW), (CBaseEntity*) this, FIRE_NATURAL );
+			}
+			break;
+
+			case ARMORPIERCING:
+				// Touch takes care of the majority damage, just do half blast damage
+				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), (GetDamage()/2), DMG_BLAST ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, NULL );
+			break;
+		}
 	}
 
 	CPASAttenuationFilter filter2( this, "GrenadeHomer.StopSounds" );

@@ -185,11 +185,6 @@ int	CNPC_Stalker::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 {
 	CTakeDamageInfo info = inputInfo;
 
-	if( info.GetDamageType() & DMG_BURN )
-	{
-		Scorch( 8, 50 );
-	}
-
 #ifdef HL2_EPISODIC
 	// --------------------------------------------
 	//	Don't take a lot of damage from Vortigaunt
@@ -1561,7 +1556,10 @@ void CNPC_Stalker::HandleAnimEvent( animevent_t *pEvent )
 //-----------------------------------------------------------------------------
 bool CNPC_Stalker::FValidateHintType(CAI_Hint *pHint)
 {
-	return(pHint->HintType() == HINT_WORLD_WORK_POSITION);
+	if (pHint->HintType() == HINT_WORLD_WORK_POSITION)
+		return true;
+
+	return BaseClass::FValidateHintType( pHint );
 }
 
 //-----------------------------------------------------------------------------

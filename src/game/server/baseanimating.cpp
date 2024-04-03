@@ -191,7 +191,7 @@ BEGIN_DATADESC( CBaseAnimating )
 	DEFINE_FIELD( m_hLightingOrigin, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_hLightingOriginRelative, FIELD_EHANDLE ),
 
-	DEFINE_FIELD( m_flModelWidthScale, FIELD_FLOAT ),
+	DEFINE_KEYFIELD( m_flModelWidthScale, FIELD_FLOAT, "modelscale" ),
 	DEFINE_FIELD( m_flDissolveStartTime, FIELD_TIME ),
 
  // DEFINE_FIELD( m_boneCacheHandle, memhandle_t ),
@@ -2524,6 +2524,26 @@ void CBaseAnimating::SetModel( const char *szModelName )
 	}
 
 	PopulatePoseParameters();
+
+/*
+#if defined ( PORTAL2 )
+	// After we set our bounds based on the model's default size,
+	// scale the bounds based on any starting scale value set in the map.
+	if ( GetObjectScaleLevel() != 0 )
+	{	
+		CaptureInfo_t captureInfo;
+		UTIL_InitCaptureInfo( captureInfo, this );
+		float flModelScale = 1.0f;
+		if ( captureInfo.pPlacementQuery )
+		{
+			flModelScale = captureInfo.pPlacementQuery->GetScaleForStep( GetObjectScaleLevel(), &captureInfo );
+		}
+		
+		// Scale by this amount to reach our target scale
+		SetModelScale( flModelScale );
+	}
+#endif // PORTAL2 
+*/
 }
 
 //-----------------------------------------------------------------------------

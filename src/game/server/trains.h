@@ -164,6 +164,7 @@ public:
 
 	void SetSpeedForwardModifier( float flModifier );
 	void SetBlockDamage( float flDamage ) { m_flBlockDamage = flDamage; }
+	float GetBlockDamage( void ) {return m_flBlockDamage;}
 
 private:
 

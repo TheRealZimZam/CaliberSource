@@ -847,13 +847,6 @@ void CAmbientGeneric::InputPlaySound( inputdata_t &inputdata )
 
 void CAmbientGeneric::ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
-#if 0
-	if ( useType != USE_TOGGLE )
-	{
-		if ( (m_fActive && useType == USE_ON) || (!m_fActive && useType == USE_OFF) )
-			return;
-	}
-#endif
 	if ( !ShouldToggle( useType, m_fActive ) )
 		return;
 

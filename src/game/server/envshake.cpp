@@ -112,6 +112,7 @@ END_DATADESC()
 
 
 #define SF_SHAKE_EVERYONE	0x0001		// Don't check radius
+#define SF_SHAKE_DISRUPT_CONTROLS		0x0002		// Screw with the player's movement, Unreal style
 #define SF_SHAKE_INAIR		0x0004		// Shake players in air
 #define SF_SHAKE_PHYSICS	0x0008		// Shake physically (not just camera)
 #define SF_SHAKE_ROPES		0x0010		// Shake ropes too.

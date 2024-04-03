@@ -112,10 +112,10 @@ enum Interruptability_t
 #define bits_MEMORY_INCOVER				( 1 << 1 )// npc knows it is in a covered position.
 #define bits_MEMORY_SUSPICIOUS			( 1 << 2 )// Ally is suspicious of the player, and will move to provoked more easily
 #define	bits_MEMORY_TASK_EXPENSIVE		( 1 << 3 )// NPC has completed a task which is considered costly, so don't do another task this frame
-//#define	bits_MEMORY_				( 1 << 4 )
+//#define	bits_MEMORY_ON_PATH			( 1 << 4 )// Moving on a path
 #define bits_MEMORY_PATH_FAILED			( 1 << 5 )// Failed to find a path
 #define bits_MEMORY_FLINCHED			( 1 << 6 )// Has already flinched
-//#define bits_MEMORY_ 					( 1 << 7 )
+//#define bits_MEMORY_KILLED 			( 1 << 7 )// HACKHACK -- remember that I've already called my Killed()
 #define bits_MEMORY_TOURGUIDE			( 1 << 8 )// I have been acting as a tourguide.
 //#define bits_MEMORY_					( 1 << 9 )// 
 #define bits_MEMORY_LOCKED_HINT			( 1 << 10 )// 

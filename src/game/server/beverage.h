@@ -46,7 +46,9 @@ public:
 	bool	m_CanInDispenser;
 	int		m_nBeverageType;
 private:
+//	bool	m_bOldBeverage;	//This is an old env_beverage - dont do any of the new stuff, as the mapper has already addressed it...
 	bool	m_bAskedToRemove;
+	bool	m_bUseSpeech;
 	float	m_flDispenseTime;
 	COutputEvent m_OnBreak;
 };

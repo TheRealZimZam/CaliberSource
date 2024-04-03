@@ -530,6 +530,7 @@ void CFish::AddVisible( CFish *fish )
  */
 
 LINK_ENTITY_TO_CLASS( func_fish_pool, CFishPool );
+LINK_ENTITY_TO_CLASS( func_fish, CFishPool );
 
 BEGIN_DATADESC( CFishPool )
 

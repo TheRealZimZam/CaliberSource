@@ -6,7 +6,6 @@
 //=============================================================================
 
 #include "cbase.h"
-#include "mp_shareddefs.h"
 #include "basemultiplayerplayer.h"
 #include "steam/steam_api.h"
 

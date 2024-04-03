@@ -1,6 +1,6 @@
 //====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
 //
-// Purpose: 
+// Purpose: 	Base class for simple projectiles
 //
 //=============================================================================
 
@@ -8,15 +8,14 @@
 #include "baseprojectile.h"
 
 BEGIN_DATADESC( CBaseProjectile )
-	DEFINE_FIELD( m_flDamage, FIELD_FLOAT ),
 	DEFINE_FIELD( m_iDamageType, FIELD_INTEGER ),
 	DEFINE_FIELD( m_flDamageScale, FIELD_FLOAT ),
 
-	DEFINE_FUNCTION( ProjectileTouch ),
+	DEFINE_ENTITYFUNC( ProjectileTouch ),
 	DEFINE_THINKFUNC( FlyThink ),
 END_DATADESC()
 
-LINK_ENTITY_TO_CLASS( proj_base, CBaseProjectile );
+//LINK_ENTITY_TO_CLASS( proj_base, CBaseProjectile );
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -54,33 +53,6 @@ void CBaseProjectile::Precache( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-CBaseProjectile *CBaseProjectile::Create( baseprojectilecreate_t &pCreate )
-{
-	CBaseProjectile *pProjectile = static_cast<CBaseProjectile*>( CBaseEntity::CreateNoSpawn( "proj_base", pCreate.vecOrigin, vec3_angle, pCreate.pOwner ) );
-	if ( !pProjectile )
-		return NULL;
-
-	pProjectile->SetModelName( pCreate.iszModel );
-	pProjectile->SetDamage( pCreate.flDamage );
-	pProjectile->SetDamageType( pCreate.iDamageType );
-	pProjectile->SetDamageScale( pCreate.flDamageScale );
-	pProjectile->SetAbsVelocity( pCreate.vecVelocity );	
-
-	// Setup the initial angles.
-	QAngle angles;
-	VectorAngles( -pCreate.vecVelocity, angles );
-	pProjectile->SetAbsAngles( angles );
-
-	// Spawn & Activate
-	DispatchSpawn( pProjectile );
-	pProjectile->Activate();
-
-	return pProjectile;
-}
-
-//-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
 unsigned int CBaseProjectile::PhysicsSolidMaskForEntity( void ) const
@@ -113,7 +85,7 @@ void CBaseProjectile::ProjectileTouch( CBaseEntity *pOther )
 	info.SetInflictor( this );
 	info.SetDamage( GetDamage() );
 	info.SetDamageType( GetDamageType() );
-	CalculateMeleeDamageForce( &info, GetAbsVelocity(), GetAbsOrigin(), GetDamageScale() );
+	GuessDamageForce( &info, GetAbsVelocity(), GetAbsOrigin(), GetDamageScale() );
 
 	Vector dir;
 	AngleVectors( GetAbsAngles(), &dir );

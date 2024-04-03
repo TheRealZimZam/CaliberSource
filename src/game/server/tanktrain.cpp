@@ -11,6 +11,8 @@
 #include "soundenvelope.h"
 #include "engine/IEngineSound.h"
 #include "eventqueue.h"
+// For interaction with pushables
+#include "func_break.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -38,6 +40,9 @@ void UTIL_RemoveHierarchy( CBaseEntity *pDead )
 	UTIL_Remove( pDead );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Tank entity, used in conjunction with tanktrain_ai
+//-----------------------------------------------------------------------------
 class CFuncTankTrain : public CFuncTrackTrain
 {
 public:
@@ -132,9 +137,6 @@ void CFuncTankTrain::Event_Killed( const CTakeDamageInfo &info )
 
 	m_takedamage = DAMAGE_NO;
 
-	if ( m_bRemoveOnDeath )
-		m_lifeState = LIFE_DEAD;	//Tanks usually dont 'die', they just stop working
-
 	// Tell my killer that he got me!
 	if( info.GetAttacker() )
 	{
@@ -149,6 +151,14 @@ void CFuncTankTrain::Event_Killed( const CTakeDamageInfo &info )
 
 	SetUse( NULL );
 	SetThink( NULL );
+
+	//Tanks usually dont 'die', they just stop working
+	if ( m_bRemoveOnDeath )
+	{
+		m_lifeState = LIFE_DEAD;
+		SetThink(&CFuncTankTrain::SUB_Remove);
+		SetNextThink( gpGlobals->curtime + 0.1f );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -157,9 +167,33 @@ void CFuncTankTrain::Event_Killed( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CFuncTankTrain::Blocked( CBaseEntity *pOther )
 {
-	// Lower speed 
+	// Lower speed
 	SetSpeed( (m_flSpeed * 0.5) );
-	// TODO; Get the mass of the offending objekt
+
+	// TODO; Some basic functionality with other common objects - 
+	// Get the mass of the offending objekt, if its low enough push it, otherwise stop -MM
+	// Try to see if its a pushable, Otherwise try phys pointer
+	CBreakable *pBreakable = dynamic_cast<CBreakable *>(pOther);
+	if ( pBreakable )
+	{
+		// If the breakable is parented to me, dont do anything to it
+		if ( pBreakable->GetMoveParent() == this )
+			return;
+
+		pBreakable->BreakTouch( this );
+		pBreakable->TakeDamage( CTakeDamageInfo( this, this, GetBlockDamage(), DMG_CRUSH ) );
+
+		// Also apply movement if its a pushable
+		if ( FClassnameIs(pBreakable, "func_pushable") )
+			pBreakable->ApplyAbsVelocityImpulse( GetAbsVelocity() );
+
+		// Dont do the baseclass code
+		return;
+	}
+//	else if ( pOther->GetMoveType() == MOVETYPE_VPHYSICS )
+//	{
+//		// Its a phys object...
+//	}
 
 	BaseClass::Blocked( pOther );
 }
@@ -215,6 +249,8 @@ void CTankTargetChange::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 
 //-----------------------------------------------------------------------------
 // UNDONE: Should be just a logical entity, but we act as another static sound channel for the train
+// Purpose: Makes a train autonomously move, towards the specified target.
+// Also handles engine/tread sounds, changing pitch depending on speed.
 //-----------------------------------------------------------------------------
 class CTankTrainAI : public CPointEntity
 {

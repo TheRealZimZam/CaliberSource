@@ -223,6 +223,8 @@ CBasePlayer *UTIL_GetListenServerHost( void );
 CBasePlayer* UTIL_PlayerByUserId( int userID );
 CBasePlayer* UTIL_PlayerByName( const char *name ); // not case sensitive
 
+CBasePlayer *UTIL_GetNearestPlayer( CBaseEntity *pLooker );
+
 // Returns true if the command was issued by the listenserver host, or by the dedicated server, via rcon or the server console.
 // This is valid during ConCommand execution.
 bool UTIL_IsCommandIssuedByServerAdmin( void );
@@ -347,7 +349,7 @@ Vector		UTIL_RandomBloodVector( void );
 void		UTIL_ImpactTrace( trace_t *pTrace, int iDamageType, char *pCustomImpactName = NULL );
 void		UTIL_PlayerDecalTrace( trace_t *pTrace, int playernum );
 void		UTIL_Dust( const Vector &origin, const Vector &dir, const float scale, const float speed );
-void		UTIL_Smoke( const Vector &origin, const float scale, const float framerate );
+void		UTIL_Smoke( const Vector &origin, const float scale, const float framerate = 10 );
 void		UTIL_AxisStringToPointDir( Vector &start, Vector &dir, const char *pString );
 void		UTIL_AxisStringToPointPoint( Vector &start, Vector &end, const char *pString );
 void		UTIL_AxisStringToUnitDir( Vector &dir, const char *pString );

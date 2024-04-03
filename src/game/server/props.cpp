@@ -1,8 +1,11 @@
 //===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: static_prop - don't move, don't animate, don't do anything.
+//			dynamic_prop - move (if enabled), take damage, and animate
 //			physics_prop - move, take damage, but don't animate
 //
+// TODO; Simple physics prop - cheaper qphysics prop, for use in caliber
+// basically func_pushable, but model based
 //===========================================================================//
 
 
@@ -226,11 +229,12 @@ void CBaseProp::Spawn( void )
 		else if ( iResult == PARSE_SUCCEEDED )
 		{
 			// If we have data, and we're not a physics prop, fail
+			//if ( !FClassnameIs( this, "prop_physics" ) && !FClassnameIs( this, "prop_physics_override" ) && !FClassnameIs( this, "prop_dynamic_override" ) )
 			if ( !dynamic_cast<CPhysicsProp*>(this) )
 			{
-				DevWarning( "%s at %.0f %.0f %0.f uses model %s, which has propdata which means that it be used on a prop_physics. DELETED.\n", GetClassname(), GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z, szModel );
-				UTIL_Remove( this );
-				return;
+				DevWarning( "%s at %.0f %.0f %0.f uses model %s, which has propdata which means that it should used on a prop_physics.\n", GetClassname(), GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z, szModel );
+			//!	UTIL_Remove( this );
+			//!	return;
 			}
 		}
 	}
@@ -257,8 +261,10 @@ void CBaseProp::Precache( void )
 
 	PrecacheModel( STRING( GetModelName() ) );
 
+#ifdef HL2_DLL
 	PrecacheScriptSound( "Metal.SawbladeStick" );
 	PrecacheScriptSound( "PropaneTank.Burst" );
+#endif
 
 #ifdef HL2_EPISODIC
 	UTIL_PrecacheOther( "env_flare" );
@@ -273,7 +279,7 @@ void CBaseProp::Precache( void )
 void CBaseProp::Activate( void )
 {
 	BaseClass::Activate();
-	
+
 	// Make sure mapmakers haven't used the wrong prop type.
 	if ( m_takedamage == DAMAGE_NO && m_iHealth != 0 )
 	{
@@ -289,7 +295,8 @@ bool CBaseProp::KeyValue( const char *szKeyName, const char *szValue )
 	if ( FStrEq(szKeyName, "health") )
 	{
 		// Only override props are allowed to override health.
-		if ( FClassnameIs( this, "prop_physics_override" ) || FClassnameIs( this, "prop_dynamic_override" ) )
+		// No, thats sthupid
+	//!	if ( FClassnameIs( this, "prop_physics_override" ) || FClassnameIs( this, "prop_dynamic_override" ) )
 			return BaseClass::KeyValue( szKeyName, szValue );
 
 		return true;
@@ -454,7 +461,7 @@ void CBreakableProp::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize,
 
 	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
 
-	if ( g_pGameRules->ShouldBurningPropsEmitLight() )
+	if ( g_pGameRules->ShouldBurningPropsEmitLight() && GetEffectEntity() != NULL )
 	{
 		GetEffectEntity()->AddEffects( EF_DIMLIGHT );
 	}
@@ -1804,6 +1811,7 @@ void CBreakableProp::Break( CBaseEntity *pBreaker, const CTakeDamageInfo &info )
 
 //=============================================================================================================
 // DYNAMIC PROPS
+// Standard interactive props - can animate, and uses QPhysics for movement (when enabled).
 //=============================================================================================================
 LINK_ENTITY_TO_CLASS( dynamic_prop, CDynamicProp );
 LINK_ENTITY_TO_CLASS( prop_dynamic, CDynamicProp );	
@@ -1822,7 +1830,7 @@ BEGIN_DATADESC( CDynamicProp )
 	DEFINE_KEYFIELD( m_bStartDisabled, FIELD_BOOLEAN, "StartDisabled" ),
 	DEFINE_FIELD(	 m_bUseHitboxesForRenderBox, FIELD_BOOLEAN ),
 	DEFINE_FIELD(	m_nPendingSequence, FIELD_SHORT ),
-		
+
 	// Inputs
 	DEFINE_INPUTFUNC( FIELD_STRING,	"SetAnimation",	InputSetAnimation ),
 	DEFINE_INPUTFUNC( FIELD_STRING,	"SetDefaultAnimation",	InputSetDefaultAnimation ),
@@ -1870,9 +1878,7 @@ void CDynamicProp::Spawn( )
 {
 	// Condense classname's to one, except for "prop_dynamic_override"
 	if ( FClassnameIs( this, "dynamic_prop" ) )
-	{
 		SetClassname( "prop_dynamic" );
-	}
 
 	// If the prop is not-solid, the bounding box needs to be 
 	// OBB to correctly surround the prop as it rotates.
@@ -1890,9 +1896,7 @@ void CDynamicProp::Spawn( )
 
 	// Now condense all classnames to one
 	if ( FClassnameIs( this, "dynamic_prop" ) || FClassnameIs( this, "prop_dynamic_override" )  )
-	{
 		SetClassname("prop_dynamic");
-	}
 
 	AddFlag( FL_STATICPROP );
 
@@ -1975,11 +1979,13 @@ bool CDynamicProp::OverridePropdata( void )
 //------------------------------------------------------------------------------
 bool CDynamicProp::CreateVPhysics( void )
 {
+	// don't create a physics object in this case - saves CPU & memory
 	if ( GetSolid() == SOLID_NONE || ((GetSolidFlags() & FSOLID_NOT_SOLID) && HasSpawnFlags(SF_DYNAMICPROP_NO_VPHYSICS)))
 		return true;
 
 	CreateBoneFollowers();
 
+	// Its a bone follower
 	if ( m_BoneFollowerManager.GetNumBoneFollowers() )
 	{
 		if ( GetSolidFlags() & FSOLID_NOT_SOLID )
@@ -2003,10 +2009,18 @@ bool CDynamicProp::CreateVPhysics( void )
 		AddSolidFlags( FSOLID_CUSTOMRAYTEST | FSOLID_CUSTOMBOXTEST );
 		return true;
 	}
-	else
+
+	if ( HasSpawnFlags(SF_DYNAMICPROP_PUSHABLE) )
 	{
-		VPhysicsInitStatic();
+		// Allow basic movement if requested
+		SetGravity(GetGravity());
+		SetSolid(GetSolid());
+		SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_SLIDE );
+		VPhysicsInitShadow( false, false );
 	}
+	else
+		VPhysicsInitStatic();
+
 	return true;
 }
 
@@ -2066,6 +2080,7 @@ bool CDynamicProp::TestCollision( const Ray_t &ray, unsigned int mask, trace_t& 
 			}
 		}
 	}
+
 	return false;
 }
 
@@ -2388,8 +2403,9 @@ void COrnamentProp::InputDetach( inputdata_t &inputdata )
 // PHYSICS PROPS
 //=============================================================================
 LINK_ENTITY_TO_CLASS( physics_prop, CPhysicsProp );
-LINK_ENTITY_TO_CLASS( prop_physics, CPhysicsProp );	
-LINK_ENTITY_TO_CLASS( prop_physics_override, CPhysicsProp );	
+LINK_ENTITY_TO_CLASS( prop_physics, CPhysicsProp );
+LINK_ENTITY_TO_CLASS( prop_physics_override, CPhysicsProp );
+LINK_ENTITY_TO_CLASS( prop_physics_simple, CPhysicsProp );
 
 BEGIN_DATADESC( CPhysicsProp )
 
@@ -3245,6 +3261,7 @@ static CBreakableProp *BreakModelCreate_Prop( CBaseEntity *pOwner, breakmodel_t 
 			pEntity->SetDmgModBullet( pBreakableOwner->GetDmgModBullet() );
 			pEntity->SetDmgModClub( pBreakableOwner->GetDmgModClub() );
 			pEntity->SetDmgModExplosive( pBreakableOwner->GetDmgModExplosive() );
+			pEntity->SetDmgModFire( pBreakableOwner->GetDmgModFire() );
 
 			// Copy over the dx7 fade too
 			pEntity->CopyFadeFrom( pBreakableOwner );

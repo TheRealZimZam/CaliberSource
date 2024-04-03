@@ -99,6 +99,10 @@ extern ConVar *sv_maxreplay;
 
 extern CServerGameDLL g_ServerGameDLL;
 
+// TODO; This might be something to store to a variable or something, for quick access... y'know?
+// This is gonna be checked alot - MM
+//bool bIsMultiplayer = g_pGameRules->IsMultiplayer();
+
 /*
 #define DMG_FREEZE		DMG_VEHICLE
 #define DMG_SLOWFREEZE	DMG_DISSOLVE
@@ -168,7 +172,14 @@ ConVar	sk_player_head( "sk_player_head","2" );
 ConVar	sk_player_chest( "sk_player_chest","1" );
 ConVar	sk_player_stomach( "sk_player_stomach","1" );
 ConVar	sk_player_arm( "sk_player_arm","1" );
-ConVar	sk_player_leg( "sk_player_leg","1" );
+ConVar	sk_player_leg( "sk_player_leg","0.75" );
+
+ConVar	sk_mpplayer_head( "sk_mpplayer_head","2", FCVAR_GAMEDLL | FCVAR_NOTIFY );
+ConVar	sk_mpplayer_chest( "sk_mpplayer_chest","1", FCVAR_GAMEDLL | FCVAR_NOTIFY );
+ConVar	sk_mpplayer_stomach( "sk_mpplayer_stomach","1", FCVAR_GAMEDLL | FCVAR_NOTIFY );
+ConVar	sk_mpplayer_arm( "sk_mpplayer_arm","1", FCVAR_GAMEDLL | FCVAR_NOTIFY );
+ConVar	sk_mpplayer_leg( "sk_mpplayer_leg","1", FCVAR_GAMEDLL | FCVAR_NOTIFY );
+
 
 ConVar	sk_player_critical_health( "sk_player_critical_health","25", FCVAR_CHEAT);
 
@@ -346,7 +357,10 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_iDeaths, FIELD_INTEGER ),
 	DEFINE_FIELD( m_bAllowInstantSpawn, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flNextDecalTime, FIELD_TIME ),
-	//DEFINE_AUTO_ARRAY( m_szTeamName, FIELD_STRING ), // mp
+	// UNDONE: Should this be FIELD_STRING or auto array of FIELD_CHARACTER?
+	// Shouldnt need to save this anyway... Its recalcuated every game
+	//DEFINE_FIELD( m_szTeamName, FIELD_STRING ),
+	//DEFINE_AUTO_ARRAY( m_szTeamName, FIELD_CHARACTER ), // mp
 
 	//DEFINE_FIELD( m_iConnected, FIELD_INTEGER ),
 	// from edict_t
@@ -892,42 +906,57 @@ void CBasePlayer::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &v
 
 		SetLastHitGroup( ptr->hitgroup );
 
+		// Two sets here, one for MP and one for SP...
 		switch ( ptr->hitgroup )
 		{
 		case HITGROUP_GENERIC:
 			break;
 		case HITGROUP_HEAD:
-			info.ScaleDamage( sk_player_head.GetFloat() );
+			if ( g_pGameRules->IsMultiplayer() )
+				info.ScaleDamage( sk_mpplayer_head.GetFloat() );
+			else
+				info.ScaleDamage( sk_player_head.GetFloat() );
 			break;
 		case HITGROUP_CHEST:
-			info.ScaleDamage( sk_player_chest.GetFloat() );
+			if ( g_pGameRules->IsMultiplayer() )
+				info.ScaleDamage( sk_mpplayer_chest.GetFloat() );
+			else
+				info.ScaleDamage( sk_player_chest.GetFloat() );
 			break;
 		case HITGROUP_STOMACH:
-			info.ScaleDamage( sk_player_stomach.GetFloat() );
+			if ( g_pGameRules->IsMultiplayer() )
+				info.ScaleDamage( sk_mpplayer_stomach.GetFloat() );
+			else
+				info.ScaleDamage( sk_player_stomach.GetFloat() );
 			break;
 		case HITGROUP_LEFTARM:
 		case HITGROUP_RIGHTARM:
-			info.ScaleDamage( sk_player_arm.GetFloat() );
+			if ( g_pGameRules->IsMultiplayer() )
+				info.ScaleDamage( sk_mpplayer_arm.GetFloat() );
+			else
+				info.ScaleDamage( sk_player_arm.GetFloat() );
 			break;
 		case HITGROUP_LEFTLEG:
 		case HITGROUP_RIGHTLEG:
-			info.ScaleDamage( sk_player_leg.GetFloat() );
+			if ( g_pGameRules->IsMultiplayer() )
+				info.ScaleDamage( sk_mpplayer_leg.GetFloat() );
+			else
+				info.ScaleDamage( sk_player_leg.GetFloat() );
 #if 0
-			//Slow down a bit if hit in the knee
-			//m_bSlowedByHit = true;
-			//m_flUnslowTime = gpGlobals->curtime + 1;
-			m_Shared.SetSlowedTime( 0.5f );
+				//Slow down a bit if hit in the knee
+				//m_bSlowedByHit = true;
+				//m_flUnslowTime = gpGlobals->curtime + 1;
+				m_Shared.SetSlowedTime( 0.5f );
+				
 #endif
 			break;
 		default:
 			break;
 		}
 
-#ifdef HL2_EPISODIC
 		// If this damage type makes us bleed, then do so
 		bool bShouldBleed = !g_pGameRules->Damage_ShouldNotBleed( info.GetDamageType() );
 		if ( bShouldBleed )
-#endif
 		{
 			SpawnBlood(ptr->endpos, vecDir, BloodColor(), info.GetDamage());// a little surface blood.
 			TraceBleed( info.GetDamage(), vecDir, ptr, info.GetDamageType() );
@@ -947,7 +976,7 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 	color32 red = {128,0,0,100};
 	color32 blue = {0,0,128,50};
 	color32 green = {0,128,0,50};
-	color32 white = {255,225,205,100};
+	color32 white = {255,225,225,100};
 	switch ( fDamageType )
 	{
 	case DMG_BULLET:
@@ -975,9 +1004,12 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 		break;
 	case DMG_SHOCK:
 		// White indicator
-		UTIL_ScreenFade( this, white, 0.2f, 0.2f, FFADE_IN );
-		// Very small screen shake
-		UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 1.0, 1000, SHAKE_START, false );
+		if ( flDamage > 2 )
+		{
+			UTIL_ScreenFade( this, white, 0.2f, 0.2f, FFADE_IN );
+			// Very small screen shake, simulate a tremble
+			UTIL_ScreenShake( EyePosition(), 1.0, 150.0, 1.0, 1000, SHAKE_START, false );
+		}
 		break;
 	case DMG_POISON:
 		// Greenish indicator
@@ -986,20 +1018,22 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 		break;
 	case DMG_ACID:
 		// Blur screen abit
-		UTIL_ScreenFade( this, green, 0.2f, 0.4f, FFADE_MODULATE );
+		UTIL_ScreenFade( this, green, 0.2f, 0.4f, FFADE_MODULATE );	//!TEMP
 		break;
 	case DMG_SONIC:
 		// Blinded
-		if ( flDamage > 1 )
+		if ( flDamage > 2 )
 		{
 			UTIL_ScreenFade( this, white, 0.2f, 1.0f, FFADE_IN );
+#if 0
 			// Within blast radius, ring the ears
-			//!EmitSound( "Player.SonicDamage" );
+			EmitSound( "Player.SonicDamage" );
 			// Directly in the center of the blast, make blind
 			if ( flDamage > 4 )
 			{
 				UTIL_ScreenFade( this, white, 0.2f, 5.0f, FFADE_IN );
 			}
+#endif
 		}
 		break;
 	default:
@@ -1402,7 +1436,6 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	if( info.GetDamage() > 15.0f )
 	{
 		RestartGesture( ACT_GESTURE_BIG_FLINCH );
-//!		DoAnimationEvent( PLAYERANIMEVENT_FLINCH_CHEST );
 		flPunch = -6;
 	}
 
@@ -1414,7 +1447,6 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 			flPunch = RandomFloat( -7, -10 );
 
 		RestartGesture( ACT_GESTURE_SMALL_FLINCH );
-//!		DoAnimationEvent( PLAYERANIMEVENT_FLINCH_CHEST );
 	}
 
 	m_Local.m_vecPunchAngle.SetX( flPunch );
@@ -1469,8 +1501,9 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 // Purpose: 
 // Input  : &info - 
 //-----------------------------------------------------------------------------
-#define MIN_SHOCK_AND_CONFUSION_DAMAGE	30.0f
-#define MIN_EAR_RINGING_DISTANCE		240.0f  // 20 feet
+#define MIN_SHOCK_AND_CONFUSION_DAMAGE	35.0f	// 30.0
+#define MIN_EAR_RINGING_DISTANCE		240.0f	// 20 feet
+#define MIN_EAR_RINGING_DAMAGE			15.0f
 
 void CBasePlayer::OnDamagedByExplosion( const CTakeDamageInfo &info )
 {
@@ -1485,14 +1518,13 @@ void CBasePlayer::OnDamagedByExplosion( const CTakeDamageInfo &info )
 		distanceFromPlayer = delta.Length();
 	}
 
-	bool ear_ringing = distanceFromPlayer < MIN_EAR_RINGING_DISTANCE ? true : false;
+	bool ear_ringing = (distanceFromPlayer < MIN_EAR_RINGING_DISTANCE && lastDamage >= MIN_EAR_RINGING_DAMAGE) ? true : false;
 	bool shock = lastDamage >= MIN_SHOCK_AND_CONFUSION_DAMAGE;
-
-//	Msg( "expl dist %f damage %f\n", distanceFromPlayer, lastDamage );
 
 	if ( !shock && !ear_ringing )
 		return;
 
+	DevMsg( "expl dist %f damage %f\n", distanceFromPlayer, lastDamage );
 	int effect = shock ? 
 		random->RandomInt( 35, 37 ) : 
 		random->RandomInt( 32, 34 );
@@ -1787,6 +1819,7 @@ void CBasePlayer::Event_Killed( const CTakeDamageInfo &info )
 		 FlashlightTurnOff();
 	}
 
+	// Turn off the heartbeat
 	if ( m_bPlayerHeartbeat )
 		ToggleHeartbeat();
 
@@ -1944,9 +1977,6 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 					if (idealActivity == ACT_INVALID)
 						idealActivity = ACT_RANGE_ATTACK1;
 				}
-
-				if ( gpGlobals->curtime + m_flAimTime < 1 )
-					SetAimTime( 1.0f );	//Always aim for at least a second
 			break;
 
 			case PLAYER_RELOAD:
@@ -1969,21 +1999,55 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 		idealActivity = GetDeathActivity();
 	}
 
-	SetActivity( idealActivity );
+#ifdef HL1_DLL
+	if (idealActivity == ACT_RANGE_ATTACK1)
+	{
+		if ( GetFlags() & FL_DUCKING )	// crouching
+		{
+			Q_strncpy( szAnim, "crouch_shoot_" ,sizeof(szAnim));
+		}
+		else
+		{
+			Q_strncpy( szAnim, "ref_shoot_" ,sizeof(szAnim));
+		}
+		Q_strncat( szAnim, m_szAnimExtension ,sizeof(szAnim), COPY_ALL_CHARACTERS );
+		animDesired = LookupSequence( szAnim );
+		if (animDesired == -1)
+			animDesired = 0;
 
-//	if ( GetActivity() == idealActivity)
-//		return;
+		if ( GetSequence() != animDesired || !SequenceLoops() )
+		{
+			SetCycle( 0 );
+		}
 
-	animDesired = SelectWeightedSequence( m_Activity );
+		// Tracker 24588:  In single player when firing own weapon this causes eye and punchangle to jitter
+		//if (!SequenceLoops())
+		//{
+		//	AddEffects( EF_NOINTERP );
+		//}
 
-	// Already using the desired animation?
-	if (GetSequence() == animDesired)
-		return;
+		SetActivity( idealActivity );
+		ResetSequence( animDesired );
+	}
+	else
+#endif
+	{
+	//	if ( GetActivity() == idealActivity)
+	//		return;
 
-	//Msg( "Set animation to %d\n", animDesired );
-	// Reset to first frame of desired animation
-	ResetSequence( animDesired );
-	SetCycle( 0 );
+		SetActivity( idealActivity );
+
+		animDesired = SelectWeightedSequence( m_Activity );
+
+		// Already using the desired animation?
+		if (GetSequence() == animDesired)
+			return;
+
+		//Msg( "Set animation to %d\n", animDesired );
+		// Reset to first frame of desired animation
+		ResetSequence( animDesired );
+		SetCycle( 0 );
+	}
 }
 
 /*
@@ -2248,17 +2312,16 @@ void CBasePlayer::PlayerDeathThink(void)
 //=========================================================
 void CBasePlayer::StartDeathCam( void )
 {
+	// don't accept subsequent attempts to StartDeathCam()
 	if ( GetViewOffset() == vec3_origin )
-	{
-		// don't accept subsequent attempts to StartDeathCam()
 		return;
-	}
+
+	CreateCorpse();
 
 	CBaseEntity *pSpot, *pNewSpot;
 	int iRand;
 
 	pSpot = gEntList.FindEntityByClassname( NULL, "info_intermission");	
-
 	if ( pSpot )
 	{
 		// at least one intermission spot in the world.
@@ -2276,8 +2339,6 @@ void CBasePlayer::StartDeathCam( void )
 			iRand--;
 		}
 
-		CreateCorpse();
-
 		// Now zip the player over to the intermission
 		SetAbsOrigin( pSpot->GetAbsOrigin() );
 		SetAbsAngles( pSpot->GetAbsAngles() );
@@ -2286,7 +2347,6 @@ void CBasePlayer::StartDeathCam( void )
 	else
 	{
 		// no intermission spot. Push them up in the air, looking down at their corpse
-		CreateCorpse();
 		StartObserverMode( OBS_MODE_DEATHCAM );
 		return;
 	}
@@ -3992,10 +4052,25 @@ void CBasePlayer::CheckTimeBasedDamage()
 	//				OnTakeDamage(pev, pev, NERVEGAS_DAMAGE, DMG_GENERIC);	
 					bDuration = NERVEGAS_DURATION;
 					break;
-	//			case itbd_Poison:
+				case itbd_Poison:
 	//				OnTakeDamage( CTakeDamageInfo( this, this, POISON_DAMAGE, DMG_GENERIC ) );
-	//				bDuration = POISON_DURATION;
-	//				break;
+					bDuration = POISON_DURATION;
+					break;
+				case itbd_PoisonRecover:
+				{
+					// NOTE: this hack is actually used to RESTORE health
+					// after the player has been poisoned.
+					if (m_nPoisonDmg > m_nPoisonRestored)
+					{
+						int nDif = min(m_nPoisonDmg - m_nPoisonRestored, 10);
+
+						TakeHealth(nDif, DMG_GENERIC);
+						m_nPoisonRestored += nDif;
+					}
+					bDuration = 8;	// get up to 9*10 = 90 points back
+					break;
+				}
+
 				case itbd_Radiation:
 	//				OnTakeDamage(pev, pev, RADIATION_DAMAGE, DMG_GENERIC);
 					bDuration = RADIATION_DURATION;
@@ -4012,20 +4087,6 @@ void CBasePlayer::CheckTimeBasedDamage()
 					}
 					bDuration = 4;	// get up to 5*10 = 50 points back
 					break;
-
-				case itbd_PoisonRecover:
-				{
-					// NOTE: this hack is actually used to RESTORE health
-					// after the player has been poisoned.
-					if (m_nPoisonDmg > m_nPoisonRestored)
-					{
-						int nDif = min(m_nPoisonDmg - m_nPoisonRestored, 10);
-						TakeHealth(nDif, DMG_GENERIC);
-						m_nPoisonRestored += nDif;
-					}
-					bDuration = 9;	// get up to 10*10 = 100 points back
-					break;
-				}
 
 				case itbd_Acid:
 	//				OnTakeDamage(pev, pev, ACID_DAMAGE, DMG_GENERIC);
@@ -4193,11 +4254,9 @@ void CBasePlayer::CheckSuitUpdate()
 	// if in range of radiation source, ping geiger counter
 	UpdateGeigerCounter();
 
+	// don't bother updating HEV voice in multiplayer.
 	if ( g_pGameRules->IsMultiplayer() )
-	{
-		// don't bother updating HEV voice in multiplayer.
 		return;
-	}
 
 	if ( gpGlobals->curtime >= m_flSuitUpdate && m_flSuitUpdate > 0)
 	{
@@ -4556,7 +4615,7 @@ void CBasePlayer::PostThink()
 				if (m_Local.m_flFallVelocity > 70 && !g_pGameRules->IsMultiplayer())
 				{
 					CSoundEnt::InsertSound( SOUND_PLAYER, GetAbsOrigin(), m_Local.m_flFallVelocity, 0.2, this );
-					// Msg( "fall %f\n", m_Local.m_flFallVelocity );
+					DevMsg( "fall %f\n", m_Local.m_flFallVelocity );
 				}
 				m_Local.m_flFallVelocity = 0;
 			}
@@ -4797,9 +4856,15 @@ CBaseEntity *CBasePlayer::EntSelectSpawnPoint()
 // choose a info_player_deathmatch point
 	if (g_pGameRules->IsCoOp() )
 	{
+		// TODO; This needs to do 2 things - 1. check if the spot is enabled (autosaves/level-progression, etc.), 
+		// and 2. - count the clients and assign each of them their own spot, host gets 0, 1st coop gets 1, etc.
+
+		// Check for unique co-op spots first (some maps may be both co-op and SP).
 		pSpot = gEntList.FindEntityByClassname( g_pLastSpawn, "info_player_coop");
 		if ( pSpot )
 			goto ReturnSpot;
+
+		// Else just use the normal starts
 		pSpot = gEntList.FindEntityByClassname( g_pLastSpawn, "info_player_start");
 		if ( pSpot ) 
 			goto ReturnSpot;
@@ -4848,6 +4913,13 @@ CBaseEntity *CBasePlayer::EntSelectSpawnPoint()
 			}
 			goto ReturnSpot;
 		}
+		else if ( !pSpot )
+		{
+			// Absolutely no deathmatch spots to be had, fall back to SP class
+			pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_start" );
+			if ( pSpot )
+				goto ReturnSpot;
+		}
 	}
 
 	// If startspot is set, (re)spawn there.
@@ -4865,7 +4937,7 @@ CBaseEntity *CBasePlayer::EntSelectSpawnPoint()
 	}
 
 ReturnSpot:
-	if ( !pSpot  )
+	if ( !pSpot )
 	{
 		Warning( "PutClientInServer: no info_player_start on level\n");
 		return CBaseEntity::Instance( INDEXENT( 0 ) );
@@ -5109,6 +5181,24 @@ void CBasePlayer::Activate( void )
 void CBasePlayer::Precache( void )
 {
 	BaseClass::Precache();
+
+#if 0
+	// in the event that the player JUST spawned, and the level node graph
+	// was loaded, fix all of the node graph pointers before the game starts.
+	// !!!BUGBUG - now that we have multiplayer, this needs to be moved!
+	if ( WorldGraph.m_fGraphPresent && !WorldGraph.m_fGraphPointersSet )
+	{
+		if ( !WorldGraph.FSetGraphPointers() )
+		{
+			ALERT ( at_console, "**Graph pointers were not set!\n");
+		}
+		else
+		{
+			ALERT ( at_console, "**Graph Pointers Set!\n" );
+		} 
+	}
+#endif
+
 	//! cached by client
 	//!PrecacheScriptSound( "Player.Death" );
 	//!PrecacheScriptSound( "Player.Pain" );
@@ -5271,10 +5361,10 @@ void CBasePlayer::OnRestore( void )
 	m_nBodyPitchPoseParam = LookupPoseParameter( "body_pitch" );
 }
 
-/* void CBasePlayer::SetTeamName( const char *pTeamName )
+void CBasePlayer::SetTeamName( const char *pTeamName )
 {
 	Q_strncpy( m_szTeamName, pTeamName, TEAM_NAME_LENGTH );
-} */
+}
 
 void CBasePlayer::SetArmorValue( int value )
 {
@@ -5946,7 +6036,7 @@ void CBasePlayer::ImpulseCommands( )
 		break;
 
 	case 200:
-		if ( sv_cheats->GetBool() )
+		if ( IsSuitEquipped() )
 		{
 			CBaseCombatWeapon *pWeapon;
 
@@ -6157,7 +6247,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 			else
 			{
 				Vector forward = UTIL_YawToVector( EyeAngles().y );
-				Create("npc_combine_s", GetLocalOrigin() + forward * 128, GetLocalAngles());	//NPC_human_grunt
+				Create("npc_combine_s", GetLocalOrigin() + forward * 128, GetLocalAngles());
 			}
 			break;
 		}
@@ -6623,7 +6713,8 @@ bool CBasePlayer::BumpWeapon( CBaseCombatWeapon *pWeapon )
 	// ----------------------------------------
 	// If I already have it just take the ammo
 	// ----------------------------------------
-	if (Weapon_OwnsThisType( pWeapon->GetClassname(), pWeapon->GetSubType())) 
+//	bool bOwnsWeaponAlready = Weapon_OwnsThisType(pWeapon->GetClassname(), pWeapon->GetSubType());
+	if (Weapon_OwnsThisType(pWeapon->GetClassname(), pWeapon->GetSubType())) 
 	{
 		if( Weapon_EquipAmmoOnly( pWeapon ) )
 		{
@@ -6639,47 +6730,43 @@ bool CBasePlayer::BumpWeapon( CBaseCombatWeapon *pWeapon )
 			return false;
 		}
 	}
+
 	// -------------------------
 	// Otherwise take the weapon
 	// -------------------------
-	else 
+	pWeapon->CheckRespawn();
+	pWeapon->AddSolidFlags( FSOLID_NOT_SOLID );
+	pWeapon->AddEffects( EF_NODRAW );
+
+	Weapon_Equip( pWeapon );
+	if ( IsInAVehicle() )
 	{
-		pWeapon->CheckRespawn();
-
-		pWeapon->AddSolidFlags( FSOLID_NOT_SOLID );
-		pWeapon->AddEffects( EF_NODRAW );
-
-		Weapon_Equip( pWeapon );
-		if ( IsInAVehicle() )
-		{
-			pWeapon->Holster();
-		}
-		else
-		{
-#ifdef HL2_DLL
-
-			if ( IsX360() )
-			{
-				CFmtStr hint;
-				hint.sprintf( "#valve_hint_select_%s", pWeapon->GetClassname() );
-				UTIL_HudHintText( this, hint.Access() );
-			}
-
-			// Always switch to a newly-picked up weapon
-			if ( !PlayerHasMegaPhysCannon() )
-			{
-				// If it uses clips, load it full. (this is the first time you've picked up this type of weapon)
-				if ( pWeapon->UsesClipsForAmmo1() )
-				{
-					pWeapon->m_iClip1 = pWeapon->GetMaxClip1();
-				}
-
-				Weapon_Switch( pWeapon );
-			}
-#endif
-		}
-		return true;
+		pWeapon->Holster();
 	}
+	else
+	{
+#ifdef HL2_DLL
+		if ( IsX360() )
+		{
+			CFmtStr hint;
+			hint.sprintf( "#valve_hint_select_%s", pWeapon->GetClassname() );
+			UTIL_HudHintText( this, hint.Access() );
+		}
+
+		// Always switch to a newly-picked up weapon
+		if ( !PlayerHasMegaPhysCannon() )
+		{
+			// If it uses clips, load it full. (this is the first time you've picked up this type of weapon)
+			if ( pWeapon->UsesClipsForAmmo1() )
+			{
+				pWeapon->m_iClip1 = pWeapon->GetMaxClip1();
+			}
+
+			Weapon_Switch( pWeapon );
+		}
+#endif
+	}
+	return true;
 }
 
 

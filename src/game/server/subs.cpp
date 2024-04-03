@@ -82,7 +82,9 @@ void CBaseEntity::SUB_Remove( void )
 	{
 		// this situation can screw up NPCs who can't tell their entity pointers are invalid.
 		m_iHealth = 0;
+#ifdef _DEBUG
 		DevWarning( 2, "SUB_Remove called on entity with health > 0\n");
+#endif
 	}
 
 	UTIL_Remove( this );
@@ -105,13 +107,17 @@ void CBaseEntity::SUB_DoNothing( void )
 
 bool CBaseEntity::SUB_AllowedToFade( void )
 {
+	// players CANNOT be faded out and/or util_remove'd!
+	if ( IsPlayer() )
+		return false;
+
 	if( VPhysicsGetObject() )
 	{
 		if( VPhysicsGetObject()->GetGameFlags() & FVPHYSICS_PLAYER_HELD || GetEFlags() & EFL_IS_BEING_LIFTED_BY_BARNACLE )
 			return false;
 	}
 
-	// on Xbox, allow these to fade out even if player is looking
+	// on Xbox, allow these to fade out even if a player is looking
 #ifndef _XBOX
 	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
 	if ( pPlayer && pPlayer->FInViewCone( this ) )

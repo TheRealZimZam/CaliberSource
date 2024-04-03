@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: The only thing that doesnt shoot the player (most of the time)
+// Purpose: Talker NPC
 //
 //=============================================================================//
 

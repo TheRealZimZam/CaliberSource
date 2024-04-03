@@ -18,6 +18,9 @@
 
 //=============================================================================================================
 // PROP TYPES
+// static_prop - don't move, don't animate, don't do anything.
+// dynamic_prop - move (if enabled), take damage, and animate
+// physics_prop - move, take damage, but don't animate
 //=============================================================================================================
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -251,6 +254,7 @@ private:
 };
 
 // Spawnflags
+#define SF_DYNAMICPROP_PUSHABLE						1
 #define SF_DYNAMICPROP_USEHITBOX_FOR_RENDERBOX		64
 #define SF_DYNAMICPROP_NO_VPHYSICS					128
 #define SF_DYNAMICPROP_DISABLE_COLLISION			256

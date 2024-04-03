@@ -20,26 +20,26 @@
 // just NULL result
 //
 //-----------------------------------------------------------------------------
-
-inline CBasePlayer *AI_GetSinglePlayer()
-{
-	if ( gpGlobals->maxClients > 1 )
-	{
-		return NULL;
-	}
-	
-	return UTIL_GetLocalPlayer();
-}
-
-inline CBasePlayer *AI_GetNearestPlayer( Vector &vecOrigin )
-{
-	//!!! TODO
-	return NULL;
-}
-
 inline bool AI_IsSinglePlayer()
 {
 	return ( gpGlobals->maxClients == 1 );
+}
+
+inline CBasePlayer *AI_GetSinglePlayer()
+{
+	if ( AI_IsSinglePlayer() )
+		return UTIL_GetLocalPlayer();
+
+	return NULL;
+}
+
+inline CBasePlayer *AI_GetNearestPlayer( CBaseEntity *pCaller )
+{
+	// In SP, just return the local player
+	if ( AI_IsSinglePlayer() )
+		return UTIL_GetLocalPlayer();
+
+	return UTIL_GetNearestPlayer( pCaller );
 }
 
 

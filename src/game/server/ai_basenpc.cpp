@@ -141,9 +141,8 @@ ConVar	ai_efficiency_override( "ai_efficiency_override", "0" );
 ConVar	ai_debug_efficiency( "ai_debug_efficiency", "0" );
 ConVar	ai_debug_dyninteractions( "ai_debug_dyninteractions", "0", FCVAR_NONE, "Debug the NPC dynamic interaction system." );
 ConVar	ai_frametime_limit( "ai_frametime_limit", "50", FCVAR_NONE, "frametime limit for min efficiency AIE_NORMAL (in sec's)." );
-
+ConVar  ai_strict_infighting( "ai_strict_infighting", "1", FCVAR_CHEAT, "Infighting will only happen with monsters outside of my class." );
 ConVar	ai_use_think_optimizations( "ai_use_think_optimizations", "1" );
-
 ConVar	ai_test_moveprobe_ignoresmall( "ai_test_moveprobe_ignoresmall", "0" );
 
 #ifdef HL2_EPISODIC
@@ -638,8 +637,15 @@ void CAI_BaseNPC::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bo
 {
 	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
 
-	//This is kinda (really) GAY
+#ifdef HL2_DLL
+	if ( g_pGameRules->ShouldBurningPropsEmitLight() == true && GetEffectEntity() != NULL )
+	{
+		GetEffectEntity()->AddEffects( EF_DIMLIGHT );
+	}
+#endif
+
 #ifdef HL2_EPISODIC
+	//This is kinda (really) GAY
 	if ( AI_IsSinglePlayer() )
 	{
 		CBasePlayer *pPlayer = AI_GetSinglePlayer();
@@ -795,6 +801,20 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	// If the attacker was an NPC or client update my position memory
 	if ( info.GetAttacker()->GetFlags() & (FL_NPC | FL_CLIENT) )
 	{
+		// Infighting!!! - MM
+#if 1
+		bool bStrictInfighting = ai_strict_infighting.GetBool();
+		// If its an NPC that isnt in my class, or strict infighting is off,
+		// and im not completely infatuated with him, start infighting!
+		if ( (!bStrictInfighting || info.GetAttacker()->Classify() != this->Classify()) && 
+		IRelationType(info.GetAttacker()) == D_NU )
+		{
+			// Grab the basepriority and bump it up a little bit
+			int basepriority = IRelationPriority(info.GetAttacker());
+			AddEntityRelationship( info.GetAttacker(), D_HT, (basepriority + 1) );
+		}
+#endif
+
 		// ------------------------------------------------------------------
 		//				DO NOT CHANGE THIS CODE W/O CONSULTING
 		// Only update information about my attacker I don't see my attacker
@@ -846,13 +866,10 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 		// add pain to the conditions
 		if ( IsLightDamage( info ) )
-		{
 			SetCondition( COND_LIGHT_DAMAGE );
-		}
+
 		if ( IsHeavyDamage( info ) )
-		{
 			SetCondition( COND_HEAVY_DAMAGE );
-		}
 
 		ForceGatherConditions();
 
@@ -960,7 +977,7 @@ int CAI_BaseNPC::OnTakeDamage_Dead( const CTakeDamageInfo &info )
 	if ( g_pGameRules->Damage_ShouldGibCorpse( info.GetDamageType() ) )
 	{
 		// Only classes that specifically request it are gibbed
-		if ( ShouldGib( info ) )
+		if ( m_takedamage != DAMAGE_EVENTS_ONLY && ShouldGib( info ) )
 		{
 			Event_Gibbed( info );
 		}
@@ -1142,11 +1159,9 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 
 	SetLastHitGroup( ptr->hitgroup );
 	m_nForceBone = ptr->physicsbone;		// save this bone for physics forces
-
 	Assert( m_nForceBone > -255 && m_nForceBone < 256 );
 
 	bool bDebug = showhitlocation.GetBool();
-
 	switch ( ptr->hitgroup )
 	{
 	case HITGROUP_GENERIC:
@@ -1192,7 +1207,8 @@ void CAI_BaseNPC::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir
 		break;
 	}
 
-	if ( subInfo.GetDamage() >= 1.0 && !(subInfo.GetDamageType() & DMG_SHOCK ) )
+	bool bShouldBleed = !g_pGameRules->Damage_ShouldNotBleed( subInfo.GetDamageType() );
+	if ( bShouldBleed && subInfo.GetDamage() >= 1.0 )
 	{
 		SpawnBlood( ptr->endpos, vecDir, BloodColor(), subInfo.GetDamage() );// a little surface blood.
 		TraceBleed( subInfo.GetDamage(), vecDir, ptr, subInfo.GetDamageType() );
@@ -1276,7 +1292,7 @@ bool CAI_BaseNPC::PlayerInSpread( const Vector &sourcePos, const Vector &targetP
 
 		if ( pPlayer && ( !ignoreHatedPlayers || IRelationType( pPlayer ) != D_HT ) )
 		{
-#ifdef HL2_EPISODIC
+#ifdef HL2_DLL
 			//If the player is being lifted by a barnacle then go ahead and ignore the player and shoot.
 			if ( pPlayer->IsEFlagSet( EFL_IS_BEING_LIFTED_BY_BARNACLE ) )
 				return false;
@@ -1514,9 +1530,10 @@ void CBaseEntity::HandleShotPenetrating( const FireBulletsInfo_t &info,
 	behindGlassInfo.m_flDistance = info.m_flDistance*( 1.0f - tr.fraction );
 	behindGlassInfo.m_iAmmoType = info.m_iAmmoType;
 	behindGlassInfo.m_iTracerFreq = info.m_iTracerFreq;
-	behindGlassInfo.m_iDamage = bHitGlass ? info.m_iDamage : (info.m_iDamage/2);	//Half the damage, if not glass
+	behindGlassInfo.m_iDamage = bHitGlass ? info.m_iDamage : (info.m_iDamage/2);	//Half the damage for each pen, if not glass
 	behindGlassInfo.m_pAttacker = info.m_pAttacker ? info.m_pAttacker : this;
 	behindGlassInfo.m_nFlags = info.m_nFlags;
+	behindGlassInfo.m_flVelocity = bHitGlass ? info.m_flVelocity : (info.m_flVelocity*0.8);	//Lower the velocity just a tad, if not glass
 
 	FireBullets( behindGlassInfo );
 }
@@ -2196,6 +2213,7 @@ void CAI_BaseNPC::OnListened()
 //=========================================================
 bool CAI_BaseNPC::FValidateHintType ( CAI_Hint *pHint )
 {
+//	DevMsg( "Couldn't validate hint type" );
 	return false;
 }
 
@@ -2651,25 +2669,25 @@ void CAI_BaseNPC::SetAim( const Vector &aimDir )
 	float newPitch;
 	float newYaw;
 
-	if( GetEnemy() )
+	if( GetEnemy() && !FVisible( GetEnemy() ) )
 	{
-		// clamp and dampen movement
-		newPitch = curPitch + 0.7 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 30 ), curPitch );
+		// Sweep your weapon more slowly if you cant see what you're aiming at
+		newPitch = curPitch + 0.5 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 20 ), curPitch );
 
 #if 0
 		float flRelativeYaw = UTIL_AngleDiff( angDir.y, GetAbsAngles().y );
 		newYaw = curYaw + UTIL_AngleDiff( flRelativeYaw, curYaw );
 #else
-		newYaw = curYaw + 0.7 * UTIL_AngleDiff( UTIL_ApproachAngle( UTIL_AngleDiff( angDir.y, GetMotor()->GetIdealYaw()), curYaw, 30 ), curYaw );
+		newYaw = curYaw + 0.5 * UTIL_AngleDiff( UTIL_ApproachAngle( UTIL_AngleDiff( angDir.y, GetMotor()->GetIdealYaw()), curYaw, 20 ), curYaw );
 #endif
 	}
 	else
 	{
-		// Sweep your weapon more slowly if you're not fighting someone
-		newPitch = curPitch + 0.5 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 20 ), curPitch );
+		// clamp and dampen movement
+		newPitch = curPitch + 0.7 * UTIL_AngleDiff( UTIL_ApproachAngle( angDir.x, curPitch, 30 ), curPitch );
 
 		float flRelativeYaw = UTIL_AngleDiff( angDir.y, GetAbsAngles().y );
-		newYaw = curYaw + 0.5 * UTIL_AngleDiff( flRelativeYaw, curYaw );
+		newYaw = curYaw + 0.7 * UTIL_AngleDiff( flRelativeYaw, curYaw );
 	}
 
 	newPitch = AngleNormalize( newPitch );
@@ -2684,13 +2702,9 @@ void CAI_BaseNPC::SetAim( const Vector &aimDir )
 	// If we've got a small adjustment off our abs yaw, use that. 
 	// Otherwise, use our abs yaw.
 	if ( fabs(newYaw) < 20 )
-	{
 		m_flInteractionYaw = angDir.y;
-	}
 	else
-	{
  		m_flInteractionYaw = GetAbsAngles().y;
-	}
 }
 
 
@@ -2711,7 +2725,7 @@ void CAI_BaseNPC::RelaxAim( )
 //-----------------------------------------------------------------------------
 void CAI_BaseNPC::AimGun()
 {
-	if (GetEnemy())
+	if (GetEnemy() != NULL)
 	{
 		Vector vecShootOrigin;
 
@@ -5847,6 +5861,10 @@ void CAI_BaseNPC::UpdateEnemyPos()
 	if ( !GetNavigator()->IsInterruptable() )
 		return;
 
+	// BRJ 10/7/02
+	// FIXME: make this check time based instead of distance based!
+
+#if 1
 	if ( m_AnyUpdateEnemyPosTimer.Expired() && m_UpdateEnemyPosTimer.Expired() )
 	{
 		// FIXME: does GetGoalRepathTolerance() limit re-routing enough to remove this?
@@ -5876,6 +5894,27 @@ void CAI_BaseNPC::UpdateEnemyPos()
 			}
 		}
 	}
+#else
+	// If my enemy has moved significantly, or if the enemy has changed update my path
+	if ( GetNavigator()->GetGoalType() == GOALTYPE_ENEMY )
+	{
+		if (m_hEnemy != GetNavigator()->GetGoalTarget())
+		{
+			GetNavigator()->SetGoalTarget( m_hEnemy, vec3_origin );
+		}
+		else
+		{
+			// UNDONE: Should we allow npcs to override this distance (80?)
+			Vector flEnemyLKP = GetEnemyLKP();
+			float ignored;
+			TranslateEnemyChasePosition( GetEnemy(), flEnemyLKP, ignored );
+			if ( (GetNavigator()->GetGoalPos() - flEnemyLKP).Length() > 80 )
+			{
+				GetNavigator()->RefindPathToGoal();
+			}
+		}
+	}
+#endif
 }
 
 
@@ -10001,7 +10040,10 @@ CBaseEntity *CAI_BaseNPC::FindNamedEntity( const char *name, IEntityFindFilter *
 {
 	if ( !stricmp( name, "!player" ))
 	{
-		return ( CBaseEntity * )AI_GetSinglePlayer();
+		if ( AI_IsSinglePlayer() )
+			return ( CBaseEntity * )AI_GetSinglePlayer();
+		else
+			return ( CBaseEntity * )AI_GetNearestPlayer( this );
 	}
 	else if ( !stricmp( name, "!enemy" ) )
 	{
@@ -10065,6 +10107,7 @@ CBaseEntity *CAI_BaseNPC::FindNamedEntity( const char *name, IEntityFindFilter *
 		}
 	}
 
+	// huh, punt
 	return NULL;
 }
 
@@ -10522,13 +10565,22 @@ bool CAI_BaseNPC::ShouldFadeOnDeath( void )
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::ShouldPlayIdleSound( void )
 {
+#if 0
 	if ( ( m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT ) &&
 		   random->RandomInt(0,99) == 0 && !HasSpawnFlags(SF_NPC_GAG) )
 	{
 		return true;
 	}
+#endif
 
-	return false;
+	// Gagged monsters don't talk
+	if ( HasSpawnFlags( SF_NPC_GAG ) )
+		return false;
+
+	if ( random->RandomInt( 0, 99 ) != 0 )
+		return false;
+
+	return ( m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT );
 }
 
 //-----------------------------------------------------------------------------
@@ -11856,7 +11908,7 @@ bool CAI_BaseNPC::HandleInteraction(int interactionType, void *data, CBaseCombat
 		AddSpawnFlags( SF_NPC_GAG );
 
 		// Drop any weapon they're holding
-		if ( GetActiveWeapon() )
+		if ( GetActiveWeapon() && GetActiveWeapon()->CanDrop() )
 		{
 			Weapon_Drop( GetActiveWeapon() );
 		}
@@ -12305,13 +12357,19 @@ bool CAI_BaseNPC::OnObstructingDoor( AILocalMoveGoal_t *pMoveGoal,
 	if ( IsMoveBlocked( *pResult ) && pMoveGoal->directTrace.vHitNormal != vec3_origin )
 	{
 		// If im not too stupid to open a door
-		if ( (CapabilitiesGet() & bits_CAP_DOORS_GROUP) )
+		if ( (CapabilitiesGet() & bits_CAP_USE) )
 		{
+			AIDoorDebugMsg( this, "Attempting to open door!\n" );
+
 			// Ask the door to open
+			// FIXMETODO; This migth be a better place to call the "touch" instead??
 			pDoor->Use(this, this, USE_TOGGLE, 0 );
 			*pResult = AIMR_OK;
 			return true;
 		}
+
+		*pResult = AIMR_BLOCKED_ENTITY;
+		return false;
 	}
 
 	return false;
@@ -12376,7 +12434,7 @@ bool CAI_BaseNPC::OnUpcomingPropDoor( AILocalMoveGoal_t *pMoveGoal,
 			if ( AIIsDebuggingDoors(this) )
 			{
 				NDebugOverlay::Cross3D(opendata.vecStandPos + Vector(0,0,1), 32, 255, 255, 255, false, 1.0 );
-				Msg( "Opening door!\n" );
+				AIDoorDebugMsg( this, "Opening door!\n" );
 			}
 
 			// Attach the door to the waypoint so we open it when we get there.

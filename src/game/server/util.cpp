@@ -614,7 +614,6 @@ CBasePlayer *UTIL_GetLocalPlayer( void )
 		if ( developer.GetBool() )
 		{
 			Assert( !"UTIL_GetLocalPlayer" );
-			
 #ifdef	DEBUG
 			Warning( "UTIL_GetLocalPlayer() called in multiplayer game.\n" );
 #endif
@@ -642,6 +641,34 @@ CBasePlayer *UTIL_GetListenServerHost( void )
 	return UTIL_PlayerByIndex( 1 );
 }
 
+//
+// Returns nearest player.
+// Credit to RenateZwei on the VCC
+//
+CBasePlayer *UTIL_GetNearestPlayer( CBaseEntity *pLooker )
+{
+	float flFinalDistance = MAX_TRACE_LENGTH;
+	CBasePlayer *pFinalPlayer = NULL;
+
+	for (int i = 1; i < gpGlobals->maxClients; i++)
+	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(i);
+
+		if (!pPlayer)
+		{
+			continue;
+		}
+
+		float flDistance = (pPlayer->GetAbsOrigin() - pLooker->GetAbsOrigin()).LengthSqr();
+		if (flDistance < flFinalDistance)
+		{	
+			pFinalPlayer = pPlayer;
+			flFinalDistance = flDistance;
+		}
+	}
+
+	return pFinalPlayer;
+}
 
 //--------------------------------------------------------------------------------------------------------------
 /**
@@ -1382,7 +1409,7 @@ void UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, 
 		return;
 
 	if ( g_Language.GetInt() == LANGUAGE_GERMAN && color == BLOOD_COLOR_RED )
-		color = 0;
+		color = BLOOD_COLOR_MECH;
 
 	if ( g_pGameRules->IsMultiplayer() )
 	{

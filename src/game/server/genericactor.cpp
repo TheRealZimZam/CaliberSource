@@ -2,7 +2,7 @@
 //
 // Purpose: Generic NPC - purely for scripted sequence work.
 //
-// $NoKeywords: $
+// TODO; Optimize, right now its just as laggy as any other npc
 //
 //=============================================================================//
 
@@ -152,6 +152,7 @@ void CGenericActor::Spawn()
 	SetHullSizeNormal( );
 
 	NPCInit();
+	SetEfficiency( AIE_VERY_EFFICIENT );
 }
 
 //=========================================================

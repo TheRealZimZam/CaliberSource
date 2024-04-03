@@ -1695,11 +1695,11 @@ void CFuncTrackTrain::Blocked( CBaseEntity *pOther )
 	}
 
 	DevWarning( 2, "TRAIN(%s): Blocked by %s (dmg:%.2f)\n", GetDebugName(), pOther->GetClassname(), m_flBlockDamage );
-	if ( m_flBlockDamage <= 0 )
+	if ( GetBlockDamage() <= 0 )
 		return;
 
 	// we can't hurt this thing, so we're not concerned with it
-	pOther->TakeDamage( CTakeDamageInfo( this, this, m_flBlockDamage, DMG_CRUSH ) );
+	pOther->TakeDamage( CTakeDamageInfo( this, this, GetBlockDamage(), DMG_CRUSH ) );
 }
 
 

@@ -1,8 +1,7 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Talker npc
+// Purpose: Talker npc - Replacement for talkmonster
 //
-// Todo's; Friendly-fire, smells and heard sound responses
 //=============================================================================//
 
 #include "cbase.h"
@@ -886,7 +885,7 @@ bool CAI_BaseTalker::SelectQuestionFriend( CBaseEntity *pFriend, AISpeechSelecti
 
 	// If we haven't said hello, say hello first.
 	// Only ever say hello to NPCs other than my type.
-	if ( !GetExpresser()->SpokeConcept( TLK_HELLO_NPC  ) && !FClassnameIs( this, pFriend->GetClassname()) )
+	if ( !GetExpresser()->SpokeConcept( TLK_HELLO_NPC ) && !FClassnameIs( this, pFriend->GetClassname()) )
 	{
 		if ( SelectSpeechResponse( TLK_HELLO_NPC, NULL, pFriend, pSelection ) )
 			return true;
@@ -1044,15 +1043,6 @@ int CAI_BaseTalker::TranslateSchedule( int schedule )
 //-----------------------------------------------------------------------------
 void CAI_BaseTalker::OnStartSchedule( int schedule )
 {
-#if 0
-	if ( IsOkToCombatSpeak() )
-	{
-		if ( schedule == SCHED_HIDE_AND_RELOAD )
-			Speak( TLK_HIDEANDRELOAD );
-		else if ( schedule == (SCHED_CHASE_ENEMY|SCHED_ESTABLISH_LINE_OF_FIRE))
-			Speak( TLK_CHASING );
-	}
-#else
 	switch ( schedule )
 	{
 		case SCHED_HIDE_AND_RELOAD:
@@ -1071,7 +1061,6 @@ void CAI_BaseTalker::OnStartSchedule( int schedule )
 		default:
 			break;
 	}
-#endif
 
 	BaseClass::OnStartSchedule( schedule );
 }
@@ -1204,53 +1193,56 @@ void CAI_BaseTalker::TraceAttack( const CTakeDamageInfo &info, const Vector &vec
 {
 	const char *pszHitLocCriterion = NULL;
 
+	if ( IsOkToSpeak(SPEECH_PRIORITY) )
+	{
 #if 1
-	switch( ptr->hitgroup )
-	{
-		case HITGROUP_HEAD:
-			pszHitLocCriterion = "shotloc:head";
-		break;
-
-		case HITGROUP_LEFTLEG:
-		case HITGROUP_RIGHTLEG:
-			pszHitLocCriterion = "shotloc:leg";
-		break;
-
-		case HITGROUP_LEFTARM:
-		case HITGROUP_RIGHTARM:
-			pszHitLocCriterion = "shotloc:arm";
-		break;
-
-		case HITGROUP_STOMACH:
-			pszHitLocCriterion = "shotloc:gut";
-		break;
-
-		default:
+		switch( ptr->hitgroup )
+		{
+			case HITGROUP_HEAD:
+				pszHitLocCriterion = "shotloc:head";
 			break;
-	}
+
+			case HITGROUP_LEFTLEG:
+			case HITGROUP_RIGHTLEG:
+				pszHitLocCriterion = "shotloc:leg";
+			break;
+
+			case HITGROUP_LEFTARM:
+			case HITGROUP_RIGHTARM:
+				pszHitLocCriterion = "shotloc:arm";
+			break;
+
+			case HITGROUP_STOMACH:
+				pszHitLocCriterion = "shotloc:gut";
+			break;
+
+			default:
+				break;
+		}
 #else
-	if ( ptr->hitgroup == HITGROUP_HEAD )
-	{
-		pszHitLocCriterion = "shotloc:head";
-	}
-	else if ( ptr->hitgroup == HITGROUP_LEFTLEG || ptr->hitgroup == HITGROUP_RIGHTLEG )
-	{
-		pszHitLocCriterion = "shotloc:leg";
-	}
-	else if ( ptr->hitgroup == HITGROUP_LEFTARM || ptr->hitgroup == HITGROUP_RIGHTARM )
-	{
-		pszHitLocCriterion = "shotloc:arm";
-	}
-	else if ( ptr->hitgroup == HITGROUP_STOMACH )
-	{
-		pszHitLocCriterion = "shotloc:gut";
-	}
+		if ( ptr->hitgroup == HITGROUP_HEAD )
+		{
+			pszHitLocCriterion = "shotloc:head";
+		}
+		else if ( ptr->hitgroup == HITGROUP_LEFTLEG || ptr->hitgroup == HITGROUP_RIGHTLEG )
+		{
+			pszHitLocCriterion = "shotloc:leg";
+		}
+		else if ( ptr->hitgroup == HITGROUP_LEFTARM || ptr->hitgroup == HITGROUP_RIGHTARM )
+		{
+			pszHitLocCriterion = "shotloc:arm";
+		}
+		else if ( ptr->hitgroup == HITGROUP_STOMACH )
+		{
+			pszHitLocCriterion = "shotloc:gut";
+		}
 #endif
 
-	// set up the speech modifiers
-	CFmtStrN<128> modifiers( "%s,damageammo:%s,damage:%f", pszHitLocCriterion, info.GetAmmoName(), info.GetDamage() );
+		// set up the speech modifiers
+		CFmtStrN<128> modifiers( "%s,damageammo:%s,damage:%f", pszHitLocCriterion, info.GetAmmoName(), info.GetDamage() );
 
-	Speak( TLK_PAIN, modifiers );
+		Speak( TLK_PAIN, modifiers );
+	}
 
 	BaseClass::TraceAttack( info, vecDir, ptr );
 }
@@ -1306,6 +1298,7 @@ int CAI_BaseTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 				// I've already been attacked in bad faith, so it makes this easy
 				if (m_afMemory & bits_MEMORY_SUSPICIOUS)
 				{
+					// 50/50 roll for instant aggression
 					if ( random->RandomInt( 0, 1 ) )
 					{
 						if (IsOkToSpeak(SPEECH_PRIORITY))
@@ -1320,7 +1313,12 @@ int CAI_BaseTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 					{
 						// Look at the player very intensely
 						GetMotor()->SetIdealYawToTarget( jackAss->WorldSpaceCenter() );
+						if (IsMoving())
+							AddFacingTarget( jackAss, 1.0, 0.2, 0 );
+
 						//TODO; say a more serious "dont shoot me again"
+						if (IsOkToSpeakInResponseToPlayer())
+							Speak( TLK_NOSHOOT );	//, modifiers
 					}
 				}
 				else
@@ -1374,6 +1372,8 @@ int CAI_BaseTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 					jackAss->SpeakIfAllowed( TLK_ANSWER );
 				}
 #endif
+				//TODO; Make a mental note, and go hostile if this guy shoots me again
+
 			}
 		}
 	}

@@ -191,10 +191,17 @@ bool CAI_LeadBehavior::CanSelectSchedule()
 
 void CAI_LeadBehavior::BeginScheduleSelection()
 {
-	SetTarget( AI_GetSinglePlayer() );
 	CAI_Expresser *pExpresser = GetOuter()->GetExpresser();
+
+	if ( AI_IsSinglePlayer() )
+		SetTarget( AI_GetSinglePlayer() );
+	else
+		SetTarget( AI_GetNearestPlayer(GetOuter()) );
+
 	if ( pExpresser )
+	{
 		pExpresser->ClearSpokeConcept( TLK_LEAD_ARRIVAL );
+	}
 }
 
 //-------------------------------------

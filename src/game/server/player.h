@@ -230,6 +230,7 @@ protected:
 	// HACK FOR BOTS
 	friend class CBotManager;
 	static edict_t *s_PlayerEdict; // must be set before calling constructor
+	virtual void			CreateCorpse( void ) { }
 public:
 	DECLARE_DATADESC();
 	DECLARE_SERVERCLASS();
@@ -474,7 +475,6 @@ public:
 	virtual int				GetDelayTicks();
 	virtual int				GetReplayEntity();
 
-	virtual void			CreateCorpse( void ) { }
 	virtual CBaseEntity		*EntSelectSpawnPoint( void );
 
 	// Vehicles
@@ -638,6 +638,7 @@ public:
 	bool	IsConnected() const		{ return m_iConnected != PlayerDisconnected; }
 	bool	IsDisconnecting() const	{ return m_iConnected == PlayerDisconnecting; }
 	bool	IsSuitEquipped() const	{ return m_Local.m_bWearingSuit; }
+	const char *TeamName() const	{ return m_szTeamName; }
 	virtual int		ArmorValue() const		{ return m_ArmorValue; }
 	bool	HUDNeedsRestart() const { return m_fInitHUD; }
 	float	MaxSpeed() const		{ return m_flMaxspeed; }
@@ -672,6 +673,7 @@ public:
 	void	SetConnected( PlayerConnectedState iConnected ) { m_iConnected = iConnected; }
 	virtual void EquipSuit( bool bPlayEffects = true );
 	virtual void RemoveSuit( void );
+	void	SetTeamName( const char *pTeamName );
 	void	SetMaxSpeed( float flMaxSpeed ) { m_flMaxspeed = flMaxSpeed; }
 
 	void	NotifyNearbyRadiationSource( float flRange );
@@ -964,7 +966,7 @@ private:
 	float					m_flNextDecalTime;// next time this player can spray a decal
 
 	// Team Handling
-	//char					m_szTeamName[TEAM_NAME_LENGTH];
+	char					m_szTeamName[TEAM_NAME_LENGTH];
 
 	// Multiplayer handling
 	PlayerConnectedState	m_iConnected;

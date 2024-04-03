@@ -397,13 +397,19 @@ bool CPointTemplate::CreateInstance( const Vector &vecOrigin, const QAngle &vecA
 // Purpose: 
 // Input  : &inputdata - 
 //-----------------------------------------------------------------------------
-void CPointTemplate::InputForceSpawn( inputdata_t &inputdata )
+void CPointTemplate::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	// Spawn our template
 	CUtlVector<CBaseEntity*> hNewEntities;
 	if ( !CreateInstance( GetAbsOrigin(), GetAbsAngles(), &hNewEntities ) )
 		return;
-	
+
 	// Fire our output
 	m_pOutputOnSpawned.FireOutput( this, this );
+}
+
+void CPointTemplate::InputForceSpawn( inputdata_t &inputdata )
+{
+	// Spawn our template
+	Use( inputdata.pActivator, inputdata.pCaller, USE_ON, 0 );
 }

@@ -252,14 +252,6 @@ void CGib::InitGib( CBaseEntity *pVictim, float fMinVelocity, float fMaxVelocity
 				pObj->AddVelocity( &vecNewVelocity, &angImpulse );
 			}
 		}
-		else
-		{
-			SetSolid( SOLID_BBOX );
-			SetCollisionBounds( vec3_origin, vec3_origin );
-			SetAbsVelocity( vecNewVelocity );
-		}
-	
-		SetCollisionGroup( COLLISION_GROUP_DEBRIS );
 #endif
 	}
 //	Relink();

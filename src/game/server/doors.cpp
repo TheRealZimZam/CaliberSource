@@ -13,10 +13,7 @@
 #include "engine/IEngineSound.h"
 #include "ai_basenpc.h"
 #include "physics_npc_solver.h"
-
-#ifdef HL1_DLL
 #include "filters.h"
-#endif
 
 #ifdef CSTRIKE_DLL
 #include "KeyValues.h"
@@ -51,10 +48,8 @@ BEGIN_DATADESC( CBaseDoor )
 	DEFINE_KEYFIELD( m_bForceClosed, FIELD_BOOLEAN, "forceclosed" ),
 	DEFINE_FIELD( m_bDoorGroup, FIELD_BOOLEAN ),
 
-#ifdef HL1_DLL
 	DEFINE_KEYFIELD( m_iBlockFilterName,	FIELD_STRING,	"filtername" ),
 	DEFINE_FIELD( m_hBlockFilter, FIELD_EHANDLE ),
-#endif
 
 	DEFINE_KEYFIELD( m_bLoopMoveSound, FIELD_BOOLEAN, "loopmovesound" ),
 	DEFINE_KEYFIELD( m_bIgnoreDebris, FIELD_BOOLEAN, "ignoredebris" ),
@@ -246,6 +241,7 @@ void CBaseDoor::Spawn()
 
 #ifdef HL1_DLL
 	SetSolid( SOLID_BSP );
+//	m_bForceClosed = true;
 #else
 	if ( GetMoveParent() && GetRootMoveParent()->GetSolid() == SOLID_BSP )
 	{
@@ -353,7 +349,7 @@ void CBaseDoor::MovingSoundThink( void )
 	{
 		ep.m_pSoundName = (char*)STRING(m_NoiseMovingClosed);
 	}
-	ep.m_flVolume = 1;
+	ep.m_flVolume = VOL_NORM;
 	ep.m_SoundLevel = SNDLVL_NORM;
 
 	EmitSound( filter, entindex(), ep );
@@ -491,13 +487,11 @@ void CBaseDoor::Activate( void )
 		break;
 	}
 
-#ifdef HL1_DLL
 	// Get a handle to my filter entity if there is one
 	if (m_iBlockFilterName != NULL_STRING)
 	{
 		m_hBlockFilter = dynamic_cast<CBaseFilter *>(gEntList.FindEntityByName( NULL, m_iBlockFilterName, NULL ));
 	}
-#endif
 }
 
 
@@ -646,13 +640,14 @@ void CBaseDoor::DoorTouch( CBaseEntity *pOther )
 	if (m_sMaster != NULL_STRING && !UTIL_IsMasterTriggered(m_sMaster, pOther))
 	{
 		PlayLockSounds(this, &m_ls, TRUE, FALSE);
+		return;
 	}
 
 	if (m_bLocked)
 	{
 		m_OnLockedUse.FireOutput( pOther, pOther );
 		PlayLockSounds(this, &m_ls, TRUE, FALSE);
-		return; 
+		return;
 	}
 	
 	// Remember who activated the door.
@@ -665,13 +660,11 @@ void CBaseDoor::DoorTouch( CBaseEntity *pOther )
 	}
 }
 
-#ifdef HL1_DLL
 bool CBaseDoor::PassesBlockTouchFilter(CBaseEntity *pOther)
 {
 	CBaseFilter* pFilter = (CBaseFilter*)(m_hBlockFilter.Get());
 	return ( pFilter && pFilter->PassesFilter( this, pOther ) );
 }
-#endif
 
 
 //-----------------------------------------------------------------------------
@@ -738,7 +731,13 @@ void CBaseDoor::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 #endif
 		if ( m_hActivator->IsNPC() )
 		{
+			// Npcs not allowed, no matter what
 			if ( HasSpawnFlags(SF_DOOR_NONPCS) )
+				return;
+
+			// Dont let dumb npcs like bugs and animals open doors
+			CAI_BaseNPC	*pNPC = m_hActivator->MyNPCPointer();
+			if ( !(pNPC->CapabilitiesGet() & (bits_CAP_OPEN_DOORS)) )
 				return;
 		}
 	}
@@ -939,10 +938,10 @@ int CBaseDoor::DoorActivate( )
 		// play door unlock sounds
 		PlayLockSounds(this, &m_ls, FALSE, FALSE);
 
+#ifndef HL1_DLL
 		if ( m_toggle_state != TS_AT_TOP && m_toggle_state != TS_GOING_UP )
-		{
+#endif
 			DoorGoUp();
-		}
 	}
 
 	return 1;
@@ -972,7 +971,7 @@ void CBaseDoor::DoorGoUp( void )
 	}
 
 	m_toggle_state = TS_GOING_UP;
-	
+
 	SetMoveDone( &CBaseDoor::DoorHitTop );
 	if ( IsRotatingDoor() )		// !!! BUGBUG Triggered doors don't work with this yet
 	{
@@ -1033,7 +1032,7 @@ void CBaseDoor::DoorHitTop( void )
 		EmitSound_t ep;
 		ep.m_nChannel = CHAN_STATIC;
 		ep.m_pSoundName = (char*)STRING(m_NoiseArrived);
-		ep.m_flVolume = 1;
+		ep.m_flVolume = VOL_NORM;
 		ep.m_SoundLevel = SNDLVL_NORM;
 
 		EmitSound( filter, entindex(), ep );
@@ -1043,7 +1042,7 @@ void CBaseDoor::DoorHitTop( void )
 	m_toggle_state = TS_AT_TOP;
 	
 	// toggle-doors don't come down automatically, they wait for refire.
-	if (HasSpawnFlags( SF_DOOR_NO_AUTO_RETURN))
+	if (HasSpawnFlags(SF_DOOR_NO_AUTO_RETURN))
 	{
 		// Re-instate touch method, movement is complete
 		SetTouch( &CBaseDoor::DoorTouch );
@@ -1068,6 +1067,8 @@ void CBaseDoor::DoorHitTop( void )
 	{
 		m_OnFullyOpen.FireOutput(this, this);
 	}
+	
+	SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 ); // this isn't finished
 }
 
 
@@ -1119,7 +1120,7 @@ void CBaseDoor::DoorHitBottom( void )
 			ep.m_pSoundName = (char*)STRING(m_NoiseArrived);
 		else
 			ep.m_pSoundName = (char*)STRING(m_NoiseArrivedClosed);
-		ep.m_flVolume = 1;
+		ep.m_flVolume = VOL_NORM;
 		ep.m_SoundLevel = SNDLVL_NORM;
 
 		EmitSound( filter, entindex(), ep );
@@ -1129,7 +1130,12 @@ void CBaseDoor::DoorHitBottom( void )
 	m_toggle_state = TS_AT_BOTTOM;
 
 	// Re-instate touch method, cycle is complete
-	SetTouch( &CBaseDoor::DoorTouch );
+	if (!HasSpawnFlags(SF_DOOR_PTOUCH))
+		SetTouch ( NULL );	// use only door
+	else
+		SetTouch( &CBaseDoor::DoorTouch );	// touchable door
+
+	SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 ); // this isn't finished
 
 	if (HasSpawnFlags(SF_DOOR_START_OPEN_OBSOLETE))
 	{
@@ -1225,6 +1231,8 @@ void CBaseDoor::Blocked( CBaseEntity *pOther )
 	if ( m_bForceClosed )
 		return;
 
+	DevMsg( 1, "DOOR(%s): Blocked by %s\n", GetDebugName(), pOther->GetClassname() );
+
 	// if a door has a negative wait, it would never come back if blocked,
 	// so let it just squash the object to death real fast
 	if (m_flWait >= 0)
@@ -1299,6 +1307,9 @@ void CBaseDoor::EndBlocked( void )
 
 
 /*func_door_rotating
+DOOR_DONT_LINK TOGGLE X_AXIS Y_AXIS
+if two doors touch, they are assumed to be connected and operate as  
+a unit.
 
 TOGGLE causes the door to wait in both the start and end states for  
 a trigger event.
@@ -1326,6 +1337,12 @@ button or trigger field activates the door.
 "speed"		movement speed (100 default)
 "wait"		wait before returning (3 default, -1 = never return)
 "dmg"		damage to inflict when blocked (2 default)
+"sounds"
+0)	no sound
+1)	stone
+2)	base
+3)	stone chain
+4)	screechy metal
 */
 
 //==================================================
@@ -1440,3 +1457,76 @@ void CRotDoor::SetToggleState( int state )
 	else
 		SetLocalAngles( m_vecAngle1 );
 }
+
+
+#ifdef HL2_DLL	//CALIBER
+//==================================================
+// CFakeDoor
+// Used for always locked doors to nowhere, better on perf
+// if you're going to have lots of them, rather than
+// creating a whole bunch of real doors.
+//==================================================
+class CFakeDoor : public CBaseToggle
+{
+public:
+	DECLARE_CLASS( CFakeDoor, CBaseToggle );
+
+	void Precache( void );
+	void Spawn( void );
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+
+	DECLARE_DATADESC();
+
+private:
+	COutputEvent m_OnLockedUse;				// Triggered when the user tries to open a locked door.
+	string_t	sLockedSound;
+};
+
+LINK_ENTITY_TO_CLASS( func_fakedoor, CFakeDoor );
+
+BEGIN_DATADESC( CFakeDoor )
+	DEFINE_KEYFIELD( sLockedSound, FIELD_SOUNDNAME, "locked_sound" ),
+	DEFINE_OUTPUT( m_OnLockedUse, "OnLockedUse" ),
+END_DATADESC()
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CFakeDoor::Precache( void )
+{
+	PrecacheScriptSound( STRING(sLockedSound) );
+	BaseClass::Precache();
+}
+
+void CFakeDoor::Spawn( void )
+{
+	BaseClass::Spawn();
+
+	Precache();
+
+	SetSolid( SOLID_BSP );
+	SetModel( STRING( GetModelName() ) );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Called when the player uses the door.
+//-----------------------------------------------------------------------------
+void CFakeDoor::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// Stop the sound if its playing first
+	StopSound( entindex(), CHAN_STATIC, STRING(sLockedSound) );
+
+	// play 'door locked' sound
+	CPASAttenuationFilter filter( this );
+
+	EmitSound_t ep;
+	ep.m_nChannel = CHAN_STATIC;
+	ep.m_pSoundName = STRING(sLockedSound);
+	ep.m_flVolume = VOL_NORM;
+	ep.m_SoundLevel = SNDLVL_NORM;
+
+	CBaseEntity::EmitSound( filter, entindex(), ep );
+
+	m_OnLockedUse.FireOutput( pActivator, pCaller );
+}
+#endif

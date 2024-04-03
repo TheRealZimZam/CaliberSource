@@ -1,6 +1,6 @@
 //====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
 //
-// Purpose: 
+// Purpose: 	Base class for simple projectiles
 //
 //=============================================================================
 
@@ -10,6 +10,8 @@
 #pragma once
 #endif
 
+#include "basegrenade_shared.h"
+
 // Creation.
 struct baseprojectilecreate_t
 {
@@ -17,7 +19,6 @@ struct baseprojectilecreate_t
 	Vector vecVelocity;
 	CBaseEntity *pOwner;
 	string_t iszModel;
-	float flDamage;
 	int iDamageType;
 	float flDamageScale;
 };
@@ -26,34 +27,29 @@ struct baseprojectilecreate_t
 //
 // Generic projectile
 //
-class CBaseProjectile : public CBaseAnimating
+class CBaseProjectile : public CBaseGrenade
 {
-	DECLARE_CLASS( CBaseProjectile, CBaseAnimating );
+	DECLARE_CLASS( CBaseProjectile, CBaseGrenade );
 public:
 	DECLARE_DATADESC();
 
 	void	Spawn( void );
 	void	Precache( void );
 
-	static CBaseProjectile *Create( baseprojectilecreate_t &pCreate );
-
-	void			SetDamage( float flDamage ) { m_flDamage = flDamage; }
-	void			SetDamageScale( float &flScale ) { m_flDamageScale = flScale; }
-	void			SetDamageType( int iType ) { m_iDamageType = iType; }
-
-private:
-	// Damage
-	virtual float	GetDamage() { return m_flDamage; }
-	virtual float	GetDamageScale( void ) { return m_flDamageScale; }
-	virtual int		GetDamageType( void ) { return m_iDamageType; }
-
-	unsigned int	PhysicsSolidMaskForEntity( void ) const;
-
 	virtual void	ProjectileTouch( CBaseEntity *pOther );
 	void			FlyThink( void );
 
+	// Damage
+	void			SetDamageScale( float &flScale ) { m_flDamageScale = flScale; }
+	void			SetDamageType( int iType ) { m_iDamageType = iType; }
+
+	virtual float	GetDamageScale( void ) { return m_flDamageScale; }
+	virtual int		GetDamageType( void ) { return m_iDamageType; }
+
+private:
+	unsigned int	PhysicsSolidMaskForEntity( void ) const;
+
 protected:
-	float			m_flDamage;
 	int				m_iDamageType;
 	float			m_flDamageScale;
 };

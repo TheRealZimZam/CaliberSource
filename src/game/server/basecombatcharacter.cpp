@@ -456,13 +456,11 @@ bool CBaseCombatCharacter::FVisibleThroughPortal( const CProp_Portal *pPortal, C
 	if ( pEntity->GetFlags() & FL_NOTARGET )
 		return false;
 
-#if HL1_DLL
 	// FIXME: only block LOS through opaque water
 	// don't look through water
-	if ((m_nWaterLevel != 3 && pEntity->m_nWaterLevel == 3) 
-		|| (m_nWaterLevel == 3 && pEntity->m_nWaterLevel == 0))
+	if ((GetWaterLevel() != 3 && pEntity->GetWaterLevel() == 3) 
+		|| (GetWaterLevel() == 3 && pEntity->GetWaterLevel() == 0))
 		return false;
-#endif
 
 	Vector vecLookerOrigin = EyePosition();//look through the caller's 'eyes'
 	Vector vecTargetOrigin = pEntity->EyePosition();
@@ -1495,7 +1493,7 @@ bool CBaseCombatCharacter::BecomeRagdoll( const CTakeDamageInfo &info, const Vec
 
 #ifdef HL2_DLL	
 	// Mega physgun requires everything to be a server-side ragdoll
-	if ( m_bForceServerRagdoll == true || ( HL2GameRules()->MegaPhyscannonActive() == true ) && !IsPlayer() && Classify() != CLASS_PLAYER_ALLY_VITAL && Classify() != CLASS_PLAYER_ALLY )
+	if ( m_bForceServerRagdoll == true || ( HL2GameRules()->MegaPhyscannonActive() == true ) && !IsPlayer() && Classify() != CLASS_PLAYER_ALLY_VITAL )
 	{
 		if ( CanBecomeServerRagdoll() == false )
 			return false;
@@ -2278,10 +2276,11 @@ Time-based damage: only occurs while the NPC is within the trigger_hurt.
 When a NPC is poisoned via an arrow etc it takes all the poison damage at once.
 
 
-
 GLOBALS ASSUMED SET:  g_iSkillLevel
 ============
 */
+#define SCORCH_MIN_DAMAGE 1
+#define SCORCH_RATE 4
 int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 {
 	int retVal = 0;
@@ -2291,16 +2290,58 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 
 	m_iDamageCount++;
 
-	if ( info.GetDamageType() & DMG_SHOCK )
+	//
+	// Do effects for damage types that arent hitscan
+	//
+
+	// Certain damage types should do different things based on conditions, consider it here -MM
+	CTakeDamageInfo ConditionalInfo = info;
+	if ( GetWaterLevel() >= 1 )
 	{
-		g_pEffects->Sparks( info.GetDamagePosition(), 2, 2 );
-		UTIL_Smoke( info.GetDamagePosition(), random->RandomInt( 10, 15 ), 10 );
+		// Shock damage does 2x in water, while fire/plasma does half, but only if im mostly submerged
+		if ( info.GetDamageType() & (DMG_SHOCK|DMG_ENERGYBEAM) )
+			ConditionalInfo.ScaleDamage( 2 );
+		else if ( GetWaterLevel() >= 2 && info.GetDamageType() & (DMG_BURN|DMG_PLASMA) )	//|DMG_RADIATION
+			ConditionalInfo.ScaleDamage( 0.5 );
 	}
 
+	if ( info.GetDamageType() & DMG_SHOCK )
+	{
+		// Only spark if im above waist-high water
+		if ( GetWaterLevel() != 3 )
+		{
+			UTIL_Smoke( info.GetDamagePosition(), random->RandomInt(10,15), 10 );
+			g_pEffects->Sparks( info.GetDamagePosition() );
+		}
+		else
+		{
+			// Bubbles!
+			UTIL_Bubbles( info.GetDamagePosition() + Vector(-2,-2,-2), info.GetDamagePosition() + Vector(2,2,2), random->RandomInt(0,2) );
+		}
+
+		// Very subtle blackening
+		Scorch( SCORCH_MIN_DAMAGE, 200 );
+	}
+	else if ( info.GetDamageType() & DMG_BURN )
+	{
+		// BBQ me up good
+		if ( ConditionalInfo.GetDamage() >= SCORCH_MIN_DAMAGE )
+			Scorch( SCORCH_RATE, 100 );
+	}
+#ifdef HL2_DLL
+	else if ( info.GetDamageType() & DMG_FREEZE )
+	{
+		// Freeze me solid
+		extern ConVar sk_default_freeze_rate;
+		Freeze( sk_default_freeze_rate.GetFloat(), info.GetInflictor() );
+	}
+#endif
+
+	// Determine the state im in, and do different things based on that aswell
 	switch( m_lifeState )
 	{
 	case LIFE_ALIVE:
-		retVal = OnTakeDamage_Alive( info );
+		retVal = OnTakeDamage_Alive( ConditionalInfo );
 		if ( m_iHealth <= 0 )
 		{
 			IPhysicsObject *pPhysics = VPhysicsGetObject();
@@ -2311,12 +2352,12 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 			
 			bool bGibbed = false;
 
-			Event_Killed( info );
+			Event_Killed( ConditionalInfo );
 
 			// Only classes that specifically request it are gibbed
-			if ( ShouldGib( info ) )
+			if ( ShouldGib( ConditionalInfo ) )
 			{
-				bGibbed = Event_Gibbed( info );
+				bGibbed = Event_Gibbed( ConditionalInfo );
 			}
 			
 			if ( bGibbed == false )
@@ -2328,11 +2369,11 @@ int CBaseCombatCharacter::OnTakeDamage( const CTakeDamageInfo &info )
 		break;
 
 	case LIFE_DYING:
-		return OnTakeDamage_Dying( info );
+		return OnTakeDamage_Dying( ConditionalInfo );
 	
 	default:
 	case LIFE_DEAD:
-		return OnTakeDamage_Dead( info );
+		return OnTakeDamage_Dead( ConditionalInfo );
 	}
 }
 
@@ -2379,7 +2420,12 @@ int CBaseCombatCharacter::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 int CBaseCombatCharacter::OnTakeDamage_Dying( const CTakeDamageInfo &info )
 {
+#ifdef HL2_DLL
+	// Consider me already DEAD
+	return OnTakeDamage_Dead( info );
+#else
 	return 1;
+#endif
 }
 
 int CBaseCombatCharacter::OnTakeDamage_Dead( const CTakeDamageInfo &info )
@@ -2474,7 +2520,7 @@ void CBaseCombatCharacter::SetTransmit( CCheckTransmitInfo *pInfo, bool bAlways 
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-void CBaseCombatCharacter::AddClassRelationship ( Class_T class_type, Disposition_t disposition, int priority )
+void CBaseCombatCharacter::AddClassRelationship( Class_T class_type, Disposition_t disposition, int priority )
 {
 	// First check to see if a relationship has already been declared for this class
 	// If so, update it with the new relationship
@@ -2502,7 +2548,7 @@ void CBaseCombatCharacter::AddClassRelationship ( Class_T class_type, Dispositio
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-void CBaseCombatCharacter::AddEntityRelationship ( CBaseEntity* pEntity, Disposition_t disposition, int priority )
+void CBaseCombatCharacter::AddEntityRelationship( CBaseEntity* pEntity, Disposition_t disposition, int priority )
 {
 	// First check to see if a relationship has already been declared for this entity
 	// If so, update it with the new relationship

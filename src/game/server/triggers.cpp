@@ -1277,9 +1277,12 @@ enum
 };
 
 
-//------------------------------------------------------------------------------
-// Reesponsible for changing levels when the player touches it
-//------------------------------------------------------------------------------
+// ##################################################################################
+//	>> ChangeLevel
+//
+//  Reesponsible for changing levels when the player touches it
+//
+// ##################################################################################
 class CChangeLevel : public CBaseTrigger
 {
 	DECLARE_DATADESC();
@@ -1288,6 +1291,7 @@ public:
 	DECLARE_CLASS( CChangeLevel, CBaseTrigger );
 
 	void Spawn( void );
+	void Precache( void );
 	void Activate( void );
 	bool KeyValue( const char *szKeyName, const char *szValue );
 
@@ -1385,10 +1389,16 @@ bool CChangeLevel::KeyValue( const char *szKeyName, const char *szValue )
 	return true;
 }
 
-
+void CChangeLevel::Precache( void )
+{
+	BaseClass::Precache();
+//	PrecacheModel( "editor/logic_changelevel.vmt" );
+}
 
 void CChangeLevel::Spawn( void )
 {
+	Precache();
+
 	if ( FStrEq( m_szMapName, "" ) )
 	{
 		Msg( "a trigger_changelevel doesn't have a map" );
@@ -1402,11 +1412,17 @@ void CChangeLevel::Spawn( void )
 	InitTrigger();
 	
 	if ( !HasSpawnFlags(SF_CHANGELEVEL_NOTOUCH) )
-	{
 		SetTouch( &CChangeLevel::TouchChangeLevel );
-	}
 
-//	Msg( "TRANSITION: %s (%s)\n", m_szMapName, m_szLandmarkName );
+	//SetUse( &CChangeLevel::ChangeLevelNow );
+
+	DevMsg( "TRANSITION: %s (%s)\n", m_szMapName, m_szLandmarkName );
+	// Create a sprite if showlogic is on
+/*
+	extern ConVar showlogic;
+	if ( showlogic.GetBool() )
+
+*/
 }
 
 void CChangeLevel::Activate( void )
@@ -1592,39 +1608,48 @@ void CChangeLevel::ChangeLevelNow( CBaseEntity *pActivator )
 
 	// look for a landmark entity		
 	pLandmark = FindLandmark( m_szLandmarkName );
-
-	if ( !pLandmark )
-		return;
-
-	// no transition volumes, check PVS of landmark
-	if ( transitionState == TRANSITION_VOLUME_NOT_FOUND )
+	if ( pLandmark )
 	{
-		byte pvs[MAX_MAP_CLUSTERS/8];
-		int clusterIndex = engine->GetClusterForOrigin( pLandmark->GetAbsOrigin() );
-		engine->GetPVSForCluster( clusterIndex, sizeof(pvs), pvs );
-		if ( pPlayer )
+		// no transition volumes, check PVS of landmark
+		if ( transitionState == TRANSITION_VOLUME_NOT_FOUND )
 		{
-			Vector vecSurroundMins, vecSurroundMaxs;
-			pPlayer->CollisionProp()->WorldSpaceSurroundingBounds( &vecSurroundMins, &vecSurroundMaxs );
-			bool playerInPVS = engine->CheckBoxInPVS( vecSurroundMins, vecSurroundMaxs, pvs, sizeof( pvs ) );
-
-			//Assert( playerInPVS );
-			if ( !playerInPVS )
+			byte pvs[MAX_MAP_CLUSTERS/8];
+			int clusterIndex = engine->GetClusterForOrigin( pLandmark->GetAbsOrigin() );
+			engine->GetPVSForCluster( clusterIndex, sizeof(pvs), pvs );
+			if ( pPlayer )
 			{
-				Warning( "Player isn't in the landmark's (%s) PVS, aborting\n", m_szLandmarkName );
+				Vector vecSurroundMins, vecSurroundMaxs;
+				pPlayer->CollisionProp()->WorldSpaceSurroundingBounds( &vecSurroundMins, &vecSurroundMaxs );
+				bool playerInPVS = engine->CheckBoxInPVS( vecSurroundMins, vecSurroundMaxs, pvs, sizeof( pvs ) );
+
+				//Assert( playerInPVS );
+				if ( !playerInPVS )
+				{
+					Warning( "Player isn't in the landmark's (%s) PVS, aborting\n", m_szLandmarkName );
 #ifndef HL1_DLL
-				// HL1 works even with these errors!
-				return;
+					// HL1 works even with these errors!
+					return;
 #endif
+				}
 			}
 		}
+	}
+	else if ( !g_pGameRules->IsMultiplayer() )	//UNDONE; g_pDeveloper->GetInt()
+	{
+		// No landmark, just command the server to change to the desired map without saving
+		// NOTENOTE;
+		// Never, ever do this in MP!!! Really, this should only be done in developer mode, 
+		// but the functionality could be useful for some maps, or modders... -MM
+		DevMsg( "CHANGE LEVEL: %s\n", m_szMapName );
+		engine->ClientCommand( pPlayer->edict(), "map %s", m_szMapName);
+		return;
 	}
 
 	WarnAboutActiveLead();
 
 	g_iDebuggingTransition = 0;
 	st_szNextSpot[0] = 0;	// Init landmark to NULL
-	Q_strncpy(st_szNextSpot, m_szLandmarkName,sizeof(st_szNextSpot));
+	Q_strncpy(st_szNextSpot, m_szLandmarkName, sizeof(st_szNextSpot));
 	// This object will get removed in the call to engine->ChangeLevel, copy the params into "safe" memory
 	Q_strncpy(st_szNextMap, m_szMapName, sizeof(st_szNextMap));
 
@@ -1633,7 +1658,6 @@ void CChangeLevel::ChangeLevelNow( CBaseEntity *pActivator )
 	m_OnChangeLevel.FireOutput(pActivator, this);
 
 	NotifyEntitiesOutOfTransition();
-
 
 ////	Msg( "Level touches %d levels\n", ChangeList( levels, 16 ) );
 	if ( g_debug_transitions.GetInt() )
@@ -2587,6 +2611,80 @@ void CTriggerSave::Touch( CBaseEntity *pOther )
 	{
 		engine->ServerCommand( "autosave\n" );
 	}
+}
+
+
+//
+// Trigger End Section
+//
+// This entity ends the current game and returns the player to the main menu. 
+//
+#define SF_ENDSECTION_USEONLY		0x0001
+
+class CTriggerEndSection : public CBaseTrigger
+{
+	DECLARE_CLASS( CTriggerEndSection, CBaseTrigger );
+
+public:
+	void Spawn( void );
+	void EndSectionTouch( CBaseEntity *pOther );
+	void InputEndSection( inputdata_t &data  );
+	
+	DECLARE_DATADESC();
+};
+
+LINK_ENTITY_TO_CLASS( trigger_endsection, CTriggerEndSection );
+
+BEGIN_DATADESC( CTriggerEndSection )
+	DEFINE_INPUTFUNC( FIELD_VOID, "EndSection", InputEndSection ),
+END_DATADESC()
+
+void CTriggerEndSection::Spawn( void )
+{
+	if ( gpGlobals->deathmatch )
+	{
+		UTIL_Remove( this );
+		return;
+	}
+
+	InitTrigger();
+
+	// If it is a "use only" trigger, then don't set the touch function.
+	if ( !HasSpawnFlags(SF_ENDSECTION_USEONLY) )
+		SetTouch( &CTriggerEndSection::EndSectionTouch );
+}
+
+void CTriggerEndSection::EndSectionTouch( CBaseEntity *pOther )
+{
+	// Only save on clients
+	if ( !pOther->IsPlayer() )
+		return;
+
+	SetTouch( NULL );
+
+	CBaseEntity *pPlayer = UTIL_PlayerByIndex( 1 );
+
+//	if (pev->message)
+//		g_engfuncs.pfnEndSection(STRING(pev->message));
+	if ( pPlayer )
+		engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
+
+	UTIL_Remove( this );
+}
+
+void CTriggerEndSection::InputEndSection( inputdata_t &data )
+{
+	CBaseEntity *pPlayer = UTIL_PlayerByIndex( 1 );
+
+	if ( pPlayer )
+	{
+		//HACKY MCHACK - This works, but it's nasty. Alfred is going to fix a
+		//bug in gameui that prevents you from dropping to the main menu after
+		// calling disconnect.
+		engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
+	}
+
+	UTIL_Remove( this );
 }
 
 

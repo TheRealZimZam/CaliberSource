@@ -22,13 +22,14 @@
 
 extern CServerGameDLL g_ServerGameDLL;
 
-// Draw the editor sprite in-game for debug purposes
+// Draw the editor sprites in-game for debug purposes
 ConVar showlogic( "showlogic", "0", FCVAR_CHEAT | FCVAR_DEVELOPMENTONLY, "Show sprites of logic entities" );
 #if 0
 //-----------------------------------------------------------------------------
 // Purpose: CLogicalEntitySprite
-// Can only be used for dormant entities, logics that are removed
-// at map start or otherwise do not exist for long should not use this class.
+// Can only be used for dormant entities. logics that are removed
+// at map start or otherwise do not exist for long (i.e logic_auto)
+// should not use this class.
 //-----------------------------------------------------------------------------
 class CLogicalEntitySprite : public CLogicalEntity
 {
@@ -2866,9 +2867,9 @@ void CAutoTrigger::Think( void )
 //
 #define SF_RELAY_FIREONCE		0x0001
 
-class CTriggerRelay : public CBaseEntity
+class CTriggerRelay : public CLogicalEntity	//CPointEntity
 {
-	DECLARE_CLASS( CTriggerRelay, CBaseEntity );
+	DECLARE_CLASS( CTriggerRelay, CLogicalEntity );
 public:
 
 	CTriggerRelay( void );
@@ -2887,8 +2888,6 @@ private:
 	float		m_flRefireInterval;
 	float		m_flRefireDuration;
 	float		m_flTimeRefireDone;
-
-	USE_TYPE	m_TargetUseType;
 	float		m_flTargetValue;
 
 	COutputEvent m_OnTrigger;
@@ -2900,7 +2899,6 @@ BEGIN_DATADESC( CTriggerRelay )
 	DEFINE_KEYFIELD( m_flRefireInterval, FIELD_FLOAT, "repeatinterval" ),
 	DEFINE_KEYFIELD( m_flRefireDuration, FIELD_FLOAT, "repeatduration" ),
 	DEFINE_FIELD( m_flTimeRefireDone, FIELD_TIME ),
-	DEFINE_FIELD( m_TargetUseType, FIELD_INTEGER ),
 	DEFINE_FIELD( m_flTargetValue, FIELD_FLOAT ),
 
 	// Function Pointers
@@ -2936,6 +2934,10 @@ bool CTriggerRelay::KeyValue( const char *szKeyName, const char *szValue )
 			break;
 		}
 	}
+	else if (FStrEq(szKeyName, "delay"))
+	{
+		DevMsg( "trigger_relay %s has an obsolete delay key, which will be non-functional!\n", GetDebugName() );
+	}
 	else
 	{
 		return BaseClass::KeyValue( szKeyName, szValue );
@@ -2948,11 +2950,36 @@ void CTriggerRelay::Spawn( void )
 {
 }
 
+
+void CTriggerRelay::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	m_OnTrigger.FireOutput(pActivator, this);
+	SUB_UseTargets( pActivator, triggerType, value );
+	// Notify the designer that relays really should be replaced
+	DevMsg( "trigger_relay is obsolete, and its use is discouraged! If you need to activate something with a specific input, use the new input/output system!\n" );
+
+	if ( m_spawnflags & SF_RELAY_FIREONCE )
+	{
+		UTIL_Remove( this );
+		return;
+	}
+
+	if( m_target != NULL_STRING && m_flRefireDuration != -1 && m_flTimeRefireDone == -1 )
+	{
+		// Set up to refire this target automatically
+		m_flTargetValue = value;
+
+		m_flTimeRefireDone = gpGlobals->curtime + m_flRefireDuration;
+		SetThink( &CTriggerRelay::RefireThink );
+		SetNextThink( gpGlobals->curtime + m_flRefireInterval );
+	}
+}
+
 void CTriggerRelay::RefireThink( void )
 {
 	// sending this as Activator and Caller right now. Seems the safest thing
 	// since whatever fired the relay the first time may no longer exist. 
-	Use( this, this, m_TargetUseType, m_flTargetValue ); 
+	Use( this, this, triggerType, m_flTargetValue ); 
 
 	if( gpGlobals->curtime > m_flTimeRefireDone )
 	{
@@ -2964,33 +2991,12 @@ void CTriggerRelay::RefireThink( void )
 	}
 }
 
-void CTriggerRelay::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
-{
-	m_OnTrigger.FireOutput(pActivator, this);
-	SUB_UseTargets( this, triggerType, 0 );
-
-	if ( m_spawnflags & SF_RELAY_FIREONCE )
-	{
-		UTIL_Remove( this );
-	}
-
-	else if( m_flRefireDuration != -1 && m_flTimeRefireDone == -1 )
-	{
-		// Set up to refire this target automatically
-		m_TargetUseType = useType;
-		m_flTargetValue = value;
-
-		m_flTimeRefireDone = gpGlobals->curtime + m_flRefireDuration;
-		SetThink( &CTriggerRelay::RefireThink );
-		SetNextThink( gpGlobals->curtime + m_flRefireInterval );
-	}
-}
-
 
 //
 // The Multimanager Entity - when fired, will fire up to 16 targets 
 // at specified times.
-//
+// FLAG:		THREAD (create clones when triggered)
+// FLAG:		CLONE (this is a clone for a threaded execution)
 #define SF_MULTIMAN_CLONE		0x80000000
 #define SF_MULTIMAN_THREAD		0x00000001
 
@@ -3201,7 +3207,7 @@ void CMultiManager::ManagerUse( CBaseEntity *pActivator, CBaseEntity *pCaller, U
 {
 	// In multiplayer games, clone the MM and execute in the clone (like a thread)
 	// to allow multiple players to trigger the same multimanager
-#if 0
+#if 0	//OBSOLEET
 	if ( ShouldClone() )
 	{
 		CMultiManager *pClone = Clone();
@@ -3300,55 +3306,6 @@ void CRenderFxManager::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_T
 void CRenderFxManager::InputActivate( inputdata_t &inputdata )
 {
 	Use( inputdata.pActivator, inputdata.pCaller, USE_ON, 0 );
-}
-
-
-//
-// Trigger End Section
-//
-// This entity ends the current game and returns the player to the main menu. 
-//
-#define SF_ENDSECTION_USEONLY		0x0001
-
-class CTriggerEndSection : public CBaseEntity
-{
-	DECLARE_CLASS( CTriggerEndSection, CBaseEntity );
-
-public:
-	void Spawn( void );
-	void InputEndSection( inputdata_t &data  );
-	
-	DECLARE_DATADESC();
-};
-
-LINK_ENTITY_TO_CLASS( trigger_endsection, CTriggerEndSection );
-
-BEGIN_DATADESC( CTriggerEndSection )
-	DEFINE_INPUTFUNC( FIELD_VOID, "EndSection", InputEndSection ),
-END_DATADESC()
-
-void CTriggerEndSection::Spawn( void )
-{
-	if ( gpGlobals->deathmatch )
-	{
-		UTIL_Remove( this );
-		return;
-	}
-}
-
-void CTriggerEndSection::InputEndSection( inputdata_t &data )
-{
-	CBaseEntity *pPlayer = UTIL_PlayerByIndex( 1 );
-
-	if ( pPlayer )
-	{
-		//HACKY MCHACK - This works, but it's nasty. Alfred is going to fix a
-		//bug in gameui that prevents you from dropping to the main menu after
-		// calling disconnect.
-		 engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
-	}
-
-	UTIL_Remove( this );
 }
 
 

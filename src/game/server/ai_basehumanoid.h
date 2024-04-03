@@ -23,6 +23,9 @@ class CAI_BaseHumanoid : public CAI_BaseHumanoidBase
 {
 	DECLARE_CLASS( CAI_BaseHumanoid, CAI_BaseHumanoidBase );
 
+	DECLARE_DATADESC();
+	DECLARE_SERVERCLASS();
+
 public:
 	bool HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* sourceEnt);
 
@@ -57,6 +60,9 @@ public:
 
 private:
 	bool		m_bKnockedDown;		//Has enough damage been done in one attack in order to knock me down?
+	CNetworkVar(bool, m_bHeadGibbed );	//Has my head been liquified by a shotgun blast?
+//	CNetworkVar(int, m_iLimbGibbed1 );	//1st limb gibbed
+//	CNetworkVar(int, m_iLimbGibbed2 );	//2 limbs gibbed - max for now
 
 };
 

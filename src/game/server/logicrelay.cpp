@@ -10,44 +10,10 @@
 //=============================================================================
 
 #include "cbase.h"
-#include "entityinput.h"
-#include "entityoutput.h"
-#include "eventqueue.h"
-//#include "soundent.h"
-//#include "logicrelay.h"
+#include "logicrelay.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
-
-class CLogicRelay : public CLogicalEntity
-{
-public:
-	DECLARE_CLASS( CLogicRelay, CLogicalEntity );
-
-	CLogicRelay();
-
-	void Activate();
-	void Think();
-
-	// Input handlers
-	void InputEnable( inputdata_t &inputdata );
-	void InputEnableRefire( inputdata_t &inputdata );  // Private input handler, not in FGD
-	void InputDisable( inputdata_t &inputdata );
-	void InputToggle( inputdata_t &inputdata );
-	void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
-	void InputTrigger( inputdata_t &inputdata );
-	void InputCancelPending( inputdata_t &inputdata );
-
-	DECLARE_DATADESC();
-
-	// Outputs
-	COutputEvent m_OnTrigger;
-	COutputEvent m_OnSpawn;
-
-private:
-	bool m_bDisabled;
-	bool m_bWaitForRefire;			// Set to disallow a refire while we are waiting for our outputs to finish firing.
-};
 
 const int SF_REMOVE_ON_FIRE				= 0x001;	// Relay will remove itself after being triggered.
 const int SF_ALLOW_FAST_RETRIGGER		= 0x002;	// Unless set, relay will disable itself until the last output is sent.

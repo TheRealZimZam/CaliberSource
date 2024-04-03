@@ -16,13 +16,13 @@ enum Hull_t
 	HULL_HUMAN,				// Combine, Stalker, Zombie...
 	HULL_SMALL_CENTERED,	// Scanner
 	HULL_WIDE_HUMAN,		// Vortigaunt
-	HULL_TINY,				// Headcrab
-	HULL_WIDE_SHORT,		// Bullsquid
+	HULL_TINY,				// Headcrab, Crow
+	HULL_WIDE_SHORT,		// Bullsquid, Houndeye
 	HULL_MEDIUM,			// Cremator
 	HULL_TINY_CENTERED,		// Manhack 
 	HULL_LARGE,				// Antlion Guard
 	HULL_LARGE_CENTERED,	// Mortar Synth
-	HULL_MEDIUM_TALL,		// Hunter
+	HULL_MEDIUM_TALL,		// Alien Assassin, Hunter
 //--------------------------------------------
 	NUM_HULLS,
 	HULL_NONE				// No Hull (appears after num hulls as we don't want to count it)

@@ -12,6 +12,11 @@
 #pragma once
 #endif
 
+
+/**********************
+	    Pendulum
+/**********************/
+
 class CPendulum : public CBaseToggle
 {
 	DECLARE_CLASS( CPendulum, CBaseToggle );

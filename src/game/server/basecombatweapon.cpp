@@ -74,9 +74,11 @@ void W_Precache(void)
 	g_sModelIndexBubbles = CBaseEntity::PrecacheModel ("sprites/bubble.vmt");//bubbles
 	g_sModelIndexLaser = CBaseEntity::PrecacheModel( (char *)g_pModelNameLaser );
 
+#ifdef HL2_EPISODIC
 	PrecacheParticleSystem( "blood_impact_red_01" );
 	PrecacheParticleSystem( "blood_impact_green_01" );
 	PrecacheParticleSystem( "blood_impact_yellow_01" );
+#endif
 
 	CBaseEntity::PrecacheModel("effects/bubble.vmt");	//bubble trails
 
@@ -491,6 +493,12 @@ CBaseEntity* CBaseCombatWeapon::Respawn( void )
 void CBaseCombatWeapon::FallInit( void )
 {
 	SetModel( GetWorldModel() );
+#ifdef HL1_DLL
+	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
+	SetSolid( SOLID_BBOX );
+	AddSolidFlags( FSOLID_TRIGGER );
+	AddSolidFlags( FSOLID_NOT_SOLID );
+#else
 	VPhysicsDestroyObject();
 
 	if ( !VPhysicsInitNormal( SOLID_BBOX, GetSolidFlags() | FSOLID_TRIGGER, false ) )
@@ -527,10 +535,18 @@ void CBaseCombatWeapon::FallInit( void )
 		}
 #endif //CLIENT_DLL
 	}	
+#endif
 
 	SetPickupTouch();
 	SetThink( &CBaseCombatWeapon::FallThink );
 	SetNextThink( gpGlobals->curtime + 0.1f );
+
+	// HACKHACK - On ground isn't always set, so look for ground underneath
+	trace_t tr;
+	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() - Vector(0,0,2), MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr );
+
+	if ( tr.fraction < 1.0 )
+		SetGroundEntity( tr.m_pEnt );
 }
 
 //-----------------------------------------------------------------------------
@@ -567,9 +583,17 @@ void CBaseCombatWeapon::FallThink( void )
 		{
 			EmitSound( "BaseCombatWeapon.WeaponDrop" );
 		}
-		//UNDONE; materialization is only for respawning MP weapons,
-		// and respawning weapons are ALWAYS non-physical - M.M
-		//Materialize(); 
+
+		// lie flat
+#ifdef HL1_DLL
+		QAngle ang = GetAbsAngles();
+		ang.x = 0;
+		ang.z = 0;
+		SetAbsAngles( ang );
+		SetSize( Vector( -24, -24, 0 ), Vector( 24, 24, 16 ) );
+#endif
+
+		Materialize(); 
 	}
 }
 

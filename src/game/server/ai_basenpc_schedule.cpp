@@ -3441,8 +3441,8 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 		}
 	case TASK_FACE_PLAYER:
 		{
-			// Get edict for one player
-			CBasePlayer *pPlayer = AI_GetSinglePlayer();
+			// Find the nearest player
+			CBasePlayer *pPlayer = AI_GetNearestPlayer( this );
 			if ( pPlayer )
 			{
 				GetMotor()->SetIdealYawToTargetAndUpdate( pPlayer->GetAbsOrigin(), AI_KEEP_YAW_SPEED );
@@ -4504,6 +4504,7 @@ int CAI_BaseNPC::SelectIdleSchedule()
 	if ( nSched != SCHED_NONE )
 		return nSched;
 
+	// React to sounds
 	if ( HasCondition ( COND_HEAR_DANGER ) ||
 		 HasCondition ( COND_HEAR_COMBAT ) ||
 		 HasCondition ( COND_HEAR_WORLD  ) ||
@@ -4543,6 +4544,7 @@ int CAI_BaseNPC::SelectAlertSchedule()
 //!		return SCHED_ALERT_SCAN;
 	}
 
+	// React to damage
 	if ( HasCondition(COND_LIGHT_DAMAGE) ||
 		 HasCondition(COND_HEAVY_DAMAGE) )
 	{
@@ -4558,7 +4560,12 @@ int CAI_BaseNPC::SelectAlertSchedule()
 		return SCHED_ALERT_FACE;
 	}
 
-	if ( HasCondition ( COND_HEAR_DANGER ) ||
+	// Basic danger avoidance
+	if ( HasCondition ( COND_HEAR_DANGER ) )
+	{
+		return SCHED_TAKE_COVER_FROM_BEST_SOUND;
+	}
+	else if ( HasCondition ( COND_HEAR_DANGER ) ||
 			  HasCondition ( COND_HEAR_PLAYER ) ||
 			  HasCondition ( COND_HEAR_WORLD  ) ||
 			  HasCondition ( COND_HEAR_BULLET_IMPACT ) ||
@@ -4566,6 +4573,8 @@ int CAI_BaseNPC::SelectAlertSchedule()
 	{
 		return SCHED_ALERT_FACE_BESTSOUND;
 	}
+	else if ( IncomingGrenade() != NULL )
+		return SCHED_TAKE_COVER_FROM_ORIGIN;
 
 	if ( gpGlobals->curtime - GetEnemies()->LastTimeSeen( AI_UNKNOWN_ENEMY ) < TIME_CARE_ABOUT_DAMAGE )
 	{
@@ -4613,6 +4622,14 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		return SCHED_SMALL_FLINCH;
 	}
 #endif
+
+	// Basic danger avoidance
+	if ( HasCondition( COND_HEAR_DANGER ) )
+	{
+		return SCHED_TAKE_COVER_FROM_BEST_SOUND;
+	}
+	else if ( IncomingGrenade() != NULL )
+		return SCHED_TAKE_COVER_FROM_ORIGIN;
 
 	// If I'm scared of this enemy run away
 	if ( IRelationType( GetEnemy() ) == D_FR )

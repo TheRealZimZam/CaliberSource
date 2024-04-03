@@ -146,8 +146,12 @@ public:
 	virtual void	OnStartingFollow( CBaseEntity *pTarget );
 	virtual void	OnStoppingFollow( CBaseEntity *pTarget );
 
-	virtual void			DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore = NULL );
+	virtual void	DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore = NULL );
+	virtual void	IdleHeadTurn( CBaseEntity *pTarget, float flDuration = 0.0, float flImportance = 1.0f );
+
+#ifdef HL1_DLL
 	bool		ShouldSpeakRandom( int iChance, float flModifier );
+#endif
 
 	// For following
 	virtual void	DeclineFollowing( void ) {}

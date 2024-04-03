@@ -40,8 +40,8 @@ extern void PlayerPickupObject( CBasePlayer *pPlayer, CBaseEntity *pObject );
 extern Vector		g_vecAttackDir;
 
 // Just add more items to the bottom of this array and they will automagically be supported
-// This is done instead of just a classname in the FGD so we can control which entities can
-// be spawned, and still remain fairly flexible
+// This is done instead of just a classname/string in the FGD because its extremely stupid and cant be
+// easily updated by mappers...
 
 #ifndef HL1_DLL
 	const char *CBreakable::pSpawnObjects[] =
@@ -49,44 +49,30 @@ extern Vector		g_vecAttackDir;
 		NULL,						// 0
 		"item_battery",				// 1
 		"item_healthkit",			// 2
-		"item_healthvial",			// 3
-		"item_ammo_pistol",			// 4
-		"item_large_box_srounds",	// 5
-		"item_ammo_smg1",			// 6
-		"item_large_box_mrounds",	// 7
-		"item_ammo_hmg",			// 8
-		"item_ammo_ar2",			// 9
-		"item_large_box_lrounds",	// 10
-		"item_ammo_357",			// 11
-		"item_ammo_crossbow",		// 12
-		"item_flare_round",			// 13
-		"item_box_flare_rounds",	// 14
-		"item_ar2_grenade",			// 15
-		"item_ml_grenade",			// 16
-		"item_box_sniper_rounds",	// 17
-		"item_ammo_buckshot",		// 18
-		"item_box_buckshot",		// 19
-		"item_large_box_buckshot",	// 20
-		"item_ammo_flamer",			// 21
-		"weapon_iceaxe",			// 22
-		"weapon_stunstick",			// 23
-		"weapon_pistol",			// 24
-		"weapon_357",				// 25
-		"weapon_smg1",				// 26
-		"weapon_smg2",				// 27
-		"weapon_ar1",				// 28
-		"weapon_ar2",				// 29
-		"weapon_hmg1",				// 30
-		"weapon_rpg",				// 31
-		"weapon_flamethrower",		// 32
-		"weapon_shotgun",			// 33
-		"weapon_supershotgun",		// 34
-		"weapon_flaregun",			// 35
-		"weapon_slam",				// 36
-		"weapon_molotov",			// 37
-		"weapon_emp",		// 38
-		"weapon_frag",				// 39
-		"item_dynamic_resupply",	// 40
+		"item_box_srounds"			// 3
+		"item_large_box_srounds"	// 4
+		"item_box_mrounds"			// 5
+		"item_large_box_mrounds"	// 6
+		"item_box_lrounds"			// 7
+		"item_large_box_lrounds"	// 8
+		"item_box_buckshot"			// 9
+		"item_flare_round"			// 10
+		"item_box_flare_rounds"		// 11
+		"item_ml_grenade"			// 12
+		"item_ar2_grenade"			// 13
+		"item_box_sniper_rounds"	// 14
+		"weapon_iceaxe"				// 15
+		"weapon_stunstick"			// 16
+		"weapon_ar1"				// 17
+		"weapon_ar2"				// 18
+		"weapon_hmg1"				// 19
+		"weapon_rpg"				// 20
+		"weapon_smg1"				// 21
+		"weapon_smg2"				// 22
+		"weapon_slam"				// 23
+		"weapon_shotgun"			// 24
+		"weapon_molotov"			// 25
+		"item_dynamic_resupply",	// 26
 	};
 #else
 	// Half-Life 1 spawn objects!
@@ -119,67 +105,53 @@ extern Vector		g_vecAttackDir;
 
 const char *pFGDPropData[] =
 {
+	// 3/10/24 rolled back -
+	// Original list is crap and disordered, but i cant really change it or compatibility with
+	// old maps is broke... I'll just try to make it look nice FGD wise -MM
 	NULL,
-//	"Wooden.Tiny",	// 1
-//	"Wooden.Small",	// 2
-//	"Wooden.Medium",	// 3
-//	"Wooden.Large",	// 4
-//	"Wooden.Huge",	// 5
-//	"Metal.Small",	// 6
-//	"Metal.Medium",	// 7
-//	"Metal.Large",	// 8
-//	"Cardboard.Small",	// 9
-//	"Cardboard.Medium",	// 10
-//	"Cardboard.Large",	// 11
-//	"Stone.Small",	// 12
-//	"Stone.Medium",	// 13
-//	"Stone.Large",	// 14
-//	"Stone.Huge",	// 15
-//	"Glass.Small",	// 16
-//	"Plastic.Small",	// 17
-//	"Plastic.Medium",	// 18
-//	"Plastic.Large",	// 19
-//	"Pottery.Small",	// 20
-//	"Pottery.Medium",	// 21
-//	"Pottery.Large",	// 22
-//	"Pottery.Huge",	// 23
-//	"Glass.Window",	// 24
-// Hopefully this doesnt break everything; Here goes!
-	"Cardboard.Small",	// 1
-	"Cardboard.Medium",	// 2
-	"Cardboard.Large",	// 3
-	"Cloth.Small",	// 4
-	"Cloth.Medium",	// 5
-	"Cloth.Large",	// 6
-	"Wooden.Tiny",	// 7
-	"Wooden.Small",	// 8
-	"Wooden.Medium",	// 9
-	"Wooden.Large",	// 10
-	"Wooden.ExtraLarge",	// 11
-	"Wooden.Huge",	// 12
-	"Wooden_Unbreakable.Huge",	// 13
-	"Stone.Small",	// 14
-	"Stone.Medium",	// 15
-	"Stone.Large",	// 16
-	"Stone.Huge",	// 17
-	"Glass.Small",	// 18
-	"Glass.Window",	// 19
-	"Glass.Window_Bulletproof",	// 20
-	"Glass.Large",	// 21
-	"Metal.Small",	// 22
-	"Metal.Barrel",	// 23
-	"Metal.ExplosiveBarrel",	// 24
-	"Metal.Medium",	// 25
-	"Metal.ExplosiveContainer",	// 26
-	"Metal.Large",	// 27
-	"Plastic.Small",	// 28
-	"Plastic.Medium",	// 29
-	"Plastic.Large",	// 30
-	"Pottery.Small",	// 31
-	"Pottery.Medium",	// 32
-	"Pottery.Large",	// 33
-	"ClubOnly",	// 34
-	"ExplosiveOnly",	// 35
+	"Wooden.Tiny",		// 1
+	"Wooden.Small",		// 2
+	"Wooden.Medium",	// 3
+	"Wooden.Large",		// 4
+	"Wooden.Huge",		// 5
+	"Metal.Small",		// 6
+	"Metal.Medium",		// 7
+	"Metal.Large",		// 8
+	"Cardboard.Small",	// 9
+	"Cardboard.Medium",	// 10
+	"Cardboard.Large",	// 11
+	"Stone.Small",		// 12
+	"Stone.Medium",		// 13
+	"Stone.Large",		// 14
+	"Stone.Huge",		// 15
+	"Glass.Small",		// 16
+	"Plastic.Small",	// 17
+	"Plastic.Medium",	// 18
+	"Plastic.Large",	// 19
+	"Pottery.Small",	// 20
+	"Pottery.Medium",	// 21
+	"Pottery.Large",	// 22
+	"Pottery.Huge",		// 23
+	"Glass.Window",		// 24
+
+	"ClubOnly",			// 25
+	"ExplosiveOnly",	// 26
+
+#ifdef CALIBER_DLL
+	"Wooden_Unbreakable.Huge",	// 27
+	"Cloth.Small",				// 28
+	"Cloth.Medium",				// 29
+	"Cloth.Large",				// 30
+	"Metal.Barrel",				// 31
+	"Metal.ExplosiveBarrel",	// 32
+	"Metal.ExplosiveContainer",	// 33
+	"Glass.Large",				// 34
+	"Glass.Window_Bulletproof",	// 35
+	"Flesh.Tiny",				// 36
+	"Flesh.Small",				// 37
+	"Flesh.Medium",				// 38
+	"Flesh.Large",				// 39
+#endif
 };
 
 LINK_ENTITY_TO_CLASS( func_breakable, CBreakable );
@@ -199,9 +171,10 @@ BEGIN_DATADESC( CBreakable )
 	DEFINE_KEYFIELD( m_flPressureDelay, FIELD_FLOAT, "PressureDelay" ),
 	DEFINE_KEYFIELD( m_iMinHealthDmg, FIELD_INTEGER, "minhealthdmg" ),
 	DEFINE_FIELD( m_bTookPhysicsDamage, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bUseDeadModel, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_iszPropData, FIELD_STRING ),
 	DEFINE_INPUT( m_impactEnergyScale, FIELD_FLOAT, "physdamagescale" ),
-	DEFINE_KEYFIELD( m_bExtraImpactFX, FIELD_BOOLEAN, "extraimpactfx" ),
+	DEFINE_KEYFIELD( m_iExtraImpactFX, FIELD_INTEGER, "extraimpactfx" ),
 	DEFINE_KEYFIELD( m_PerformanceMode, FIELD_INTEGER, "PerformanceMode" ),
 
 	DEFINE_INPUTFUNC( FIELD_VOID, "Break", InputBreak ),
@@ -249,7 +222,6 @@ bool CBreakable::KeyValue( const char *szKeyName, const char *szValue )
 		int i = atoi( szValue);
 
 		// 0:glass, 1:metal, 2:flesh, 3:wood
-
 		if ((i < 0) || (i >= matLastMaterial))
 			m_Material = matWood;
 		else
@@ -257,10 +229,16 @@ bool CBreakable::KeyValue( const char *szKeyName, const char *szValue )
 	}
 	else if (FStrEq(szKeyName, "deadmodel"))
 	{
+		// Deadmodel - instead of having to create a disabled brush or prop,
+		// you can just specifiy a model here and things will be taken care of.
+//		m_iszDeadModelName = AllocPooledString(szValue);
+		m_bUseDeadModel = (atoi(szValue) != 0);
 	}
 	else if (FStrEq(szKeyName, "shards"))
 	{
-//			m_iShards = atof(szValue);
+		// OBSOLETE - See func_break_max_pieces
+//		m_iShards = atof(szValue);
+		Warning("%s (%s) using obsolete shard parameters. Replace with a func_breakable_surf!\n", GetClassname(), GetDebugName() );
 	}
 	else if (FStrEq(szKeyName, "gibmodel") )
 	{
@@ -268,9 +246,15 @@ bool CBreakable::KeyValue( const char *szKeyName, const char *szValue )
 	}
 	else if (FStrEq(szKeyName, "spawnobject") )
 	{
+		// Default to NULL
+		m_iszSpawnObject = NULL_STRING;
+
+		// TODO; If its a obsoleet number use the old preset list, else assume its a string
 		int object = atoi( szValue );
 		if ( object > 0 && object < ARRAYSIZE(pSpawnObjects) )
 			m_iszSpawnObject = MAKE_STRING( pSpawnObjects[object] );
+		else if ( object != 0 )
+			m_iszSpawnObject = AllocPooledString(szValue);
 	}
 	else if (FStrEq(szKeyName, "propdata") )
 	{
@@ -284,7 +268,7 @@ bool CBreakable::KeyValue( const char *szKeyName, const char *szValue )
 			// If you've hit this warning, it's probably because someone's added a new
 			// propdata field to func_breakables in the .fgd, and not added it to the
 			// pFGDPropData list.
-			Warning("func_breakable with invalid propdata %d.\n", pdata );
+			Warning("func_breakable (%s) with invalid propdata %d.\n", GetDebugName(), pdata );
 		}
 	}
 	else if (FStrEq(szKeyName, "lip") )
@@ -351,10 +335,11 @@ void CBreakable::Spawn( void )
 	{
 		m_impactEnergyScale = 1.0;
 	}
-	// this is a old prop, assume true
-	if ( m_bExtraImpactFX == NULL )
+
+	// If this is set to 0 this is a old breakable that hasnt specified, so put it to true
+	if ( m_iExtraImpactFX == NULL )
 	{
-		m_bExtraImpactFX = true;
+		m_iExtraImpactFX = 2;
 	}
 
 	CreateVPhysics();
@@ -407,6 +392,9 @@ const char *CBreakable::MaterialSound( Materials precacheMaterial )
 	case matRocks:
 		return "Breakable.MatConcrete";
 	case matCeilingTile:
+	case matDirt:
+	case matPlaster:
+	case matPlastic:
 	case matNone:
 	default:
 		break;
@@ -467,40 +455,38 @@ void CBreakable::Precache( void )
 	case matComputer:
 		pGibName = "ComputerGibs";
 		break;
+#else
+	case matComputer:
+		pGibName = "ComputerChunks";
+		break;
+#endif
 
 	case matCeilingTile:
 		pGibName = "CeilingTile";
-		break;
-
-	case matFlesh:
-		pGibName = "FleshGibs";
 		break;
 
 	case matCinderBlock:
 		pGibName = "CinderBlocks";
 		break;
-
-#else
-
-	case matComputer:
-		pGibName = "ComputerChunks";
-		break;
-
-	case matCeilingTile:
-		pGibName = "CeilingTile";
-		break;
-
-	case matCinderBlock:
-		pGibName = "ConcreteChunks";
-		break;
 		
 	case matFlesh:
 		pGibName = "FleshGibs";
 		break;
-#endif
 
 	case matWeb:
 		pGibName = "WebGibs";
+		break;
+
+	case matDirt:
+		pGibName = "DirtChunks";
+		break;
+
+	case matPlaster:
+		pGibName = "PlasterChunks";
+		break;
+
+	case matPlastic:
+		pGibName = "PlasticChunks";
 		break;
 
 	case matNone:
@@ -516,10 +502,7 @@ void CBreakable::Precache( void )
 	if ( m_iszGibModel != NULL_STRING )
 	{
 		pGibName = STRING(m_iszGibModel);
-
-#ifdef HL1_DLL
 		PrecacheModel( pGibName );
-#endif
 	}
 
 	m_iszModelName = MAKE_STRING( pGibName );
@@ -544,7 +527,7 @@ void CBreakable::Precache( void )
 				continue;
 
 			UTIL_PrecacheOther( pSpawnObjects[ i ] );
-		}	
+		}
 	}
 
 	PrecacheScriptSound( "Breakable.MatGlass" );
@@ -564,7 +547,6 @@ void CBreakable::Precache( void )
 
 // play shard sound when func_breakable takes damage.
 // the more damage, the louder the shard sound.
-
 void CBreakable::DamageSound( void )
 {
 	int pitch;
@@ -637,13 +619,13 @@ void CBreakable::DamageSound( void )
 
 void CBreakable::BreakTouch( CBaseEntity *pOther )
 {
-	float flDamage;
-	
 	// only players can break these right now
 	if ( !pOther->IsPlayer() || !IsBreakable() )
 	{
         return;
 	}
+
+	float flDamage;
 
 	// can I be broken when run into?
 	if ( HasSpawnFlags( SF_BREAK_TOUCH ) )
@@ -672,7 +654,7 @@ void CBreakable::BreakTouch( CBaseEntity *pOther )
 
 		m_hBreaker = pOther;
 
-		SetThink ( &CBreakable::Die );
+		SetThink( &CBreakable::Die );
 		SetTouch( NULL );
 		
 		// Add optional delay 
@@ -807,13 +789,17 @@ void CBreakable::Break( CBaseEntity *pBreaker )
 		m_hBreaker = pBreaker;
 		Die();
 	}
+	else
+	{
+		DamageSound();
+	}
 }
 
 
 void CBreakable::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr )
 {
 #ifndef HL1_DLL
-	if ( m_bExtraImpactFX && random->RandomInt(0,1) )
+	if ( m_iExtraImpactFX == 2 && random->RandomInt(0,1) )
 	{
 		switch( m_Material )
 		{
@@ -829,7 +815,7 @@ void CBreakable::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir,
 			// Send some smoke and embers - actual ignition is level-based
 			case matWood:
 			{
-				if ( info.GetDamageType() & (DMG_BURN|DMG_PLASMA) )
+				if ( info.GetDamageType() & (DMG_BURN|DMG_PLASMA|DMG_SHOCK) )
 				{
 					UTIL_Smoke( info.GetDamagePosition(), random->RandomInt( 10, 15 ), 10 );
 				}
@@ -1052,10 +1038,10 @@ void CBreakable::ResetOnGroundFlags(void)
 void CBreakable::Die( void )
 {
 	Vector vecVelocity;// shard velocity
-	char cFlag = 0;
+	char cFlag = 0;	//Used for legacy tempents - only glass does anything for now
 	int pitch;
 	float fvol;
-	
+
 	pitch = 95 + random->RandomInt(0,29);
 
 	if (pitch > 97 && pitch < 103)
@@ -1066,7 +1052,7 @@ void CBreakable::Die( void )
 	// The more negative m_iHealth, the louder
 	// the sound should be.
 
-	fvol = random->RandomFloat(0.85, 1.0) + (abs(m_iHealth) / 100.0);
+	fvol = random->RandomFloat(0.80, 0.95) + (abs(m_iHealth) / 100.0);
 	if (fvol > 1.0)
 	{
 		fvol = 1.0;
@@ -1113,6 +1099,18 @@ void CBreakable::Die( void )
 
 	case matCeilingTile:
 		soundname = "Breakable.Ceiling";
+		break;
+
+	case matDirt:
+		soundname = "Breakable.Dirt";
+		break;
+
+	case matPlaster:
+		soundname = "Breakable.Plaster";
+		break;
+
+	case matPlastic:
+		soundname = "Breakable.Plastic";
 		break;
 	}
     
@@ -1202,6 +1200,7 @@ void CBreakable::Die( void )
 		}
 	}
 
+	float fadetime = 2.5;
 	if ( m_iszModelName != NULL_STRING )
 	{
 		for ( int i = 0; i < iCount; i++ )
@@ -1213,7 +1212,7 @@ void CBreakable::Die( void )
 			if( strstr( modelName, ".mdl" ) != NULL )
 				iModelIndex = modelinfo->GetModelIndex( modelName );
 			else
-				iModelIndex = modelinfo->GetModelIndex( g_PropDataSystem.GetRandomChunkModel(  STRING( m_iszModelName ) ) );
+				iModelIndex = modelinfo->GetModelIndex( g_PropDataSystem.GetRandomChunkModel( STRING( m_iszModelName ) ) );
 
 			// All objects except the first one in this run are marked as slaves...
 			int slaveFlag = 0;
@@ -1224,7 +1223,7 @@ void CBreakable::Die( void )
 
 			te->BreakModel( filter2, 0.0, 
 				vecSpot, pCollisionProp->GetCollisionAngles(), vSize, 
-				vecVelocity, iModelIndex, 100, 1, 2.5, cFlag | slaveFlag );
+				vecVelocity, iModelIndex, 100, 1, fadetime, cFlag | slaveFlag );
 		}
 	}
 
@@ -1234,21 +1233,43 @@ void CBreakable::Die( void )
 	SetName( NULL_STRING );
 
 	AddSolidFlags( FSOLID_NOT_SOLID );
-	
+
 	// Fire targets on break
 	m_OnBreak.FireOutput( m_hBreaker, this );
 
-	VPhysicsDestroyObject();
-	SetThink( &CBreakable::SUB_Remove );
-	SetNextThink( gpGlobals->curtime + 0.1f );
 	if ( m_iszSpawnObject != NULL_STRING )
-	{
 		CBaseEntity::Create( STRING(m_iszSpawnObject), vecSpot, pCollisionProp->GetCollisionAngles(), this );
-	}
 
 	if ( Explodable() )
-	{
 		ExplosionCreate( vecSpot, pCollisionProp->GetCollisionAngles(), this, GetExplosiveDamage(), GetExplosiveRadius(), true );
+
+	VPhysicsDestroyObject();
+
+	if ( m_bUseDeadModel )
+	{
+		// Disable collisions, Update texture
+		SetTextureFrameIndex( 1 );
+		SetUse( NULL );
+		SetTouch( NULL );
+		m_takedamage = DAMAGE_NO;
+
+		// TODO; Need to count the number of breakables here...
+		// It'd be nice to keep broken windows and such around, but breakable entities
+		// are expected to be deleted when they are killed - if logics arent setup when entering
+		// new areas to delete the old area's breakables, the entlist could get clogged very quickly.
+		// For now, im going to assume the level designer hasnt done that and just fade these out here
+		// like its a ps1 game - MM
+
+		// Reuse the pressure delay time
+		if ( m_flPressureDelay > 0 )
+			fadetime = m_flPressureDelay;
+
+		SUB_StartFadeOut(fadetime, true);
+	}
+	else
+	{
+		SetThink( &CBreakable::SUB_Remove );
+		SetNextThink( gpGlobals->curtime + 0.1f );
 	}
 }
 
@@ -1266,7 +1287,7 @@ bool CBreakable::IsBreakable( void )
 //-----------------------------------------------------------------------------
 char const *CBreakable::DamageDecal( int bitsDamageType, int gameMaterial )
 {
-	if ( m_Material == matGlass  )
+	if ( m_Material == matGlass )
 		return "GlassBreak";
 
 	if ( m_Material == matUnbreakableGlass )
@@ -1334,8 +1355,6 @@ CBasePlayer *CBreakable::HasPhysicsAttacker( float dt )
 
 //=============================================================================================================================
 // PUSHABLE
-// TODO; Forced vertex lighting - static lightmaps just look bad on these, do it here instead of per texture, cause'
-// every prop vmt is already lightmappedgeneric and alot of stuff in that folder is used statically often anyways.
 //=============================================================================================================================
 class CPushable : public CBreakable
 {
@@ -1344,6 +1363,7 @@ public:
 
 	void	Spawn ( void );
 	bool	CreateVPhysics( void );
+	void	Move( CBaseEntity *pMover, bool push );
 	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	virtual int	ObjectCaps( void ) { return BaseClass::ObjectCaps() | FCAP_ONOFF_USE; }
@@ -1413,13 +1433,75 @@ void CPushable::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 	{
 		if ( useType == USE_ON )
 		{
+// HLS uses ropes, otherwise use legacy code
+#ifdef HL1_DLL
 			PlayerPickupObject( pPlayer, this );
+#else
+			// TODO; Pull by default, pull if the player is going forward/holding W
+			Move( pActivator, 0 );
+#endif
 		}
 	}
 
 	BaseClass::Use( pActivator, pCaller, useType, value );
 }
 
+// OBSOLETE
+#if 0
+void CPushable :: Touch( CBaseEntity *pOther )
+{
+	if ( FClassnameIs( pOther->pev, "worldspawn" ) )
+		return;
+
+	Move( pOther, 1 );
+}
+#endif
+
+void CPushable::Move( CBaseEntity *pOther, bool push )
+{
+	// TODO; This might need to be re-done
+
+	Vector vVelocity;
+	int playerTouch = 0;
+
+	// Is entity standing on this pushable ?
+	if ( FBitSet(pOther->GetFlags(),FL_ONGROUND) && pOther->GetGroundEntity() == this )
+	{
+		// Only push if floating
+		if ( GetWaterLevel() > 0 )
+			vVelocity.z = pOther->GetAbsVelocity().z * 1;
+
+		return;
+	}
+
+	if ( pOther->IsPlayer() )
+	{
+//		if ( push && !(pOther->m_nButtons & (IN_FORWARD|IN_USE)) )	// Don't push unless the player is pushing forward and NOT use (pull)
+//			return;
+		playerTouch = 1;
+	}
+
+	int factor;
+	if ( playerTouch )
+	{
+		if ( !(pOther->GetFlags() & FL_ONGROUND) )	// Don't push away from jumping/falling players unless in water
+		{
+			if ( GetWaterLevel() < 1 )
+				return;
+			else 
+				factor = 10;
+		}
+		else
+			factor = push ? 75 : 50; //Pulling is a little harder than pushing
+	}
+	else
+		factor = 25;
+
+	vVelocity.x = pOther->GetAbsVelocity().x * factor;
+	vVelocity.y = pOther->GetAbsVelocity().y * factor;
+
+	ApplyAbsVelocityImpulse( vVelocity );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Allows us to take damage from physics objects

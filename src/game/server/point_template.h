@@ -36,6 +36,9 @@ public:
 	void			StartBuildingTemplates( void );
 	void			FinishBuildingTemplates( void );
 
+	// Certain objects might need a bit more fixing up when spawned this way
+//	void			SpecialTemplateFixes( void );
+
 	// Template Entity accessors
 	int				GetNumTemplateEntities( void );
 	CBaseEntity		*GetTemplateEntity( int iTemplateNumber );
@@ -52,6 +55,7 @@ public:
 
 	// Inputs
 	void			InputForceSpawn( inputdata_t &inputdata );
+	void			Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	virtual void	PerformPrecache();
 

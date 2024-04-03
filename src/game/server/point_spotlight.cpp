@@ -7,6 +7,7 @@
 #include "cbase.h"
 #include "beam_shared.h"
 #include "spotlightend.h"
+//#include "beamspotlight.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -14,7 +15,7 @@
 // Spawnflags
 #define SF_SPOTLIGHT_START_LIGHT_ON			0x1
 #define SF_SPOTLIGHT_NO_DYNAMIC_LIGHT		0x2
-#define SF_SPOTLIGHT_NO_TOGGLE				0x4	//For perf, delete the env_spotlight entity after its done doing its thing
+#define SF_SPOTLIGHT_NO_TOGGLE				0x4	//For perf, delete the env_spotlight then create a beamspotlight
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -169,8 +170,8 @@ void CPointSpotlight::Spawn(void)
 	m_bEfficientSpotlight = true;
 
 	// Beam_spotlight is always cheap
-	if( FClassnameIs( this, "beam_spotlight" ) )
-		AddSpawnFlags( SF_SPOTLIGHT_NO_TOGGLE );
+	//if( FClassnameIs( this, "beam_spotlight" ) )
+	//	AddSpawnFlags( SF_SPOTLIGHT_NO_TOGGLE );
 
 	// Check for user error
 	if (m_flSpotlightMaxLength <= 0)

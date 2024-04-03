@@ -26,6 +26,15 @@
 ConVar ai_stun_duration		( "ai_stun_duration","5");
 ConVar ai_stun_duration_max	( "ai_stun_duration_max","8");
 
+BEGIN_DATADESC( CAI_BaseHumanoid )
+	DEFINE_FIELD( m_bHeadGibbed,	FIELD_BOOLEAN ),
+END_DATADESC()
+
+IMPLEMENT_SERVERCLASS_ST( CAI_BaseHumanoid, DT_BaseHumanoid )
+	// Send it to the client, that part takes care of the bone shrinkage
+	SendPropBool( SENDINFO( m_bHeadGibbed ) ),
+END_SEND_TABLE()
+
 //-----------------------------------------------------------------------------
 // Purpose:  This is a generic function (to be implemented by sub-classes) to
 //			 handle specific interactions between different types of characters
@@ -105,13 +114,6 @@ void CAI_BaseHumanoid::BuildScheduleTestBits( )
 			ClearCustomInterruptCondition( COND_CAN_RANGE_ATTACK1 );
 		}
 	}
-
-#if 0
-	if ( !IsCurSchedule( SCHED_BURNING_RUN ) && !IsCurSchedule( SCHED_BURNING_STAND ) )
-	{
-		SetCustomInterruptCondition( COND_ON_FIRE );
-	}
-#endif
 }
 
 //------------------------------------------------------------------------------
@@ -227,13 +229,6 @@ void CAI_BaseHumanoid::Ignite( float flFlameLifetime, bool bNPCOnly, float flSiz
 {
 	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
 
-#ifdef HL2_EPISODIC
-	if ( g_pGameRules->ShouldBurningPropsEmitLight() == true && GetEffectEntity() != NULL )
-	{
-		GetEffectEntity()->AddEffects( EF_DIMLIGHT );
-	}
-#endif // HL2_EPISODIC
-
 	if( !BehaviorSelectSchedule() )
 	{
 		Activity activity = GetActivity();
@@ -288,28 +283,38 @@ void CAI_BaseHumanoid::TraceAttack( const CTakeDamageInfo &info, const Vector &v
 	// Always drop if its a melee attack, regardless of hitgroup
 	if( ptr->hitgroup == HITGROUP_HEAD || info.GetDamageType() & (DMG_SLASH|DMG_CLUB|DMG_SHOCK) )
 	{
-		if ( info.GetAttacker() && info.GetAttacker()->IsPlayer() && info.GetAttacker() != GetEnemy() && !IsInAScript() )
+		if ( info.GetAttacker() && !IsInAScript() )
 		{
-			// Shot/Thwapped in the head by a player I've never seen. In this case the player 
-			// has gotten the drop on this enemy and such an attack is always lethal (at close range)
-			bSneakAttacked = true;
-
-			AIEnemiesIter_t	iter;
-			for( AI_EnemyInfo_t *pMemory = GetEnemies()->GetFirst(&iter); pMemory != NULL; pMemory = GetEnemies()->GetNext(&iter) )
+			if ( info.GetAttacker()->IsPlayer() && info.GetAttacker() != GetEnemy() )
 			{
-				if ( pMemory->hEnemy == info.GetAttacker() )
+				// Shot/Thwapped in the head by a player I've never seen. In this case the player 
+				// has gotten the drop on this enemy and such an attack is always lethal (at close range)
+				bSneakAttacked = true;
+
+				AIEnemiesIter_t	iter;
+				for( AI_EnemyInfo_t *pMemory = GetEnemies()->GetFirst(&iter); pMemory != NULL; pMemory = GetEnemies()->GetNext(&iter) )
+				{
+					if ( pMemory->hEnemy == info.GetAttacker() )
+					{
+						bSneakAttacked = false;
+						break;
+					}
+				}
+
+				float flDist;
+				flDist = (info.GetAttacker()->GetAbsOrigin() - GetAbsOrigin()).Length();
+
+				if( flDist > sk_backstab_distance.GetFloat() )
 				{
 					bSneakAttacked = false;
-					break;
 				}
 			}
 
-			float flDist;
-			flDist = (info.GetAttacker()->GetAbsOrigin() - GetAbsOrigin()).Length();
-
-			if( flDist > sk_backstab_distance.GetFloat() )
+			if ((ShouldGib(info) || info.GetDamageType() & (DMG_BUCKSHOT|DMG_AIRBOAT) && m_iHealth <= (GIB_HEALTH_VALUE-5)))
 			{
-				bSneakAttacked = false;
+				// My head just got liquidated by a huge blow - gib it and kill me
+				m_bHeadGibbed = true;
+				Event_Killed( info );
 			}
 		}
 	}

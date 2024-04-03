@@ -7,6 +7,7 @@
 
 #include "player.h"
 #include "ai_speech.h"
+#include "mp_shareddefs.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: 

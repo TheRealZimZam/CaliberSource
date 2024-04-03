@@ -2,7 +2,10 @@
 //
 // Purpose: Half life port
 //
-// $NoKeywords: $
+// NOTENOTE; Alot of stuff in here is #ifdef'd because said things are handled in
+// the baseclass (ai_basetalker). If you're compiling HL1, it will automagically
+// plug everything back in, resulting in a mostly faithful recreation of hl1's talker
+// system. Everything that isnt ifdef'd is new stuff from 2002.
 //
 //=============================================================================//
 #include "cbase.h"
@@ -15,7 +18,6 @@
 #include "tier0/memdbgon.h"
 
 
-	
 BEGIN_SIMPLE_DATADESC( CNPC_SimpleTalkerExpresser )
 	//									m_pSink		(reconnected on load)
 	DEFINE_AUTO_ARRAY(	m_szMonologSentence,	FIELD_CHARACTER	),
@@ -229,26 +231,41 @@ void CNPC_SimpleTalker::RunTask( const Task_t *pTask )
 
 	case TASK_TALKER_CLIENT_STARE:
 	case TASK_TALKER_LOOK_AT_CLIENT:
-
-		if ( pTask->iTask == TASK_TALKER_CLIENT_STARE && AI_IsSinglePlayer() )
+		// track head to the client for a while.
+		if ( AI_IsSinglePlayer() )
 		{
 			// Get edict for one player
 			CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
 			Assert( pPlayer );
 
-			// fail out if the player looks away or moves away.
-			if ( ( pPlayer->GetAbsOrigin() - GetAbsOrigin() ).Length2D() > TALKER_STARE_DIST )
+			if ( m_NPCState == NPC_STATE_IDLE && !IsMoving() && !GetExpresser()->IsSpeaking() )
 			{
-				// player moved away.
-				TaskFail("Player moved away");
+				if ( pPlayer )
+					IdleHeadTurn( pPlayer );
+			}
+			else
+			{
+				// started moving or talking
+				TaskFail( "Moved away" );
+				return;
 			}
 
-			Vector forward;
-			AngleVectors( pPlayer->GetLocalAngles(), &forward );
-			if ( UTIL_DotPoints( pPlayer->GetAbsOrigin(), GetAbsOrigin(), forward ) < m_flFieldOfView )
+			if ( pTask->iTask == TASK_TALKER_CLIENT_STARE )
 			{
-				// player looked away
-				TaskFail("Player looked away");
+				// fail out if the player looks away or moves away.
+				if ( ( pPlayer->GetAbsOrigin() - GetAbsOrigin() ).Length2D() > TALKER_STARE_DIST )
+				{
+					// player moved away.
+					TaskFail("Player moved away");
+				}
+
+				Vector forward;
+				AngleVectors( pPlayer->GetLocalAngles(), &forward );
+				if ( UTIL_DotPoints( pPlayer->GetAbsOrigin(), GetAbsOrigin(), forward ) < m_flFieldOfView )
+				{
+					// player looked away
+					TaskFail("Player looked away");
+				}
 			}
 		}
 
@@ -259,6 +276,12 @@ void CNPC_SimpleTalker::RunTask( const Task_t *pTask )
 		break;
 
 	case TASK_TALKER_EYECONTACT:
+		if (GetExpresser()->IsSpeaking() && GetSpeechTarget() != NULL)
+		{
+			// ALERT( at_console, "waiting %f\n", m_flStopTalkTime - gpGlobals->time );
+			IdleHeadTurn( GetSpeechTarget(), GetExpresser()->GetTimeSpeechComplete() - gpGlobals->curtime );
+		}
+
 		if (IsMoving() || !GetExpresser()->IsSpeaking() || GetSpeechTarget() == NULL)
 		{
 			TaskComplete();
@@ -368,13 +391,9 @@ void CNPC_SimpleTalker::AlertFriends( CBaseEntity *pKiller )
 				if ( pKiller->GetFlags() & FL_CLIENT )
 				{
 					CNPC_SimpleTalker*pTalkNPC = (CNPC_SimpleTalker *)pFriend;
-
 #if 0
 					if (pTalkNPC && pTalkNPC->IsOkToCombatSpeak())
-					{
-						// FIXME: need to check CanSpeakConcept?
 						pTalkNPC->Speak( TLK_BETRAYED );
-					}
 #else
 					pTalkNPC->SetSchedule( SCHED_TALKER_BETRAYED );
 #endif
@@ -605,6 +624,27 @@ void CNPC_SimpleTalker::DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore 
 	BaseClass::DeferAllIdleSpeech( flDelay, pIgnore );
 }
 
+//---------------------------------------------------------
+// Make eyecontact with a target
+//---------------------------------------------------------
+void CNPC_SimpleTalker::IdleHeadTurn( CBaseEntity *pTarget, float flDuration, float flImportance )
+{
+	// Must be able to turn our head
+	if (!(CapabilitiesGet() & bits_CAP_TURN_HEAD))
+		return;
+
+	// If the target is invalid, or we're in a script, do nothing
+	if ( ( !pTarget ) || ( m_NPCState == NPC_STATE_SCRIPT ) )
+		return;
+
+	// Fill in a duration if we haven't specified one
+	if ( flDuration == 0.0f )
+		 flDuration = random->RandomFloat( 2.0, 4.0 );
+
+	// Add a look target
+	AddLookTarget( pTarget, 1.0, flDuration );
+}
+
 //=========================================================
 // FIdleSpeak
 // ask question of nearby friend, or make statement
@@ -748,10 +788,13 @@ void CNPC_SimpleTalker::FIdleSpeakWhileMoving( void )
 			// override so that during walk, a scientist may talk and greet player
 			FIdleHello();
 
+#ifdef HL1_DLL
 			if ( ShouldSpeakRandom( m_nSpeak * 20, GetSpeechFilter() ? GetSpeechFilter()->GetIdleModifier() : 1.0 ) )
-			{
 				FIdleSpeak();
-			}
+#else
+			 if ( ShouldSpeakRandom( TLK_IDLE, m_nSpeak * 20 ) )
+				 FIdleSpeak();
+#endif
 		}
 	}
 }
@@ -826,12 +869,17 @@ int CNPC_SimpleTalker::SelectNonCombatSpeechSchedule()
 		return SCHED_NONE;
 		
 	// talk about world
+#ifdef HL1_DLL
 	if ( ShouldSpeakRandom( m_nSpeak * 2, GetSpeechFilter() ? GetSpeechFilter()->GetIdleModifier() : 1.0 ) )
 	{
 		//Msg("standing idle speak\n" );
 		return SCHED_TALKER_IDLE_SPEAK;
 	}
-	
+#else
+	if ( ShouldSpeakRandom( TLK_IDLE, m_nSpeak * 2 ) )
+		return SCHED_TALKER_IDLE_SPEAK;
+#endif
+
 	// failed to speak, so look at the player if he's around
 	if ( AI_IsSinglePlayer() && GetExpresser()->CanSpeak() && HasCondition ( COND_SEE_PLAYER ) && random->RandomInt( 0, 6 ) == 0 )
 	{
@@ -867,7 +915,7 @@ int CNPC_SimpleTalker::SelectNonCombatSpeechSchedule()
 // Output : Returns true on success, false on failure.
 //-----------------------------------------------------------------------------
 bool CNPC_SimpleTalker::CanSayHello( void )
-{	
+{
 	if ( GetSpeechFilter() && GetSpeechFilter()->NeverSayHello() )
 		return false;
 
@@ -912,11 +960,18 @@ void CNPC_SimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCall
 
 	if ( pCaller != NULL && pCaller->IsPlayer() )
 	{
+#ifdef HL1_DLL
+		// Pre-disaster followers can't be used
+		if ( HasSpawnFlags(SF_NPC_PREDISASTER) )
+		{
+			DeclineFollowing();
+		}
+#endif
 		if ( !m_FollowBehavior.GetFollowTarget() && IsInterruptable() )
 		{
 			LimitFollowers( pCaller , 1 );
 			if ( m_afMemory & bits_MEMORY_PROVOKED )
-				Msg( "I'm not following you, you evil person!\n" );
+				DevMsg( "I'm not following you, you evil person!\n" );
 			else
 			{
 				StartFollowing( pCaller );
@@ -1161,9 +1216,11 @@ bool CNPC_SimpleTalker::OnBehaviorChangeStatus( CAI_BehaviorBase *pBehavior, boo
 	return interrupt;
 
 }
+
 //-----------------------------------------------------------------------------
 // Purpose: Return true if I should speak based on the chance & the speech filter's modifier
 //-----------------------------------------------------------------------------
+#ifdef HL1_DLL
 bool CNPC_SimpleTalker::ShouldSpeakRandom( int iChance, float flModifier )
 {
 	if ( flModifier != 1.0 )
@@ -1177,6 +1234,7 @@ bool CNPC_SimpleTalker::ShouldSpeakRandom( int iChance, float flModifier )
 
 	return (random->RandomInt(0,iChance) == 0);
 }
+#endif
 
 
 AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
@@ -1382,7 +1440,7 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 		"	Tasks"
 		"		TASK_TALKER_IDEALYAW			0"			// look at who I'm talking to
 		"		TASK_FACE_IDEAL					0"
-		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL3"
+//		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL3"
 		"		TASK_TALKER_EYECONTACT			0"			// Wait until speaker is done
 		""
 		"	Interrupts"

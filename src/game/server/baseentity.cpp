@@ -1301,6 +1301,7 @@ void CBaseEntity::TakeDamage( const CTakeDamageInfo &inputInfo )
 	if ( !g_pGameRules )
 		return;
 
+#if _DEBUG
 	bool bHasPhysicsForceDamage = !g_pGameRules->Damage_NoPhysicsForce( inputInfo.GetDamageType() );
 	if ( bHasPhysicsForceDamage && inputInfo.GetDamageType() != DMG_GENERIC )
 	{
@@ -1318,15 +1319,16 @@ void CBaseEntity::TakeDamage( const CTakeDamageInfo &inputInfo )
 			{
 				if ( inputInfo.GetDamageForce() == vec3_origin )
 				{
-					DevWarning( "CBaseEntity::TakeDamage:  with inputInfo.GetDamageForce() == vec3_origin\n" );
+					DevWarning( "CBaseEntity::TakeDamage: with inputInfo.GetDamageForce() == vec3_origin\n" );
 				}
 				if ( inputInfo.GetDamagePosition() == vec3_origin )
 				{
-					DevWarning( "CBaseEntity::TakeDamage:  with inputInfo.GetDamagePosition() == vec3_origin\n" );
+					DevWarning( "CBaseEntity::TakeDamage: with inputInfo.GetDamagePosition() == vec3_origin\n" );
 				}
 			}
 		}
 	}
+#endif
 
 	// Make sure our damage filter allows the damage.
 	if ( !PassesDamageFilter( inputInfo ))

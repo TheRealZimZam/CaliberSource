@@ -11,6 +11,8 @@
 	4 - Finished Dispensing
 	5 - Broken
 */
+// This entity should be placed in the dispensing slot of the parented machine, as all
+// items/effects are created at or relative to this entity's origin.
 //=============================================================================//
 
 #include "cbase.h"
@@ -38,8 +40,11 @@
 //=========================================================
 void CEnvBeverage::Precache ( void )
 {
-	PrecacheModel( "models/can.mdl" );
-	PrecacheModel( "models/candybar.mdl" );
+//	PrecacheModel( "models/can.mdl" );
+	if ( FClassnameIs( this, "env_snacks" ) )
+		UTIL_PrecacheOther("item_candybar");
+	else
+		UTIL_PrecacheOther("item_sodacan");
 
 	PrecacheScriptSound( "VendingMachine.Dispensing" );
 	PrecacheScriptSound( "VendingMachine.FinishDispense" );
@@ -87,6 +92,8 @@ bool CEnvBeverage::KeyValue( const char *szKeyName, const char *szValue )
 {
 	if (FStrEq(szKeyName, "beveragetype"))
 		m_nBeverageType = atoi(szValue);
+	else if (FStrEq(szKeyName, "playspeech"))
+		m_bUseSpeech = atoi(szValue);
 	else
 		return BaseClass::KeyValue( szKeyName, szValue );
 

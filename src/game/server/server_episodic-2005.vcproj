@@ -146,9 +146,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
-				Description="Copying to C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\"
-				CommandLine="if exist &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.dll&quot; attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.dll&quot;&#x0D;&#x0A;if exist &quot;$(TargetDir)&quot;server.dll copy &quot;$(TargetDir)&quot;server.dll &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.dll&quot;&#x0D;&#x0A;if exist C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.pdb attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.pdb&quot;&#x0D;&#x0A;if exist &quot;$(TargetDir)&quot;server.pdb copy &quot;$(TargetDir)&quot;server.pdb &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin&quot;&#x0D;&#x0A;"
-				Outputs="C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.dll;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.pdb"
+				Description="Copying to C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\"
+				CommandLine="if exist &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\server.dll&quot; attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\server.dll&quot;&#x0D;&#x0A;if exist &quot;$(TargetDir)&quot;server.dll copy &quot;$(TargetDir)&quot;server.dll &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\server.dll&quot;&#x0D;&#x0A;if exist C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\server.pdb attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\server.pdb&quot;&#x0D;&#x0A;if exist &quot;$(TargetDir)&quot;server.pdb copy &quot;$(TargetDir)&quot;server.pdb &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin&quot;&#x0D;&#x0A;"
+				Outputs="C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\server.dll;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\server.pdb"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -166,7 +166,7 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				AdditionalIncludeDirectories="..\..\common;..\..\public;..\..\public\tier0;..\..\public\tier1;.\;..\..\game\shared;..\..\utils\common;..\..\game\shared\hl2;..\..\game\shared\episodic;.\hl2;.\episodic"
-				PreprocessorDefinitions="WIN32;_WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;GAME_DLL;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;fopen=dont_use_fopen;sprintf=use_Q_snprintf_instead_of_sprintf;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;_RETAIL;HL2_DLL;HL2_EPISODIC;SP_SDK;USES_SAVERESTORE"
+				PreprocessorDefinitions="WIN32;_WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;GAME_DLL;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;fopen=dont_use_fopen;sprintf=use_Q_snprintf_instead_of_sprintf;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;_RETAIL;HL2_DLL;HL2_EPISODIC;SP_SDK;USES_SAVERESTORE;CALIBER_DLL"
 				StringPooling="true"
 				ExceptionHandling="0"
 				RuntimeLibrary="0"
@@ -969,6 +969,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\baseprojectile.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\baseprojectile.h"
+				>
+			</File>
+			<File
 				RelativePath=".\BasePropDoor.h"
 				>
 			</File>
@@ -1525,6 +1533,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\caliber\fakebot.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\public\filesystem_helpers.cpp"
 				>
 				<FileConfiguration
@@ -2009,11 +2021,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\item_world.cpp"
+				RelativePath="..\shared\item_world.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\items.h"
+				RelativePath="..\shared\items.h"
 				>
 			</File>
 			<File
@@ -2073,11 +2085,27 @@
 				>
 			</File>
 			<File
+				RelativePath=".\logic_playerproxy.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\logic_playerproxy.h"
+				>
+			</File>
+			<File
+				RelativePath=".\logic_playmovie.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\logic_random_outputs.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\logic_random_outputs.h"
+				>
+			</File>
+			<File
+				RelativePath=".\logic_skill.cpp"
 				>
 			</File>
 			<File
@@ -2090,6 +2118,10 @@
 			</File>
 			<File
 				RelativePath=".\logicrelay.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\logicrelay.h"
 				>
 			</File>
 			<File
@@ -3001,6 +3033,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\splash.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\splash.h"
+				>
+			</File>
+			<File
 				RelativePath=".\spotlightend.cpp"
 				>
 			</File>
@@ -3134,10 +3174,6 @@
 			</File>
 			<File
 				RelativePath=".\TemplateEntities.h"
-				>
-			</File>
-			<File
-				RelativePath=".\tempmonster.cpp"
 				>
 			</File>
 			<File
@@ -3888,6 +3924,14 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\grenade_homer.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\grenade_homer.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\grenade_molotov.cpp"
 					>
 				</File>
@@ -4460,7 +4504,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\shared\hl2\weapon_45.cpp"
+					RelativePath="..\shared\hl2\weapon_44.cpp"
 					>
 				</File>
 				<File
@@ -4652,14 +4696,6 @@
 					</File>
 					<File
 						RelativePath=".\hl2\grenade_brickbat.h"
-						>
-					</File>
-					<File
-						RelativePath=".\hl2\grenade_homer.cpp"
-						>
-					</File>
-					<File
-						RelativePath=".\hl2\grenade_homer.h"
 						>
 					</File>
 					<File

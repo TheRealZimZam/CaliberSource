@@ -1377,6 +1377,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_GET_PATH_TO_TARGET			0"
 	"		TASK_RUN_PATH					0"
 	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_TARGET_FACE"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -2441,7 +2442,7 @@ AI_DEFINE_SCHEDULE
 	"	Tasks"
 	"		TASK_STOP_MOVING				0"
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE_ON_FIRE"
-	"		TASK_WAIT						8"	//If you arent dead after eight seconds then you must be immortal
+	"		TASK_WAIT						10"	//If you arent dead after ten seconds then you must be immortal
 	""
 	"	Interrupts"
 );

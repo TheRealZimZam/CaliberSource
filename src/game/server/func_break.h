@@ -17,7 +17,7 @@ typedef enum { expRandom = 0, expDirected, expUsePrecise} Explosions;
 
 // TODO; The best way to do this, actually, would be to use surface properties -
 // this is a bad kind of obsolete that could stand to be redone
-#if 1
+
 typedef enum 
 { 
 	matGlass = 0,
@@ -31,26 +31,13 @@ typedef enum
 	matRocks,
 	matWeb,
 	matNone,
-	matLastMaterial } Materials;
-#else
-typedef enum 
-{ 
-	matNone = 0,
+#ifdef CALIBER_DLL	//CALIBER
 	matDirt,
-	matWood,
-	matRock,
-	matMetal,
-	matGlass,
-	matCinderBlock,
-	matCeilingTile,
 	matPlaster,
 	matPlastic,
-	matComputer,
-	matFlesh,
-	matWeb,
-	matUnbreakableGlass,
-	matLastMaterial } Materials;
 #endif
+	matLastMaterial } Materials;
+
 
 #define	NUM_SHARDS 6 // this many shards spawned when breakable objects break;
 
@@ -84,6 +71,7 @@ public:
 
 	void BreakTouch( CBaseEntity *pOther );
 	void DamageSound( void );
+//	void BreakSound( void );
 	void Break( CBaseEntity *pBreaker );
 
 	// Input handlers
@@ -146,7 +134,7 @@ public:
 	void			SetMaxBreakableSize( int iSize ) { m_iMaxBreakableSize = iSize; }
 	int				GetMaxBreakableSize( void ) { return m_iMaxBreakableSize; }
 	void			SetPropDataBlocksLOS( bool bBlocksLOS ) { SetBlocksLOS( bBlocksLOS ); }
-	void			SetPropDataIsAIWalkable( bool bBlocksLOS ) { SetAIWalkable( bBlocksLOS ); }
+	void			SetPropDataIsAIWalkable( bool bAIWalkable ) { SetAIWalkable( bAIWalkable ); }
 	void			SetBasePropData( string_t iszBase ) { m_iszBasePropData = iszBase; }
 	string_t		GetBasePropData( void ) { return m_iszBasePropData; }
 	void			SetInteraction( propdata_interactions_t Interaction ) { m_iInteractions |= (1 << Interaction); }
@@ -170,9 +158,10 @@ private:
 	int			m_ExplosionMagnitude;
 	float		m_flPressureDelay;		// Delay before breaking when destoyed by pressure
 	int			m_iMinHealthDmg;		// minimum damage attacker must have to cause damage
-	bool		m_bExtraImpactFX;
+	int			m_iExtraImpactFX;
 	bool		m_bTookPhysicsDamage;
-//	bool		m_bUseNewMaterials;
+//	bool		m_bUseNewMaterials;		//Use new material list? Otherwise keep compatibilty
+	bool		m_bUseDeadModel;		//When killed, change model/texture to "broken" state.
 
 	string_t	m_iszPropData;
 	string_t	m_iszModelName;

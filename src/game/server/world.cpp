@@ -566,9 +566,9 @@ static const char *g_DefaultLightstyles[] =
 	// 6 FLICKER (second variety)
 	"nmonqnmomnmomomno",
 	// 7 CANDLE (second variety)
-	"mmmaaaabcdefgmmmmaaaammmaamm",
+	"mmmcccbbcdefgmmmmccccmmmccmm",
 	// 8 CANDLE (third variety)
-	"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa",
+	"mmmcccmmmcccmmmbbcdefccccmmmmabcdefmmmcccc",
 	// 9 SLOW STROBE (fourth variety)
 	"aaaaaaaazzzzzzzz",
 	// 10 FLUORESCENT FLICKER

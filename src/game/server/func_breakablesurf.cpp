@@ -566,13 +566,9 @@ void CBreakableSurface::Die( CBaseEntity *pBreaker, const Vector &vAttackDir )
 	m_iHealth = 0.0f;
 
 	if (pBreaker)
-	{
 		m_OnBreak.FireOutput( pBreaker, this );
-	}
 	else
-	{
 		m_OnBreak.FireOutput( this, this );
-	}
 
 	float flDir = -1;
 

@@ -7,7 +7,7 @@
 Currently very WIP - use at your own discretion!
 
 
-Latest build 7/20/2023 - Demo Alpha/Deathmatch Alpha
+Latest build 4/3/2024 - Alpha Demo Build
 
 Variably compatible with all existing source maps, including Half-Life:Source and PlatinumSrc(hl2beta)
 

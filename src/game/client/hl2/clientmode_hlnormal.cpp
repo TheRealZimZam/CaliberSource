@@ -53,7 +53,7 @@ protected:
 		SetPaintBackgroundEnabled( false );
 	}
 
-	virtual void CreateDefaultPanels( void ) { /* don't create any panels yet*/ };
+//	virtual void CreateDefaultPanels( void ) { /* don't create any panels yet*/ };
 };
 
 
@@ -62,14 +62,8 @@ protected:
 //-----------------------------------------------------------------------------
 ClientModeHLNormal::ClientModeHLNormal()
 {
-	m_pViewport = new CHudViewport();
-	m_pViewport->Start( gameuifuncs, gameeventmanager );
 }
 
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
 ClientModeHLNormal::~ClientModeHLNormal()
 {
 }
@@ -88,6 +82,12 @@ void ClientModeHLNormal::Init()
 	{
 		Warning( "Couldn't load combine panel scheme!\n" );
 	}
+}
+
+void ClientModeHLNormal::InitViewport()
+{
+	m_pViewport = new CHudViewport();
+	m_pViewport->Start( gameuifuncs, gameeventmanager );
 }
 
 bool ClientModeHLNormal::ShouldDrawCrosshair( void )

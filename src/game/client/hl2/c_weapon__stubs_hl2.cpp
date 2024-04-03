@@ -34,7 +34,7 @@ STUB_WEAPON_CLASS( weapon_oldmanharpoon, WeaponOldManHarpoon, C_WeaponCitizenPac
 // Weapons that are supported in MP
 #ifndef HL2MP
 STUB_WEAPON_CLASS( weapon_357, Weapon357, C_BaseHLCombatWeapon );						//Super Magnum
-//STUB_WEAPON_CLASS( weapon_45, Weapon45, C_HLSniperRifle );								//45 Contender
+//STUB_WEAPON_CLASS( weapon_44, Weapon44, C_HLSniperRifle );								//44 Magnum
 //STUB_WEAPON_CLASS( weapon_ar1, WeaponAR1, C_HLMachineGun );								//Assault Rifle
 //STUB_WEAPON_CLASS( weapon_ar2, WeaponAR2, C_HLMachineGun );								//Battle Rifle
 STUB_WEAPON_CLASS( weapon_crossbow, WeaponCrossbow, C_BaseHLCombatWeapon );				//Hot-Stick Launcher

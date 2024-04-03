@@ -29,8 +29,7 @@ extern ConVar zoom_sensitivity_ratio;
 extern ConVar default_fov;
 extern ConVar sensitivity;
 
-#if SINGLEPLAYER_ANIMSTATE
-#else
+#if USE_ANIMSTATE
 //extern ConVar hl2_walkspeed;
 //extern ConVar hl2_jogspeed;
 //extern ConVar hl2_runspeed;
@@ -141,22 +140,29 @@ C_BaseHLPlayer::C_BaseHLPlayer() :
 	AddVar( &m_Local.m_vecPunchAngleVel, &m_Local.m_iv_vecPunchAngleVel, LATCH_SIMULATION_VAR );
 	AddVar( &m_angEyeAngles, &m_iv_angEyeAngles, LATCH_SIMULATION_VAR );
 
-#if SINGLEPLAYER_ANIMSTATE
+#if USE_ANIMSTATE
 	// SP animstate
-	m_PlayerAnimState = CreatePlayerAnimState( this );
-#else
-	// FIXME; MP state is extremely broken and WIP, rn it just crashes anyway
-	// Probably not going to spend time fixing because the few additional
-	// features arent really worth it - we only need animations so the player
-	// can admire himself in the mirror anyway.
-	// Setup the movement data.
-	MultiPlayerMovementData_t movementData;
-	movementData.m_flRunSpeed = HL2_RUN_SPEED;
-	movementData.m_flWalkSpeed = HL2_WALK_SPEED;
-	movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
+	if ( !g_pGameRules->IsMultiplayer() )
+	{
+		m_PlayerAnimState = CreatePlayerAnimState( this );
+	}
+	else
+	{
+		// FIXME; MP state is extremely broken and WIP, rn it just crashes anyway
+		// Probably not going to spend time fixing because the few additional
+		// features arent really worth it - we only need animations so the player
+		// can admire himself in the mirror anyway.
+/*
+		// Setup the movement data.
+		MultiPlayerMovementData_t movementData;
+		movementData.m_flRunSpeed = HL2_RUN_SPEED;
+		movementData.m_flWalkSpeed = HL2_WALK_SPEED;
+		movementData.m_flSprintSpeed = HL2_SPRINT_SPEED;
 
-	// Create animation state for this player.
-	m_PlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
+		// Create animation state for this player.
+		m_MultiplayerPlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
+*/
+	}
 #endif
 
 	m_fLastPredFreeze = -1;

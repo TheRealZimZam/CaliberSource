@@ -36,6 +36,8 @@ public:
 	~ClientModeHLNormal();
 
 	virtual void	Init();
+	virtual void	InitViewport();
+
 	virtual bool	ShouldDrawCrosshair( void );
 };
 

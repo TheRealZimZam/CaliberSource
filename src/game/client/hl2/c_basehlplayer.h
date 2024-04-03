@@ -16,7 +16,7 @@
 #include "c_hl2_playerlocaldata.h"
 #include "multiplayer_animstate.h"
 
-#define SINGLEPLAYER_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
+#define USE_ANIMSTATE 1	//Use a animstate instead of the old, setanimation system
 
 class C_BaseHLPlayer : public C_BasePlayer
 {
@@ -81,10 +81,18 @@ public:
 private:
 	C_BaseHLPlayer( const C_BaseHLPlayer & ); // not defined, not accessible
 
-#if SINGLEPLAYER_ANIMSTATE
+#if USE_ANIMSTATE
 	IPlayerAnimState	*m_PlayerAnimState;
-#else
-	CMultiPlayerAnimState	*m_PlayerAnimState;
+	CMultiPlayerAnimState	*m_MultiplayerPlayerAnimState;	//BROKEN
+
+	// Determine which animation system we're using
+	IPlayerAnimState	*GetAnimState( void ) 
+	{
+		if ( g_pGameRules->IsMultiplayer() )
+			return m_MultiplayerPlayerAnimState;
+
+		return m_PlayerAnimState;
+	}
 #endif
 
 	QAngle	m_angEyeAngles;

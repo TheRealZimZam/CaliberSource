@@ -59,7 +59,7 @@ ConVar r_RainWindScale( "r_RainWindScale", "1.0", FCVAR_CHEAT, "Scale of wind to
 
 // Performance optimization by Certain Affinity
 // calling IsInAir() for 800 particles was taking 4 ms
-ConVar r_RainCheck( "r_RainCheck", "0", FCVAR_NONE, "Enable/disable IsInAir() check for rain drops?" );
+ConVar r_RainCheck( "r_RainCheck", "0", FCVAR_NONE, "Enable/disable IsInAir() check for rain drops? Disabling activates cheaper simulation, but worse physics." );
 
 ConVar r_RainSimulate( "r_RainSimulate", "1", FCVAR_CHEAT, "Enable/disable rain simulation." );
 ConVar r_DrawRain( "r_DrawRain", "1", FCVAR_CHEAT, "Enable/disable rain rendering." );
@@ -1355,14 +1355,7 @@ void CClient_Precipitation::CreateRainOrSnowParticle( const Vector &vSpawnPositi
 
 	VectorCopy( vVelocity, p->m_Velocity );
 	p->m_Pos = vSpawnPosition;
-
-	/* TERROR: moving random velocity out so it can be included in endpos calcs
-	p->m_Velocity[ 0 ] += random->RandomFloat(-r_RainSideVel.GetInt(), r_RainSideVel.GetInt());
-	p->m_Velocity[ 1 ] += random->RandomFloat(-r_RainSideVel.GetInt(), r_RainSideVel.GetInt());
-	*/
-
 	p->m_Mass = random->RandomFloat( 0.5, 1.5 );
-
 	p->m_flMaxLifetime = fabs((vSpawnPosition.z - vEndPosition.z) / vVelocity.z);
 }
 
@@ -1479,11 +1472,10 @@ void CClient_Precipitation::EmitParticles( float fTimeDelta )
 		//!!!TODO; This is bad! a hardcoded endpoint doesnt work for ledges, or when the player is viewing from a high indoor position!
 		//!!! possible solution - determine if the player is viewing the particles from indoors (ie not in the trigger box),
 		//!!! if so, use the old logic that just falls through the floor until the lifetime ends - M.M
-
 		// TERROR: Find an endpos
 		float endposCompatibility = 192.0f; 
 		if ( r_RainCheck.GetInt() != 0 )
-			endposCompatibility = 256.0f;
+			endposCompatibility = 288.0f;
 
 		Vector vParticleEndPos( vPlayerHeight );
 		vParticleEndPos.z -= endposCompatibility;

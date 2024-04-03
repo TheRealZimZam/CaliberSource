@@ -142,7 +142,8 @@ private:
 	float m_DensityRampSpeed;
 	float m_RotationSpeed;
 	float m_MovementSpeed;
-	float m_Density;
+	float m_DesiredDensity;
+	bool m_bStartDisabled;
 	int	  m_spawnflags;
 
 private:
@@ -175,7 +176,8 @@ IMPLEMENT_CLIENTCLASS_DT( C_FuncSmokeVolume, DT_FuncSmokeVolume, CFuncSmokeVolum
 	RecvPropFloat( RECVINFO( m_DensityRampSpeed ) ),
 	RecvPropFloat( RECVINFO( m_RotationSpeed ) ),
 	RecvPropFloat( RECVINFO( m_MovementSpeed ) ),
-	RecvPropFloat( RECVINFO( m_Density ) ),
+	RecvPropFloat( RECVINFO( m_DesiredDensity ) ),
+	RecvPropBool( RECVINFO( m_bStartDisabled ) ),
 	RecvPropInt( RECVINFO( m_spawnflags ) ),
 	RecvPropDataTable( RECVINFO_DT( m_Collision ), 0, &REFERENCE_RECV_TABLE(DT_CollisionProperty) ),
 END_RECV_TABLE()
@@ -284,7 +286,7 @@ void C_FuncSmokeVolume::OnDataChanged( DataUpdateType_t updateType )
 
 	m_ParticleEffect.SetParticleCullRadius( m_ParticleRadius );
 
-//	Warning( "m_Density: %f\n", m_Density );
+//	Warning( "m_DesiredDensity: %f\n", m_DesiredDensity );
 //	Warning( "m_MovementSpeed: %f\n", m_MovementSpeed );
 	
 	if(updateType == DATA_UPDATE_CREATED)
@@ -293,7 +295,7 @@ void C_FuncSmokeVolume::OnDataChanged( DataUpdateType_t updateType )
 		m_xCount = 0.5f + ( size.x / ( m_SpacingRadius * 2.0f ) );
 		m_yCount = 0.5f + ( size.y / ( m_SpacingRadius * 2.0f ) );
 		m_zCount = 0.5f + ( size.z / ( m_SpacingRadius * 2.0f ) );
-		m_CurrentDensity = m_Density;
+		m_CurrentDensity = m_DesiredDensity;
 
 		delete [] m_pSmokeParticleInfos;
 		m_pSmokeParticleInfos = new SmokeParticleInfo[m_xCount * m_yCount * m_zCount];
@@ -339,21 +341,21 @@ void C_FuncSmokeVolume::Update( float fTimeDelta )
 		m_ParticleEffect.SetBBox( vWorldMins, vWorldMaxs );
 	}
 		
-	// lerp m_CurrentDensity towards m_Density at a rate of m_DensityRampSpeed
-	if( m_CurrentDensity < m_Density )
+	// lerp m_CurrentDensity towards m_DesiredDensity at a rate of m_DensityRampSpeed
+	if( m_CurrentDensity < m_DesiredDensity )
 	{
 		m_CurrentDensity += m_DensityRampSpeed * fTimeDelta;
-		if( m_CurrentDensity > m_Density )
+		if( m_CurrentDensity > m_DesiredDensity )
 		{
-			m_CurrentDensity = m_Density;
+			m_CurrentDensity = m_DesiredDensity;
 		}
 	}
-	else if( m_CurrentDensity > m_Density )
+	else if( m_CurrentDensity > m_DesiredDensity )
 	{
 		m_CurrentDensity -= m_DensityRampSpeed * fTimeDelta;
-		if( m_CurrentDensity < m_Density )
+		if( m_CurrentDensity < m_DesiredDensity )
 		{
-			m_CurrentDensity = m_Density;
+			m_CurrentDensity = m_DesiredDensity;
 		}
 	}
 

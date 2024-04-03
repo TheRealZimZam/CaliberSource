@@ -387,7 +387,6 @@ void CBaseHudChat::ApplySchemeSettings( vgui::IScheme *pScheme )
 	SetBgColor( Color( 0, 0, 0, 0 ) );
 	SetFgColor( Color( 0, 0, 0, 0 ) );
 #else
-	//#define CHAT_HISTORY_ALPHA 16
 	Color cColor = pScheme->GetColor( "Chat.Panel", GetBgColor() );
 	SetBgColor( Color( cColor.r(), cColor.g(), cColor.b(), cColor.a() ) );
 #endif
@@ -406,7 +405,7 @@ bool CBaseHudChat::ShouldDraw()
 	if ( IsXbox() )
 		return false;
 
-	if ( m_flFadeTime == 0 )
+	if ( m_flFadeTime <= 0 )
 		return false;
 
 	return cl_showtextmsg.GetBool();
@@ -440,7 +439,6 @@ void CBaseHudChat::Init( void )
 	gameeventmanager->AddListener( this, "hltv_chat", false );
 }
 
-#ifndef _XBOX
 static int __cdecl SortLines( void const *line1, void const *line2 )
 {
 	CBaseHudChatLine *l1 = *( CBaseHudChatLine ** )line1;
@@ -466,7 +464,6 @@ static int __cdecl SortLines( void const *line1, void const *line2 )
 
 	return 0;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: Allow inheriting classes to change this spacing behavior
@@ -559,6 +556,9 @@ void CBaseHudChat::OnTick( void )
 	}
 
 	vgui::surface()->MovePopupToBack( GetVPanel() );
+
+	if ( m_flFadeTime > 0 )
+		FadeChatHistory();
 #endif
 }
 
@@ -628,7 +628,6 @@ int CBaseHudChat::ComputeBreakChar( int width, const char *text, int textlen )
 //-----------------------------------------------------------------------------
 void CBaseHudChat::Printf( int iFilter, const char *fmt, ... )
 {
-#ifndef _XBOX
 	va_list marker;
 	char msg[4096];
 
@@ -754,7 +753,6 @@ void CBaseHudChat::Printf( int iFilter, const char *fmt, ... )
 // Way too much
 //	CLocalPlayerFilter filter;
 //	C_BaseEntity::EmitSound( filter, SOUND_FROM_LOCAL_PLAYER, "HudChat.Message" );
-#endif
 }
 	
 #pragma optimize( "", on )
@@ -764,8 +762,8 @@ void CBaseHudChat::Printf( int iFilter, const char *fmt, ... )
 //-----------------------------------------------------------------------------
 void CBaseHudChat::StartMessageMode( int iMessageModeType )
 {
-#ifndef _XBOX
 	m_nMessageMode = iMessageModeType;
+	// Reset fade time
 	m_flFadeTime = gpGlobals->curtime + hud_chat_time.GetFloat();
 
 	m_pChatInput->ClearEntry();
@@ -784,7 +782,6 @@ void CBaseHudChat::StartMessageMode( int iMessageModeType )
 	m_pChatInput->SetVisible( true );
 	vgui::surface()->CalculateMouseVisible();
 	m_pChatInput->RequestFocus();
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -792,17 +789,17 @@ void CBaseHudChat::StartMessageMode( int iMessageModeType )
 //-----------------------------------------------------------------------------
 void CBaseHudChat::StopMessageMode( void )
 {
-#ifndef _XBOX
 	SetKeyBoardInputEnabled( false );
 	m_pChatInput->SetVisible( false );
-#endif
 }
 
 void CBaseHudChat::FadeChatHistory( void )
 {
+	// TODO;
 #if 0
-	float frac = ( m_flFadeTime - gpGlobals->curtime ) / CHAT_HISTORY_FADE_TIME;
+	float frac = ( m_flFadeTime - gpGlobals->curtime ) / hud_chat_time.GetFloat();
 
+	#define CHAT_HISTORY_ALPHA 16
 	int alpha = frac * CHAT_HISTORY_ALPHA;
 	alpha = clamp( alpha, 0, CHAT_HISTORY_ALPHA );
 
@@ -929,7 +926,6 @@ vgui::Panel *CBaseHudChat::GetInputPanel( void )
 //-----------------------------------------------------------------------------
 void CBaseHudChat::Clear( void )
 {
-#ifndef _XBOX
 	// Kill input prompt
 	StopMessageMode();
 
@@ -945,7 +941,6 @@ void CBaseHudChat::Clear( void )
 
 		line->Expire();
 	}
-#endif
 }
 
 //-----------------------------------------------------------------------------

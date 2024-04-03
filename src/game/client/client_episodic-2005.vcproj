@@ -148,9 +148,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
-				Description="Copying to C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\"
-				CommandLine="if exist &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.dll&quot; attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.dll&quot;&#x0D;&#x0A;copy &quot;$(TargetDir)&quot;client.dll &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin&quot;&#x0D;&#x0A;if exist &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.pdb&quot; attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.pdb&quot;&#x0D;&#x0A;if exist &quot;$(TargetDir)&quot;client.pdb copy &quot;$(TargetDir)&quot;client.pdb &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.pdb&quot;&#x0D;&#x0A;"
-				Outputs="C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.dll;C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.pdb"
+				Description="Copying to C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\"
+				CommandLine="if exist &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\client.dll&quot; attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\client.dll&quot;&#x0D;&#x0A;copy &quot;$(TargetDir)&quot;client.dll &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin&quot;&#x0D;&#x0A;if exist &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\client.pdb&quot; attrib -r &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\client.pdb&quot;&#x0D;&#x0A;if exist &quot;$(TargetDir)&quot;client.pdb copy &quot;$(TargetDir)&quot;client.pdb &quot;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\client.pdb&quot;&#x0D;&#x0A;"
+				Outputs="C:\Program Files (x86)\Steam\steamapps\SourceMods\iacsource\bin\client.dll;C:\Program Files (x86)\Steam\steamapps\SourceMods\caliber\bin\client.pdb"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -168,7 +168,7 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				AdditionalIncludeDirectories=".\hl2;.\hl2\elements;..\..\game\shared\hl2;..\..\game\shared\episodic;..\..\public;.\;..\..\common;..\..\public;..\..\public\tier0;..\..\public\tier1;..\..\vgui2\include;..\..\vgui2\controls;..\..\game\shared;.\game_controls"
-				PreprocessorDefinitions="WIN32;_WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;NO_STRING_T;CLIENT_DLL;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;fopen=dont_use_fopen;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;ENABLE_HTMLWINDOW;_RETAIL;HL2_CLIENT_DLL;HL2_EPISODIC;SP_SDK"
+				PreprocessorDefinitions="WIN32;_WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;NO_STRING_T;CLIENT_DLL;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;fopen=dont_use_fopen;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;ENABLE_HTMLWINDOW;_RETAIL;HL2_CLIENT_DLL;HL2_EPISODIC;SP_SDK;CALIBER_DLL"
 				StringPooling="true"
 				ExceptionHandling="0"
 				RuntimeLibrary="0"
@@ -602,6 +602,10 @@
 			</File>
 			<File
 				RelativePath=".\c_plasma.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\c_playerattachedmodel.cpp"
 				>
 			</File>
 			<File
@@ -1329,6 +1333,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\shared\item_world.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\public\jigglebones.cpp"
 				>
 				<FileConfiguration
@@ -2021,6 +2029,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\vgui_hudvideo.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\vgui_int.cpp"
 				>
 			</File>
@@ -2038,6 +2050,14 @@
 			</File>
 			<File
 				RelativePath=".\vgui_slideshow_display_screen.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\vgui_video.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\vgui_video_player.cpp"
 				>
 			</File>
 			<File
@@ -2500,10 +2520,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\c_barney.cpp"
-					>
-				</File>
-				<File
 					RelativePath=".\hl2\c_basehelicopter.cpp"
 					>
 				</File>
@@ -2864,7 +2880,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\shared\hl2\weapon_45.cpp"
+					RelativePath="..\shared\hl2\weapon_44.cpp"
 					>
 				</File>
 				<File
@@ -3166,6 +3182,10 @@
 			</File>
 			<File
 				RelativePath=".\c_pixel_visibility.h"
+				>
+			</File>
+			<File
+				RelativePath=".\c_playerattachedmodel.h"
 				>
 			</File>
 			<File
@@ -3793,11 +3813,23 @@
 				>
 			</File>
 			<File
+				RelativePath=".\vgui_hudvideo.h"
+				>
+			</File>
+			<File
 				RelativePath=".\vgui_imagehealthpanel.h"
 				>
 			</File>
 			<File
 				RelativePath=".\vgui_int.h"
+				>
+			</File>
+			<File
+				RelativePath=".\vgui_video.h"
+				>
+			</File>
+			<File
+				RelativePath=".\vgui_video_player.h"
 				>
 			</File>
 			<File
@@ -4322,6 +4354,10 @@
 			</File>
 			<File
 				RelativePath="..\..\public\ivguicenterprint.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\public\video\ivideoservices.h"
 				>
 			</File>
 			<File
@@ -4954,6 +4990,10 @@
 			</File>
 			<File
 				RelativePath="..\shared\itempents.h"
+				>
+			</File>
+			<File
+				RelativePath="..\shared\items.h"
 				>
 			</File>
 			<File

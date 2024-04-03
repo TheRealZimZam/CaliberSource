@@ -1438,8 +1438,23 @@ void C_BaseAnimating::ApplyBoneMatrixTransform( matrix3x4_t& transform )
 	float scale = GetModelWidthScale();
 	if ( scale != 1.0f )
 	{
+#if 0	//2013 does all this for some reason
+		// The bone transform is in worldspace, so to scale this, we need to translate it back
+		Vector pos;
+		MatrixGetColumn( transform, 3, pos );
+		pos -= GetRenderOrigin();
+		pos *= scale;
+		pos += GetRenderOrigin();
+		MatrixSetColumn( pos, 3, transform );
+#endif
+
 		VectorScale( transform[0], scale, transform[0] );
 		VectorScale( transform[1], scale, transform[1] );
+#ifndef HL1_DLL
+		// For some reason model scale in 2007 only did width... putting this in
+		// a ifdef for posterity -MM
+		VectorScale( transform[2], scale, transform[2] );
+#endif
 	}
 }
 

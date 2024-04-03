@@ -189,7 +189,7 @@ public:
 	static C_BaseEntity				*CreatePredictedEntityByName( const char *classname, const char *module, int line, bool persist = false );
 	
 	// FireBullets uses shared code for prediction.
-	virtual void					FireBullets( const FireBulletsInfo_t &info );
+	virtual void					FireBullets( const FireBulletsInfo_t &info, float flDelay = 0 );
 	virtual bool					ShouldDrawUnderwaterBulletBubbles();
 	virtual bool					ShouldDrawWaterImpacts( void ) { return true; }
 	virtual bool					HandleShotImpactingWater( const FireBulletsInfo_t &info, 

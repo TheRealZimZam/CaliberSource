@@ -28,7 +28,7 @@
 EXPOSE_PROTOTYPE_EFFECT(Splash, C_Splash);
 
 // Datatable.. this can have all the smoketrail parameters when we need it to.
-IMPLEMENT_CLIENTCLASS_DT(C_Splash, DT_Splash, Splash)
+IMPLEMENT_CLIENTCLASS_DT(C_Splash, DT_Splash, CSplash)
 	RecvPropFloat(RECVINFO(m_flSpawnRate)),
 	RecvPropVector(RECVINFO(m_vStartColor)),
 	RecvPropVector(RECVINFO(m_vEndColor)),
@@ -188,6 +188,10 @@ void C_Splash::PlaySplashSound(Vector vPos)
 	if ( !m_bSplashSound )
 		return;
 
+//	TODO; if this bool is ever changed to a string/soundpatch...
+//	if ( m_sSplashSound == NULL_STRING )
+//		return;
+
 	// TODO; We need to check if its a looping sound here
 	if (gpGlobals->curtime > m_flNextSoundTime)
 	{
@@ -269,73 +273,6 @@ void C_Splash::Update(float fTimeDelta)
 // Input   :
 // Output  :
 //------------------------------------------------------------------------------
-/*
-bool C_Splash::SimulateAndRender(Particle *pParticle, ParticleDraw *pDraw, float &sortKey)
-{
-	SimpleParticle* pSimpleParticle = (SimpleParticle*)pParticle;
-
-	//Should this particle die?
-	pSimpleParticle->m_flLifetime += pDraw->GetTimeDelta();
-	if ( pSimpleParticle->m_flLifetime >= m_flParticleLifetime )
-		return false;
-
-	// Calculate color
-	float lifetimePercent = pSimpleParticle->m_flLifetime / m_flParticleLifetime;
-	float color[3];
-	color[0] = m_vStartColor[0] + (m_vEndColor[0] - m_vStartColor[0]) * lifetimePercent;
-	color[1] = m_vStartColor[1] + (m_vEndColor[1] - m_vStartColor[1]) * lifetimePercent;
-	color[2] = m_vStartColor[2] + (m_vEndColor[2] - m_vStartColor[2]) * lifetimePercent;
-	color[3] = 1.0;
-
-	float scale = random->RandomFloat( 0.02, 0.08 );
-
-	// NOTE: We need to do everything in screen space
-	Vector  delta;
-	Vector	start;
-	TransformParticle(ParticleMgr()->GetModelView(), pSimpleParticle->m_Pos, start);
-
-	Vector3DMultiply( CurrentWorldToViewMatrix(), pSimpleParticle->m_vecVelocity, delta );
-
-	delta[0] *= scale;
-	delta[1] *= scale;
-	delta[2] *= scale;
-
-	// See c_tracer.* for this method
-	Tracer_Draw( pDraw, start, delta, random->RandomInt( m_flWidthMin, m_flWidthMax ), color );
-
-	//Simulate the movement with collision
-	const float	timeDelta = pDraw->GetTimeDelta();
-	trace_t trace;
-	
-	if (m_ParticleCollision.MoveParticle( pSimpleParticle->m_Pos, pSimpleParticle->m_vecVelocity, NULL, timeDelta, &trace ))
-	{
-		// If particle hits horizontal surface kill it soon
-		if (DotProduct(trace.plane.normal, CurrentViewUp())>0.8)
-		{
-			pSimpleParticle->m_flLifetime = m_flParticleLifetime-0.2;
-		}
-
-		// Drop a decal if any remaining
-		if (m_nDecalsRemaining>0)
-		{
-			C_BaseEntity *ent = cl_entitylist->GetEnt( 0 );
-			if ( ent )
-			{
-				int index = decalsystem->GetDecalIndexForName( "Splash" );
-				if ( index >= 0 )
-				{
-					color32 rgbaColor = {255*m_vStartColor[0],255*m_vStartColor[1],255*m_vStartColor[2],150};
-					effects->DecalColorShoot( index, 0, ent->GetModel(), ent->GetAbsOrigin(), ent->GetAbsAngles(), trace.endpos, 0, 0, rgbaColor);
-				}
-				m_nDecalsRemaining--;
-			}
-		}
-		PlaySplashSound(trace.endpos);
-	}
-	return true;
-}
-*/
-
 void C_Splash::SimulateParticles( CParticleSimulateIterator *pIterator )
 {
 	float timeDelta = pIterator->GetTimeDelta();
@@ -383,7 +320,6 @@ void C_Splash::SimulateParticles( CParticleSimulateIterator *pIterator )
 		pParticle = (SimpleParticle*)pIterator->GetNext();
 	}
 }
-
 
 void C_Splash::RenderParticles( CParticleRenderIterator *pIterator )
 {

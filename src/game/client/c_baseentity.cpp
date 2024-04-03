@@ -1097,7 +1097,7 @@ bool C_BaseEntity::InitializeAsClientEntity( const char *pszModelName, RenderGro
 //-----------------------------------------------------------------------------
 bool C_BaseEntity::InitializeAsClientEntityByIndex( int iIndex, RenderGroup_t renderGroup )
 {
-	// Setup model data.
+	// NOTE: This will add the client entity to the renderable "leaf system" (Renderable)
 	SetModelByIndex( iIndex );
 
 	// Add the client entity to the master entity list.
@@ -1111,6 +1111,7 @@ bool C_BaseEntity::InitializeAsClientEntityByIndex( int iIndex, RenderGroup_t re
 	CollisionProp()->CreatePartitionHandle();
 
 	index = -1;
+//	m_pClientAlphaProperty->SetDesyncOffset( rand() % 1024 );
 
 	SpawnClientEntity();
 
@@ -1928,12 +1929,44 @@ int C_BaseEntity::DrawModel( int flags )
 		break;
 	case mod_studio:
 		// All studio models must be derived from C_BaseAnimating.  Issue warning.
-		Warning( "ERROR:  Can't draw studio model %s because %s is not derived from C_BaseAnimating\n",
+		Warning( "ERROR: Can't draw studio model %s because %s is not derived from C_BaseAnimating\n",
 			modelinfo->GetModelName( model ), GetClientClass()->m_pNetworkName ? GetClientClass()->m_pNetworkName : "unknown" );
 		break;
 	case mod_sprite:
-		//drawn = DrawSprite();
-		Warning( "ERROR:  Sprite model's not supported any more except in legacy temp ents\n" );
+		//!!! TODO;
+		Warning( "ERROR: Can't draw model %s because Sprite model's are not supported yet\n", modelinfo->GetModelName( model ) );
+
+		//!!TODOFIXME; Need this working, sooner rather than later! Really need this for alot of things,
+		// weapons (flamethrower, etc.), old-style sprite enemies (doom secret level), etc.
+		// ---------------------------------------------------------------------------------------
+/*
+// The way legacy ents/sprite.cpp does it
+		drawn = DrawSprite( 
+			this,
+			model, 
+			GetAbsOrigin(), 
+			GetAbsAngles(), 
+			m_iTextureFrameIndex,  // sprite frame to render
+			NULL,  // attach to
+			NULL,  // attachment point
+			m_nRenderMode, // rendermode
+			m_nRenderFX, // renderfx
+			m_clrRender->a, // alpha
+			m_clrRender->r,
+			m_clrRender->g,
+			m_clrRender->b,
+			1		  // sprite scale
+			);
+*/
+/*
+		// I'm not sure if this is right?? This isnt used ANYWHERE else. in-fact,
+		// almost all of entity_client_tools is completely unused in the code. I tried
+		// the way legacytempents does it but that didnt want to work either, even including sprite.h -M.M
+		drawn = clienttools->DrawSprite( GetClientRenderable(), 1, m_iTextureFrameIndex,
+										m_nRenderMode, m_nRenderFX,
+										GetRenderColor(), 
+										NULL, NULL );
+*/
 		break;
 	default:
 		break;
@@ -5261,7 +5294,9 @@ void C_BaseEntity::SUB_Remove( void )
 	{
 		// this situation can screw up NPCs who can't tell their entity pointers are invalid.
 		m_iHealth = 0;
+#ifdef _DEBUG
 		DevWarning( 2, "SUB_Remove called on entity with health > 0\n");
+#endif
 	}
 
 	Remove( );

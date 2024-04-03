@@ -323,6 +323,11 @@ void ClientModeShared::OverrideMouseInput( float *x, float *y )
 //-----------------------------------------------------------------------------
 bool ClientModeShared::ShouldDrawViewModel()
 {
+	C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+	C_BaseCombatWeapon *pWpn = pPlayer->GetActiveWeapon();
+	if( pWpn && pWpn->ShouldDrawViewModel() == false )
+		return false;
+
 	return true;
 }
 

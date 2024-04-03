@@ -308,7 +308,7 @@ void FX_BloodSpray( const Vector &origin, const Vector &normal, float scale, uns
 //			normal - 
 //			scale - This parameter is not currently used
 //-----------------------------------------------------------------------------
-void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float scale /*NOTE: Unused!*/, unsigned char r, unsigned char g, unsigned char b )
+void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, int scale, unsigned char r, unsigned char g, unsigned char b )
 {
 	if ( UTIL_IsLowViolence() )
 		return;
@@ -341,6 +341,10 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 	color[2] = ( (float)(worldLight[2] * b) * ramp ) / 255.0f;
 #endif
 
+	// Assuming most bullets do around 8 dmg
+	int iMinSpriteSize = clamp((scale/4), 2, 4);	// Clamp to min 2, max 4
+	int iMaxSpriteSize = clamp((scale/2), 4, 6);	//Clamp to min 4, max 6
+
 	CSmartPtr<CBloodSprayEmitter> pSimple = CBloodSprayEmitter::Create( "bloodgore" );
 	if ( !pSimple )
 		return;
@@ -360,7 +364,6 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 	SimpleParticle *pParticle;
 
 	Vector	dir = normal * RandomVector( -0.5f, 0.5f );
-
 	offset = origin + ( 2.0f * normal );
 
 	pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), g_Blood_Core, offset );
@@ -377,8 +380,8 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 		pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
 		pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
 		
-		pParticle->m_uchStartSize	= random->RandomInt( 2, 4 );
-		pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 8;
+		pParticle->m_uchStartSize	= random->RandomFloat( iMinSpriteSize, iMaxSpriteSize );
+		pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 6;
 	
 		pParticle->m_uchStartAlpha	= 255;
 		pParticle->m_uchEndAlpha	= 0;
@@ -387,13 +390,13 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 		pParticle->m_flRollDelta	= 0.0f;
 	}
 
-	// Cache the material if we haven't already
+	// Gore Chunks
 	if ( g_Blood_Gore == NULL )
 	{
 		g_Blood_Gore = ParticleMgr()->GetPMaterial( "effects/blood_gore" );
 	}
 
-	for ( int i = 0; i < 4; i++ )
+	for ( int i = 0; i < iMinSpriteSize; i++ )
 	{
 		offset = origin + ( 2.0f * normal );
 
@@ -411,9 +414,9 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 			pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
 			pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
 			
-			pParticle->m_uchStartSize	= random->RandomInt( 2, 4 );
+			pParticle->m_uchStartSize	= random->RandomFloat( iMinSpriteSize, iMaxSpriteSize );
 			pParticle->m_uchEndSize		= pParticle->m_uchStartSize * 4;
-		
+
 			pParticle->m_uchStartAlpha	= 255;
 			pParticle->m_uchEndAlpha	= 0;
 			
@@ -447,7 +450,7 @@ void FX_BloodBulletImpact( const Vector &origin, const Vector &normal, float sca
 	//
 	// Shorter droplets
 	//
-	for ( int i = 0; i < 8; i++ )	//TODO; Callback to perf
+	for ( int i = 0; i < iMaxSpriteSize; i++ )
 	{
 		// Originate from within a circle 'scale' inches in diameter
 		offset = origin;

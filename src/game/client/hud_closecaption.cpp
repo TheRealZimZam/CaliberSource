@@ -26,6 +26,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#define CC_BOTTOM_FRAC .9f
+#define CC_HEIGHT		60
 #define CC_INSET		12
 
 extern ISoundEmitterSystemBase *soundemitterbase;

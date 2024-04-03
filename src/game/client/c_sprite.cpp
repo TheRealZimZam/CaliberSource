@@ -561,13 +561,13 @@ const char *CSprite::ParseClientsideEntity( const char *pEntData )
 	if ( !entData.ExtractValue( "classname", className ) )
 		Error( "classname missing from entity!\n" );
 
-	if ( Q_strcmp( className, "env_sprite_clientside" ) == 0 )
+	if ( !Q_strcmp( className, "env_sprite_clientside" ) || !Q_strcmp( className, "env_glow" ) )
 	{
 		// always force clientside entities placed in maps
 		CSprite *pEntity = new CSprite(); 
 
 		if ( pEntity )
-		{	
+		{
 			// Set up keyvalues.
 			pEntity->ParseMapData(&entData);
 

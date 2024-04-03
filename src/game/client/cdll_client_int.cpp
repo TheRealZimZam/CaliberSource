@@ -87,12 +87,23 @@
 #include "ihudlcd.h"
 #include "toolframework_client.h"
 #include "hltvcamera.h"
+#if defined( REPLAY_ENABLED )
+#include "hltvreplaysystem.h"
+#include "replaycamera.h"
+#include "replay_ragdoll.h"
+#include "replay_ragdoll.h"
+#include "qlimits.h"
+#include "engine/ireplayhistorymanager.h"
+#endif
 #include "ixboxsystem.h"
 #include "ipresence.h"
 #include "engine/imatchmaking.h"
 #include "cdll_bounded_cvars.h"
 #include "matsys_controls/matsyscontrols.h"
 #include "GameStats.h"
+
+#include "Sprite.h"
+#include "vgui_video.h"
 
 #ifdef PORTAL
 #include "PortalRender.h"
@@ -131,7 +142,11 @@ IInputSystem *inputsystem = NULL;
 ISceneFileCache *scenefilecache = NULL;
 IXboxSystem *xboxsystem = NULL;	// Xbox 360 only
 IMatchmaking *matchmaking = NULL;
+#if 1	//SRC2013 - g_pVideo doesnt exist in 2007, so just thump it disabled here
+IVideoServices *g_pVideo = NULL;
+#endif
 IAvi *avi = NULL;
+IBik *bik = NULL;
 IUploadGameStats *gamestatsuploader = NULL;
 
 
@@ -172,6 +187,19 @@ void ProcessCacheUsedMaterials()
 	}
 }
 
+static bool g_bHeadTrackingEnabled = false;
+
+bool IsHeadTrackingEnabled()
+{
+#if defined( HL2_CLIENT_DLL )
+	return g_bHeadTrackingEnabled;
+#else
+	return false;
+#endif
+}
+
+void VGui_ClearVideoPanels();
+
 // String tables
 INetworkStringTable *g_pStringTableParticleEffectNames = NULL;
 INetworkStringTable *g_StringTableEffectDispatch = NULL;
@@ -179,6 +207,7 @@ INetworkStringTable *g_StringTableVguiScreen = NULL;
 INetworkStringTable *g_pStringTableMaterials = NULL;
 INetworkStringTable *g_pStringTableInfoPanel = NULL;
 INetworkStringTable *g_pStringTableClientSideChoreoScenes = NULL;
+INetworkStringTable *g_pStringTableMovies = NULL;
 
 static CGlobalVarsBase dummyvars( true );
 // So stuff that might reference gpGlobals during DLL initialization won't have a NULL pointer.
@@ -534,12 +563,15 @@ public:
 	virtual void			InvalidateMdlCache();
 public:
 	void PrecacheMaterial( const char *pMaterialName );
+	void PrecacheMovie( const char *pMovieName );
 
 private:
-	void UncacheAllMaterials( );
+	void UncacheAllMaterials();
+	void UncacheAllMovies();
 	void ResetStringTablePointers();
 
 	CUtlVector< IMaterial * > m_CachedMaterials;
+	CUtlSymbolTable			m_CachedMovies;
 };
 
 
@@ -589,6 +621,48 @@ const char *GetMaterialNameFromIndex( int nIndex )
 	}
 }
 
+
+//-----------------------------------------------------------------------------
+// Precaches a movie
+//-----------------------------------------------------------------------------
+void PrecacheMovie( const char *pMovieName )
+{
+	gHLClient.PrecacheMovie( pMovieName );
+}
+
+//-----------------------------------------------------------------------------
+// Converts a previously precached movie into an index
+//-----------------------------------------------------------------------------
+int GetMovieIndex( const char *pMovieName )
+{
+	if ( pMovieName )
+	{
+		int nIndex = g_pStringTableMovies->FindStringIndex( pMovieName );
+		Assert( nIndex >= 0 );
+		if ( nIndex >= 0 )
+		{
+			return nIndex;
+		}
+	}
+
+	// This is the invalid string index
+	return 0;
+}
+
+//-----------------------------------------------------------------------------
+// Converts precached movie indices into strings
+//-----------------------------------------------------------------------------
+const char *GetMovieNameFromIndex( int nIndex )
+{
+	if ( nIndex != ( g_pStringTableMovies->GetMaxStrings() - 1 ) )
+	{
+		return g_pStringTableMovies->GetString( nIndex );
+	}
+	else
+	{
+		return NULL;
+	}
+}
 
 //-----------------------------------------------------------------------------
 // Precaches a particle system
@@ -737,6 +811,8 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 		return false;
 	if ( IsPC() && (avi = (IAvi *)appSystemFactory(AVI_INTERFACE_VERSION, NULL)) == NULL )
 		return false;
+	if ( (bik = (IBik *)appSystemFactory(BIK_INTERFACE_VERSION, NULL)) == NULL )
+		return false;
 	if ( (scenefilecache = (ISceneFileCache *)appSystemFactory( SCENE_FILE_CACHE_INTERFACE_VERSION, NULL )) == NULL )
 		return false;
 	if ( IsX360() && (xboxsystem = (IXboxSystem *)appSystemFactory( XBOXSYSTEM_INTERFACE_VERSION, NULL )) == NULL )
@@ -883,6 +959,18 @@ void CHLClient::PostInit()
 //-----------------------------------------------------------------------------
 void CHLClient::Shutdown( void )
 {
+	VGui_ClearVideoPanels();
+
+#ifdef SIXENSE
+		g_pSixenseInput->Shutdown();
+		delete g_pSixenseInput;
+		g_pSixenseInput = NULL;
+#endif
+
+#ifdef PORTAL2
+	GameInstructor_Shutdown();
+#endif
+
 	C_BaseAnimating::ShutdownBoneSetupThreadPool();
 	ClientWorldFactoryShutdown();
 
@@ -969,6 +1057,14 @@ void CHLClient::HudUpdate( bool bActive )
 	// I don't think this is necessary any longer, but I will leave it until
 	// I can check into this further.
 	C_BaseTempEntity::CheckDynamicTempEnts();
+
+#ifdef SIXENSE
+	// If we're not connected, update sixense so we can move the mouse cursor when in the menus
+	if( !engine->IsConnected() || engine->IsPaused() )
+	{
+		g_pSixenseInput->SixenseFrame( 0, NULL ); 
+	}
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1084,7 +1180,6 @@ void CHLClient::IN_SetSampleTime( float frametime )
 //-----------------------------------------------------------------------------
 void CHLClient::CreateMove ( int sequence_number, float input_sample_frametime, bool active )
 {
-
 	Assert( C_BaseEntity::IsAbsRecomputationsEnabled() );
 	Assert( C_BaseEntity::IsAbsQueriesValid() );
 
@@ -1092,6 +1187,9 @@ void CHLClient::CreateMove ( int sequence_number, float input_sample_frametime, 
 
 	MDLCACHE_CRITICAL_SECTION();
 	input->CreateMove( sequence_number, input_sample_frametime, active );
+
+	// [mariod] - testing, see note in c_baseanimating.cpp
+	//C_BaseAnimating::EnableNewBoneSetupRequest( true );
 }
 
 //-----------------------------------------------------------------------------
@@ -1272,6 +1370,8 @@ void CHLClient::LevelInitPostEntity( )
 {
 	IGameSystem::LevelInitPostEntityAllSystems();
 	C_PhysPropClientside::RecreateAll();
+	C_Sprite::RecreateAllClientside();
+
 	internalCenterPrint->Clear();
 }
 
@@ -1286,6 +1386,7 @@ void CHLClient::ResetStringTablePointers()
 	g_pStringTableMaterials = NULL;
 	g_pStringTableInfoPanel = NULL;
 	g_pStringTableClientSideChoreoScenes = NULL;
+	g_pStringTableMovies = NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -1420,6 +1521,14 @@ void OnMaterialStringTableChanged( void *object, INetworkStringTable *stringTabl
 	RequestCacheUsedMaterials();
 }
 
+//-----------------------------------------------------------------------------
+// Called when the string table for movies changes
+//-----------------------------------------------------------------------------
+void OnMovieStringTableChanged( void *object, INetworkStringTable *stringTable, int stringNumber, const char *newString, void const *newData )
+{
+	// Make sure this puppy is precached
+	gHLClient.PrecacheMovie( newString );
+}
 
 //-----------------------------------------------------------------------------
 // Called when the string table for particle systems changes
@@ -1498,6 +1607,14 @@ void CHLClient::InstallStringTableCallback( const char *tableName )
 		// When the particle system list changes, we need to know immediately
 		g_pStringTableParticleEffectNames->SetStringChangedCallback( NULL, OnParticleSystemStringTableChanged );
 	}
+	else if ( !Q_strcasecmp( tableName, "Movies" ) )
+	{
+		// Look up the id 
+		g_pStringTableMovies = networkstringtable->FindTable( tableName );
+
+		// When the movie list changes, we need to know immediately
+		g_pStringTableMovies->SetStringChangedCallback( NULL, OnMovieStringTableChanged );
+	}
 
 
 	InstallStringTableCallback_GameRules();
@@ -1535,6 +1652,35 @@ void CHLClient::UncacheAllMaterials( )
 		m_CachedMaterials[i]->DecrementReferenceCount();
 	}
 	m_CachedMaterials.RemoveAll();
+}
+
+//-----------------------------------------------------------------------------
+// Movie precache
+//-----------------------------------------------------------------------------
+void CHLClient::PrecacheMovie( const char *pMovieName )
+{
+	if ( m_CachedMovies.Find( pMovieName ) != UTL_INVAL_SYMBOL )
+	{
+		// already precached
+		return;
+	}
+	
+	// hint the movie system to precache our movie resource
+	m_CachedMovies.AddString( pMovieName );
+#ifdef PORTAL	//SRC2013
+	g_pBIK->PrecacheMovie( pMovieName );
+#endif
+}
+
+void CHLClient::UncacheAllMovies()
+{
+#ifdef PORTAL	//SRC2013
+	for ( int i = 0; i < m_CachedMovies.GetNumStrings(); i++ )
+	{
+		g_pBIK->EvictPrecachedMovie( m_CachedMovies.String( i ) );
+	}
+#endif
+	m_CachedMovies.RemoveAll();
 }
 
 //-----------------------------------------------------------------------------

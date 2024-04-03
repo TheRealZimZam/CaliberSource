@@ -1266,7 +1266,7 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool bSand
 		}
 	}
 
-	// Extra particles for sand/very dry dirt
+	// Extra dust for sand/very dry dirt
 	if ( bSand )
 	{
 		int iHangingDust = random->RandomInt( 1, 2 );
@@ -1304,6 +1304,11 @@ void FX_DustImpact( const Vector &origin, trace_t *tr, float flScale, bool bSand
 				pParticle->m_flRollDelta	= random->RandomFloat( -8.0f, 8.0f );
 			}
 		}
+	}
+	else
+	{
+		//Throw some grass chunks/straws
+		//TODO;
 	}
 }
 

@@ -186,6 +186,40 @@ char const *GetImpactDecal( C_BaseEntity *pEntity, int iMaterial, int iDamageTyp
 	return decalsystem->TranslateDecalForGameMaterial( decalName, iMaterial );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Handle weapon impacts
+//-----------------------------------------------------------------------------
+void ImpactCallback( const CEffectData &data )
+{
+	VPROF_BUDGET( "ImpactCallback", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+
+	trace_t tr;
+	Vector vecOrigin, vecStart, vecShotDir;
+	int iMaterial, iDamageType, iHitbox;
+	short nSurfaceProp;
+	C_BaseEntity *pEntity = ParseImpactData( data, &vecOrigin, &vecStart, &vecShotDir, nSurfaceProp, iMaterial, iDamageType, iHitbox );
+
+	if ( !pEntity )
+	{
+		// This happens for impacts that occur on an object that's then destroyed.
+		// Clear out the fraction so it uses the server's data
+		tr.fraction = 1.0;
+		PlayImpactSound( pEntity, tr, vecOrigin, nSurfaceProp );
+		return;
+	}
+
+	// If we hit, perform our custom effects and play the sound
+	if ( Impact( vecOrigin, vecStart, iMaterial, iDamageType, iHitbox, pEntity, tr ) )
+	{
+		// Check for custom effects based on the Decal index
+		PerformCustomEffects( vecOrigin, tr, vecShotDir, iMaterial, 1.0 );
+	}
+
+	PlayImpactSound( pEntity, tr, vecOrigin, nSurfaceProp );
+}
+
+DECLARE_CLIENT_EFFECT( "Impact", ImpactCallback );
+
 //------------------------------------------------------------------------------
 // Purpose : Create leak effect if material requests it
 // Input   :
@@ -247,7 +281,7 @@ void LeakEffect( trace_t &tr )
 	VectorAngles( tr.plane.normal, angles );
 	pLeak->SetLocalAngles( angles );
 
-	// TODO; Soundpatch instead? It'd be cool to be able to play steam or fire sounds here
+	// TODO; Soundpatch/string instead? It'd be cool to be able to play steam or fire sounds here
 	IMaterialVar*	pLeakSound = pTraceMaterial->FindVar( "$leaksound", &found );
 	if (found)
 		pLeak->m_bSplashSound	= pLeakSound->GetIntValue();

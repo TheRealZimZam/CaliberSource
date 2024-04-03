@@ -403,6 +403,14 @@ bool C_BaseCombatWeapon::ShouldDraw( void )
 	// If it's a player, then only show active weapons
 	if ( pOwner->IsPlayer() )
 	{
+		if ( GetModel() == NULL )
+		{
+			Warning( "BADNESS! Tell Matt that the weapon '%s' tried to draw with a null model ( %d ) \n",
+				GetWpnData().szClassName, m_iWorldModelIndex );
+
+			return false;
+		}
+
 		// Show it if it's active...
 		return bIsActive;
 	}

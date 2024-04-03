@@ -43,7 +43,7 @@ CLIENTEFFECT_REGISTER_END()
 PMaterialHandle g_Material_Spark = NULL;
 
 static ConVar fx_drawmetalspark( "fx_drawmetalspark", "1", FCVAR_DEVELOPMENTONLY, "Draw metal spark effects." );
-ConVar perf_spark_scale( "perf_spark_scale", "1", FCVAR_ARCHIVE );
+ConVar fx_sparks_detail_scale( "fx_sparks_detail_scale", "1", FCVAR_ARCHIVE );
 
 // Why dfuq is this in here??
 #if 0
@@ -335,7 +335,7 @@ void FX_ElectricSpark( const Vector &pos, int nMagnitude, int nTrailLength, cons
 	// Big sparks.
 	//
 	Vector	dir;
-	int		numSparks = (nMagnitude * nMagnitude * random->RandomFloat( 2, 4 )) * perf_spark_scale.GetFloat();
+	int		numSparks = (nMagnitude * nMagnitude * random->RandomFloat( 2, 4 )) * fx_sparks_detail_scale.GetFloat();
 
 	int i;
 	TrailParticle	*pParticle;
@@ -411,7 +411,7 @@ void FX_ElectricSpark( const Vector &pos, int nMagnitude, int nTrailLength, cons
 	pSparkEmitter2->m_ParticleCollision.SetGravity( 400.0f );
 	pSparkEmitter2->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
 
-	numSparks = (nMagnitude * random->RandomInt( 16, 32 )) * perf_spark_scale.GetFloat();
+	numSparks = (nMagnitude * random->RandomInt( 16, 32 )) * fx_sparks_detail_scale.GetFloat();
 
 	// Dump out sparks
 	for ( i = 0; i < numSparks; i++ )
@@ -863,7 +863,7 @@ void FX_Sparks( const Vector &pos, int nMagnitude, int nTrailLength, const Vecto
 	// Big sparks.
 	//
 	Vector	dir;
-	int		numSparks = (nMagnitude * nMagnitude * random->RandomFloat( 2, 4 )) * perf_spark_scale.GetFloat();
+	int		numSparks = (nMagnitude * nMagnitude * random->RandomFloat( 2, 4 )) * fx_sparks_detail_scale.GetFloat();
 
 	int i;
 	TrailParticle	*pParticle;
@@ -918,7 +918,7 @@ void FX_Sparks( const Vector &pos, int nMagnitude, int nTrailLength, const Vecto
 	pSparkEmitter2->m_ParticleCollision.SetGravity( 400.0f );
 	pSparkEmitter2->SetFlag( bitsPARTICLE_TRAIL_VELOCITY_DAMPEN );
 
-	numSparks = (nMagnitude * random->RandomInt( 4, 8 )) * perf_spark_scale.GetFloat();
+	numSparks = (nMagnitude * random->RandomInt( 4, 8 )) * fx_sparks_detail_scale.GetFloat();
 
 	// Dump out sparks
 	for ( i = 0; i < numSparks; i++ )

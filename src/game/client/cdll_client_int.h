@@ -53,6 +53,7 @@ class IInputSystem;
 class ISceneFileCache;
 class IXboxSystem;	// Xbox 360 only
 class IMatchmaking;
+class IVideoServices;
 class IAvi;
 class IBik;
 class CSteamAPIContext;
@@ -89,6 +90,7 @@ extern IInputSystem *inputsystem;
 extern ISceneFileCache *scenefilecache;
 extern IXboxSystem *xboxsystem;	// Xbox 360 only
 extern IMatchmaking *matchmaking;
+extern IVideoServices *g_pVideo;
 extern IAvi *avi;
 extern IBik *bik;
 extern IUploadGameStats *gamestatsuploader;
@@ -127,6 +129,12 @@ void PrecacheParticleSystem( const char *pParticleSystemName );
 int GetParticleSystemIndex( const char *pParticleSystemName );
 const char *GetParticleSystemNameFromIndex( int nIndex );
 
+//-----------------------------------------------------------------------------
+// Precache-related methods for movies
+//-----------------------------------------------------------------------------
+void PrecacheMovie( const char *pMovieName );
+int GetMovieIndex( const char *pMovieName );
+const char *GetMovieNameFromIndex( int nIndex );
 
 //-----------------------------------------------------------------------------
 // Called during bone setup to test perf

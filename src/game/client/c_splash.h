@@ -30,8 +30,8 @@ class CFleckParticles;
 
 class C_Splash : public C_BaseParticleEntity, public IPrototypeAppEffect
 {
-public:
 	DECLARE_CLASS( C_Splash, C_BaseParticleEntity );
+public:
 	DECLARE_CLIENTCLASS();
 	
 					C_Splash();
@@ -39,7 +39,6 @@ public:
 
 	virtual const char *GetEffectName() { return "LeakEffect"; }
 public:
-
 	// Call this to move the source..
 	// Set bInitial if this is the first call (or if it's not moving in a continuous motion).
 	void			SetPos(const Vector &pos, bool bInitial);
@@ -50,12 +49,10 @@ public:
 	// Change the spawn rate.
 	void			SetSpawnRate(float rate);
 
-
 // C_BaseEntity.
 public:
 	virtual	void	OnDataChanged(DataUpdateType_t updateType);
 	virtual bool	ShouldDraw();
-
 
 // IPrototypeAppEffect.
 public:

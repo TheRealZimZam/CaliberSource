@@ -13,6 +13,7 @@
 #include "c_sprite.h"
 #include "tier1/callqueue.h"
 //#include "/avi/iavi.h"
+//#include "/avi/ibik.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -312,9 +313,11 @@ void CEngineSprite::GetTexCoordRange( float *pMinU, float *pMinV, float *pMaxU, 
 	*pMaxU = 1.0f; 
 	*pMaxV = 1.0f;
 	if ( IsAVI() )
-	{
 		avi->GetTexCoordRange( m_hAVIMaterial, pMaxU, pMaxV );
-	}
+	//FIXME;!!Crashing!!
+//	else if ( IsBIK() )
+//		bik->GetTexCoordRange( m_hBIKMaterial, pMaxU, pMaxV );
+
 	float flOOWidth = ( m_width != 0 ) ? 1.0f / m_width : 1.0f;
 	float flOOHeight = ( m_height!= 0 ) ? 1.0f / m_height : 1.0f;
 

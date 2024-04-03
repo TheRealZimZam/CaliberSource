@@ -102,6 +102,7 @@ void CPropScalable::Spawn( void )
 
 		PrecacheModel( szModel );
 		SetModel( szModel );
+		SetModelWidthScale( GetModelWidthScale() );
 	}
 
 	SetMoveType( MOVETYPE_NONE );

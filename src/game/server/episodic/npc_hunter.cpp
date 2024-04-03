@@ -436,7 +436,7 @@ void CC_Hunter_Shoot_Flechette( const CCommand& args )
 	CBaseEntity::SetAllowPrecache( allowPrecache );
 }
 
-static ConCommand ent_create("hunter_shoot_flechette", CC_Hunter_Shoot_Flechette, "Fires a hunter flechette where the player is looking.", FCVAR_GAMEDLL | FCVAR_CHEAT);
+static ConCommand flechette("hunter_shoot_flechette", CC_Hunter_Shoot_Flechette, "Fires a hunter flechette where the player is looking.", FCVAR_GAMEDLL | FCVAR_CHEAT);
 
 
 //-----------------------------------------------------------------------------

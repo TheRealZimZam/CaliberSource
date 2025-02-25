@@ -15,6 +15,7 @@
 
 STUB_WEAPON_CLASS( cycler_weapon, WeaponCycler, C_BaseCombatWeapon );
 STUB_WEAPON_CLASS( weapon_cubemap, WeaponCubemap, C_BaseCombatWeapon );
+//STUB_WEAPON_CLASS( weapon_physgun, WeaponPhysGun, C_BaseCombatWeapon );
 
 // Weapons that arent supported by MP
 STUB_WEAPON_CLASS( weapon_alyxgun, WeaponAlyxGun, C_HLSelectFireMachineGun );
@@ -38,15 +39,14 @@ STUB_WEAPON_CLASS( weapon_357, Weapon357, C_BaseHLCombatWeapon );						//Super M
 //STUB_WEAPON_CLASS( weapon_ar1, WeaponAR1, C_HLMachineGun );								//Assault Rifle
 //STUB_WEAPON_CLASS( weapon_ar2, WeaponAR2, C_HLMachineGun );								//Battle Rifle
 STUB_WEAPON_CLASS( weapon_crossbow, WeaponCrossbow, C_BaseHLCombatWeapon );				//Hot-Stick Launcher
-STUB_WEAPON_CLASS( weapon_crowbarold, WeaponCrowbarOld, C_BaseBludgeonWeapon );
+STUB_WEAPON_CLASS( weapon_crowbar, WeaponCrowbar, C_BaseBludgeonWeapon );
 STUB_WEAPON_CLASS( weapon_flamethrower, WeaponFlamethrower, C_BaseHLCombatWeapon );		//Flamethrower
 STUB_WEAPON_CLASS( weapon_frag, WeaponFrag, C_HLThrowable );							//Frag 'Nade
 STUB_WEAPON_CLASS( weapon_gauss, WeaponGaussGun, C_BaseHLCombatWeapon );
 //STUB_WEAPON_CLASS( weapon_gpistol, WeaponGPistol, C_BaseHLCombatWeapon );				//Golden Gun
 //STUB_WEAPON_CLASS( weapon_hmg1, WeaponHMG1, C_HLSelectFireMachineGun );					//Medium-Rare-Machine Gun
-STUB_WEAPON_CLASS( weapon_flash, WeaponFlash, C_BaseHLCombatWeapon );					//Rawket Lawnchairx4
+STUB_WEAPON_CLASS( weapon_flash, WeaponFLASH, C_BaseHLCombatWeapon );					//Rawket Lawnchairx4
 STUB_WEAPON_CLASS( weapon_molotov, WeaponMolotov, C_HLThrowable );						//Finnish Booze
-//!STUB_WEAPON_CLASS( weapon_physcannon, WeaponPhysCannon, C_BaseHLCombatWeapon );			//!!!ALREADY DEFINED
 //STUB_WEAPON_CLASS( weapon_pistol, WeaponPistol, C_BaseHLCombatWeapon );					//Pistol
 STUB_WEAPON_CLASS( weapon_rpg, WeaponRPG, C_BaseHLCombatWeapon );						//Rawket Lawnchair
 //STUB_WEAPON_CLASS( weapon_shotgun, WeaponShotgun, C_BaseHLCombatWeapon );				//Elephant Gun

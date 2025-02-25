@@ -152,7 +152,7 @@ C_BaseHLPlayer::C_BaseHLPlayer() :
 		// Probably not going to spend time fixing because the few additional
 		// features arent really worth it - we only need animations so the player
 		// can admire himself in the mirror anyway.
-/*
+
 		// Setup the movement data.
 		MultiPlayerMovementData_t movementData;
 		movementData.m_flRunSpeed = HL2_RUN_SPEED;
@@ -161,7 +161,6 @@ C_BaseHLPlayer::C_BaseHLPlayer() :
 
 		// Create animation state for this player.
 		m_MultiplayerPlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
-*/
 	}
 #endif
 
@@ -176,8 +175,17 @@ C_BaseHLPlayer::C_BaseHLPlayer() :
 
 C_BaseHLPlayer::~C_BaseHLPlayer()
 {
+	// Clears the animation state.
 	if ( m_PlayerAnimState )
+	{
 		m_PlayerAnimState->Release();
+		m_PlayerAnimState = NULL;
+	}
+	else if ( m_MultiplayerPlayerAnimState )
+	{
+		m_MultiplayerPlayerAnimState->Release();
+		m_MultiplayerPlayerAnimState = NULL;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -330,10 +338,10 @@ int C_BaseHLPlayer::DrawModel( int flags )
 
 const QAngle& C_BaseHLPlayer::GetRenderAngles()
 {
-	if ( IsRagdoll() || IsPlayerDead() || m_PlayerAnimState == NULL )
+	if ( IsRagdoll() || IsPlayerDead() || GetAnimState() == NULL )
 		return BaseClass::GetRenderAngles();
 	else
-		return m_PlayerAnimState->GetRenderAngles();
+		return GetAnimState()->GetRenderAngles();
 }
 
 const QAngle& C_BaseHLPlayer::EyeAngles()
@@ -799,16 +807,16 @@ void C_BaseHLPlayer::PerformClientSideNPCSpeedModifiers( float flFrameTime, CUse
 
 void C_BaseHLPlayer::UpdateClientSideAnimation()
 {
-	if ( m_PlayerAnimState )
-		m_PlayerAnimState->Update( EyeAngles()[YAW], EyeAngles()[PITCH] );
+	if ( GetAnimState() )
+		GetAnimState()->Update( EyeAngles()[YAW], EyeAngles()[PITCH] );
 
 	BaseClass::UpdateClientSideAnimation();
 }
 
 void C_BaseHLPlayer::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
 {
-	if ( m_PlayerAnimState )
-		m_PlayerAnimState->DoAnimationEvent( PlayerAnimEvent_t, nData );
+	if ( GetAnimState() )
+		GetAnimState()->DoAnimationEvent( PlayerAnimEvent_t, nData );
 }
 
 //-----------------------------------------------------------------------------

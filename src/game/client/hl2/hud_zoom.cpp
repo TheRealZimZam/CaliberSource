@@ -24,6 +24,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar hud_zoom_oldstyle( "hud_zoom_oldstyle", "0", FCVAR_ARCHIVE, "Use HL2 zoom hud" );
+
 //-----------------------------------------------------------------------------
 // Purpose: Draws the zoom screen
 //-----------------------------------------------------------------------------
@@ -175,26 +177,30 @@ void CHudZoom::Paint( void )
 		scale = 1.0f - ( scale * 0.5f );
 	}
 
-	Color col = GetFgColor();
-	col[3] = alpha * 64;
-
-	surface()->DrawSetColor( col );
-	
-	// draw zoom circles
 	int wide, tall;
 	GetSize(wide, tall);
-	surface()->DrawOutlinedCircle(wide / 2, tall / 2, m_flCircle1Radius * scale, 48);
-	surface()->DrawOutlinedCircle(wide / 2, tall / 2, m_flCircle2Radius * scale, 64);
 
-	// draw dashed lines
-	int dashCount = 1;
-	int ypos = (tall - m_flDashHeight) / 2;
-	int xpos = (int)((wide / 2) + (m_flDashGap * ++dashCount * scale));
-	while (xpos < wide && xpos > 0)
+	if ( hud_zoom_oldstyle.GetBool() )
 	{
-		surface()->DrawFilledRect(xpos, ypos, xpos + 1, ypos + m_flDashHeight);
-		surface()->DrawFilledRect(wide - xpos, ypos, wide - xpos + 1, ypos + m_flDashHeight);
-		xpos = (int)((wide / 2) + (m_flDashGap * ++dashCount * max(scale,0.1f)));
+		Color col = GetFgColor();
+		col[3] = alpha * 64;
+
+		surface()->DrawSetColor( col );
+
+		// draw zoom circles
+		surface()->DrawOutlinedCircle(wide / 2, tall / 2, m_flCircle1Radius * scale, 48);
+		surface()->DrawOutlinedCircle(wide / 2, tall / 2, m_flCircle2Radius * scale, 64);
+
+		// draw dashed lines
+		int dashCount = 1;
+		int ypos = (tall - m_flDashHeight) / 2;
+		int xpos = (int)((wide / 2) + (m_flDashGap * ++dashCount * scale));
+		while (xpos < wide && xpos > 0)
+		{
+			surface()->DrawFilledRect(xpos, ypos, xpos + 1, ypos + m_flDashHeight);
+			surface()->DrawFilledRect(wide - xpos, ypos, wide - xpos + 1, ypos + m_flDashHeight);
+			xpos = (int)((wide / 2) + (m_flDashGap * ++dashCount * max(scale,0.1f)));
+		}
 	}
 
 	// draw the darkened edges, with a rotated texture in the four corners

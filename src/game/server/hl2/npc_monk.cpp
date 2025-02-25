@@ -46,13 +46,14 @@ public:
 	int GetSoundInterests();
 	void BuildScheduleTestBits( void );
 	Class_T	Classify( void );
+	bool	ShouldGib( const CTakeDamageInfo &info ) { return (info.GetDamageType() & DMG_ALWAYSGIB) ? true : false; }
 
 	bool ShouldBackAway();
 
 	bool IsValidEnemy( CBaseEntity *pEnemy );
 
 	int	TranslateSchedule( int scheduleType );
-	int	SelectSchedule ();
+	int	SelectSchedule();
 
 	void HandleAnimEvent( animevent_t *pEvent );
 	Activity NPC_TranslateActivity( Activity eNewActivity );

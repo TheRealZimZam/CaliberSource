@@ -59,6 +59,8 @@ public:
 	int				CheckCanThrowGrenade( const Vector &vecTarget );
 	int				RangeAttack2Conditions( float flDot, float flDist ); // For innate grenade attack
 	int				MeleeAttack1Conditions( float flDot, float flDist ); // For kick/punch
+	int				MeleeAttack2Conditions( float flDot, float flDist ); // For kick/punch
+	void			CalculateClips();
 
 	int				CanAltFireEnemy( float flDot, float flDist );	// For weapon altfire
 
@@ -97,6 +99,7 @@ public:
 	void			DelayAltFireAttack( float flDelay );
 	void			DelaySquadAltFireAttack( float flDelay );
 	float			MaxYawSpeed( void );
+	float			GetIdealSpeed() { return m_sType == (SHOCK|ELITE) ? (m_flGroundSpeed*1.2) : BaseClass::GetIdealSpeed(); }
 	bool			ShouldMoveAndShoot();
 	void			OnUpdateShotRegulator();
 	bool			OverrideMoveFacing( const AILocalMoveGoal_t &move, float flInterval );;
@@ -194,36 +197,33 @@ private:
 		SCHED_COMBINE_COMBAT_FACE,
 		SCHED_COMBINE_COVER_AND_RELOAD,
 		SCHED_COMBINE_HIDE_AND_RELOAD,
-		SCHED_COMBINE_SIGNAL_SUPPRESS,
+		SCHED_COMBINE_RANGE_ATTACK1,
+		SCHED_COMBINE_MELEE_ATTACK1,
+		SCHED_COMBINE_RANGE_ATTACK2,
 		SCHED_COMBINE_ASSAULT,
-//		SCHED_COMBINE_GRENADE_ASSAULT,
 		SCHED_COMBINE_ESTABLISH_LINE_OF_FIRE,
 		SCHED_COMBINE_FOUND_ENEMY,
 		SCHED_COMBINE_PRESS_ATTACK,
 		SCHED_COMBINE_SIGNAL_PRESS_ATTACK,
+		SCHED_COMBINE_SIGNAL_SUPPRESS,
+		SCHED_COMBINE_SIGNAL_TAKE_COVER,
 		SCHED_COMBINE_WAIT_IN_COVER,
-		SCHED_COMBINE_RANGE_ATTACK1,
-		SCHED_COMBINE_MELEE_ATTACK1,
-		SCHED_COMBINE_RANGE_ATTACK2,
-		SCHED_COMBINE_TAKE_COVER1,
-		SCHED_COMBINE_TAKE_COVER2,
+		SCHED_COMBINE_TAKE_COVER,
+		SCHED_COMBINE_DODGE,
 		SCHED_COMBINE_TAKE_COVER_FROM_BEST_SOUND,
 		SCHED_COMBINE_RUN_AWAY_FROM_BEST_SOUND,
-		SCHED_COMBINE_SIGNAL_TAKE_COVER,
-		SCHED_COMBINE_GRENADE_COVER1,
 		SCHED_COMBINE_TAKECOVER_FAILED,
+		SCHED_COMBINE_GRENADE_COVER1,
 		SCHED_COMBINE_GRENADE_AND_RELOAD,
 		SCHED_COMBINE_PATROL,
 		SCHED_COMBINE_BUGBAIT_DISTRACTION,
-		SCHED_COMBINE_CHARGE_TURRET,
+		SCHED_COMBINE_FIX_BAYONET,
 		SCHED_COMBINE_DROP_GRENADE,
 		SCHED_COMBINE_DEFUSE,
+		SCHED_COMBINE_CHARGE_TURRET,
 		SCHED_COMBINE_CHARGE_PLAYER,
-		SCHED_COMBINE_PATROL_ENEMY,
 		SCHED_COMBINE_BURNING_STAND,
-//		SCHED_COMBINE_EVADE,
 		SCHED_COMBINE_AR2_ALTFIRE,
-//		SCHED_COMBINE_SMG1_ALTFIRE,
 		SCHED_COMBINE_FORCED_GRENADE_THROW,
 		SCHED_COMBINE_MOVE_TO_FORCED_GREN_LOS,
 		NEXT_SCHEDULE,
@@ -243,6 +243,7 @@ private:
 		TASK_COMBINE_PLAY_SEQUENCE_FACE_ALTFIRE_TARGET,
 		TASK_COMBINE_GET_PATH_TO_FORCED_GREN_LOS,
 		TASK_COMBINE_SET_STANDING,
+		TASK_COMBINE_ENABLE_BAYONET,
 //		TASK_COMBINE_MOVE_AND_SHOOT,
 //		TASK_COMBINE_MOVE_AND_AIM,
 //!		TASK_WAIT_FOR_TELEPORT,
@@ -307,6 +308,7 @@ private:
 	bool			m_bShouldAutosquad;	//If not in a squad, should i try to join one?
 	bool			m_bShouldPatrol;
 	bool			m_bHelmet;	// Is the helmet still on after a headshot?
+	bool			m_bBayonet;	// Is my bayonet attached?
 
 //	float			m_flDistToEnemy = ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length();
 

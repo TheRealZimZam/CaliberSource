@@ -23,7 +23,7 @@
 #define STUN_GRENADE_GRACE_TIME_AFTER_PICKUP 1.5f
 #define STUN_GRENADE_WARN_TIME 1.5f
 
-ConVar sk_stun_radius			( "sk_stun_radius", "400");
+ConVar sk_emp_radius			( "sk_emp_radius", "400");
 
 #define STUNGRENADE_MODEL "models/Weapons/w_grenade.mdl"
 
@@ -184,7 +184,7 @@ void CGrenadeConcussive::Spawn( void )
 	else
 		m_flDamage		= 5;
 
-	m_DmgRadius		= sk_stun_radius.GetFloat();
+	m_DmgRadius		= sk_emp_radius.GetFloat();
 	m_takedamage	= DAMAGE_YES;
 	m_iHealth		= 5;
 

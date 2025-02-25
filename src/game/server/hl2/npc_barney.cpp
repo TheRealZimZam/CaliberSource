@@ -80,7 +80,7 @@ public:
 	void DeathSound( const CTakeDamageInfo &info );
 	void GatherConditions();
 	void SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
-	void FollowUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+//	void FollowUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	CAI_FuncTankBehavior		m_FuncTankBehavior;
 	COutputEvent				m_OnPlayerUse;
@@ -234,12 +234,13 @@ void CNPC_Barney::GatherConditions()
 void CNPC_Barney::SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	m_bDontUseSemaphore = true;
-	SpeakIfAllowed( TLK_USE );
+	SelectPlayerUseSpeech(pCaller);
 	m_bDontUseSemaphore = false;
 
 	if ( AI_IsSinglePlayer() && pActivator == UTIL_GetLocalPlayer() )
 	{
-		FollowUse(pActivator, pCaller, useType, value);
+	//	FollowUse(pActivator, pCaller, useType, value);
+		FollowerUse( pActivator, pCaller, useType, value );
 
 		m_OnPlayerUse.FireOutput( pActivator, pCaller );
 	}
@@ -247,6 +248,7 @@ void CNPC_Barney::SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 
 //---------------------------------------------------------
 //---------------------------------------------------------
+#if 0
 void CNPC_Barney::FollowUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	CBaseEntity *pLeader = ( !m_FollowBehavior.GetFollowTarget() ) ? pCaller : NULL;
@@ -265,6 +267,7 @@ void CNPC_Barney::FollowUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_
 		}
 	}
 }
+#endif
 
 //-----------------------------------------------------------------------------
 //

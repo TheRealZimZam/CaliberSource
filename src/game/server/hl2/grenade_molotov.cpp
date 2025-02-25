@@ -25,8 +25,8 @@
 
 extern short	g_sModelIndexFireball;
 
-extern ConVar    sk_plr_dmg_molotov;
-extern ConVar    sk_npc_dmg_molotov;
+extern ConVar    sk_molotov_plr_dmg;
+extern ConVar    sk_molotov_npc_dmg;
 //This is the radius of the fire, not the explosion
 ConVar    sk_molotov_radius			( "sk_molotov_radius","128");
 ConVar    sk_molotov_fire_radius	( "sk_molotov_fire_radius","200");
@@ -78,9 +78,9 @@ void CGrenadeMolotov::Spawn( void )
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
-		m_flDamage		= sk_plr_dmg_molotov.GetFloat();
+		m_flDamage		= sk_molotov_plr_dmg.GetFloat();
 	else
-		m_flDamage		= sk_npc_dmg_molotov.GetFloat();
+		m_flDamage		= sk_molotov_npc_dmg.GetFloat();
 
 	m_DmgRadius		= sk_molotov_radius.GetFloat();
 
@@ -136,7 +136,7 @@ void CGrenadeMolotov::MolotovTouch( CBaseEntity *pOther )
 //-----------------------------------------------------------------------------
 void CGrenadeMolotov::ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity )
 {
-	ResolveFlyCollisionBounce( trace, vecVelocity, 0.4 );
+	ResolveFlyCollisionBounce( trace, vecVelocity, 0.4f );
 }
 
 //-----------------------------------------------------------------------------
@@ -201,6 +201,9 @@ void CGrenadeMolotov::Detonate( void )
 		float scale	 = 32.0f + ( 0.75f * ( 1.0f - ( offset / 128.0f ) ) );
 		float growth = 0.1f + ( 0.75f * ( offset / 128.0f ) );
 
+		// First, add heat to existing fire
+		FireSystem_AddHeatInRadius( firetrace.endpos, m_DmgRadius, m_flDamage );
+		// Then, spawn a new fire (if i can)
 		if( firetrace.fraction != 1.0 )
 		{
 			FireSystem_StartFire( firetrace.endpos, scale, growth, lifetime, (SF_FIRE_START_ON|SF_FIRE_SMOKELESS|SF_FIRE_NO_GLOW), (CBaseEntity*) this, FIRE_NATURAL );

@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Flying taser/suicide drone
+// Purpose: Flying taser drone
 //
 //=============================================================================//
 
@@ -32,8 +32,10 @@
 #include "ai_squadslot.h"
 #include "world.h"
 #include "smoke_trail.h"
+#include "func_break.h"
 #include "physics_impact_damage.h"
 #include "weapon_physcannon.h"
+#include "physics_prop_ragdoll.h"
 #include "soundent.h"
 #include "ammodef.h"
 
@@ -41,14 +43,12 @@
 #include "tier0/memdbgon.h"
 
 // When the engine is running and the manhack is operating under power
-// we only barely let gravity affect him. Adds a slight hovering effect
+// we barely let gravity affect him. Adds a slight hovering effect
 // as the engine adjusts
-#define MANHACK_GRAVITY 0.25
+#define MANHACK_GRAVITY 0.990
 
 #define MANHACK_GIB_COUNT			5 
 #define MANHACK_INGORE_WATER_DIST	384
-
-#define	MANHACK_CHARGE_MIN_DIST	220
 
 // Sound stuff
 #define MANHACK_PITCH_DIST1		512
@@ -74,15 +74,18 @@
 #define MANHACK_AE_DONE_UNPACKING		51
 #define MANHACK_AE_OPEN_BLADE			52
 
-#define MANHACK_GLOW_SPRITE	"sprites/laserdot.vmt"
+//#define MANHACK_GLOW_SPRITE	"sprites/laserdot.vmt"
+#define MANHACK_GLOW_SPRITE	"sprites/glow1.vmt"
+
+#define	MANHACK_CHARGE_MIN_DIST	200
 
 ConVar	sk_manhack_health( "sk_manhack_health","0");
-ConVar	sk_manhack_min_melee_dmg( "sk_manhack_min_melee_dmg","0");
-ConVar	sk_manhack_max_melee_dmg( "sk_manhack_max_melee_dmg","0");
+ConVar	sk_manhack_melee_dmg( "sk_manhack_melee_dmg","0");
 ConVar	sk_manhack_explode_dmg( "sk_manhack_explode_dmg","0");
+ConVar	sk_manhack_v2( "sk_manhack_v2","0", FCVAR_NONE, "For Caliber - Use explosive suicide manhacks" );
 
-ConVar	npc_manhack_maxspeed( "npc_manhack_maxspeed","300");
-ConVar	npc_manhack_maxburstspeed( "npc_manhack_maxburstspeed","350");
+ConVar	npc_manhack_maxspeed( "npc_manhack_maxspeed","500");
+ConVar	npc_manhack_maxburstspeed( "npc_manhack_maxburstspeed","650");
 
 #define	MANHACK_MAX_SPEED				npc_manhack_maxspeed.GetFloat()
 #define MANHACK_BURST_SPEED				npc_manhack_maxburstspeed.GetFloat()
@@ -109,7 +112,7 @@ enum ManhackConditions
 //-----------------------------------------------------------------------------
 enum ManhackSchedules
 {
-	SCHED_MANHACK_HOVER = LAST_SHARED_SCHEDULE,
+	SCHED_MANHACK_ATTACK_HOVER = LAST_SHARED_SCHEDULE,
 	SCHED_MANHACK_DEPLOY,
 	SCHED_MANHACK_REGROUP,
 	SCHED_MANHACK_SWARM_IDLE,
@@ -143,7 +146,7 @@ BEGIN_DATADESC( CNPC_Manhack )
 
 	DEFINE_FIELD( m_flNextEngineSoundTime,	FIELD_TIME),
 	DEFINE_FIELD( m_flEngineStallTime,		FIELD_TIME),
-	DEFINE_FIELD( m_flNextBurstTime,		FIELD_TIME ),
+	DEFINE_FIELD( m_flNextBurstTime,			FIELD_TIME ),
 	DEFINE_FIELD( m_flWaterSuspendTime,		FIELD_TIME),
 	DEFINE_FIELD( m_nLastSpinSound,			FIELD_INTEGER ),
 
@@ -246,109 +249,6 @@ Class_T	CNPC_Manhack::Classify(void)
 	return (m_bHeld||m_bHackedByAlyx) ? CLASS_PLAYER_ALLY : CLASS_MANHACK; 
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_Manhack::Spawn(void)
-{
-	Precache();
-
-#ifdef _XBOX
-	// Always fade the corpse
-	AddSpawnFlags( SF_NPC_FADE_CORPSE );
-#endif // _XBOX
-
-	SetModel( "models/manhack.mdl" );
-	SetHullType(HULL_TINY_CENTERED); 
-	SetHullSizeNormal();
-
-	SetSolid( SOLID_OBB );
-	AddSolidFlags( FSOLID_NOT_STANDABLE );
-
-	if ( HasSpawnFlags( SF_MANHACK_CARRIED ) )
-	{
-		AddSolidFlags( FSOLID_NOT_SOLID );
-		SetMoveType( MOVETYPE_NONE );
-		SetTouch( NULL );
-	}
-	else
-	{
-		SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
-		SetTouch( &CNPC_Manhack::NormalTouch );
-	}
-
-	m_iHealth			= sk_manhack_health.GetFloat();
-	SetViewOffset( Vector(0, 0, 10) );		// Position of the eyes relative to NPC's origin.
-	m_flFieldOfView		= VIEW_FIELD_NARROW;
-	m_NPCState			= NPC_STATE_NONE;
-
-	if ( m_spawnflags & SF_MANHACK_USE_AIR_NODES)
-	{
-		SetNavType(NAV_FLY);
-	}
-	else
-	{
-		SetNavType(NAV_GROUND);
-	}
-
-	AddEFlags( EFL_NO_DISSOLVE | EFL_NO_MEGAPHYSCANNON_RAGDOLL );
-	AddEffects( EF_NOSHADOW );
-	RemoveEffects( EF_NOINTERP );
-
-	SetBloodColor( DONT_BLEED );
-	SetCurrentVelocity( vec3_origin );
-	m_vForceVelocity.Init();
-	m_vCurrentBanking.Init();
-	m_vTargetBanking.Init();
-
-	m_flNextBurstTime = gpGlobals->curtime;
-	m_flLastAttackTime = gpGlobals->curtime;
-
-	CapabilitiesAdd( bits_CAP_INNATE_MELEE_ATTACK1 | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_MOVE_FLY | bits_CAP_SQUAD );
-
-	m_flNextEngineSoundTime		= gpGlobals->curtime;
-	m_flWaterSuspendTime		= gpGlobals->curtime;
-	m_flEngineStallTime			= gpGlobals->curtime;
-	m_fForceMoveTime			= gpGlobals->curtime;
-	m_vForceMoveTarget			= vec3_origin;
-	m_fSwarmMoveTime			= gpGlobals->curtime;
-	m_vSwarmMoveTarget			= vec3_origin;
-	m_nLastSpinSound			= -1;
-
-	m_fSmokeTime		= 0;
-	m_fSparkTime		= 0;
-
-	// Set the noise mod to huge numbers right now, in case this manhack starts out waiting for a script
-	// for instance, we don't want him to bob whilst he's waiting for a script. This allows designers
-	// to 'hide' manhacks in small places. (sjb)
-	SetNoiseMod( MANHACK_NOISEMOD_HIDE, MANHACK_NOISEMOD_HIDE, MANHACK_NOISEMOD_HIDE );
-
-	// Start out with full power! 
-	m_fEnginePowerScale = GetMaxEnginePower();
-	
-	// find panels
-	m_iPanel1 = LookupPoseParameter( "Panel1" );
-	m_iPanel2 = LookupPoseParameter( "Panel2" );
-	m_iPanel3 = LookupPoseParameter( "Panel3" );
-	m_iPanel4 = LookupPoseParameter( "Panel4" );
-
-	m_fHeadYaw			= 0;
-
-	NPCInit();
-
-	// Manhacks are designed to slam into things, so don't take much damage from it!
-	SetImpactEnergyScale( 0.001 );
-
-	// Manhacks get 30 seconds worth of free knowledge.
-	GetEnemies()->SetFreeKnowledgeDuration( 30.0 );
-	
-	// don't be an NPC, we want to collide with debris stuff
-	SetCollisionGroup( COLLISION_GROUP_PROJECTILE );
-
-	m_bHeld = false;
-	m_bHackedByAlyx = false;
-	StopLoitering();
-}
 
 
 //-----------------------------------------------------------------------------
@@ -356,10 +256,7 @@ void CNPC_Manhack::Spawn(void)
 //-----------------------------------------------------------------------------
 void CNPC_Manhack::Event_Dying(void)
 {
-	// Make a little bigger for easier collision
-	UTIL_SetSize(this, Vector(-12, -12, -5), Vector(12, 12, 5));
-	if ( VPhysicsGetObject() )
-		SetupVPhysicsHull();
+	SetHullSizeNormal();
 
 	BaseClass::Event_Dying();
 }
@@ -416,15 +313,6 @@ void CNPC_Manhack::PrescheduleThink( void )
 }
 
 //-----------------------------------------------------------------------------
-void CNPC_Manhack::Activate()
-{
-	BaseClass::Activate();
-
-	if ( IsAlive() )
-		StartEye();
-}
-
-//-----------------------------------------------------------------------------
 // Purpose:
 // Input  :
 // Output :
@@ -441,7 +329,7 @@ void CNPC_Manhack::TraceAttack( const CTakeDamageInfo &info, const Vector &vecDi
 	if ( info.GetDamageType() & DMG_CLUB )
 	{
 		// Clubbed!
-		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(10, 15));
+		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(10, 15), 10);
 		g_pEffects->Sparks( ptr->endpos, 1, 1, &ptr->plane.normal );
 	}
 
@@ -512,11 +400,39 @@ void CNPC_Manhack::Event_Killed( const CTakeDamageInfo &info )
 	StopLoopingSounds();
 	DeathSound( info );
 
-	m_lifeState = LIFE_DYING;
-	SetTouch( &CNPC_Manhack::CrashTouch );
-	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_CUSTOM );	//MOVETYPE_TOSS
-	AddEffects( EF_NOINTERP );
+	// Caliber manhacks spiral and go boom when dying
+	if ( sk_manhack_v2.GetBool() )
+	{
+		m_lifeState = LIFE_DYING;
+		SetTouch( &CNPC_Manhack::CrashTouch );
+		SetMoveType( MOVETYPE_FLYGRAVITY );
+	}
+	else
+		BaseClass::Event_Killed( info );
 }
+
+void CNPC_Manhack::HitPhysicsObject( CBaseEntity *pOther )
+{
+	IPhysicsObject *pOtherPhysics = pOther->VPhysicsGetObject();
+	Vector pos, posOther;
+	// Put the force on the line between the manhack origin and hit object origin
+	VPhysicsGetObject()->GetPosition( &pos, NULL );
+	pOtherPhysics->GetPosition( &posOther, NULL );
+	Vector dir = posOther - pos;
+	VectorNormalize(dir);
+	// size/2 is approx radius
+	pos += dir * WorldAlignSize().x * 0.5;
+	Vector cross;
+
+	// UNDONE: Use actual manhack up vector so the fake blade is
+	// in the right plane?
+	// Get a vector in the x/y plane in the direction of blade spin (clockwise)
+	CrossProduct( dir, Vector(0,0,1), cross );
+	VectorNormalize( cross );
+	// force is a 30kg object going 100 in/s
+	pOtherPhysics->ApplyForceOffset( cross * 30 * 100, pos );
+}
+
 
 //-----------------------------------------------------------------------------
 // Take damage from being thrown by a physcannon 
@@ -612,30 +528,6 @@ void CNPC_Manhack::TakeDamageFromPhysicsImpact( int index, gamevcollisionevent_t
 	PhysCallbackDamage( this, CTakeDamageInfo( pHitEntity, pHitEntity, damageForce, damagePos, damage, damageType ), *pEvent, index );
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_Manhack::HitPhysicsObject( CBaseEntity *pOther )
-{
-	IPhysicsObject *pOtherPhysics = pOther->VPhysicsGetObject();
-	Vector pos, posOther;
-	// Put the force on the line between the manhack origin and hit object origin
-	VPhysicsGetObject()->GetPosition( &pos, NULL );
-	pOtherPhysics->GetPosition( &posOther, NULL );
-	Vector dir = posOther - pos;
-	VectorNormalize(dir);
-	// size/2 is approx radius
-	pos += dir * WorldAlignSize().x * 0.5;
-	Vector cross;
-
-	// UNDONE: Use actual manhack up vector so the fake blade is
-	// in the right plane?
-	// Get a vector in the x/y plane in the direction of blade spin (clockwise)
-	CrossProduct( dir, Vector(0,0,1), cross );
-	VectorNormalize( cross );
-	// force is a 30kg object going 100 in/s
-	pOtherPhysics->ApplyForceOffset( cross * 30 * 100, pos );
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -662,6 +554,15 @@ void CNPC_Manhack::VPhysicsCollision( int index, gamevcollisionevent_t *pEvent )
 	if( pPlayer )
 	{
 		if (!pHitEntity)
+		{
+			TakeDamageFromPhyscannon( pPlayer );
+			StopBurst( true );
+			return;
+		}
+
+		// Don't take damage from NPCs or server ragdolls killed by the manhack
+		CRagdollProp *pRagdollProp = dynamic_cast<CRagdollProp*>(pHitEntity);
+		if (!pHitEntity->IsNPC() && (!pRagdollProp || pRagdollProp->GetKiller() != this))
 		{
 			TakeDamageFromPhyscannon( pPlayer );
 			StopBurst( true );
@@ -706,41 +607,6 @@ void CNPC_Manhack::VPhysicsShadowCollision( int index, gamevcollisionevent_t *pE
 		HitPhysicsObject( pOther );
 	}
 	BaseClass::VPhysicsShadowCollision( index, pEvent );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose:
-// Input  :
-// Output :
-//-----------------------------------------------------------------------------
-void CNPC_Manhack::NormalTouch( CBaseEntity *pOther )
-{
-	if ( pOther != NULL )
-	{
-		if ( !pOther->IsSolid() || pOther->IsSolidFlagSet( FSOLID_VOLUME_CONTENTS ) )
-			return;
-
-		if ( pOther->m_takedamage == DAMAGE_YES && 
-			 pOther->Classify() != CLASS_MANHACK && 
-			 gpGlobals->curtime > m_flWaterSuspendTime )
-		{
-			// Slice this thing
-			Slice( pOther );
-			m_flBladeSpeed = 30.0;
-		}
-		else
-		{
-			// Just bump into this thing.
-			Bump( pOther );
-			m_flBladeSpeed = 20.0;
-		}
-	}
-	else
-	{
-		// Bumped into world
-		Bump( NULL );
-		m_flBladeSpeed = 10.0;
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -819,7 +685,7 @@ int	CNPC_Manhack::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 
 		StopBurst( true );
 	}
-	else if (info.GetDamageType() & (DMG_CLUB|DMG_CRUSH))
+	else if (info.GetDamageType() & DMG_CLUB)
 	{
 		// Being hit by a club means a couple of things:
 		//
@@ -830,7 +696,8 @@ int	CNPC_Manhack::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		//
 
 		//		-Take 150% damage from club attacks. This makes crowbar duels take two hits.
-
+		
+		tdInfo.ScaleDamage( 1.50 );
 
 #define MANHACK_PHYS_SEARCH_SIZE		64
 #define	MANHACK_PHYSICS_SEARCH_RADIUS	128
@@ -936,7 +803,7 @@ int	CNPC_Manhack::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 //------------------------------------------------------------------------------
 // Purpose:
 //------------------------------------------------------------------------------
-bool CNPC_Manhack::Event_Gibbed( const CTakeDamageInfo &info )
+bool  CNPC_Manhack::Event_Gibbed( const CTakeDamageInfo &info )
 {
 	// Cover the removal
 	KillSprites( 0.0f );
@@ -977,7 +844,7 @@ bool CNPC_Manhack::CorpseGib( const CTakeDamageInfo &info )
 	PropBreakableCreateAll( GetModelIndex(), NULL, GetAbsOrigin(), GetAbsAngles(), vecGibVelocity, vecGibAVelocity, 1.0, 60, COLLISION_GROUP_DEBRIS );
 
 	// Finally, kill me off
-	RemoveDeferred();
+	UTIL_Remove( m_hSmokeTrail );
 
 	return true;
 }
@@ -990,14 +857,10 @@ bool CNPC_Manhack::CorpseGib( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 int	CNPC_Manhack::OnTakeDamage_Dying( const CTakeDamageInfo &info )
 {
-	// TODO;
 	// Ignore damage for the first 1 second of crashing behavior.
 	// If we don't do this, manhacks always just explode under 
 	// sustained fire.
-	if ( info.GetDamageType() & DMG_GIB_CORPSE )
-	{
-		return BaseClass::OnTakeDamage_Dying( info );
-	}
+	VPhysicsTakeDamage( info );
 
 	return 0;
 }
@@ -1021,17 +884,6 @@ void CNPC_Manhack::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
 		m_spawnflags &= ~SF_NPC_GAG;
 		SoundInit();
 	}
-
-	BaseClass::OnStateChange( OldState, NewState );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  :
-//-----------------------------------------------------------------------------
-int CNPC_Manhack::SelectSchedule( void )
-{
-	return BaseClass::SelectSchedule();
 }
 
 //-----------------------------------------------------------------------------
@@ -1049,15 +901,11 @@ void CNPC_Manhack::HandleAnimEvent( animevent_t *pEvent )
 		m_spawnflags &= ~SF_MANHACK_PACKED_UP;
 
 		// No bursts until fully unpacked!
-		m_flNextBurstTime = gpGlobals->curtime + 99.0f;	//Ludicrous!
+		m_flNextBurstTime = gpGlobals->curtime + FLT_MAX;
 		break;
 
 	case MANHACK_AE_DONE_UNPACKING:
-		vecNewVelocity = GetAbsVelocity();
-		vecNewVelocity.z = 0.0;
-		// SetAbsVelocity( vecNewVelocity );
-
-		m_flNextBurstTime = gpGlobals->curtime + 2.0f;
+		m_flNextBurstTime = gpGlobals->curtime + 2.0;
 		break;
 
 	case MANHACK_AE_OPEN_BLADE:
@@ -1111,7 +959,7 @@ int CNPC_Manhack::TranslateSchedule( int scheduleType )
 	{
 	case SCHED_MELEE_ATTACK1:
 		{
-			return SCHED_MANHACK_HOVER;
+			return SCHED_MANHACK_ATTACK_HOVER;
 			break;
 		}
 	case SCHED_BACK_AWAY_FROM_ENEMY:
@@ -1177,7 +1025,6 @@ int CNPC_Manhack::TranslateSchedule( int scheduleType )
 		}
 
 	}
-
 	return BaseClass::TranslateSchedule(scheduleType);
 }
 
@@ -1237,10 +1084,10 @@ void CNPC_Manhack::MaintainGroundHeight( void )
 	if ( zSpeed > 32.0f )
 		return;
 
-	const float minGroundHeight = MinGroundDist();
+	const float minGroundHeight = 52.0f;
 
 	trace_t	tr;
-	AI_TraceHull( GetAbsOrigin(), 
+	AI_TraceHull(	GetAbsOrigin(), 
 		GetAbsOrigin() - Vector( 0, 0, minGroundHeight ), 
 		GetHullMins(), 
 		GetHullMaxs(), 
@@ -1263,25 +1110,26 @@ void CNPC_Manhack::MaintainGroundHeight( void )
 //-----------------------------------------------------------------------------
 bool CNPC_Manhack::OverrideMove( float flInterval )
 {
+	SpinBlades( flInterval );
+		
 	// Don't execute any move code if packed up.
 	if( HasSpawnFlags(SF_MANHACK_PACKED_UP|SF_MANHACK_CARRIED) )
-		return false;
+		return true;
 
-	SpinBlades( flInterval );
-	// StudioFrameAdvance( flInterval );
-
-	if ( GetNavType() != NAV_FLY )
-		SetNavType( NAV_FLY );
+	if( IsLoitering() )
+	{
+		Loiter();
+	}
+	else
+	{
+		MaintainGroundHeight();
+	}
 
 	// So cops, etc. will try to avoid them
 	if ( !HasSpawnFlags( SF_MANHACK_NO_DANGER_SOUNDS ) && !m_bHeld )
+	{
 		CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), 75, flInterval, this );
-
-	// Unless I'm loitering, always try to maintain ground height
-	if( IsLoitering() )
-		Loiter();
-	else
-		MaintainGroundHeight();
+	}
 
 	// -----------------------------------------------------------------
 	//  If I'm being forced to move somewhere
@@ -1296,8 +1144,9 @@ bool CNPC_Manhack::OverrideMove( float flInterval )
 	else if (GetNavigator()->IsGoalActive())
 	{
 		bool bReducible = GetNavigator()->GetPath()->GetCurWaypoint()->IsReducible();
+		const float strictTolerance = 64.0;
 		//NDebugOverlay::Line( GetAbsOrigin(), GetAbsOrigin() + Vector(0, 0, 10 ), 255, 0, 0, true, 0.1);
-  		if ( ProgressFlyPath( flInterval, GetEnemy(), MoveCollisionMask(), bReducible ) == AINPP_COMPLETE )
+  		if ( ProgressFlyPath( flInterval, GetEnemy(), MoveCollisionMask(), bReducible, strictTolerance ) == AINPP_COMPLETE )
 			return true;
 	}
 	// -----------------------------------------------------------------
@@ -1368,7 +1217,9 @@ void CNPC_Manhack::TurnHeadRandomly(float flInterval )
 void CNPC_Manhack::MoveToTarget(float flInterval, const Vector &vMoveTarget)
 {
 	if (flInterval <= 0)
+	{
 		return;
+	}
 
 	// -----------------------------------------
 	// Don't steer if engine's have stalled
@@ -1377,9 +1228,13 @@ void CNPC_Manhack::MoveToTarget(float flInterval, const Vector &vMoveTarget)
 		return;
 
 	if ( GetEnemy() != NULL )
+	{
 		TurnHeadToTarget( flInterval, GetEnemy()->EyePosition() );
+	}
 	else
+	{
 		TurnHeadToTarget( flInterval, vMoveTarget );
+	}
 
 	// -------------------------------------
 	// Move towards our target
@@ -1415,16 +1270,27 @@ void CNPC_Manhack::MoveToTarget(float flInterval, const Vector &vMoveTarget)
 			VectorNormalize( m_vecBurstDirection );
 		}
 
+		// Debug visualizations
+		/*
+		NDebugOverlay::Line( GetAbsOrigin(), GetAbsOrigin() + ( targetDir * 64.0f ), 255, 0, 0, true, 2.1f );
+		NDebugOverlay::Line( GetAbsOrigin(), GetAbsOrigin() + ( steerDir * 64.0f ), 0, 255, 0, true, 2.1f );
+		NDebugOverlay::Line( GetAbsOrigin(), GetAbsOrigin() + ( m_vecBurstDirection * 64.0f ), 0, 0, 255, true, 2.1f );
+		NDebugOverlay::Cross3D( GetAbsOrigin() , -Vector(8,8,8), Vector(8,8,8), 255, 0, 0, true, 2.1f );
+		*/
+
 		targetDir = m_vecBurstDirection;
 
 		flDist	= FLT_MAX;
 		myDecay	 = 0.3f;
-		myAccel	 = 280;
-		myZAccel = min( myZAccel, zDist / flInterval );
+#ifdef _XBOX
+		myAccel	 = 500;
+#else
+		myAccel	 = 400;
+#endif // _XBOX
+		myZAccel = min( 500, zDist / flInterval );
 	}
 	else
 	{
-		// Get the relationship between my current velocity and the way I want to be going.
 		Vector vecCurrentDir = GetCurrentVelocity();
 		VectorNormalize( vecCurrentDir );
 
@@ -1437,14 +1303,12 @@ void CNPC_Manhack::MoveToTarget(float flInterval, const Vector &vMoveTarget)
 		if( flDot > 0.25 )
 		{
 			// If my target is in front of me, my flight model is a bit more accurate.
-			//Msg("Fast Accel\n");
-			myAccel = 200;
+			myAccel = 300;
 		}
 		else
 		{
 			// Have a harder time correcting my course if I'm currently flying away from my target.
-			//Msg("Slow Accel\n");
-			myAccel = 120;
+			myAccel = 200;
 		}
 	}
 
@@ -1453,6 +1317,16 @@ void CNPC_Manhack::MoveToTarget(float flInterval, const Vector &vMoveTarget)
 	{
 		myAccel = flDist / flInterval;
 	}
+
+	/*
+	// Boost vertical movement
+	if ( targetDir.z > 0 )
+	{
+		// Z acceleration is faster when we thrust upwards.
+		// This is to help keep manhacks out of water. 
+		myZAccel *= 5.0;
+	}
+	*/
 
 	// Clamp vertical movement
 	if ( myZAccel > flDist / flInterval )
@@ -1533,7 +1407,7 @@ void CNPC_Manhack::Splash( const Vector &vecSplashPos )
 //-----------------------------------------------------------------------------
 // Computes the slice bounce velocity
 //-----------------------------------------------------------------------------
-void CNPC_Manhack::ComputeSliceBounceVelocity( CBaseEntity *pHitEntity )
+void CNPC_Manhack::ComputeSliceBounceVelocity( CBaseEntity *pHitEntity, trace_t &tr )
 {
 	if( pHitEntity->IsAlive() && FClassnameIs( pHitEntity, "func_breakable_surf" ) )
 	{
@@ -1549,9 +1423,9 @@ void CNPC_Manhack::ComputeSliceBounceVelocity( CBaseEntity *pHitEntity )
 	// If the manhack isn't bouncing away from whatever he sliced, force it.
 	VectorSubtract( WorldSpaceCenter(), pHitEntity->WorldSpaceCenter(), vecDir );
 	VectorNormalize( vecDir );
-	vecDir *= 150;
+	vecDir *= 200;
 	vecDir[2] = 0.0f;
-
+	
 	// Knock it away from us
 	if ( VPhysicsGetObject() != NULL )
 	{
@@ -1560,7 +1434,6 @@ void CNPC_Manhack::ComputeSliceBounceVelocity( CBaseEntity *pHitEntity )
 
 	// Also set our velocity
 	SetCurrentVelocity( vecDir );
-	m_flBumpSuppressTime = gpGlobals->curtime + 0.2f;
 }
 
 
@@ -1578,7 +1451,7 @@ bool CNPC_Manhack::IsHeldByPhyscannon( )
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-void CNPC_Manhack::Slice( CBaseEntity *pHitEntity )
+void CNPC_Manhack::Slice( CBaseEntity *pHitEntity, float flInterval, trace_t &tr )
 {
 	// Can't slice players holding it with the phys cannon
 	if ( IsHeldByPhyscannon() )
@@ -1587,63 +1460,99 @@ void CNPC_Manhack::Slice( CBaseEntity *pHitEntity )
 			return;
 	}
 
+#if 0
+	// Don't hurt the player if I'm in water
+	if( GetWaterLevel() > 0 && pHitEntity->IsPlayer() )
+		return;
+#endif
+
 	if ( pHitEntity->m_takedamage == DAMAGE_NO )
 		return;
 
-	// This function is expensive, so dont do it too often
-	if ( m_flLastAttackTime < gpGlobals->curtime - 0.2 )
+	// Damage must be scaled by flInterval so framerate independent
+	float flDamage = sk_manhack_melee_dmg.GetFloat() * flInterval;
+
+#if 0
+	// Held manhacks do more damage
+	if ( IsHeldByPhyscannon() )
 	{
-		// Damage is scaled by velocity (non or slow moving hacks do very little damage per frame)
-		float flDamage = sk_manhack_min_melee_dmg.GetFloat() * (GetCurrentVelocity().Length2D()/20);
-		if (flDamage > sk_manhack_max_melee_dmg.GetFloat())
-			flDamage = sk_manhack_max_melee_dmg.GetFloat();
-
-		// If its caliber, shock AND slash, otherwise just slash
-		CTakeDamageInfo info( this, this, flDamage, (DMG_SHOCK|DMG_SLASH) );
-
-		// Do MORE damage in water, but also damage me!
-		if( pHitEntity->GetWaterLevel() > 0 )
-		{
-			info.ScaleDamage( 2.0f );
-			TakeDamage( info );
-		}
-
-		Vector vecDir = GetCurrentVelocity();
-		CalculateMeleeDamageForce( &info, vecDir, GetAbsOrigin() );
-		pHitEntity->TakeDamage( info );
-
-		// Spawn some extra blood where we hit
-		if ( pHitEntity->BloodColor() == DONT_BLEED )
-		{
-			CEffectData data;
-			Vector velocity = GetCurrentVelocity();
-			data.m_vOrigin = info.GetDamagePosition();
-			data.m_vAngles = GetAbsAngles();
-
-			VectorNormalize( velocity );
-			data.m_vNormal = ( info.GetDamagePosition() + velocity ) * 0.5;;
-
-			DispatchEffect( "ManhackSparks", data );
-
-			EmitSound( "NPC_Manhack.Grind" );
-
-			//TODO: What we really want to do is get a material reference and emit the proper sprayage! - jdw
-		}
-		else
-		{
-			SpawnBlood(info.GetDamagePosition(), g_vecAttackDir, pHitEntity->BloodColor(), flDamage );
-			EmitSound( "NPC_Manhack.Slice" );
-		}
-
-		// Pop back a little bit after hitting the player
-		ComputeSliceBounceVelocity( pHitEntity );
-
-		// Save off when we last hit something
-		m_flLastAttackTime = gpGlobals->curtime;
-
-		// Reset our state and give the player time to react
-		StopBurst( true );
+		// Deal 100 damage/sec
+		flDamage = 100.0f * flInterval;
 	}
+	else if ( pHitEntity->IsNPC() && HasPhysicsAttacker( MANHACK_SMASH_TIME ) )
+	{
+		extern ConVar sk_combine_guard_health;
+		// NOTE: The else here is essential.
+		// The physics attacker *will* be set even when the manhack is held
+		flDamage = sk_combine_guard_health.GetFloat(); // the highest healthed fleshy enemy
+	}
+	else if ( dynamic_cast<CBaseProp*>(pHitEntity) || dynamic_cast<CBreakable*>(pHitEntity) )
+	{
+		// If we hit a prop, we want it to break immediately
+		flDamage *= 6.0f;
+	}
+	else if ( pHitEntity->IsNPC() && IRelationType( pHitEntity ) == D_HT  && FClassnameIs( pHitEntity, "npc_combine_s" ) ) 
+	{
+		flDamage *= 3.0f;
+	}
+#endif
+
+	if (flDamage < 1.0f)
+	{
+		flDamage = 1.0f;
+	}
+
+	// If its caliber, shock AND slash, otherwise just slash
+	CTakeDamageInfo info( this, this, flDamage, (sk_manhack_v2.GetBool()) ? (DMG_SHOCK|DMG_SLASH) : DMG_SLASH );
+
+	// check for actual "ownership" of damage
+	CBasePlayer *pPlayer = HasPhysicsAttacker( MANHACK_SMASH_TIME );
+	if (pPlayer)
+	{
+		info.SetAttacker( pPlayer );
+	}
+
+	Vector dir = (tr.endpos - tr.startpos);
+	if ( dir == vec3_origin )
+	{
+		dir = tr.m_pEnt->GetAbsOrigin() - GetAbsOrigin();
+	}
+	CalculateMeleeDamageForce( &info, dir, tr.endpos );
+	pHitEntity->TakeDamage( info );
+
+	// Spawn some extra blood where we hit
+	if ( pHitEntity->BloodColor() == DONT_BLEED )
+	{
+		CEffectData data;
+		Vector velocity = GetCurrentVelocity();
+
+		data.m_vOrigin = tr.endpos;
+		data.m_vAngles = GetAbsAngles();
+
+		VectorNormalize( velocity );
+		
+		data.m_vNormal = ( tr.plane.normal + velocity ) * 0.5;;
+
+		DispatchEffect( "ManhackSparks", data );
+
+		EmitSound( "NPC_Manhack.Grind" );
+
+		//TODO: What we really want to do is get a material reference and emit the proper sprayage! - jdw
+	}
+	else
+	{
+		SpawnBlood(tr.endpos, g_vecAttackDir, pHitEntity->BloodColor(), 6 );
+		EmitSound( "NPC_Manhack.Slice" );
+	}
+
+	// Pop back a little bit after hitting the player
+	ComputeSliceBounceVelocity( pHitEntity, tr );
+
+	// Save off when we last hit something
+	m_flLastDamageTime = gpGlobals->curtime;
+
+	// Reset our state and give the player time to react
+	StopBurst( true );
 }
 
 //-----------------------------------------------------------------------------
@@ -1651,18 +1560,24 @@ void CNPC_Manhack::Slice( CBaseEntity *pHitEntity )
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-void CNPC_Manhack::Bump( CBaseEntity *pHitEntity )
+void CNPC_Manhack::Bump( CBaseEntity *pHitEntity, float flInterval, trace_t &tr )
 {
-	// Caught in some sort of... feedback loop?!
+	if ( !VPhysicsGetObject() )
+		return;
+
+	// Surpressing this behavior
 	if ( m_flBumpSuppressTime > gpGlobals->curtime )
 		return;
 
-	// bumped into world
-	if ( pHitEntity == NULL )
+	if ( pHitEntity->GetMoveType() == MOVETYPE_VPHYSICS && pHitEntity->Classify()!=CLASS_MANHACK )
 	{
-		// We've hit something inanimate so deflect our velocity based on the surface
-		// norm of what we've hit
-#if 0
+		HitPhysicsObject( pHitEntity );
+	}
+
+	// We've hit something so deflect our velocity based on the surface
+	// norm of what we've hit
+	if (flInterval > 0)
+	{
 		float moveLen = ( (GetCurrentVelocity() * flInterval) * (1.0 - tr.fraction) ).Length();
 
 		Vector moveVec	= moveLen*tr.plane.normal/flInterval;
@@ -1759,40 +1674,96 @@ void CNPC_Manhack::Bump( CBaseEntity *pHitEntity )
 			float flSpeed = GetCurrentVelocity().Length();
 			SetCurrentVelocity( GetCurrentVelocity() + vReflection * flSpeed * 0.5f );
 		}
-#endif
 	}
-	else if ( m_flLastAttackTime < gpGlobals->curtime - 0.2 )
+
+	// -------------------------------------------------------------
+	// If I'm on a path check LOS to my next node, and fail on path
+	// if I don't have LOS.  Note this is the only place I do this,
+	// so the manhack has to collide before failing on a path
+	// -------------------------------------------------------------
+	if (GetNavigator()->IsGoalActive() && !(GetNavigator()->GetPath()->CurWaypointFlags() & bits_WP_TO_PATHCORNER) )
 	{
-		if ( pHitEntity->GetMoveType() == (MOVETYPE_FLYGRAVITY|MOVETYPE_VPHYSICS) && pHitEntity->Classify() != CLASS_MANHACK )
-			HitPhysicsObject( pHitEntity );
+		AIMoveTrace_t moveTrace;
+		GetMoveProbe()->MoveLimit( NAV_GROUND, GetAbsOrigin(), GetNavigator()->GetCurWaypointPos(), 
+			MoveCollisionMask(), GetEnemy(), &moveTrace );
 
-		// Save off when we last hit something
-		m_flLastAttackTime = gpGlobals->curtime;
-
-		ComputeSliceBounceVelocity( pHitEntity );
-
-		// -------------------------------------------------------------
-		// If I'm on a path check LOS to my next node, and fail on path
-		// if I don't have LOS.  Note this is the only place I do this,
-		// so the manhack has to collide before failing on a path
-		// -------------------------------------------------------------
-		if (GetNavigator()->IsGoalActive() && !(GetNavigator()->GetPath()->CurWaypointFlags() & bits_WP_TO_PATHCORNER) )
+		if (IsMoveBlocked( moveTrace ) && 
+			!moveTrace.pObstruction->ClassMatches( GetClassname() ))
 		{
-			AIMoveTrace_t moveTrace;
-			GetMoveProbe()->MoveLimit( NAV_GROUND, GetAbsOrigin(), GetNavigator()->GetCurWaypointPos(), 
-				MoveCollisionMask(), GetEnemy(), &moveTrace );
+			TaskFail(FAIL_NO_ROUTE);
+			GetNavigator()->ClearGoal();
+			return;
+		}
+	}
+}
 
-			if (IsMoveBlocked( moveTrace ) && 
-				!moveTrace.pObstruction->ClassMatches( GetClassname() ))
+
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+void CNPC_Manhack::CheckCollisions(float flInterval)
+{
+	// Trace forward to see if I hit anything. But trace forward along the
+	// owner's view direction if you're being carried.
+	Vector vecTraceDir, vecCheckPos;
+	VPhysicsGetObject()->GetVelocity( &vecTraceDir, NULL );
+	vecTraceDir *= flInterval;
+	if ( IsHeldByPhyscannon() )
+	{
+		CBasePlayer *pCarrier = HasPhysicsAttacker( FLT_MAX );
+		if ( pCarrier )
+		{
+			if ( pCarrier->CollisionProp()->CalcDistanceFromPoint( WorldSpaceCenter() ) < 30 )
 			{
-				TaskFail(FAIL_NO_ROUTE);
-				GetNavigator()->ClearGoal();
-				return;
+				AngleVectors( pCarrier->EyeAngles(), &vecTraceDir, NULL, NULL );
+				vecTraceDir *= 40.0f;
 			}
 		}
+	}
 
-		// Reset our state and give the player time to react
-		StopBurst( false );
+	VectorAdd( GetAbsOrigin(), vecTraceDir, vecCheckPos );
+	
+	trace_t			tr;
+	CBaseEntity*	pHitEntity = NULL;
+	
+	AI_TraceHull(	GetAbsOrigin(), 
+					vecCheckPos, 
+					GetHullMins(), 
+					GetHullMaxs(),
+					MoveCollisionMask(),
+					this,
+					COLLISION_GROUP_NONE,
+					&tr );
+
+	if ( (tr.fraction != 1.0 || tr.startsolid) && tr.m_pEnt)
+	{
+		PhysicsMarkEntitiesAsTouching( tr.m_pEnt, tr );
+		pHitEntity = tr.m_pEnt;
+
+		if( m_bHeld && tr.m_pEnt->MyNPCPointer() && tr.m_pEnt->MyNPCPointer()->IsPlayerAlly() )
+		{
+			// Don't slice Alyx when she approaches to hack. We need a better solution for this!!
+			//Msg("Ignoring!\n");
+			return;
+		}
+
+		if ( pHitEntity != NULL && 
+			 pHitEntity->m_takedamage == DAMAGE_YES && 
+			 pHitEntity->Classify() != CLASS_MANHACK && 
+			 gpGlobals->curtime > m_flWaterSuspendTime )
+		{
+			// Slice this thing
+			Slice( pHitEntity, flInterval, tr );
+			m_flBladeSpeed = 20.0;
+		}
+		else
+		{
+			// Just bump into this thing.
+			Bump( pHitEntity, flInterval, tr );
+			m_flBladeSpeed = 20.0;
+		}
 	}
 }
 
@@ -1801,7 +1772,7 @@ void CNPC_Manhack::Bump( CBaseEntity *pHitEntity )
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-#define TIME_STEP = 0.5;
+#define tempTIME_STEP = 0.5;
 void CNPC_Manhack::PlayFlySound(void)
 {
 	float flEnemyDist;
@@ -1894,10 +1865,10 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 {
 	PhysicsCheckWaterTransition();
 
-	// -------------------------------------------
-	//  Avoid obstacles
-	// -------------------------------------------
-	SetCurrentVelocity( GetCurrentVelocity() + VelocityToAvoidObstacles(flInterval) + m_vForceVelocity );
+	Vector	vCurrentVelocity = GetCurrentVelocity();
+
+	// FIXME: move this
+	VPhysicsGetObject()->Wake();
 
 	if( m_fEnginePowerScale < GetMaxEnginePower() && gpGlobals->curtime > m_flWaterSuspendTime )
 	{
@@ -1910,7 +1881,7 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 	// ----------------------------------------------------------------------------------------
 	float noiseScale = 7.0f;
 
-	if ( GetEnemy() )
+	if ( (CBaseEntity*)GetEnemy() )
 	{
 		float flDist = (GetAbsOrigin() - GetEnemy()->GetAbsOrigin()).Length2D();
 
@@ -1948,18 +1919,37 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 			}
 		}
 
+		// steve, what does this code do?
+		/*
+		if( m_translatedActivity == ACT_MANHACK_UNPACK && !m_fAnimate )
+		{
+			// See if I should continue unpacking!!
+			if( ( flDist / m_vCurrentVelocity.Length() ) <= 1.8 )
+			{
+				// Alright! Let the unpacking continue!!
+				Msg("FINISHING UP!");
+				m_fAnimate = true;
+			}
+		}
+		*/
+
 		if ( gpGlobals->curtime > m_flBurstDuration )
 		{
 			ShowHostile( false );
 		}
 	}
 
-	// ---------------------
-	//  Limit overall speed
-	// ---------------------
+	// ----------------------------------------------------------------------------------------
+	// Add in any forced velocity
+	// ----------------------------------------------------------------------------------------
+	SetCurrentVelocity( vCurrentVelocity + m_vForceVelocity );
 	m_vForceVelocity = vec3_origin;
+
 	if( !m_bHackedByAlyx || GetEnemy() )
-		AddNoiseToVelocity( noiseScale );	// If hacked and no enemy, don't drift!
+	{
+		// If hacked and no enemy, don't drift!
+		AddNoiseToVelocity( noiseScale );
+	}
 
 	LimitSpeed( 200, ManhackMaxSpeed() );
 
@@ -1982,6 +1972,8 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 		m_vCurrentVelocity.z = max( m_vCurrentVelocity.z, 0 );
 	}
 
+	CheckCollisions(flInterval);
+
 	// Blend out desired velocity when launched by the physcannon
 	if ( HasPhysicsAttacker( MANHACK_SMASH_TIME ) && (!IsHeldByPhyscannon()) && VPhysicsGetObject() )
 	{
@@ -2000,11 +1992,13 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 	// ------------------------------------------
 	if (gpGlobals->curtime < m_flEngineStallTime)
 	{
+		/*
 		// If I'm stalled add random noise
 		angles.x += -20+(random->RandomInt(-10,10));
 		angles.z += -20+(random->RandomInt(0,40));
 
 		TurnHeadRandomly(flInterval);
+		*/
 	}
 	else
 	{
@@ -2021,6 +2015,7 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 		angles.z = m_vCurrentBanking.z;
 		angles.y = 0;
 
+#if 0
 		// Using our steering if we're not otherwise affecting our panels
 		if ( m_flEngineStallTime < gpGlobals->curtime && m_flBurstDuration < gpGlobals->curtime )
 		{
@@ -2040,14 +2035,16 @@ void CNPC_Manhack::MoveExecute_Alive(float flInterval)
 			//SetPoseParameter( m_iPanel3, delta.x );
 			//SetPoseParameter( m_iPanel4, delta.x );
 		}
+#endif
 	}
 
-	SetLocalAngles( angles );
+	// SetLocalAngles( angles );
 
 	if( m_lifeState != LIFE_DEAD )
 	{
 		PlayFlySound();
-		WalkMove( GetCurrentVelocity() * flInterval, MASK_NPCSOLID );
+		// SpinBlades( flInterval );
+		// WalkMove( GetCurrentVelocity() * flInterval, MASK_NPCSOLID );
 	}
 
 //	 NDebugOverlay::Line( GetAbsOrigin(), GetAbsOrigin() + Vector(0, 0, -10 ), 0, 255, 0, true, 0.1);
@@ -2131,7 +2128,7 @@ void CNPC_Manhack::MoveExecute_Dead(float flInterval)
 	// Periodically emit smoke.
 	if (gpGlobals->curtime > m_fSmokeTime && GetWaterLevel() == 0)
 	{
-		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(10, 15));
+//		UTIL_Smoke(GetAbsOrigin(), random->RandomInt(10, 15), 10);
 		m_fSmokeTime = gpGlobals->curtime + random->RandomFloat( 0.1, 0.3);
 	}
 
@@ -2148,7 +2145,7 @@ void CNPC_Manhack::MoveExecute_Dead(float flInterval)
 	newVelocity = newVelocity + (newVelocity * 1.5 * flInterval );
 
 	// Lose lift
-	newVelocity.z -= 0.1*flInterval*(sv_gravity.GetFloat());
+	newVelocity.z -= 0.02*flInterval*(sv_gravity.GetFloat());
 
 	// ----------------------------------------------------------------------------------------
 	// Add in any forced velocity
@@ -2163,7 +2160,7 @@ void CNPC_Manhack::MoveExecute_Dead(float flInterval)
 	// ----------------------
 	// Limit overall speed
 	// ----------------------
-	LimitSpeed( 400, ManhackMaxSpeed() );
+	LimitSpeed( -1, MANHACK_MAX_SPEED * 2.0 );
 
 	QAngle angles = GetLocalAngles();
 
@@ -2173,11 +2170,12 @@ void CNPC_Manhack::MoveExecute_Dead(float flInterval)
 	angles.x += -20+(random->RandomInt(0,40));
 	angles.z += -20+(random->RandomInt(0,40));
 
+	CheckCollisions(flInterval);
 	PlayFlySound();
 
-	SetLocalAngles( angles );
+	// SetLocalAngles( angles );
 
-	WalkMove( GetCurrentVelocity() * flInterval, MASK_NPCSOLID );
+	WalkMove( GetCurrentVelocity() * flInterval,MASK_NPCSOLID );
 }
 
 
@@ -2263,12 +2261,12 @@ int CNPC_Manhack::MeleeAttack1Conditions( float flDot, float flDist )
 		return COND_NONE;
 
 	float flMaxDist = 45;
-	float flMinDist = 1;
+	float flMinDist = 24;
 	bool bEnemyInVehicle = GetEnemy()->IsPlayer() && assert_cast< CBasePlayer * >(GetEnemy())->IsInAVehicle();
 	if ( GetEnemy()->IsPlayer() && assert_cast< CBasePlayer * >(GetEnemy())->IsInAVehicle() )
 	{
 		flMinDist = 0;
-		flMaxDist = 100.0f;
+		flMaxDist = 200.0f;
 	}
 
 	if (flDist > flMaxDist)
@@ -2298,17 +2296,6 @@ int CNPC_Manhack::MeleeAttack1Conditions( float flDot, float flDist )
 	}
 
 	return COND_CAN_MELEE_ATTACK1;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: For taser attack
-// Input  :
-// Output :
-//-----------------------------------------------------------------------------
-int CNPC_Manhack::RangeAttack1Conditions( float flDot, float flDist )
-{
-
-	return COND_NONE;
 }
 
 
@@ -2387,6 +2374,106 @@ void CNPC_Manhack::RunTask( const Task_t *pTask )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+void CNPC_Manhack::Spawn(void)
+{
+	Precache();
+
+#ifdef _XBOX
+	// Always fade the corpse
+	AddSpawnFlags( SF_NPC_FADE_CORPSE );
+#endif // _XBOX
+
+	SetModel( "models/manhack.mdl" );
+	SetHullType(HULL_TINY_CENTERED); 
+	SetHullSizeNormal();
+
+	SetSolid( SOLID_BBOX );
+	AddSolidFlags( FSOLID_NOT_STANDABLE );
+
+	if ( HasSpawnFlags( SF_MANHACK_CARRIED ) )
+	{
+		AddSolidFlags( FSOLID_NOT_SOLID );
+		SetMoveType( MOVETYPE_NONE );
+	}
+	else
+	{
+		SetMoveType( MOVETYPE_VPHYSICS );
+	}
+
+	m_iHealth			= sk_manhack_health.GetFloat();
+	SetViewOffset( Vector(0, 0, 10) );		// Position of the eyes relative to NPC's origin.
+	m_flFieldOfView		= VIEW_FIELD_FULL;
+	m_NPCState			= NPC_STATE_NONE;
+
+	if ( m_spawnflags & SF_MANHACK_USE_AIR_NODES)
+	{
+		SetNavType(NAV_FLY);
+	}
+	else
+	{
+		SetNavType(NAV_GROUND);
+	}
+		 
+	AddEFlags( EFL_NO_DISSOLVE | EFL_NO_MEGAPHYSCANNON_RAGDOLL );
+	AddEffects( EF_NOSHADOW );
+
+	SetBloodColor( DONT_BLEED );
+	SetCurrentVelocity( vec3_origin );
+	m_vForceVelocity.Init();
+	m_vCurrentBanking.Init();
+	m_vTargetBanking.Init();
+
+	m_flNextBurstTime	= gpGlobals->curtime;
+
+	CapabilitiesAdd( bits_CAP_INNATE_MELEE_ATTACK1 | bits_CAP_MOVE_FLY | bits_CAP_SQUAD );
+
+	m_flNextEngineSoundTime		= gpGlobals->curtime;
+	m_flWaterSuspendTime		= gpGlobals->curtime;
+	m_flEngineStallTime			= gpGlobals->curtime;
+	m_fForceMoveTime			= gpGlobals->curtime;
+	m_vForceMoveTarget			= vec3_origin;
+	m_fSwarmMoveTime			= gpGlobals->curtime;
+	m_vSwarmMoveTarget			= vec3_origin;
+	m_nLastSpinSound			= -1;
+
+	m_fSmokeTime		= 0;
+	m_fSparkTime		= 0;
+
+	// Set the noise mod to huge numbers right now, in case this manhack starts out waiting for a script
+	// for instance, we don't want him to bob whilst he's waiting for a script. This allows designers
+	// to 'hide' manhacks in small places. (sjb)
+	SetNoiseMod( MANHACK_NOISEMOD_HIDE, MANHACK_NOISEMOD_HIDE, MANHACK_NOISEMOD_HIDE );
+
+	// Start out with full power! 
+	m_fEnginePowerScale = GetMaxEnginePower();
+	
+	// find panels
+	m_iPanel1 = LookupPoseParameter( "Panel1" );
+	m_iPanel2 = LookupPoseParameter( "Panel2" );
+	m_iPanel3 = LookupPoseParameter( "Panel3" );
+	m_iPanel4 = LookupPoseParameter( "Panel4" );
+
+	m_fHeadYaw			= 0;
+
+	NPCInit();
+
+	// Manhacks are designed to slam into things, so don't take much damage from it!
+	SetImpactEnergyScale( 0.001 );
+
+	// Manhacks get 30 seconds worth of free knowledge.
+	GetEnemies()->SetFreeKnowledgeDuration( 30.0 );
+	
+	// don't be an NPC, we want to collide with debris stuff
+	SetCollisionGroup( COLLISION_GROUP_NONE );
+
+	m_bHeld = false;
+	m_bHackedByAlyx = false;
+	StopLoitering();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
 void CNPC_Manhack::StartEye( void )
 {
 	//Create our Eye sprite
@@ -2435,11 +2522,23 @@ void CNPC_Manhack::StartEye( void )
 }
 
 //-----------------------------------------------------------------------------
+
+void CNPC_Manhack::Activate()
+{
+	BaseClass::Activate();
+
+	if ( IsAlive() )
+	{
+		StartEye();
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Get the engine sound started. Unless we're not supposed to have it on yet!
 //-----------------------------------------------------------------------------
 void CNPC_Manhack::PostNPCInit( void )
 {
-	SetAbsVelocity( vec3_origin ); 
+	// SetAbsVelocity( vec3_origin ); 
 	m_bBladesActive = (m_spawnflags & (SF_MANHACK_PACKED_UP|SF_MANHACK_CARRIED)) ? false : true;
 	BladesInit();
 }
@@ -2451,7 +2550,8 @@ void CNPC_Manhack::BladesInit()
 		// manhack is packed up, so has no power of its own. 
 		// don't start the engine sounds.
 		// make us fall a little slower than we should, for visual's sake
-		SetGravity( UTIL_ScaleForGravity( 200 ) );
+		SetGravity( UTIL_ScaleForGravity( 400 ) );
+
 		SetActivity( ACT_IDLE );
 	}
 	else
@@ -2486,11 +2586,8 @@ void CNPC_Manhack::StartEngine( bool fStartSound )
 	}
 
 	// Under powered flight now.
-	SetMoveType( MOVETYPE_FLY, MOVECOLLIDE_FLY_CUSTOM );
-	SetSimulatedEveryTick( true );
-	SetAnimatedEveryTick( true );
-	SetGravity( UTIL_ScaleForGravity( sv_gravity.GetFloat() * MANHACK_GRAVITY ) );
-
+	// SetMoveType( MOVETYPE_STEP );
+	SetGravity( MANHACK_GRAVITY );
 	AddFlag( FL_FLY );
 }
 
@@ -2506,6 +2603,7 @@ void CNPC_Manhack::SoundInit( void )
 	m_flEnginePitch2Time = gpGlobals->curtime;
 }
 
+
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -2517,6 +2615,7 @@ void CNPC_Manhack::StopLoopingSounds(void)
 	m_nEnginePitch2 = -1;
 	m_flEnginePitch2Time = gpGlobals->curtime;
 }
+
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -2544,6 +2643,14 @@ void CNPC_Manhack::StartTask( const Task_t *pTask )
 	case TASK_GET_PATH_TO_PLAYER:
 		{
 			BaseClass::StartTask( pTask );
+			/*
+			// FIXME: why were these tasks considered bad?
+			_asm
+			{
+				int	3;
+				int 5;
+			}
+			*/
 		}
 		break;
 
@@ -2730,23 +2837,28 @@ bool CNPC_Manhack::HandleInteraction(int interactionType, void* data, CBaseComba
 //-----------------------------------------------------------------------------
 float CNPC_Manhack::ManhackMaxSpeed( void )
 {
-	if ( m_flWaterSuspendTime > gpGlobals->curtime )
+	if( m_flWaterSuspendTime > gpGlobals->curtime )
 	{
 		// Slower in water!
 		return MANHACK_MAX_SPEED * 0.1;
 	}
 
-	// If I gotta burst, go fast
-	if ( m_flNextBurstTime <= gpGlobals->curtime && GetEnemy() )
+	if ( HasPhysicsAttacker( MANHACK_SMASH_TIME ) )
 	{
-		if ( GetEnemy()->IsPlayer() )
-			return MANHACK_BURST_SPEED;
-		else
-			return MANHACK_NPC_BURST_SPEED;
+		return MANHACK_NPC_BURST_SPEED;
 	}
+
+/*
+	if( m_spawnflags & SF_MANHACK_LIMIT_SPEED )
+	{
+		// Slower if asked to be
+		return MANHACK_MAX_SPEED * 0.5;
+	}
+*/
 
 	return MANHACK_MAX_SPEED;
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -2778,32 +2890,6 @@ void CNPC_Manhack::ClampMotorForces( Vector &linear, AngularImpulse &angular )
 	angular.x *= scale;
 	angular.y *= scale;
 	angular.z *= scale;
-
-#if 0
-	if (m_flBladeSpeed >= 50)
-	{
-		// limit reaction forces'
-		float scale = (m_flBladeSpeed - 50) * 40;
-
-		linear.x = clamp( linear.x, -scale, scale );
-		linear.y = clamp( linear.y, -scale, scale );
-		linear.z = clamp( linear.z, -scale, scale < 1200 ? 1200 : scale );
-
-		scale = (m_flBladeSpeed - 50) * 20;
-		angular.x = clamp( angular.x, -scale, scale );
-		angular.y = clamp( angular.y, -scale, scale );
-		angular.z = clamp( angular.z, -scale * 0.5, scale * 0.5 );
-	}
-	else
-	{
-		// don't react if the blade is running slowly
-		linear.x = 0; // clamp( linear.x, -100, 100 );
-		linear.y = 0; // clamp( linear.y, -100, 100 );
-		linear.z = clamp( linear.z, 0, 1200 );  // always allow some Z
-
-		angular.Init();
-	}
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -2993,6 +3079,7 @@ void CNPC_Manhack::OnPhysGunDrop( CBasePlayer *pPhysGunUser, PhysGunDrop_t Reaso
 void CNPC_Manhack::StartLoitering( const Vector &vecLoiterPosition )
 {
 	//Msg("Start Loitering\n");
+
 	m_vTargetBanking = vec3_origin;
 	m_vecLoiterPosition = GetAbsOrigin();
 	m_vForceVelocity = vec3_origin;
@@ -3011,14 +3098,16 @@ CBasePlayer *CNPC_Manhack::HasPhysicsAttacker( float dt )
 }
 
 //-----------------------------------------------------------------------------
-// The more damaged I get, the more horses I lose
+// Manhacks that have been hacked by Alyx get more engine power (fly faster)
 //-----------------------------------------------------------------------------
 float CNPC_Manhack::GetMaxEnginePower()
 {
 	if( m_bHackedByAlyx )
-		return 1.5f * (m_iHealth/8);
+	{
+		return 2.0f;
+	}
 
-	return 1.0f * (m_iHealth/6);
+	return 1.0f;
 }
 
 
@@ -3188,7 +3277,7 @@ void CNPC_Manhack::SetEyeState( int state )
 
 			break;
 		}
-
+	
 	default:
 		if ( m_pEyeGlow )
 			m_pEyeGlow->m_nRenderFX = kRenderFxNone;
@@ -3237,11 +3326,11 @@ AI_BEGIN_CUSTOM_NPC( npc_manhack, CNPC_Manhack )
 	DECLARE_ACTIVITY( ACT_MANHACK_UNPACK );
 
 //=========================================================
-// > SCHED_MANHACK_HOVER
+// > SCHED_MANHACK_ATTACK_HOVER
 //=========================================================
 DEFINE_SCHEDULE
 (
-	SCHED_MANHACK_HOVER,
+	SCHED_MANHACK_ATTACK_HOVER,
 
 	"	Tasks"
 	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_FLY"
@@ -3259,7 +3348,7 @@ DEFINE_SCHEDULE
 
 
 //=========================================================
-// > SCHED_MANHACK_DEPLOY
+// > SCHED_MANHACK_ATTACK_HOVER
 //=========================================================
 DEFINE_SCHEDULE
 (

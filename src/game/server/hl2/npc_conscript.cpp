@@ -129,8 +129,8 @@ void CNPC_Conscript::Spawn( void )
 	m_iHealth = sk_conscript_health.GetFloat();
 
 	m_iszIdleExpression = MAKE_STRING("scenes/expressions/citizenidle.vcd");
-	m_iszAlertExpression = MAKE_STRING("scenes/expressions/citizenalert_loop.vcd");
-	m_iszCombatExpression = MAKE_STRING("scenes/expressions/citizencombat_loop.vcd");
+	m_iszAlertExpression = MAKE_STRING("scenes/expressions/citizenalert.vcd");
+	m_iszCombatExpression = MAKE_STRING("scenes/expressions/citizencombat.vcd");
 
 	BaseClass::Spawn();
 

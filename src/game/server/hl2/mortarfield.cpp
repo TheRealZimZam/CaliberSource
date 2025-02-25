@@ -314,7 +314,22 @@ void CMortar::MortarExplode( void )
 	Vector vecEnd	= vecStart;
 	vecEnd.z += 1024;
 
-	UTIL_Beam( vecStart, vecEnd, m_spriteTexture, 0, 0, 0, 0.5, 4.0, 4.0, 100, 0, 255, 160, 100, 128, 0 );
+	UTIL_Beam( vecStart, 
+		vecEnd, 
+		m_spriteTexture, 
+		0, 
+		0, 
+		0, 
+		0.5, 
+		4.0, 
+		4.0, 
+		100, 
+		0, 
+		255, 
+		160, 
+		100, 
+		128, 
+		0 );
 
 	trace_t tr;
 	UTIL_TraceLine( GetAbsOrigin() + Vector( 0, 0, 1024 ), GetAbsOrigin() - Vector( 0, 0, 1024 ), MASK_ALL, this, COLLISION_GROUP_NONE, &tr );
@@ -376,9 +391,11 @@ public:
 
 	DECLARE_DATADESC();
 
-	void EXPORT FieldUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void LightningUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void InputStrike( inputdata_t &inputdata ) { CFuncLightningField::LightningUse(inputdata.pActivator, inputdata.pCaller, USE_ON, 0); }
 
 	int	m_beamIndex;
+	int	m_haloIndex;
 	int	m_iLightningType;
 
 	enum iLightningType
@@ -390,14 +407,17 @@ public:
 
 };
 
-LINK_ENTITY_TO_CLASS( func_lightning_field, CFuncMortarField );
+LINK_ENTITY_TO_CLASS( func_lightning_field, CFuncLightningField );
 
 BEGIN_DATADESC( CFuncLightningField )
 	DEFINE_FIELD( m_beamIndex, FIELD_INTEGER ),
+	DEFINE_FIELD( m_haloIndex, FIELD_INTEGER ),
 	DEFINE_KEYFIELD( m_iLightningType, FIELD_INTEGER, "lightningtype" ),
+
+	DEFINE_INPUTFUNC( FIELD_VOID, "Trigger", InputStrike ),
 END_DATADESC()
 
-// Drop bolts from above
+// Enter Zeus
 void CFuncLightningField :: Spawn( void )
 {
 	Precache();
@@ -406,7 +426,7 @@ void CFuncLightningField :: Spawn( void )
 	SetModel( STRING(GetModelName()) );    // set size and link into world
 	SetMoveType( MOVETYPE_NONE );
 	AddEffects( EF_NODRAW );
-	SetUse( &CFuncLightningField::FieldUse );
+	SetUse( &CFuncLightningField::LightningUse );
 
 	if(m_iCount == NULL)
 		m_iCount = 1;
@@ -415,12 +435,16 @@ void CFuncLightningField :: Spawn( void )
 void CFuncLightningField::Precache( void )
 {
 	m_beamIndex = PrecacheModel( "sprites/lgtning.vmt" );
-	PrecacheScriptSound("Weather.Thunder");
+
+	PrecacheModel( "sprites/cloudglow1.vmt" );
+	PrecacheModel( "sprites/cloudglow2.vmt" );
+
+//	PrecacheScriptSound("Weather.Thunder");
 //	PrecacheScriptSound("Weather.ThunderImpact");
 	BaseClass::Precache();
 }
 
-void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+void CFuncLightningField::LightningUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	DetectInSkybox();
 	bool bInSkybox = IsEFlagSet(EFL_IN_SKYBOX);
@@ -430,7 +454,7 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 	vecStart.y = random->RandomFloat( this->mins.y, this->maxs.y );
 	vecStart.z = this->maxs.z;
 */
-	CollisionProp()->RandomPointInBounds( Vector( 0, 0, 1 ), Vector( 1, 1, 1 ), &vecStart );
+	CollisionProp()->RandomPointInBounds( vec3_origin, Vector( 1, 1, 1 ), &vecStart );
 	Vector StrikePos = vecStart;
 
 	switch( m_fControl )
@@ -445,6 +469,14 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 		}
 		break;
 	}
+
+	// Randomly choose a cloudglow
+	if ( random->RandomInt(0,1) )
+		m_haloIndex = modelinfo->GetModelIndex("sprites/cloudglow2.vmt");
+	else
+		m_haloIndex = modelinfo->GetModelIndex("sprites/cloudglow1.vmt");
+
+	CBroadcastRecipientFilter filter;
 
 	// Spawn the beams
 	for (int i = 0; i < m_iCount; i++)
@@ -462,12 +494,19 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 		// If its random, change it
 		if ( iType == 0 )
 		{
-			if ( random->RandomInt(0,2) == 2)
+			if ( random->RandomInt(0,2) == 2 )
 				iType = 1;
 			else
 				iType = 2;
 		}
 
+		// Cloudglow
+		te->Sprite( filter, 0.0,
+			&vecStart, m_haloIndex,
+			bInSkybox ? random->RandomInt( 6, 10 ) : random->RandomInt( 18, 26 ),
+			255, 10 );
+
+		// Shoot the beam
 		switch( iType )
 		{
 		default:
@@ -475,19 +514,19 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 			UTIL_Beam(  vecStart,
 						tr.endpos,
 						m_beamIndex,
-						0,			//halo index
-						0,			//frame start
-						2.0f,		//framerate
-						random->RandomFloat( 0.05, 0.1 ),	//life
-						bInSkybox ? 0.4 : 4.0,		// width
-						bInSkybox ? 0.4 : 4.0,		// endwidth
+						0,	//halo index
+						random->RandomInt( 0, 2 ),			//frame start
+						1.0f,		//framerate
+						random->RandomFloat( 0.15, 0.3 ),	//life
+						bInSkybox ? random->RandomFloat( 7.8, 8.0 ) : 15.0,		// width
+						bInSkybox ? random->RandomFloat( 7.0, 8.2 ) : 16.0,		// endwidth
 						bInSkybox ? 10 : 100,		// fadelength,
-						1,			// noise
-						100,		// red
-						160,		// green
+						bInSkybox ? random->RandomFloat( (m_flSpread/4), m_flSpread ) : m_flSpread,			// noise
+						160,		// red
+						200,		// green
 						255,		// blue,
 						255,		// bright
-						0			// speed
+						1			// speed
 						);
 			break;
 
@@ -496,19 +535,19 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 			UTIL_Beam(  vecStart,
 						tr.endpos,
 						m_beamIndex,
-						0,			//halo index
-						0,			//frame start
+						0,	//halo index
+						random->RandomInt( 0, 2 ),			//frame start
 						2.0f,		//framerate
-						random->RandomFloat( 0.1, 0.4 ),	//life
-						bInSkybox ? 0.4 : 4.0,		// width
-						bInSkybox ? 0.4 : 4.0,		// endwidth
+						random->RandomFloat( 0.15, 0.4 ),	//life
+						bInSkybox ? random->RandomFloat( 7.8, 8.6 ) : 15.0,		// width
+						bInSkybox ? random->RandomFloat( 6.0, 7.2 ) : 10.0,		// endwidth
 						bInSkybox ? 10 : 100,		// fadelength,
-						1,			// noise
-						160,		// red
-						100,		// green
+						bInSkybox ? random->RandomFloat( (m_flSpread/4), m_flSpread ) : random->RandomFloat( m_flSpread, m_flSpread*2 ),			// noise
+						200,		// red
+						160,		// green
 						255,		// blue,
 						255,		// bright
-						0			// speed
+						15			// speed
 						);
 			break;
 		}
@@ -516,10 +555,11 @@ void CFuncLightningField::FieldUse( CBaseEntity *pActivator, CBaseEntity *pCalle
 		// Add a little bit of Z to the actual endpos, so we dont clip through thin roofs and such
 		StrikePos = (tr.endpos + Vector(0,0,8));
 		RadiusDamage( CTakeDamageInfo( this, pActivator ? pActivator : this, iDmg, DMG_ENERGYBEAM ), StrikePos, iDmg, CLASS_NONE, NULL );
+		UTIL_ImpactTrace( &tr, DMG_ENERGYBEAM );
 	}
 
 //	if ( bInSkybox )
-		EmitSound( "Weather.Thunder" );
+//		EmitSound( "Weather.Thunder" );
 //	else
 //		EmitSound( "Weather.ThunderImpact" );
 

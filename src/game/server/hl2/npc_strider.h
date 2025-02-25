@@ -120,7 +120,7 @@ public:
 	//---------------------------------
 	// CBaseAnimating
 	void			CalculateIKLocks( float currentTime );
-	float			GetIdealAccel() const { return GetIdealSpeed(); }
+	float			GetIdealAccel() { return GetIdealSpeed(); }
 
 	//---------------------------------
 	// Behavior

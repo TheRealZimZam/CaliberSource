@@ -1,13 +1,12 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Grenade used by the city scanner
+// Purpose: Homing projectile used by the city scanner, turrets, etc.
 //
 // $NoKeywords: $
 //=============================================================================//
 
 #include "cbase.h"
 #include "grenade_homer.h"
-#include "weapon_ar2.h"
 #include "soundent.h"
 #include "decals.h"
 #include "shake.h"
@@ -26,9 +25,9 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	HOMER_TRAIL0_LIFE	0.2	//Exhaust
+#define	HOMER_TRAIL0_LIFE	0.3	//Exhaust
 #define	HOMER_TRAIL1_LIFE	2.0	//Smoketrail
-#define	HOMER_TRAIL2_LIFE	0.1	//Fire
+#define	HOMER_TRAIL2_LIFE	0.2	//Fire
 #define	BUBBLE_WARNING		1	//Should the danger be issued once, or over a period in a cone?
 
 extern short	g_sModelIndexFireball;			// (in combatweapon.cpp) holds the index for the smoke cloud
@@ -37,6 +36,7 @@ ConVar    homer_grenade_obstacle_avoidance( "homer_grenade_obstacle_avoidance","
 
 ConVar    sk_dmg_homer_grenade( "sk_dmg_homer_grenade","0" );
 ConVar	  sk_homer_grenade_radius( "sk_homer_grenade_radius","0" );
+//extern ConVar    sk_rpg_missile_speed;
 
 BEGIN_DATADESC( CGrenadeHomer )
 
@@ -55,23 +55,36 @@ BEGIN_DATADESC( CGrenadeHomer )
 	DEFINE_FIELD( m_flSpinSpeed,				FIELD_FLOAT),
 	DEFINE_FIELD( m_nRocketTrailType,			FIELD_INTEGER),
 	DEFINE_FIELD( m_nRocketType,				FIELD_INTEGER),
-
 //	DEFINE_FIELD( m_spriteTexture,				FIELD_INTEGER),
+	DEFINE_FIELD( m_bWaterproof,				FIELD_BOOLEAN),
 
 	DEFINE_FIELD( m_flHomingLaunchTime,			FIELD_TIME),
 	DEFINE_FIELD( m_flHomingStartTime,			FIELD_TIME ),
 	DEFINE_FIELD( m_flHomingEndTime,			FIELD_TIME ),
 	DEFINE_FIELD( m_flSpinOffset,				FIELD_FLOAT),
-	
-	DEFINE_FIELD( m_hTarget,					FIELD_EHANDLE),
 
 	// Function pointers
-	DEFINE_THINKFUNC( AimThink ),
-	DEFINE_ENTITYFUNC( GrenadeHomerTouch ),
+	DEFINE_THINKFUNC( FlyThink ),
+	DEFINE_THINKFUNC( DeadThink ),
+//	DEFINE_ENTITYFUNC( GrenadeHomerTouch ),
 
 END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( grenade_homer, CGrenadeHomer );
+
+//------------------------------------------------------------------------------
+CGrenadeHomer::CGrenadeHomer(void)
+{
+	for (int i=0;i<3;i++)
+	{
+		m_hRocketTrail[i]  = NULL;
+	}
+}
+
+Class_T	CGrenadeHomer::Classify(void)
+{
+	return CLASS_MISSILE; 
+}
 
 ///------------------------------------------------------------------------------
 // Purpose :
@@ -93,6 +106,7 @@ CGrenadeHomer* CGrenadeHomer::CreateGrenadeHomer( string_t sModelName, string_t 
 		pGrenade->SetOwnerEntity( Instance( pentOwner ) );
 		pGrenade->SetLocalOrigin( vecOrigin );
 		pGrenade->SetLocalAngles( vecAngles );
+		pGrenade->SetModelName( sModelName );
 		pGrenade->SetModel( STRING(sModelName) );
 	}
 	return pGrenade;
@@ -101,6 +115,7 @@ CGrenadeHomer* CGrenadeHomer::CreateGrenadeHomer( string_t sModelName, string_t 
 
 void CGrenadeHomer::Precache( void )
 {
+	PrecacheModel( STRING(GetModelName()) );
 	m_spriteTexture = PrecacheModel( "sprites/lgtning.vmt" );
 
 	PrecacheScriptSound( "GrenadeHomer.StopSounds" );
@@ -118,15 +133,18 @@ void CGrenadeHomer::Spawn( void )
 {
 	Precache( );
 
+	SetModel( STRING(GetModelName()) );
 	SetSolid( SOLID_BBOX );
 	SetMoveType( MOVETYPE_FLY );
+	AddFlag( FL_OBJECT );
 
-	UTIL_SetSize(this, Vector(0, 0, 0), Vector(0, 0, 0));
+	UTIL_SetSize( this, -Vector( 1.0f, 1.0f, 1.0f ), Vector( 1.0f, 1.0f, 1.0f ) );
 
 	SetDamage(sk_dmg_homer_grenade.GetFloat());
 	SetDamageRadius(sk_homer_grenade_radius.GetFloat());
-	m_takedamage	= DAMAGE_YES;
-	m_iHealth		= 1;
+	m_takedamage = DAMAGE_YES;
+	m_lifeState = LIFE_ALIVE;
+	m_iHealth = 5;
 
 	SetGravity( 1.0 );
 	SetFriction( 0.8 );
@@ -135,6 +153,9 @@ void CGrenadeHomer::Spawn( void )
 	m_flHomingStrength	= 0;
 	m_flHomingDelay		= 0;
 	m_flHomingDuration	= 0;
+	m_flNextWarnTime	= gpGlobals->curtime + 0.5f;
+
+	m_bWaterproof = false;
 
 	SetCollisionGroup( HL2COLLISION_GROUP_HOMING_MISSILE ); 
 }
@@ -175,6 +196,8 @@ void CGrenadeHomer::StartRocketTrail(bool bTrail1, bool bTrail2, bool bTrail3)
 	//!!!TODO
 	// TODO; This is destroying the entlimit!!!
 
+	AddEffects( EF_DIMLIGHT );
+
 	// Exhaust
 	// Always show this at any distance - the other two can
 	// be safely turned off if needed for perf - MM
@@ -182,7 +205,7 @@ void CGrenadeHomer::StartRocketTrail(bool bTrail1, bool bTrail2, bool bTrail3)
 
 	if(bTrail1 && pRocketTrail)
 	{
-		pRocketTrail->m_SpawnRate = 60;
+		pRocketTrail->m_SpawnRate = 50;
 		pRocketTrail->m_ParticleLifetime = HOMER_TRAIL0_LIFE;
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
 			pRocketTrail->m_StartColor.Init(0.2, 0.0, 0.5);
@@ -191,13 +214,13 @@ void CGrenadeHomer::StartRocketTrail(bool bTrail1, bool bTrail2, bool bTrail3)
 
 		pRocketTrail->m_Opacity = 0.35f;
 		pRocketTrail->m_EndColor.Init(0.6,0.6,0.5);
-		pRocketTrail->m_StartSize = 8;
-		pRocketTrail->m_EndSize = 16;
+		pRocketTrail->m_StartSize = 7;
+		pRocketTrail->m_EndSize = 15;
 		pRocketTrail->m_SpawnRadius = 3;
-		pRocketTrail->m_MinSpeed = 10;
-		pRocketTrail->m_MaxSpeed = 20;
+		pRocketTrail->m_MinSpeed = 5;
+		pRocketTrail->m_MaxSpeed = 15;
 		pRocketTrail->SetLifetime(120);
-		pRocketTrail->FollowEntity(this);
+		pRocketTrail->FollowEntity(this, "0");
 
 		m_hRocketTrail[0] = pRocketTrail;
 	}
@@ -206,7 +229,7 @@ void CGrenadeHomer::StartRocketTrail(bool bTrail1, bool bTrail2, bool bTrail3)
 	pRocketTrail = RocketTrail::CreateRocketTrail();
 	if(bTrail2 && pRocketTrail)
 	{
-		pRocketTrail->m_SpawnRate = 50;
+		pRocketTrail->m_SpawnRate = 25;
 		pRocketTrail->m_ParticleLifetime = HOMER_TRAIL1_LIFE;
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
 			pRocketTrail->m_StartColor.Init(0.1, 0.0, 0.1);
@@ -218,7 +241,7 @@ void CGrenadeHomer::StartRocketTrail(bool bTrail1, bool bTrail2, bool bTrail3)
 		pRocketTrail->m_StartSize = 8;
 		pRocketTrail->m_EndSize = 20;
 		pRocketTrail->m_SpawnRadius = 2;
-		pRocketTrail->m_MinSpeed = 15;
+		pRocketTrail->m_MinSpeed = 10;
 		pRocketTrail->m_MaxSpeed = 25;
 		pRocketTrail->SetLifetime(120);
 		pRocketTrail->FollowEntity(this);
@@ -231,7 +254,7 @@ void CGrenadeHomer::StartRocketTrail(bool bTrail1, bool bTrail2, bool bTrail3)
 	pRocketTrail = RocketTrail::CreateRocketTrail();
 	if(bTrail3 && pRocketTrail)
 	{
-		pRocketTrail->m_SpawnRate = 80;
+		pRocketTrail->m_SpawnRate = 30;
 		pRocketTrail->m_ParticleLifetime = HOMER_TRAIL2_LIFE;
 		if ( m_nRocketTrailType == HOMER_SMOKE_TRAIL_ALIEN )
 			pRocketTrail->m_StartColor.Init(0.0, 0.5, 0.5);
@@ -272,7 +295,7 @@ void CGrenadeHomer::UpdateRocketTrail(float fScale)
 	// In SP, if im far away from the player, dont show the extra trails
 	if (!g_pGameRules->IsMultiplayer())
 	{
-		CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+		CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
 		float flPlayerDist = pPlayer->GetAbsOrigin().DistToSqr(GetAbsOrigin());
 		if ( pPlayer && flPlayerDist > 4000 )	//TODO; Magic Number//
 		{
@@ -339,14 +362,16 @@ void CGrenadeHomer::Launch( CBaseEntity*		pOwner,
 							const Vector&		vInitVelocity,
 							float				flHomingSpeed,
 							float				flGravity,
-							int					nRocketTrailType)
+							int					nRocketTrailType,
+							int					nRocketType)
 {
 	SetOwnerEntity( pOwner );
-	m_hTarget					= pTarget;
+	m_hIntendedTarget			= pTarget;
 	SetAbsVelocity( vInitVelocity );
 	m_flHomingSpeed				= flHomingSpeed;
 	SetGravity( flGravity );
 	m_nRocketTrailType			= nRocketTrailType;
+	m_nRocketType				= nRocketType;
 
 	// ----------------------------
 	// Initialize homing parameters
@@ -366,9 +391,9 @@ void CGrenadeHomer::Launch( CBaseEntity*		pOwner,
 	PlayFlySound();
 
 	SetUse( &CGrenadeHomer::DetonateUse );
-	SetTouch( &CGrenadeHomer::GrenadeHomerTouch );
-	SetThink( &CGrenadeHomer::AimThink );
-	AimThink();
+//	SetTouch( &CGrenadeHomer::GrenadeHomerTouch );
+	SetThink( &CGrenadeHomer::FlyThink );
+	FlyThink();
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 #ifndef BUBBLE_WARNING
@@ -379,7 +404,7 @@ void CGrenadeHomer::Launch( CBaseEntity*		pOwner,
 		float flDist = ( pTarget->WorldSpaceCenter() - WorldSpaceCenter() ).Length();
 		float flTime = max( 0.5, flDist / GetAbsVelocity().Length() );
 
-		CSoundEnt::InsertSound( SOUND_DANGER, m_hTarget->GetAbsOrigin(), 300, flTime, pOwner );
+		CSoundEnt::InsertSound( SOUND_DANGER, m_hIntendedTarget->GetAbsOrigin(), 300, flTime, pOwner );
 	}
 #endif
 }
@@ -394,19 +419,21 @@ void CGrenadeHomer::Event_Killed( const CTakeDamageInfo &info )
 	Detonate( );
 }
 
-void CGrenadeHomer::GrenadeHomerTouch( CBaseEntity *pOther )
+void CGrenadeHomer::Touch( CBaseEntity *pOther )
 {
 	Assert( pOther );
 
 	// Don't take damage from other homing grenades so can shoot in vollies
-	if (FClassnameIs( pOther, "grenade_homer") || !pOther->IsSolid() )
-	{
+	if ( FClassnameIs(pOther, "grenade_homer") || !pOther->IsSolid() || pOther->IsSolidFlagSet( FSOLID_VOLUME_CONTENTS ) )
 		return;
-	}
 
 	// AP rocket? Take full direct damage
 	if (m_nRocketType == ARMORPIERCING && pOther->m_takedamage)
+	{
 		pOther->TakeDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), (DMG_BLAST|DMG_DIRECT) ) );
+		// Set the thing i just touched as my target, so I dont do anymore damage to it when i detonate
+		m_hIntendedTarget = pOther;
+	}
 
 	// ----------------------------------
 	// If I hit the sky, don't explode
@@ -422,14 +449,33 @@ void CGrenadeHomer::Detonate( bool bToSpace )
 {
 	StopRocketTrail();
 	StopSound(entindex(), CHAN_BODY, STRING(m_sFlySound));
-
-	m_takedamage = DAMAGE_NO;	
+	m_takedamage = DAMAGE_NO;
+	m_lifeState = LIFE_DEAD;
 
 	if ( !bToSpace )
 	{
-		if (m_nRocketType != INCENDIARY)
+		// ----------------------
+		// Do the effects
+		// ----------------------
+		Vector vecForward = GetAbsVelocity();
+		VectorNormalize(vecForward);
+		trace_t		tr;
+		UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward,  MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr);
+		UTIL_DecalTrace( &tr, "Scorch" );
+
+		CPASFilter filter( GetAbsOrigin() );
+		if (m_nRocketType == INCENDIARY)
 		{
-			CPASFilter filter( GetAbsOrigin() );
+			// Incendiary rockets spark and burn, no explosion
+			int iSparks = random->RandomInt(6,8);
+			for ( int i = 0; i < iSparks; i++ )
+			{
+				Create( "spark_shower", GetAbsOrigin(), GetAbsAngles(), this );
+				UTIL_DecalTrace( &tr, "FadingScorch" );
+			}
+		}
+		else
+		{
 			te->Explosion( filter, 0.0,
 				&GetAbsOrigin(), 
 				g_sModelIndexFireball,
@@ -449,7 +495,7 @@ void CGrenadeHomer::Detonate( bool bToSpace )
 			te->BeamRingPoint( filter3, 0, 
 				GetAbsOrigin(),	//origin
 				16,			//start radius
-				1000,		//end radius
+				GetDamageRadius()*3,		//end radius
 				m_spriteTexture, //texture
 				0,			//halo index
 				0,			//start frame
@@ -470,7 +516,7 @@ void CGrenadeHomer::Detonate( bool bToSpace )
 			te->BeamRingPoint( filter4, 0, 
 				GetAbsOrigin(),	//origin
 				16,			//start radius
-				500,		//end radius
+				GetDamageRadius()*2,		//end radius
 				m_spriteTexture, //texture
 				0,			//halo index
 				0,			//start frame
@@ -487,39 +533,51 @@ void CGrenadeHomer::Detonate( bool bToSpace )
 				);
 		}
 
-		Vector vecForward = GetAbsVelocity();
-		VectorNormalize(vecForward);
-		trace_t		tr;
-		UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward,  MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, & tr);
-		UTIL_DecalTrace( &tr, "Scorch" );
-
+		// ----------------------
+		// Now do the damage
+		// ----------------------
 		switch(m_nRocketType)
 		{
 			case EXPLOSIVE:
 				UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
-				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), DMG_BLAST ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, NULL );
+				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), DMG_BLAST ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, this );
 			break;
 
 			case EXPLOSIVEINCENDIARY:
-				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), DMG_BURN ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, NULL );
+				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), GetDamage(), DMG_BURN ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, this );
 			case INCENDIARY:
-			int i;
-			for( i = 0 ; i < (GetDamageRadius()/10) ; i++ )
+			if ( GetWaterLevel() == 0 )
 			{
-				FireSystem_StartFire( GetAbsOrigin(), (16.0f + GetDamage()), 0.2f, 10.0f, (SF_FIRE_START_ON|SF_FIRE_SMOKELESS|SF_FIRE_NO_GLOW), (CBaseEntity*) this, FIRE_NATURAL );
+				int i;
+				for( i = 0 ; i < (GetDamageRadius()/12) ; i++ )
+				{
+					FireSystem_StartFire( GetAbsOrigin(), (16.0f + GetDamage()), 0.2f, 10.0f, (SF_FIRE_START_ON|SF_FIRE_SMOKELESS|SF_FIRE_NO_GLOW), GetOwnerEntity(), FIRE_PLASMA );
+				}
 			}
 			break;
 
 			case ARMORPIERCING:
 				// Touch takes care of the majority damage, just do half blast damage
-				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), (GetDamage()/2), DMG_BLAST ), GetAbsOrigin(), GetDamageRadius(), CLASS_NONE, NULL );
+				RadiusDamage( CTakeDamageInfo( this, GetOwnerEntity(), (GetDamage()/2), DMG_BLAST ), GetAbsOrigin(), GetDamageRadius(), CLASS_MISSILE, m_hIntendedTarget );
 			break;
 		}
+
+		// Remove me in the next frame (have to allow my sounds to clear)
+		SetThink( &CBaseEntity::SUB_Remove );
+		SetNextThink( gpGlobals->curtime );
+	}
+	else
+	{
+		// I'm flying off to space, do a fake "shrink" effect
+		SetAbsVelocity(0);
+		m_nRenderFX = kRenderFxExplode;
+
+		// Fade me AND my sounds out
+		SUB_StartFadeOutInstant();
 	}
 
 	CPASAttenuationFilter filter2( this, "GrenadeHomer.StopSounds" );
 	EmitSound( filter2, entindex(), "GrenadeHomer.StopSounds" );
-	UTIL_Remove( this );
 }
 
 //-----------------------------------------------------------------------------
@@ -551,7 +609,7 @@ void CGrenadeHomer::PlayFlySound(void)
 // Input   :
 // Output  :
 //------------------------------------------------------------------------------
-void CGrenadeHomer::AimThink( void )
+void CGrenadeHomer::FlyThink( void )
 { 
 	// Blow up the missile if we have an explicit detonate time that
 	// has been reached
@@ -562,25 +620,45 @@ void CGrenadeHomer::AimThink( void )
 		return;
 	}
 
+	if (!IsInWorld())
+	{
+		Detonate(true);
+		return;
+	}
+
+	// Entered Water
+	if ( GetWaterLevel() >= 1 )
+	{
+		// Bubbles!
+		UTIL_Bubbles( GetAbsOrigin() + Vector( -2, -2, -2 ), GetAbsOrigin() + Vector( 2, 2, 2 ), random->RandomInt(2,4) );
+
+		if ( !m_bWaterproof )
+		{
+			SetThink( &CGrenadeHomer::DeadThink );
+			SetNextThink( gpGlobals->curtime + 0.1f );
+			return;
+		}
+	}
+
 	Vector		vTargetPos	= vec3_origin;
 	float		flCurHomingStrength = 0;
 
 	// ------------------------------------------------
 	//  If I'm homing
 	// ------------------------------------------------
-	if (m_hTarget != NULL)
+	if (m_hIntendedTarget != NULL)
 	{
 		// Only target the eyes if its a living thing
-		if ( m_hTarget->MyCombatCharacterPointer() )
-			vTargetPos = m_hTarget->EyePosition();
+		if ( m_hIntendedTarget->MyCombatCharacterPointer() )
+			vTargetPos = m_hIntendedTarget->EyePosition();
 		else
-			vTargetPos = m_hTarget->GetAbsOrigin();
+			vTargetPos = m_hIntendedTarget->GetAbsOrigin();
 
 		Vector vTargetDir = vTargetPos - GetAbsOrigin();
 		VectorNormalize(vTargetDir);
 
 		//!!TODO; Broken as hell, it is a cool zig-zag effect but it fucks the targeting,
-		//!! If it can be fixed properly, re-enable
+		//!! If it can be fixed properly, re-enable -MM
 		if ( homer_grenade_obstacle_avoidance.GetBool() )
 		{
 			// --------------------------------------------------
@@ -594,7 +672,7 @@ void CGrenadeHomer::AimThink( void )
 				vTravelDir *= 50;
 
 				trace_t tr;
-				UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + vTravelDir, MASK_SHOT, m_hTarget, COLLISION_GROUP_NONE, &tr );
+				UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() + vTravelDir, MASK_SHOT, m_hIntendedTarget, COLLISION_GROUP_NONE, &tr );
 				if (tr.fraction < 1.0)	//!=
 				{
 					// Head off in normal 
@@ -734,6 +812,43 @@ void CGrenadeHomer::AimThink( void )
 	SetNextThink( gpGlobals->curtime + 0.1f );
 }
 
+
+void CGrenadeHomer::DeadThink( void )
+{
+	// Make me fall outta the sky like a brick
+	if ( m_lifeState != LIFE_DYING )
+	{
+		SetMoveType( MOVETYPE_FLYGRAVITY );
+
+		// TODO; Dont stop the sound, just lower the pitch or something similar
+		StopSound(entindex(), CHAN_BODY, STRING(m_sFlySound));
+		StopRocketTrail();
+		// Stomp det time
+		m_flDetonateTime = gpGlobals->curtime + 10.0f;
+		m_lifeState = LIFE_DYING;
+
+		if ( GetWaterLevel() >= 1 )
+			SetGravity( 0.5 );
+		else
+			SetGravity( 2 );
+	}
+
+	// Blow up the missile if we have an explicit detonate time that
+	// has been reached
+	if (m_flDetonateTime != 0 &&
+		gpGlobals->curtime > m_flDetonateTime)
+	{
+		Detonate();
+		return;
+	}
+
+	// Lower speed in a linear ramp
+	if ( GetAbsVelocity().Length() > (m_flHomingSpeed*0.25) )
+		SetAbsVelocity( GetAbsVelocity() * 0.9f );
+
+	SetNextThink( gpGlobals->curtime + 0.1f );
+}
+
 //------------------------------------------------------------------------------
 // Purpose : 
 // Input   :
@@ -743,21 +858,8 @@ int CGrenadeHomer::OnTakeDamage( const CTakeDamageInfo &info )
 {
 	// Don't take damage from other homing grenades so can shoot in vollies
 	if (FClassnameIs( info.GetInflictor(), "grenade_homer"))
-	{
 		return 0;
-	}
+
 	return BaseClass::OnTakeDamage( info );
 }
 
-//------------------------------------------------------------------------------
-// Purpose :
-// Input   :
-// Output  :
-//------------------------------------------------------------------------------
-CGrenadeHomer::CGrenadeHomer(void)
-{
-	for (int i=0;i<3;i++)
-	{
-		m_hRocketTrail[i]  = NULL;
-	}
-}

@@ -44,14 +44,17 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	RPG_SPEED			sk_rpg_speed.GetInt()
-ConVar sk_rpg_speed( "sk_rpg_speed","1500");
-#define	RPG_HOMING_SPEED	sk_rpg_homing_speed.GetFloat()
-ConVar sk_rpg_homing_speed( "sk_rpg_homing_speed","0.05");	//0.125
-#define	RPG_LIFETIME		sk_rpg_engine_lifetime.GetFloat()
-ConVar sk_rpg_engine_lifetime( "sk_rpg_engine_lifetime","10");	// Engine shuts down at this time
-#define	RPG_MAX_LIFETIME	sk_rpg_max_lifetime.GetFloat()
-ConVar sk_rpg_max_lifetime( "sk_rpg_max_lifetime","20");	// Explodes after this amount of time
+#define	RPG_SPEED			sk_rpg_missile_speed.GetInt()
+ConVar sk_rpg_missile_speed( "sk_rpg_missile_speed","1500");
+
+#define	RPG_HOMING_SPEED	sk_rpg_missile_homing_speed.GetFloat()
+ConVar sk_rpg_missile_homing_speed( "sk_rpg_missile_homing_speed","0.05");	//0.125
+
+#define	RPG_LIFETIME		sk_rpg_missile_engine_lifetime.GetFloat()
+ConVar sk_rpg_missile_engine_lifetime( "sk_rpg_missile_engine_lifetime","10");	// Engine shuts down at this time
+
+#define	RPG_MAX_LIFETIME	sk_rpg_missile_max_lifetime.GetFloat()
+ConVar sk_rpg_missile_max_lifetime( "sk_rpg_missile_max_lifetime","20");	// Explodes after this amount of time
 
 extern ConVar    sk_plr_dmg_rpg_round;
 extern ConVar    sk_npc_dmg_rpg_round;
@@ -125,7 +128,6 @@ BEGIN_DATADESC( CMissile )
 	DEFINE_FIELD( m_bGuidingDisabled,		FIELD_BOOLEAN ),
 	
 	// Function Pointers
-	DEFINE_ENTITYFUNC( MissileTouch ),
 	DEFINE_THINKFUNC( AccelerateThink ),
 	DEFINE_THINKFUNC( AugerThink ),
 	DEFINE_THINKFUNC( IgniteThink ),
@@ -183,7 +185,6 @@ void CMissile::Spawn( void )
 	SetModel("models/weapons/w_missile_launch.mdl");
 	UTIL_SetSize( this, -Vector(4,4,4), Vector(4,4,4) );
 
-	SetTouch( &CMissile::MissileTouch );
 	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
 	SetThink( &CMissile::IgniteThink );
 	SetNextThink( gpGlobals->curtime + 0.3f );
@@ -217,10 +218,6 @@ void CMissile::Event_Killed( const CTakeDamageInfo &info )
 	ShotDown();
 }
 
-unsigned int CMissile::PhysicsSolidMaskForEntity( void ) const
-{ 
-	return BaseClass::PhysicsSolidMaskForEntity() | CONTENTS_HITBOX;
-}
 
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -318,7 +315,7 @@ void CMissile::AugerThink( void )
 	// If we've augered long enough, then just explode
 	if ( m_flMaxLifetime < gpGlobals->curtime )
 	{
-		Explode();
+		Detonate();
 		return;
 	}
 
@@ -398,7 +395,7 @@ void CMissile::DoExplosion( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CMissile::Explode( void )
+void CMissile::Detonate( void )
 {
 	// Don't explode against the skybox. Just pretend that 
 	// the missile flies off into the distance.
@@ -443,10 +440,10 @@ void CMissile::Explode( void )
 // Purpose: 
 // Input  : *pOther - 
 //-----------------------------------------------------------------------------
-void CMissile::MissileTouch( CBaseEntity *pOther )
+void CMissile::Touch( CBaseEntity *pOther )
 {
-	Assert( pOther );
-	
+	BaseClass::Touch(pOther);
+
 	// Don't touch triggers (but DO hit weapons)
 	if ( pOther->IsSolidFlagSet(FSOLID_TRIGGER|FSOLID_VOLUME_CONTENTS) && pOther->GetCollisionGroup() != COLLISION_GROUP_WEAPON )
 	{
@@ -456,7 +453,7 @@ void CMissile::MissileTouch( CBaseEntity *pOther )
 	}
 
 	//TODO: Play a special effect on the target to denote that it pierced and did damage
-	Explode();
+	Detonate();
 }
 
 //-----------------------------------------------------------------------------
@@ -475,7 +472,7 @@ void CMissile::CreateSmokeTrail( void )
 		m_hRocketTrail->m_ParticleLifetime = 0.5f;
 		m_hRocketTrail->m_StartColor.Init( 0.65f, 0.65f , 0.65f );
 		m_hRocketTrail->m_EndColor.Init( 0.0, 0.0, 0.0 );
-		m_hRocketTrail->m_StartSize = 8;
+		m_hRocketTrail->m_StartSize = 12;
 		m_hRocketTrail->m_EndSize = 32;
 		m_hRocketTrail->m_SpawnRadius = 4;
 		m_hRocketTrail->m_MinSpeed = 2;
@@ -647,7 +644,7 @@ void CMissile::SeekThink( void )
 					{
 						if ( ( GetAbsOrigin().AsVector2D() - vPos.AsVector2D() ).LengthSqr() < detonator.radiusSq )
 						{
-							Explode();
+							Detonate();
 							return;
 						}
 					}
@@ -656,7 +653,7 @@ void CMissile::SeekThink( void )
 				{
 					if ( ( GetAbsOrigin() - vPos ).LengthSqr() < detonator.radiusSq )
 					{
-						Explode();
+						Detonate();
 						return;
 					}
 				}
@@ -664,13 +661,22 @@ void CMissile::SeekThink( void )
 		}
 	}
 
-	if( GetAbsVelocity() == vec3_origin )
+	if ( GetAbsVelocity() == vec3_origin || !IsInWorld() )
 	{
 		// Strange circumstances have brought this missile to halt. Just blow it up.
-		Explode();
+		Detonate();
 		return;
 	}
 
+	// Im stuck in water, kill the engine and disable guiding
+	if ( GetWaterLevel() >= 1 )
+	{
+		KillEngine();
+		m_bGuidingDisabled = true;
+		return;
+	}
+
+	Vector vDir = GetAbsVelocity();
 	if ( m_bGuidingDisabled == false )
 	{
 		CBaseEntity	*pBestDot	= NULL;
@@ -728,7 +734,6 @@ void CMissile::SeekThink( void )
 			}
 		}
 
-		Vector	vDir	= GetAbsVelocity();
 		float	flSpeed	= VectorNormalize( vDir );
 		Vector	vNewVelocity = vDir;
 		if ( gpGlobals->frametime > 0.0f )
@@ -764,7 +769,6 @@ void CMissile::SeekThink( void )
 	{
 		if ( gpGlobals->curtime < m_flEngineLifetime )
 		{
-			Vector vDir = GetAbsVelocity();
 			VectorNormalize( vDir );
 			SetAbsVelocity( vDir * RPG_SPEED );
 		}
@@ -1110,7 +1114,7 @@ void CAPCMissile::APCMissileTouch( CBaseEntity *pOther )
 	if ( !pOther->IsSolid() && !pOther->IsSolidFlagSet(FSOLID_VOLUME_CONTENTS) )
 		return;
 
-	Explode();
+	Detonate();
 }
 
 
@@ -1588,6 +1592,7 @@ void CWeaponRPG::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatChara
 {
 	switch( pEvent->event )
 	{
+		case EVENT_WEAPON_MISSILE_FIRE:
 		case EVENT_WEAPON_SMG1:
 		{
 			if ( m_hMissile != NULL )
@@ -1722,10 +1727,10 @@ void CWeaponRPG::PrimaryAttack( void )
 	pOwner->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
-	//WeaponSound( SINGLE );
-	EmitSound( "Weapon_RPG.Single" );
+	WeaponSound( SINGLE );
+	//EmitSound( "Weapon_RPG.Single" );
 
-	pOwner->RumbleEffect( RUMBLE_SHOTGUN_SINGLE, 0, RUMBLE_FLAG_RESTART );
+	pOwner->RumbleEffect( RUMBLE_RPG_MISSILE, 0, RUMBLE_FLAG_RESTART );
 
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pOwner, true, GetClassname() );
@@ -2474,311 +2479,3 @@ void CLaserDot::MakeInvisible( void )
 	BaseClass::TurnOff();
 }
 
-
-//=============================================================================
-// LIGHT-RPG
-//=============================================================================
-
-IMPLEMENT_SERVERCLASS_ST(CWeaponFlash, DT_WeaponFlash)
-END_SEND_TABLE()
-
-LINK_ENTITY_TO_CLASS( weapon_flash, CWeaponFlash );
-PRECACHE_WEAPON_REGISTER(weapon_flash);
-
-BEGIN_DATADESC( CWeaponFlash )
-
-END_DATADESC()
-
-acttable_t	CWeaponFlash::m_acttable[] = 
-{
-	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_RPG, true },
-
-	{ ACT_IDLE_RELAXED,				ACT_IDLE_RPG_RELAXED,			true },
-	{ ACT_IDLE_STIMULATED,			ACT_IDLE_ANGRY_RPG,				true },
-	{ ACT_IDLE_AGITATED,			ACT_IDLE_ANGRY_RPG,				true },
-
-	{ ACT_IDLE,						ACT_IDLE_RPG,					true },
-	{ ACT_IDLE_ANGRY,				ACT_IDLE_ANGRY_RPG,				true },
-	{ ACT_WALK,						ACT_WALK_RPG,					true },
-	{ ACT_WALK_CROUCH,				ACT_WALK_CROUCH_RPG,			true },
-	{ ACT_RUN,						ACT_RUN_RPG,					true },
-	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RPG,				true },
-	{ ACT_COVER_LOW,				ACT_COVER_LOW_RPG,				true },
-};
-
-IMPLEMENT_ACTTABLE(CWeaponFlash);
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-CWeaponFlash::CWeaponFlash()
-{
-	m_bReloadsSingly = false;
-
-	m_fMinRange1 = 20*12;
-	m_fMaxRange1 = 500*12;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-CWeaponFlash::~CWeaponFlash()
-{
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CWeaponFlash::Precache( void )
-{
-	BaseClass::Precache();
-
-	PrecacheScriptSound( "Missile.Ignite" );
-	PrecacheScriptSound( "Weapon_RPG.NPC_Single" );
-	PrecacheScriptSound( "Weapon_RPG.Single" );
-
-	UTIL_PrecacheOther( "rpg_missile" );
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : *pEvent - 
-//			*pOperator - 
-//-----------------------------------------------------------------------------
-void CWeaponFlash::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator )
-{
-	switch( pEvent->event )
-	{
-		case EVENT_WEAPON_SMG1:
-		{
-			Vector	muzzlePoint;
-			QAngle	vecAngles;
-
-			muzzlePoint = GetOwner()->Weapon_ShootPosition();
-
-			CAI_BaseNPC *npc = pOperator->MyNPCPointer();
-			ASSERT( npc != NULL );
-
-			Vector vecShootDir = npc->GetActualShootTrajectory( muzzlePoint );
-
-			// look for a better launch location
-			Vector altLaunchPoint;
-			if (GetAttachment( "missile", altLaunchPoint ))
-			{
-				// check to see if it's relativly free
-				trace_t tr;
-				AI_TraceHull( altLaunchPoint, altLaunchPoint + vecShootDir * (10.0f*12.0f), Vector( -24, -24, -24 ), Vector( 24, 24, 24 ), MASK_NPCSOLID, NULL, &tr );
-
-				if( tr.fraction == 1.0)
-				{
-					muzzlePoint = altLaunchPoint;
-				}
-			}
-
-			VectorAngles( vecShootDir, vecAngles );
-
-			m_hMissile = CMissile::Create( muzzlePoint, vecAngles, GetOwner()->edict() );
-
-			// NPCs always get a grace period
-			m_hMissile->SetGracePeriod( 0.5 );
-
-			pOperator->DoMuzzleFlash();
-
-			//WeaponSound( SINGLE_NPC );
-			EmitSound( "Weapon_RPG.NPC_Single" );
-		}
-		break;
-
-		default:
-			BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
-			break;
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CWeaponFlash::PrimaryAttack( void )
-{
-	// If my clip is empty (and I use clips) start reload
-	if ( UsesClipsForAmmo1() && !m_iClip1 ) 
-	{
-		Reload();
-		return;
-	}
-
-	// Can't be reloading
-	if ( GetActivity() == ACT_VM_RELOAD )
-		return;
-
-	m_flNextPrimaryAttack = gpGlobals->curtime + 0.5f;
-
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
-	
-	if ( pOwner == NULL )
-		return;
-
-	Vector	vForward, vRight, vUp;
-
-	pOwner->EyeVectors( &vForward, &vRight, &vUp );
-
-	Vector	muzzlePoint = pOwner->Weapon_ShootPosition() + vForward * 12.0f + vRight * 6.0f + vUp * -3.0f;
-
-	QAngle vecAngles;
-	VectorAngles( vForward, vecAngles );
-	m_hMissile = CMissile::Create( muzzlePoint, vecAngles, GetOwner()->edict() );
-
-	m_hMissile->GuidingDisabled( true );
-
-	// If the shot is clear to the player, give the missile a grace period
-	trace_t	tr;
-	Vector vecEye = pOwner->EyePosition();
-	UTIL_TraceLine( vecEye, vecEye + vForward * 128, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
-	if ( tr.fraction == 1.0 )
-	{
-		m_hMissile->SetGracePeriod( 0.3 );
-	}
-
-	m_iClip1--;
-
-	// Register a muzzleflash for the AI
-	pOwner->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
-
-	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
-	//WeaponSound( SINGLE );
-	EmitSound( "Weapon_RPG.Single" );
-
-	pOwner->RumbleEffect( RUMBLE_SHOTGUN_SINGLE, 0, RUMBLE_FLAG_RESTART );
-
-	m_iPrimaryAttacks++;
-	gamestats->Event_WeaponFired( pOwner, true, GetClassname() );
-
-	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 1000, 0.2, GetOwner(), SOUNDENT_CHANNEL_WEAPON );
-
-	// Check to see if we should trigger any RPG firing triggers
-	int iCount = g_hWeaponFireTriggers.Count();
-	for ( int i = 0; i < iCount; i++ )
-	{
-		if ( g_hWeaponFireTriggers[i]->IsTouching( pOwner ) )
-		{
-			if ( FClassnameIs( g_hWeaponFireTriggers[i], "trigger_rpgfire" ) )
-			{
-				g_hWeaponFireTriggers[i]->ActivateMultiTrigger( pOwner );
-			}
-		}
-	}
-
-	if( hl2_episodic.GetBool() )
-	{
-		CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
-		int nAIs = g_AI_Manager.NumAIs();
-
-		string_t iszStriderClassname = AllocPooledString( "npc_strider" );
-
-		for ( int i = 0; i < nAIs; i++ )
-		{
-			if( ppAIs[ i ]->m_iClassname == iszStriderClassname )
-			{
-				ppAIs[ i ]->DispatchInteraction( g_interactionPlayerLaunchedRPG, NULL, m_hMissile );
-			}
-		}
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-bool CWeaponFlash::Reload( void )
-{
-	CBaseCombatCharacter *pOwner = GetOwner();
-	
-	if ( pOwner == NULL )
-		return false;
-
-	if ( pOwner->GetAmmoCount(m_iPrimaryAmmoType) <= 0 )
-		return false;
-
-	bool fRet;
-	fRet = DefaultReload( GetMaxClip1(), GetMaxClip2(), ACT_VM_RELOAD );
-	if ( fRet )
-	{
-		WeaponSound( RELOAD );
-	}
-
-	return fRet;
-}
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-bool CWeaponFlash::WeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions )
-{
-	bool bResult = BaseClass::WeaponLOSCondition( ownerPos, targetPos, bSetConditions );
-
-	if( bResult )
-	{
-		CAI_BaseNPC* npcOwner = GetOwner()->MyNPCPointer();
-
-		if( npcOwner )
-		{
-			trace_t tr;
-
-			Vector vecRelativeShootPosition;
-			VectorSubtract( npcOwner->Weapon_ShootPosition(), npcOwner->GetAbsOrigin(), vecRelativeShootPosition );
-			Vector vecMuzzle = ownerPos + vecRelativeShootPosition;
-			Vector vecShootDir = npcOwner->GetActualShootTrajectory( vecMuzzle );
-
-			// Make sure I have a good 8 feet of wide clearance in front, or I'll blow my teeth out.
-			AI_TraceHull( vecMuzzle, vecMuzzle + vecShootDir * (8.0f*12.0f), Vector( -16, -16, -16 ), Vector( 16, 16, 16 ), MASK_NPCSOLID, npcOwner, COLLISION_GROUP_NONE, &tr );
-
-			if( tr.fraction != 1.0f )
-				bResult = false;
-		}
-	}
-
-	return bResult;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : flDot - 
-//			flDist - 
-// Output : int
-//-----------------------------------------------------------------------------
-int CWeaponFlash::WeaponRangeAttack1Condition( float flDot, float flDist )
-{
-	// Ignore vertical distance when doing our RPG distance calculations
-	CAI_BaseNPC *pOwner = GetOwner()->MyNPCPointer();
-	ASSERT( pOwner != NULL );
-	if ( pOwner )
-	{
-		CBaseEntity *pEnemy = pOwner->GetEnemy();
-		Vector vecToTarget = (pEnemy->GetAbsOrigin() - pOwner->GetAbsOrigin());
-		vecToTarget.z = 0;
-		flDist = vecToTarget.Length();
-	}
-
-	if ( m_flNextPrimaryAttack > gpGlobals->curtime )
-		return COND_NONE;
-
-	if ( flDist < m_fMinRange1 )
-		return COND_TOO_CLOSE_TO_ATTACK;
-	if ( flDist > m_fMaxRange1 )
-		return COND_TOO_FAR_TO_ATTACK;
-
-	if( pOwner )
-	{
-		Vector vecEnemyLKP = pOwner->GetEnemyLKP();
-		CBaseEntity *pTarget = NULL;
-
-		while ( ( pTarget = gEntList.FindEntityInSphere( pTarget, vecEnemyLKP, CMissile::EXPLOSION_RADIUS ) ) != NULL )
-		{
-			if ( pOwner->IRelationType( pTarget ) == D_LI )
-			{
-				CSoundEnt::InsertSound( SOUND_MOVE_AWAY, vecEnemyLKP, CMissile::EXPLOSION_RADIUS, 0.1 );
-				return COND_WEAPON_BLOCKED_BY_FRIEND;
-			}
-		}
-	}
-
-	return COND_CAN_RANGE_ATTACK1;
-}

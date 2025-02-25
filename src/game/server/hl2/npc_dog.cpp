@@ -38,6 +38,7 @@ public:
 	void StartTask( const Task_t *pTask );
 	void HandleAnimEvent( animevent_t *pEvent );
 	int	 SelectSchedule( void );
+	bool ShouldGib( const CTakeDamageInfo &info ) { return false; }
 
 	bool FindPhysicsObject( const char *pPickupName, CBaseEntity *pIgnore = NULL );
 	void RunTask( const Task_t *pTask );

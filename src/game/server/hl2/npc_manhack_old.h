@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Flying taser/suicide drone
+// Purpose: 
 //
 //=============================================================================//
 
@@ -10,7 +10,7 @@
 #pragma once
 #endif
 
-#include "ai_basenpc_flyer.h"
+#include "ai_basenpc_physicsflyer.h"
 #include "Sprite.h"
 #include "SpriteTrail.h"
 #include "player_pickup.h"
@@ -30,8 +30,14 @@ enum
 	MANHACK_EYE_STATE_STUNNED,
 };
 
+//-----------------------------------------------------------------------------
+// Attachment points.
+//-----------------------------------------------------------------------------
 #define	MANHACK_GIB_HEALTH				30
 #define	MANHACK_INACTIVE_HEALTH			25
+//#define	MANHACK_MAX_SPEED				500
+//#define MANHACK_BURST_SPEED				650
+//#define MANHACK_NPC_BURST_SPEED			800
 
 //-----------------------------------------------------------------------------
 // Movement parameters.
@@ -45,9 +51,9 @@ class CSoundPatch;
 //-----------------------------------------------------------------------------
 // Manhack 
 //-----------------------------------------------------------------------------
-class CNPC_Manhack : public CNPCBaseInteractive<CAI_BaseFlyingBot>, public CDefaultPlayerPickupVPhysics
+class CNPC_Manhack : public CNPCBaseInteractive<CAI_BasePhysicsFlyingBot>, public CDefaultPlayerPickupVPhysics
 {
-DECLARE_CLASS( CNPC_Manhack, CNPCBaseInteractive<CAI_BaseFlyingBot> );
+DECLARE_CLASS( CNPC_Manhack, CNPCBaseInteractive<CAI_BasePhysicsFlyingBot> );
 DECLARE_SERVERCLASS();
 
 public:
@@ -79,27 +85,25 @@ public:
 	Activity		NPC_TranslateActivity( Activity baseAct );
 	virtual int		TranslateSchedule( int scheduleType );
 	int				MeleeAttack1Conditions ( float flDot, float flDist );
-	int				RangeAttack1Conditions ( float flDot, float flDist );
 	void			HandleAnimEvent( animevent_t *pEvent );
 
-	bool			OverrideMove(float flInterval = 0.1);
+	bool			OverrideMove(float flInterval);
 	void			MoveToTarget(float flInterval, const Vector &MoveTarget);
 	void			MoveExecute_Alive(float flInterval);
 	void			MoveExecute_Dead(float flInterval);
 	int				MoveCollisionMask(void);
-	virtual float	MinGroundDist(void) { return 40.0f; }	// How high above the floor i should hover
 
 	void			TurnHeadRandomly( float flInterval );
 
-	void			NormalTouch( CBaseEntity *pOther );
 	void			CrashTouch( CBaseEntity *pOther );
 
 	void			StartEngine( bool fStartSound );
 
 	virtual Vector	BodyTarget( const Vector &posSrc, bool bNoisy = true ) { return WorldSpaceCenter(); }
 
-	virtual float	GetHeadTurnRate(void) { return 45.0f; } // Degrees per second
+	virtual float	GetHeadTurnRate( void ) { return 45.0f; } // Degrees per second
 
+	void			CheckCollisions(float flInterval);
 	virtual void	GatherEnemyConditions( CBaseEntity *pEnemy );
 	void			PlayFlySound(void);
 	virtual void	StopLoopingSounds(void);
@@ -109,8 +113,6 @@ public:
 	void			Spawn(void);
 	void			Activate();
 	void			StartTask( const Task_t *pTask );
-
-	int				SelectSchedule ( void );
 
 	void			BladesInit();
 	void			SoundInit( void );
@@ -125,8 +127,8 @@ public:
 
 	void			SpinBlades(float flInterval);
 
-	void			Slice( CBaseEntity *pHitEntity );
-	void			Bump( CBaseEntity *pHitEntity );
+	void			Slice( CBaseEntity *pHitEntity, float flInterval, trace_t &tr );
+	void			Bump( CBaseEntity *pHitEntity, float flInterval, trace_t &tr );
 	void			Splash( const Vector &vecSplashPos );
 
 	float			ManhackMaxSpeed( void );
@@ -190,7 +192,7 @@ private:
 	bool IsFlyingActivity( Activity baseAct );
 
 	// Computes the slice bounce velocity
-	void ComputeSliceBounceVelocity( CBaseEntity *pHitEntity );
+	void ComputeSliceBounceVelocity( CBaseEntity *pHitEntity, trace_t &tr );
 
 	// Take damage from being thrown by a physcannon 
 	void TakeDamageFromPhyscannon( CBasePlayer *pPlayer );

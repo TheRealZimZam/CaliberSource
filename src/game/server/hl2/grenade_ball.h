@@ -6,28 +6,13 @@
 // $Date:         $
 //=============================================================================//
 
-#ifndef	GRENADEBALL_H
-#define	GRENADEBALL_H
+#ifndef	GRENADE_BALL_H
+#define	GRENADE_BALL_H
 #ifdef _WIN32
 #pragma once
 #endif
 
-//#include "cbasespriteprojectile.h"
-#include "baseprojectile.h"
-
-enum SpitType_e
-{
-	FIRE,
-	ACID,
-	SPIT,
-};
-
-enum SpitSize_e
-{
-	SMALL,	//Imp fireballs, small flamelets
-	MEDIUM,	//Fireclouds, flamethrower, explosions
-	LARGE,	//Big explosions,
-};
+#include "basespriteprojectile.h"
 
 #define FLAME_GRAVITY 250	//Fire has the lowest gravity, try to go in a straightish line
 #define ACID_GRAVITY 400	// Acid drops fast
@@ -36,30 +21,44 @@ enum SpitSize_e
 #define BALL_MAX_DECALS 2	// Maximum amount of decals a single ball can create
 
 class SmokeTrail;
-class CSprite;
 
-abstract_class CGrenadeBall : public CBaseProjectile
+class CGrenadeBall : public CBaseSpriteProjectile
 {
-	DECLARE_CLASS( CGrenadeBall, CBaseProjectile );
+	DECLARE_CLASS( CGrenadeBall, CBaseSpriteProjectile );
 	DECLARE_DATADESC();
 
 public:
 	CGrenadeBall( void );
 
-	virtual void		Spawn( void );
 	virtual void		Precache( void );
+	void				Spawn(	char *pszModel,
+									int iSize,
+									const Vector &vecVelocity,
+									CBaseEntity *pOwner,
+									MoveType_t	iMovetype,
+									MoveCollide_t nMoveCollide,
+									int	iGravity,
+									CBaseEntity *pIntendedTarget = NULL,
+									float fLifetime = -1 );
 	virtual void		Event_Killed( const CTakeDamageInfo &info );
 
 //	virtual	unsigned int	PhysicsSolidMaskForEntity( void ) const { return ( BaseClass::PhysicsSolidMaskForEntity() | CONTENTS_WATER ); }
 
-	void 				GrenadeSpitTouch( CBaseEntity *pOther );
-	void				SetSpitType( int nType, int nSize );
-	void				Detonate( void );
+	void 				Touch( CBaseEntity *pOther );
 	void				FlyThink( void );
+
+	virtual void		SetLife( float fLifetime ) { m_flSpitLifeTime = fLifetime; }
+	virtual void		SetGroundLife( float fGLifetime ) { m_flSpitGroundLifeTime = fGLifetime; }
+	virtual void		SetDamage( int iDamage ) { m_flDamage = iDamage; }
+	virtual void		SetDamageRadius( int iDamageRadius ) { m_DmgRadius = iDamageRadius; }
+
+	void				SetHissSound( const char *pszSound ) { m_iszHissSound = MAKE_STRING(pszSound); }
+	void				SetHitSound( const char *pszSound ) { m_iszHitSound = MAKE_STRING(pszSound); }
+
+	void				Detonate( void );
 	void				InitHissSound( void );
 
 	CHandle<SmokeTrail>	m_hSmokeTrail;
-	CHandle<CSprite>	m_pSquidSpitSprite;
 
 private:
 	float			m_flSpitLifeTime;		// If non-zero won't despawn
@@ -69,37 +68,9 @@ private:
 	int 			nSpitType;
 	int 			m_iSplatDecals;	//stop decaling surfaces after this many touches
 
-	CSoundPatch		*m_pHissSound;
-	const char 		*m_pHitSound;
-	bool			m_bPlaySound;
+	string_t		m_iszHissSound;
+	string_t		m_iszHitSound;
 	bool			m_bHitGround;
 };
 
-//=============================================================================
-// Purpose:	Spawn helpers - just create a certain type
-// Code-created balls should still use the baseclass and manually assign a type
-//=============================================================================
-class CGrenadeFireball : public CGrenadeBall
-{
-	DECLARE_CLASS( CGrenadeFireball, CGrenadeBall );
-public:
-	void Spawn( void );
-};
-
-//-----------------------------------------------------------------------------
-class CGrenadeAcid : public CGrenadeBall
-{
-	DECLARE_CLASS( CGrenadeAcid, CGrenadeBall );
-public:
-	void Spawn( void );
-};
-
-//-----------------------------------------------------------------------------
-class CGrenadeSpit : public CGrenadeBall
-{
-	DECLARE_CLASS( CGrenadeSpit, CGrenadeBall );
-public:
-	void Spawn( void );
-};
-
-#endif	//GRENADEBALL_H
+#endif	//GRENADE_BALL_H

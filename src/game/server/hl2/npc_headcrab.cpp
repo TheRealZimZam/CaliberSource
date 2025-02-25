@@ -273,6 +273,7 @@ void CBaseHeadcrab::Spawn( void )
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_INNATE_RANGE_ATTACK1 );
 	CapabilitiesAdd( bits_CAP_SQUAD );
+	CapabilitiesAdd( bits_CAP_HEAR );
 
 	// headcrabs get to cheat for 5 seconds (sjb)
 	GetEnemies()->SetFreeKnowledgeDuration( 5.0 );
@@ -778,12 +779,6 @@ void CBaseHeadcrab::RunTask( const Task_t *pTask )
 				SetGravity(1.0);
 				SetMoveType( MOVETYPE_STEP );
 
-#if 0
-				if( GetEnemy() && ( GetEnemy()->GetAbsOrigin() - GetAbsOrigin() ).Length() > HEADCRAB_MAX_JUMP_DIST )
-				{
-					TaskFail( "");
-				}
-#endif
 				TaskComplete();
 			}
 			break;
@@ -2526,7 +2521,9 @@ void CHeadcrab::Spawn( void )
 
 	BaseClass::Spawn();
 
-	m_iHealth = sk_cheadcrab_health.GetFloat();
+	if ( GetHealth() == 0 )
+		SetHealth(sk_cheadcrab_health.GetFloat());
+
 	m_flBurrowTime = 0.0f;
 	m_bCrawlFromCanister = false;
 	m_bMidJump = false;
@@ -2668,7 +2665,8 @@ void CFastHeadcrab::Spawn( void )
 
 	BaseClass::Spawn();
 
-	m_iHealth = sk_headcrab_health.GetFloat();
+	if ( GetHealth() == 0 )
+		SetHealth(sk_headcrab_health.GetFloat());
 
 	m_iRunMode = HEADCRAB_RUNMODE_IDLE;
 	m_flPauseTime = 999999;
@@ -3079,7 +3077,9 @@ void CBlackHeadcrab::Spawn( void )
 	BaseClass::Spawn();
 
 	m_bPanicState = false;
-	m_iHealth = sk_headcrab_poison_health.GetFloat();
+
+	if ( GetHealth() == 0 )
+		SetHealth(sk_headcrab_poison_health.GetFloat());
 
 	NPCInit();
 	HeadcrabInit();

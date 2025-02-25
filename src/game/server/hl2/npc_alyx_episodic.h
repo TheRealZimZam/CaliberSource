@@ -51,7 +51,7 @@ public:
 	void	OnUpdateShotRegulator();
 	bool	IsCrouchedActivity( Activity activity );
 
-	virtual float	GetJumpGravity() const		{ return 1.8f; }
+	virtual float	GetJumpGravity() const		{ return 1.6f; }
 
 	// Crouching
 	Vector  GetCrouchEyeOffset( void ) { return Vector(0,0,50); }
@@ -92,6 +92,7 @@ public:
 	void	TraceAttack( const CTakeDamageInfo &info, const Vector &vecDir, trace_t *ptr );
 	bool	CanBeHitByMeleeAttack( CBaseEntity *pAttacker );
 	int		OnTakeDamage_Alive( const CTakeDamageInfo &info );
+	bool	ShouldGib( const CTakeDamageInfo &info ) { return (info.GetDamageType() & DMG_ALWAYSGIB) ? true : false; }
 	bool	FCanCheckAttacks();
 	float	GetAttackDamageScale( CBaseEntity *pVictim );
 
@@ -120,8 +121,6 @@ public:
 	bool	HasInteractTarget() { return m_hHackTarget != NULL; }
 	CBaseEntity *GetInteractTarget() { return m_hHackTarget; }
 	void	EmpZapTarget( CBaseEntity *pTarget );
-
-	virtual void OnSeeEntity( CBaseEntity *pEntity );
 
 	void InputAllowInteraction( inputdata_t &inputdata )
 	{

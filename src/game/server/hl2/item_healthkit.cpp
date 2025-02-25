@@ -9,6 +9,7 @@
 #include "gamerules.h"
 #include "player.h"
 #include "items.h"
+#include "beverage.h"
 #include "in_buttons.h"
 #include "engine/IEngineSound.h"
 
@@ -38,7 +39,9 @@ public:
 
 		// Choose a random skin for candybars
 		if (m_bIsFood)
+		{
 			m_nSkin = random->RandomInt( 0, 5 );
+		}
 
 		BaseClass::Spawn();
 	}
@@ -265,6 +268,14 @@ public:
 			{
 				CPASAttenuationFilter filter( pPlayer, "Player.Eat" );
 				EmitSound( filter, pPlayer->entindex(), "Player.Eat" );
+
+				if ( GetOwnerEntity() )
+				{
+					// tell the machine the bar was taken
+					CEnvBeverage *bev = (CEnvBeverage *)GetOwnerEntity();
+					if (bev)
+						bev->m_ItemInDispenser = false;
+				}
 			}
 			else
 			{

@@ -22,6 +22,7 @@ public:
 
 	void Spawn( void );
 	void Precache( void );
+	void ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	
 	DECLARE_DATADESC();
 

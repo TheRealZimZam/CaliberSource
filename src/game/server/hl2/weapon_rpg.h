@@ -14,7 +14,7 @@
 #endif
 
 #include "basehlcombatweapon_shared.h"
-#include "basegrenade_shared.h"
+#include "baseprojectile.h"
 #include "Sprite.h"
 #include "npcevent.h"
 #include "beam_shared.h"
@@ -29,9 +29,9 @@ class RocketTrail;
 //###########################################################################
 //	>> CMissile		(missile launcher class is below this one!)
 //###########################################################################
-class CMissile : public CBaseGrenade
+class CMissile : public CBaseProjectile
 {
-	DECLARE_CLASS( CMissile, CBaseGrenade );
+	DECLARE_CLASS( CMissile, CBaseProjectile );
 
 public:
 	static const int EXPLOSION_RADIUS = 216;
@@ -39,16 +39,12 @@ public:
 	CMissile();
 	~CMissile();
 
-#ifdef HL1_DLL
-	Class_T Classify( void ) { return CLASS_NONE; }
-#else
 	Class_T Classify( void ) { return CLASS_MISSILE; }
-#endif
 	
 	void	Spawn( void );
 	void	Precache( void );
-	void	MissileTouch( CBaseEntity *pOther );
-	void	Explode( void );
+	void	Touch( CBaseEntity *pOther );
+	void	Detonate( void );
 	void	ShotDown( void );
 	void	AccelerateThink( void );
 	void	AugerThink( void );
@@ -64,8 +60,6 @@ public:
 	virtual void	SetDamage(float flDamage) { m_flDamage = flDamage; }
 	virtual void	SetEngineLifetime(float flLifetime) { m_flEngineLifetime = gpGlobals->curtime + flLifetime; }
 	virtual void	SetMaxLifetime(float flLifetime) { m_flMaxLifetime = gpGlobals->curtime + flLifetime; }
-
-	unsigned int PhysicsSolidMaskForEntity( void ) const;
 
 	CHandle<CWeaponRPG>		m_hOwner;
 
@@ -263,52 +257,6 @@ protected:
 	CHandle<CMissile>	m_hMissile;
 	CHandle<CSprite>	m_hLaserMuzzleSprite;
 	CHandle<CBeam>		m_hLaserBeam;
-};
-
-//-----------------------------------------------------------------------------
-// Dumbfire clip-fed rpg
-//-----------------------------------------------------------------------------
-class CWeaponFlash : public CBaseHLCombatWeapon
-{
-	DECLARE_DATADESC();
-public:
-	DECLARE_CLASS( CWeaponFlash, CBaseHLCombatWeapon );
-
-	CWeaponFlash();
-	~CWeaponFlash();
-
-	DECLARE_SERVERCLASS();
-
-	void	Precache( void );
-
-	void	PrimaryAttack( void );
-	virtual float GetFireRate( void ) { return 0.875f; };
-
-	bool	Reload( void );
-
-	int		GetMinBurst() { return 4; }
-	int		GetMaxBurst() { return 4; }
-	float	GetMinRestTime() { return 1.0; }
-	float	GetMaxRestTime() { return 1.5; }
-
-	bool	WeaponLOSCondition( const Vector &ownerPos, const Vector &targetPos, bool bSetConditions );
-	int		WeaponRangeAttack1Condition( float flDot, float flDist );
-
-	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-
-	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
-
-	virtual const Vector& GetBulletSpread( void )
-	{
-		static Vector cone = VECTOR_CONE_3DEGREES;
-		return cone;
-	}
-
-	DECLARE_ACTTABLE();
-
-protected:
-	CHandle<CMissile>	m_hMissile;
-
 };
 
 #endif // WEAPON_RPG_H

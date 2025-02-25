@@ -12,12 +12,13 @@
 
 #include "cbase.h"
 #include "player_pickup.h"
+#include "ai_basenpc_physicsflyer.h"
 #include "weapon_physcannon.h"
 #include "hl2_player.h"
 #include "smoke_trail.h"
 #include "Sprite.h"
 #include "SpriteTrail.h"
-#include "ai_basenpc_physicsflyer.h"
+#include "beam_shared.h"
 
 //-----------------------------------------------------------------------------
 // States for the scanner's sound.

@@ -241,7 +241,7 @@ void CNPC_MissileDefense::FireCannons( void )
 		}
 
 		CTakeDamageInfo info( this, this, flDamage, DMG_MISSILEDEFENSE );
-		CalculateBulletDamageForce( &info, GetAmmoDef()->Index("SMG1"), vecDir, GetEnemy()->GetAbsOrigin() );
+		CalculateBulletDamageForce( &info, GetAmmoDef()->Index("762"), vecDir, GetEnemy()->GetAbsOrigin() );
 		GetEnemy()->TakeDamage( info );
 	}
 }

@@ -64,10 +64,11 @@ void CSatchelCharge::Deactivate( void )
 //-----------------------------------------------------------------------------
 void CSatchelCharge::Precache( void )
 {
-	PrecacheModel("models/Weapons/w_slam.mdl");
+	PrecacheModel("models/Weapons/w_satchel.mdl");
 	PrecacheModel(SLAM_SPRITE);
-	PrecacheScriptSound( "SatchelCharge.Pickup" );
+	PrecacheScriptSound( "SatchelCharge.Attach" );
 	PrecacheScriptSound( "SatchelCharge.Bounce" );
+	PrecacheScriptSound( "SatchelCharge.Pickup" );
 	// FIXME:  Are these used?
 	PrecacheScriptSound( "SatchelCharge.Slide" );
 //	enginesound->PrecacheSound("weapons/slam/slide.wav");
@@ -80,15 +81,12 @@ void CSatchelCharge::Precache( void )
 void CSatchelCharge::Spawn( void )
 {
 	Precache( );
-	SetModel( "models/Weapons/w_slam.mdl" );
+	SetModel( "models/Weapons/w_satchel.mdl" );
 
 	// motor
-//	VPhysicsInitNormal( SOLID_BBOX, GetSolidFlags() | FSOLID_TRIGGER, false );
-//	SetMoveType( MOVETYPE_VPHYSICS );
-//	SetCollisionGroup( COLLISION_GROUP_WEAPON );
-	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
+	SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_CUSTOM );
 	SetSolid( SOLID_BBOX ); 
-	SetCollisionGroup( COLLISION_GROUP_PROJECTILE );
+	SetCollisionGroup( COLLISION_GROUP_PROJECTILE );	//COLLISION_GROUP_WEAPON
 
 	UTIL_SetSize(this, Vector( -6, -6, -2), Vector(6, 6, 2));
 //	Relink();
@@ -99,21 +97,18 @@ void CSatchelCharge::Spawn( void )
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
-	{
-		m_flDamage		= sk_plr_dmg_satchel.GetFloat();
-	}
+		SetDamage( sk_plr_dmg_satchel.GetFloat() );
 	else
-	{
-		m_flDamage		= sk_npc_dmg_satchel.GetFloat();
-	}
+		SetDamage( sk_npc_dmg_satchel.GetFloat() );
+
 	m_DmgRadius		= sk_satchel_radius.GetFloat();
 	m_takedamage	= DAMAGE_YES;
-	m_iHealth		= 1;
+	m_iHealth		= 5;
 
 	SetGravity( UTIL_ScaleForGravity( 560 ) );	// slightly lower gravity
 	SetFriction( 1.0 );
 	SetSequence( 1 );
-//!	SetDamage( 150 );
+	SetElasticity( 0.5 );	//Satchels are heavy
 
 	m_bIsAttached			= false;
 	m_bInAir				= true;
@@ -176,6 +171,11 @@ void CSatchelCharge::SatchelUse( CBaseEntity *pActivator, CBaseEntity *pCaller, 
 	KillSlideSound();
 	SetThink( &CBaseGrenade::Detonate );
 	SetNextThink( gpGlobals->curtime );
+}
+
+void CSatchelCharge::InputExplode( inputdata_t &inputdata )
+{
+	SatchelUse( inputdata.pActivator, inputdata.pCaller, USE_ON, 0 );
 }
 
 //-----------------------------------------------------------------------------
@@ -309,14 +309,6 @@ void CSatchelCharge::UpdateSlideSound( void )
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-void CSatchelCharge::InputExplode( inputdata_t &inputdata )
-{
-	ExplosionCreate( GetAbsOrigin() + Vector( 0, 0, 16 ), GetAbsAngles(), GetThrower(), GetDamage(), 200, 
-		SF_ENVEXPLOSION_NOSPARKS | SF_ENVEXPLOSION_NODLIGHTS | SF_ENVEXPLOSION_NOSMOKE, 0.0f, this);
-
-	UTIL_Remove( this );
-}
-
 void CSatchelCharge::SatchelThink( void )
 {
 	// If attached resize so player can pick up off wall
@@ -384,6 +376,7 @@ void CSatchelCharge::SatchelThink( void )
 	Vector vecNewVel = GetAbsVelocity();
 	if (GetWaterLevel() == 3)
 	{
+		// If im completely submerged
 		SetMoveType( MOVETYPE_FLY );
 		vecNewVel *= 0.8;
 		vecNewVel.z += 8;
@@ -391,7 +384,7 @@ void CSatchelCharge::SatchelThink( void )
 	}
 	else if (GetWaterLevel() == 0)
 	{
-		SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_SLIDE );
+		SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_CUSTOM );
 	}
 	else
 	{
@@ -409,6 +402,16 @@ void CSatchelCharge::BounceSound( void )
 
 		m_flNextBounceSoundTime = gpGlobals->curtime + 0.1;
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CSatchelCharge::ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity )
+{
+	// Calculate bouncing first, then sliding
+	ResolveFlyCollisionBounce( trace, vecVelocity );
+	ResolveFlyCollisionSlide( trace, vecVelocity );
 }
 
 

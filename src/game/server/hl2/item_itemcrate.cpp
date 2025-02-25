@@ -12,27 +12,22 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-const char *pszItemCrateModelName[] =
-{
-	"models/items/item_item_crate.mdl",
-	"models/items/item_beacon_crate.mdl",
-};
+// Default model (can be anything breakable)
+#define ITEM_CRATE_MODEL "models/items/item_item_crate.mdl"
 
 //-----------------------------------------------------------------------------
 // A breakable crate that drops items
 //-----------------------------------------------------------------------------
-class CItem_ItemCrate : public CPhysicsProp
+class CItem_ItemCrate : public CPhysicsPropSimple
 {
 public:
-	DECLARE_CLASS( CItem_ItemCrate, CPhysicsProp );
+	DECLARE_CLASS( CItem_ItemCrate, CPhysicsPropSimple );
 	DECLARE_DATADESC();
 
 	void Precache( void );
 	void Spawn( void );
 
 	virtual int	ObjectCaps() { return BaseClass::ObjectCaps() | FCAP_WCEDIT_POSITION; };
-
-	virtual int		OnTakeDamage( const CTakeDamageInfo &info );
 
 	void InputKill( inputdata_t &data );
 
@@ -68,7 +63,7 @@ private:
 
 
 LINK_ENTITY_TO_CLASS(item_item_crate, CItem_ItemCrate);
-
+LINK_ENTITY_TO_CLASS(item_itemcrate, CItem_ItemCrate);
 
 //-----------------------------------------------------------------------------
 // Save/load: 
@@ -92,8 +87,13 @@ END_DATADESC()
 void CItem_ItemCrate::Precache( void )
 {
 	// Set this here to quiet base prop warnings
-	PrecacheModel( pszItemCrateModelName[m_CrateAppearance] );
-	SetModel( pszItemCrateModelName[m_CrateAppearance] );
+	if ( GetModelName() == NULL_STRING )
+	{
+		SetModelName( MAKE_STRING(ITEM_CRATE_MODEL) );
+		PrecacheModel( ITEM_CRATE_MODEL );
+	}
+	else
+		PrecacheModel( STRING(GetModelName()) );
 
 	BaseClass::Precache();
 	if ( m_CrateType == CRATE_SPECIFIC_ITEM )
@@ -118,7 +118,6 @@ void CItem_ItemCrate::Spawn( void )
 	}
 
 	DisableAutoFade();
-	SetModelName( AllocPooledString( pszItemCrateModelName[m_CrateAppearance] ) );
 
 	if ( NULL_STRING == m_strItemClass )
 	{
@@ -128,7 +127,7 @@ void CItem_ItemCrate::Spawn( void )
 	}
 
 	Precache( );
-	SetModel( pszItemCrateModelName[m_CrateAppearance] );
+	SetModel( STRING(GetModelName()) );
 	AddEFlags( EFL_NO_ROTORWASH_PUSH );
 	BaseClass::Spawn( );
 }
@@ -141,22 +140,6 @@ void CItem_ItemCrate::Spawn( void )
 void CItem_ItemCrate::InputKill( inputdata_t &data )
 {
 	UTIL_Remove( this );
-}
-
-
-//-----------------------------------------------------------------------------
-// Item crates blow up immediately
-//-----------------------------------------------------------------------------
-int CItem_ItemCrate::OnTakeDamage( const CTakeDamageInfo &info )
-{
-	if ( info.GetDamageType() & DMG_AIRBOAT )
-	{
-		CTakeDamageInfo dmgInfo = info;
-		dmgInfo.ScaleDamage( 10.0 );
-		return BaseClass::OnTakeDamage( dmgInfo );
-	}
-
-	return BaseClass::OnTakeDamage( info );
 }
 
 

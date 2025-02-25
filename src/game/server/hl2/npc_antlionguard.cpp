@@ -823,6 +823,7 @@ void CNPC_AntlionGuard::Spawn( void )
 
 	CapabilitiesClear();
 	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_INNATE_MELEE_ATTACK1 | bits_CAP_SQUAD );
+	CapabilitiesAdd( bits_CAP_HEAR );
 	CapabilitiesAdd( bits_CAP_SKIP_NAV_GROUND_CHECK );
 
 	NPCInit();

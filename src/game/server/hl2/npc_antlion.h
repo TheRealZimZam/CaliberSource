@@ -83,7 +83,7 @@ public:
 
 	bool		IsWorker( void ) const { return HasSpawnFlags( SF_ANTLION_WORKER ); }	// NOTE: IsAntlionWorker function must agree!
 
-	float		GetIdealAccel( void ) const;
+	float		GetIdealAccel( void );
 	float		MaxYawSpeed( void );
 	bool		FInViewCone( CBaseEntity *pEntity );
 	bool		FInViewCone( const Vector &vecSpot );

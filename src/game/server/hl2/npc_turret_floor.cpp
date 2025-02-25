@@ -310,7 +310,7 @@ void CNPC_FloorTurret::Spawn( void )
 	SetPoseParameter( m_poseAim_Yaw, 0 );
 	SetPoseParameter( m_poseAim_Pitch, 0 );
 
-	m_iAmmoType = GetAmmoDef()->Index( "PISTOL" );
+	m_iAmmoType = GetAmmoDef()->Index( "762" );
 
 	m_iMuzzleAttachment = LookupAttachment( "eyes" );
 	m_iEyeAttachment = LookupAttachment( "light" );
@@ -592,7 +592,7 @@ bool CNPC_FloorTurret::OnAttemptPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGu
 //-----------------------------------------------------------------------------
 bool CNPC_FloorTurret::HandleInteraction(int interactionType, void *data, CBaseCombatCharacter *sourceEnt)
 {
-	if ( interactionType == g_interactionCombineBash )
+	if ( interactionType == g_interactionCombineKick )
 	{
 		// We've been bashed by a combine soldier. Remember who it was, if we haven't got an active kicker
 		if ( !m_hLastNPCToKickMe )

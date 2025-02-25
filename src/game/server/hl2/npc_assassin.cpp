@@ -140,9 +140,10 @@ void CNPC_Assassin::Spawn( void )
 	m_NPCState			= NPC_STATE_NONE;
 
 	CapabilitiesClear();
-	CapabilitiesAdd( bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP );
+	CapabilitiesAdd( bits_CAP_BASIC_MOVEMENT_GROUP | bits_CAP_MOVE_CLIMB );
 	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_USE_WEAPONS | bits_CAP_AIM_GUN | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_RANGE_ATTACK2 | bits_CAP_INNATE_MELEE_ATTACK1 );
 	CapabilitiesAdd( bits_CAP_DOORS_GROUP | bits_CAP_USE );
+	CapabilitiesAdd( bits_CAP_HEAR );
 
 	//Turn on our guns
 	SetBodygroup( 1, 1 );
@@ -220,8 +221,8 @@ float CNPC_Assassin::MaxYawSpeed( void )
 bool CNPC_Assassin::IsJumpLegal(const Vector &startPos, const Vector &apex, const Vector &endPos) const
 {
 	const float MAX_JUMP_RISE		= 256.0f;
-	const float MAX_JUMP_DISTANCE	= 256.0f;
-	const float MAX_JUMP_DROP		= 512.0f;
+	const float MAX_JUMP_DISTANCE	= 288.0f;
+	const float MAX_JUMP_DROP		= 448.0f;
 
 	return BaseClass::IsJumpLegal( startPos, apex, endPos, MAX_JUMP_RISE, MAX_JUMP_DROP, MAX_JUMP_DISTANCE );
 }
@@ -335,7 +336,7 @@ void CNPC_Assassin::FirePistol( int hand )
 		VectorNormalize( muzzleDir );
 	}
 
-	int bulletType = GetAmmoDef()->Index( "Pistol" );
+	int bulletType = GetAmmoDef()->Index( "9mm" );
 
 	FireBullets( 1, muzzlePos, muzzleDir, VECTOR_CONE_5DEGREES, 1024, bulletType, 2 );
 

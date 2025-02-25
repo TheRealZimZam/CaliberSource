@@ -67,13 +67,15 @@ enum
 	SCHED_ZOMBIE_RELEASECRAB,
 	SCHED_ZOMBIE_MOVE_TO_AMBUSH,
 	SCHED_ZOMBIE_WAIT_AMBUSH,
-	SCHED_ZOMBIE_WANDER_MEDIUM,	// medium range wandering behavior.
+	SCHED_ZOMBIE_WANDER_MEDIUM,
 	SCHED_ZOMBIE_WANDER_FAIL,
 	SCHED_ZOMBIE_WANDER_STANDOFF,
 	SCHED_ZOMBIE_MELEE_ATTACK1,
 	SCHED_ZOMBIE_POST_MELEE_WAIT,
+	SCHED_ZOMBIE_IDLE_STAND,
+	SCHED_ZOMBIE_CHARGE_ENEMY,
 
-	LAST_BASE_ZOMBIE_SCHEDULE,
+	LAST_BASE_ZOMBIE_SCHEDULE
 };
 
 //=========================================================
@@ -87,6 +89,7 @@ enum
 	TASK_ZOMBIE_DIE,
 	TASK_ZOMBIE_RELEASE_HEADCRAB,
 	TASK_ZOMBIE_WAIT_POST_MELEE,
+	TASK_ZOMBIE_CHARGE_ENEMY,
 
 	LAST_BASE_ZOMBIE_TASK,
 };
@@ -100,6 +103,7 @@ enum Zombie_Conds
 	COND_ZOMBIE_CAN_SWAT_ATTACK = LAST_SHARED_CONDITION,
 	COND_ZOMBIE_RELEASECRAB,
 	COND_ZOMBIE_LOCAL_MELEE_OBSTRUCTION,
+	COND_ZOMBIE_CHARGE_TARGET_MOVED,
 
 	LAST_BASE_ZOMBIE_CONDITION,
 };
@@ -132,11 +136,18 @@ public:
 
 	void KillMe( void )
 	{
-		Event_Killed( CTakeDamageInfo( this, this, m_iHealth, DMG_GENERIC ) );
+		CTakeDamageInfo info;
+		info.SetAttacker( this );
+		info.SetInflictor( this );
+		info.SetDamage( (m_iHealth-1) );
+		info.SetDamageType( DMG_GENERIC );
+		info.SetDamageForce( Vector( 0.1, 0.1, 0.1 ) );
+		Event_Killed( info );
 	}
 
 	int MeleeAttack1Conditions ( float flDot, float flDist );
 	virtual float GetClawAttackRange() const { return ZOMBIE_MELEE_REACH; }
+	virtual float	GetJumpGravity() const { return 1.7f; }
 
 	// No range attacks
 	int RangeAttack1Conditions ( float flDot, float flDist ) { return( 0 ); }
@@ -240,10 +251,7 @@ public:
 public:
 	CAI_ActBusyBehavior		m_ActBusyBehavior;
 
-
-
 protected:
-
 	CSoundPatch	*m_pMoanSound;
 
 	bool	m_fIsTorso;			// is this is a half-zombie?
@@ -289,6 +297,7 @@ protected:
 
 private:
 	bool m_bIsSlumped;
+	Vector m_vPositionCharged;
 
 };
 

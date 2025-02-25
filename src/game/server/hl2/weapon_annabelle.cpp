@@ -37,6 +37,7 @@ public:
 	void	Precache( void );
 
 	int CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
+	bool CanBePickedUpByNPCs( void ) { return false; }
 
 	virtual const Vector& GetBulletSpread( void )
 	{
@@ -47,7 +48,7 @@ public:
 	virtual int				GetMinBurst() { return 1; }
 	virtual int				GetMaxBurst() { return 1; }
 
-	void ItemHolsterFrame( void );
+	void ItemDormantFrame( void );
 	bool StartReload( void );
 	bool Reload( void );
 	void FillClip( void );
@@ -288,7 +289,7 @@ void CWeaponAnnabelle::Pump( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeaponAnnabelle::ItemHolsterFrame( void )
+void CWeaponAnnabelle::ItemDormantFrame( void )
 {
 	// Must be player held
 	if ( GetOwner() && GetOwner()->IsPlayer() == false )

@@ -38,9 +38,8 @@ extern ConVar npc_combine_limp_health;
 
 ConVar	sk_combine_e_health( "sk_combine_e_health","0");
 ConVar	sk_combine_e_kick( "sk_combine_e_kick","0");
-ConVar	sk_combine_e_jump( "sk_combine_e_jump","1");	//Is jumping allowed?
 
-extern ConVar sk_plr_dmg_buckshot;	
+extern ConVar sk_buckshot_plr_dmg;	
 extern ConVar sk_plr_num_shotgun_pellets;
 extern ConVar sk_plr_dmg_ar2;
 extern ConVar npc_combine_drop_health;
@@ -72,11 +71,6 @@ void CNPC_CombineE::Spawn( void )
 		CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
 	}
 	CapabilitiesAdd( bits_CAP_DOORS_GROUP );
-
-	if ( sk_combine_e_jump.GetBool() )
-	{
-		CapabilitiesAdd( bits_CAP_MOVE_JUMP );
-	}
 
 	BaseClass::Spawn();
 }
@@ -414,7 +408,7 @@ bool CNPC_CombineE::IsHeavyDamage( const CTakeDamageInfo &info )
 	// Shotgun blasts where at least half the pellets hit me are heavy damage
 	if ( info.GetDamageType() & DMG_BUCKSHOT )
 	{
-		int iHalfMax = sk_plr_dmg_buckshot.GetFloat() * sk_plr_num_shotgun_pellets.GetInt() * 0.5;
+		int iHalfMax = sk_buckshot_plr_dmg.GetFloat() * sk_plr_num_shotgun_pellets.GetInt() * 0.5;
 		if ( info.GetDamage() >= iHalfMax )
 			return true;
 	}
@@ -426,7 +420,7 @@ bool CNPC_CombineE::IsHeavyDamage( const CTakeDamageInfo &info )
 	}
 
 	// Rifle-grenades (This grenade is too quick to yell "Grenade!", so yell the heavy damage after it hits)
-	if( info.GetAmmoType() == GetAmmoDef()->Index("SMG1_Grenade") )
+	if( info.GetAmmoType() == GetAmmoDef()->Index("AR2Grenade") )
 	{
 		return true;
 	}

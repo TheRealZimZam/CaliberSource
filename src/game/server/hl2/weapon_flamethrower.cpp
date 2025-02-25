@@ -34,6 +34,10 @@
 
 static const char *g_pFlameThrowerSound = "Weapon_Flamethrower.Flame";
 
+extern ConVar sk_fireball_dmg;
+extern ConVar sk_fireball_radius;
+extern ConVar sk_fireball_life;
+
 extern ConVar sv_funmode;
 ConVar sk_flamethrower_velocity( "sk_flamethrower_velocity", "450.0", FCVAR_CHEAT | FCVAR_GAMEDLL, "Velocity of flameballs." );
 
@@ -112,7 +116,8 @@ CWeaponFlameThrower::~CWeaponFlameThrower()
 //-----------------------------------------------------------------------------
 void CWeaponFlameThrower::Precache( void )
 {
-	UTIL_PrecacheOther("grenade_fireball");
+	UTIL_PrecacheOther("grenade_ball");
+	PrecacheModel("sprites/xfireball3.vmt");
 
 	PrecacheScriptSound( g_pFlameThrowerSound );
 
@@ -190,15 +195,14 @@ void CWeaponFlameThrower::PrimaryAttack()
 		Vector vForward, vRight, vUp;
 		pOwner->EyeVectors( &vForward, &vRight, &vUp );
 		Vector vOrigin = pOwner->Weapon_ShootPosition();
+		Vector vMuzzle;
 
-	/*
-		if ( GetAttachment( "muzzle", vMuzzle ) )	//If we have an attachment, dont bother changing
-			vMuzzle = "muzzle";
-		else
-	*/
-		// Else, we have to manually specifiy the smaller details Old style
-		Vector vMuzzle = vOrigin + vForward * FLAMETHROWER_MUZZLEPOS_FORWARD 
-			+ vRight * FLAMETHROWER_MUZZLEPOS_RIGHT + vUp * FLAMETHROWER_MUZZLEPOS_UP;
+		if ( !GetAttachment( "muzzle", vMuzzle ) )
+		{
+			// No muzzlepoint? Gotta manually specifiy the smaller details Old style.
+			Vector vMuzzle = vOrigin + vForward * FLAMETHROWER_MUZZLEPOS_FORWARD 
+				+ vRight * FLAMETHROWER_MUZZLEPOS_RIGHT + vUp * FLAMETHROWER_MUZZLEPOS_UP;
+		}
 
 		QAngle vecAngles;
 		VectorAngles( vForward, vecAngles );
@@ -216,23 +220,34 @@ void CWeaponFlameThrower::PrimaryAttack()
 
 		for ( int i = 0; i < iFireballs; i++ )
 		{
-			CGrenadeFireball *pGrenade = (CGrenadeFireball*)Create( "grenade_fireball", vMuzzle, vecAngles, pOwner );
-			DispatchSpawn( pGrenade );
+			CGrenadeBall *pGrenade = (CGrenadeBall*)CreateNoSpawn( "grenade_fireball", vMuzzle, vecAngles, pOwner );
+			pGrenade->SetHissSound( "GrenadeFlame.Hiss" );
+			pGrenade->SetHitSound( "GrenadeFlame.Hit" );
+			pGrenade->Spawn( "sprites/xfireball3.vmt",
+				3,
+				vVelocity,
+				pOwner,
+				MOVETYPE_FLYGRAVITY,
+				MOVECOLLIDE_FLY_SLIDE,
+				FLAME_GRAVITY,
+				NULL,
+				sk_fireball_life.GetFloat());
+			pGrenade->SetDamageType( DMG_BURN );
 
 			// 0 is the main fireball
 			if ( i == 0 )
 			{
-				pGrenade->SetSpitType( FIRE, LARGE );
-				pGrenade->SetAbsVelocity( vVelocity );
+				pGrenade->SetDamage( sk_fireball_dmg.GetFloat() );
+				pGrenade->SetDamageRadius( sk_fireball_radius.GetFloat() );
+				pGrenade->SetHitSound( "GrenadeFlame.Hit" );
 			}
 			else
 			{
-				pGrenade->SetSpitType( FIRE, random->RandomInt( SMALL, MEDIUM ) );
+				UTIL_SetSize( pGrenade, -Vector( 1.0f, 1.0f, 1.0f ), Vector( 1.0f, 1.0f, 1.0f ) );
 				pGrenade->SetAbsVelocity( vVelocity + RandomFloat( -48.0f, 12.0f ) );
+				pGrenade->SetDamage( 0 );
+				pGrenade->SetDamageRadius( 0 );
 			}
-
-			pGrenade->SetThrower( pOwner );
-			pGrenade->SetOwnerEntity( pOwner );
 
 			// Tumble through the air
 			pGrenade->SetLocalAngularVelocity(

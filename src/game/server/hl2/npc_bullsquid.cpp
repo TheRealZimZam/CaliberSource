@@ -38,6 +38,10 @@
 
 #define		SQUID_SPRINT_DIST	256 // how close the squid has to get before starting to sprint and refusing to swerve
 
+extern ConVar sk_spitball_dmg;
+extern ConVar sk_spitball_radius;
+extern ConVar sk_spitball_life;
+
 ConVar sk_bullsquid_health( "sk_bullsquid_health", "0" );
 ConVar sk_bullsquid_dmg_bite( "sk_bullsquid_dmg_bite", "0" );
 ConVar sk_bullsquid_dmg_whip( "sk_bullsquid_dmg_whip", "0" );
@@ -154,6 +158,7 @@ void CNPC_Bullsquid::Precache()
 		SetModelName( MAKE_STRING( "models/bullsquid.mdl" ) );
 
 	PrecacheModel( STRING( GetModelName() ) );
+	PrecacheModel("sprites/bigspit.vmt");
 
 	m_nSquidSpitSprite = PrecacheModel("sprites/greenspit1.vmt");// client side spittle.
 
@@ -281,13 +286,21 @@ void CNPC_Bullsquid::HandleAnimEvent( animevent_t *pEvent )
 				float flGravity  = SPIT_GRAVITY;
 				ThrowLimit(vSpitPos, vTarget, flGravity, 3, Vector(0,0,0), Vector(0,0,0), GetEnemy(), &vToss, &pBlocker);
 
-				CGrenadeSpit *pGrenade = (CGrenadeSpit*)CreateNoSpawn( "grenade_spit", vSpitPos, vec3_angle, this );
-				//pGrenade->KeyValue( "velocity", vToss );
-				pGrenade->Spawn( );
-				pGrenade->SetThrower( this );
-				pGrenade->SetOwnerEntity( this );
-				pGrenade->SetSpitType( SPIT, 2 );
-				pGrenade->SetAbsVelocity( vToss );
+				CGrenadeBall *pGrenade = (CGrenadeBall*)CreateNoSpawn( "grenade_spit", vSpitPos, vec3_angle, this );
+				pGrenade->SetHissSound( "GrenadeSpit.Hiss" );
+				pGrenade->SetHitSound( "GrenadeSpit.Hit" );
+				pGrenade->Spawn( "sprites/bigspit.vmt",
+					3,
+					vToss,
+					this,
+					MOVETYPE_FLYGRAVITY,
+					MOVECOLLIDE_FLY_BOUNCE,
+					SPIT_GRAVITY,
+					GetEnemy());
+				pGrenade->SetLife( sk_spitball_life.GetFloat() );
+				pGrenade->SetDamageType( DMG_ACID );
+				pGrenade->SetDamageRadius( sk_spitball_radius.GetFloat() );
+				pGrenade->SetDamage( sk_spitball_dmg.GetFloat() );
 
 				// Tumble through the air
 				pGrenade->SetLocalAngularVelocity(

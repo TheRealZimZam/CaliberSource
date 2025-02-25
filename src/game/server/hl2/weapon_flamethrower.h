@@ -27,7 +27,7 @@
 #define FLAMETHROWER_SPREAD_ANGLE		12.0	// How far the flame particles can spread from the center.
 #define FLAMETHROWER_SPREAD_VERTICAL	2.0		// How far the flame particles can vertically spread
 
-#define FLAMETHROWER_MUZZLEPOS_FORWARD		10.0f
+#define FLAMETHROWER_MUZZLEPOS_FORWARD		36.0f
 #define FLAMETHROWER_MUZZLEPOS_RIGHT		9.0f
 #define FLAMETHROWER_MUZZLEPOS_UP			-18.0f
 
@@ -57,6 +57,7 @@ public:
 	float GetFireRate( void )		{ return BaseClass::GetCycleTime(); }	//FLAMETHROWER_FIRERATE
 
 	int CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
+	bool CanBePickedUpByNPCs( void ) { return false; }
 
 	void Precache( void );
 	void PrimaryAttack( void );

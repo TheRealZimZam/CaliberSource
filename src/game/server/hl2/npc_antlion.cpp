@@ -55,6 +55,10 @@ ConVar  sk_antlion_air_attack_dmg( "sk_antlion_air_attack_dmg", "0" );
 #define ANTLION_WORKERS_BURST() (true)
 #define ANTLION_WORKER_BURST_IS_POISONOUS() (true)
 
+extern ConVar sk_spitball_dmg;
+extern ConVar sk_spitball_radius;
+extern ConVar sk_spitball_life;
+
 ConVar  sk_antlion_worker_burst_damage( "sk_antlion_worker_burst_damage", "50", FCVAR_NONE, "How much damage is inflicted by an antlion worker's death explosion." );
 ConVar	sk_antlion_worker_health( "sk_antlion_worker_health", "0", FCVAR_NONE, "Hitpoints of an antlion worker. If 0, will use base antlion hitpoints."   );
 ConVar  sk_antlion_worker_spit_speed( "sk_antlion_worker_spit_speed", "0", FCVAR_NONE, "Speed at which an antlion spit grenade travels." );
@@ -319,15 +323,16 @@ void CNPC_Antlion::Spawn( void )
 	m_NPCState	= NPC_STATE_NONE;
 
 #if HL2_EPISODIC
-	m_iHealth = ( IsWorker() ) ? sk_antlion_worker_health.GetFloat() : sk_antlion_health.GetFloat();
+	if ( m_iHealth == 0 )
+		m_iHealth = ( IsWorker() ) ? sk_antlion_worker_health.GetFloat() : sk_antlion_health.GetFloat();
 #else
-	m_iHealth	= sk_antlion_health.GetFloat();
+	if ( m_iHealth == 0 )
+		m_iHealth = sk_antlion_health.GetFloat();
 #endif // _DEBUG
 
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_NOT_STANDABLE );
 
-	
 	SetMoveType( MOVETYPE_STEP );
 
 	//Only do this if a squadname appears in the entity
@@ -339,6 +344,7 @@ void CNPC_Antlion::Spawn( void )
 	SetCollisionGroup( HL2COLLISION_GROUP_ANTLION );
 
 	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP | bits_CAP_INNATE_MELEE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
+	CapabilitiesAdd( bits_CAP_HEAR | bits_CAP_STRAFE );
 	
 	// Workers shoot projectiles
 	if ( IsWorker() )
@@ -452,6 +458,7 @@ void CNPC_Antlion::Precache( void )
 		PrecacheModel( ANTLION_WORKER_MODEL );
 		PropBreakablePrecacheAll( MAKE_STRING( ANTLION_WORKER_MODEL ) );
 		UTIL_PrecacheOther( "grenade_spit" );
+		PrecacheModel("sprites/bigspit.vmt");
 		PrecacheParticleSystem( "blood_impact_antlion_worker_01" );
 		PrecacheParticleSystem( "antlion_gib_02" );
 		PrecacheParticleSystem( "blood_impact_yellow_01" );
@@ -1138,22 +1145,29 @@ void CNPC_Antlion::HandleAnimEvent( animevent_t *pEvent )
 
 			for ( int i = 0; i < 6; i++ )
 			{
-				CGrenadeSpit *pGrenade = (CGrenadeSpit*) CreateEntityByName( "grenade_spit" );
-				pGrenade->SetAbsOrigin( vSpitPos );
-				pGrenade->SetAbsAngles( vec3_angle );
-				DispatchSpawn( pGrenade );
-				pGrenade->SetThrower( this );
-				pGrenade->SetOwnerEntity( this );
-										
+			//	CGrenadeSpit *pGrenade = (CGrenadeSpit*) CreateEntityByName( "grenade_spit" );
+				CGrenadeBall *pGrenade = (CGrenadeBall*)CreateNoSpawn( "grenade_spit", vSpitPos, vec3_angle, this );
+				pGrenade->SetHissSound( "GrenadeSpit.Hiss" );
+				pGrenade->SetHitSound( "GrenadeSpit.Hit" );
+				pGrenade->Spawn( "sprites/bigspit.vmt",
+					3,
+					( vecToss * flVelocity ),
+					this,
+					MOVETYPE_FLYGRAVITY,
+					MOVECOLLIDE_FLY_BOUNCE,
+					SPIT_GRAVITY,
+					GetEnemy());
+				pGrenade->SetLife( sk_spitball_life.GetFloat() );
+				pGrenade->SetDamageType( DMG_ACID );				
 				if ( i == 0 )
 				{
-					pGrenade->SetSpitType( SPIT, LARGE );
-					pGrenade->SetAbsVelocity( vecToss * flVelocity );
+					pGrenade->SetDamageRadius( sk_spitball_radius.GetFloat() );
+					pGrenade->SetDamage( sk_spitball_dmg.GetFloat() );
 				}
 				else
 				{
+					UTIL_SetSize( pGrenade, -Vector( 1.0f, 1.0f, 1.0f ), Vector( 1.0f, 1.0f, 1.0f ) );
 					pGrenade->SetAbsVelocity( ( vecToss + RandomVector( -0.035f, 0.035f ) ) * flVelocity );
-					pGrenade->SetSpitType( SPIT, random->RandomInt( SMALL, MEDIUM ) );
 				}
 
 				// Tumble through the air
@@ -2067,10 +2081,10 @@ bool CNPC_Antlion::AllowedToBePushed( void )
 //-----------------------------------------------------------------------------
 bool CNPC_Antlion::IsJumpLegal( const Vector &startPos, const Vector &apex, const Vector &endPos ) const
 {
-	const float MAX_JUMP_RISE		= 512;
-	const float MAX_JUMP_DROP		= 512;
-	const float MAX_JUMP_DISTANCE	= 1024;
-	const float MIN_JUMP_DISTANCE   = 128;
+	const float MAX_JUMP_RISE		= 512.0f;
+	const float MAX_JUMP_DROP		= 512.0f;
+	const float MAX_JUMP_DISTANCE	= 1024.0f;
+	const float MIN_JUMP_DISTANCE   = 112.0f;
 
 	if ( CAntlionRepellant::IsPositionRepellantFree( endPos ) == false )
 		 return false;
@@ -2891,7 +2905,7 @@ void CNPC_Antlion::PainSound( const CTakeDamageInfo &info )
 // Purpose: 
 // Output : 
 //-----------------------------------------------------------------------------
-float CNPC_Antlion::GetIdealAccel( void ) const
+float CNPC_Antlion::GetIdealAccel( void ) //const
 {
 	return GetIdealSpeed() * 2.0;
 }
@@ -4143,7 +4157,7 @@ bool CNPC_Antlion::CorpseGib( const CTakeDamageInfo &info )
 		GetBonePosition( s_nBodyBone, vecOrigin, angBone );
 
 // Screw that particle effect, the old version is better, period!
-#ifndef HL2_DLL
+#if 0
 		DispatchParticleEffect( "AntlionGib", vecOrigin, QAngle( 0, 0, 0 ) );
 #else
 		CEffectData	data;

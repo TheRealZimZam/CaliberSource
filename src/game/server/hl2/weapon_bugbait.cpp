@@ -34,6 +34,7 @@ public:
 	void	FallInit( void );
 
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
+	bool	CanBePickedUpByNPCs( void ) { return false; }
 	
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 

@@ -148,14 +148,11 @@ private:
 	
 	CRandSimTimer 		 m_DurationDoorBash;
 	CSimTimer 	  		 m_NextTimeToStartDoorBash;
-
-	Vector				 m_vPositionCharged;
 };
 
 LINK_ENTITY_TO_CLASS( npc_zombie, CClassicZombie );
 LINK_ENTITY_TO_CLASS( npc_zombie_torso, CClassicZombie );
-LINK_ENTITY_TO_CLASS( npc_czombie, CClassicZombie );
-LINK_ENTITY_TO_CLASS( npc_czombie_torso, CClassicZombie );
+LINK_ENTITY_TO_CLASS( npc_zombie_classic, CClassicZombie );
 #ifndef HL1_DLL
 LINK_ENTITY_TO_CLASS( monster_zombie, CClassicZombie );
 #endif
@@ -177,7 +174,6 @@ enum
 {
 	COND_BLOCKED_BY_DOOR = LAST_BASE_ZOMBIE_CONDITION,
 	COND_DOOR_OPENED,
-	COND_ZOMBIE_CHARGE_TARGET_MOVED,
 };
 
 //=========================================================
@@ -187,7 +183,6 @@ enum
 {
 	SCHED_ZOMBIE_BASH_DOOR = LAST_BASE_ZOMBIE_SCHEDULE,
 	SCHED_ZOMBIE_WANDER_ANGRILY,
-	SCHED_ZOMBIE_CHARGE_ENEMY,
 	SCHED_ZOMBIE_FAIL,
 };
 
@@ -199,7 +194,6 @@ enum
 	TASK_ZOMBIE_EXPRESS_ANGER = LAST_BASE_ZOMBIE_TASK,
 	TASK_ZOMBIE_YAW_TO_DOOR,
 	TASK_ZOMBIE_ATTACK_DOOR,
-	TASK_ZOMBIE_CHARGE_ENEMY,
 };
 
 //-----------------------------------------------------------------------------
@@ -213,7 +207,6 @@ BEGIN_DATADESC( CClassicZombie )
 	DEFINE_FIELD( m_flDoorBashYaw, FIELD_FLOAT ),
 	DEFINE_EMBEDDED( m_DurationDoorBash ),
 	DEFINE_EMBEDDED( m_NextTimeToStartDoorBash ),
-	DEFINE_FIELD( m_vPositionCharged, FIELD_POSITION_VECTOR ),
 
 END_DATADESC()
 
@@ -254,7 +247,7 @@ void CClassicZombie::Spawn( void )
 	Precache();
 
 	// This was placed as an npc_zombie_torso
-	if( FClassnameIs( this, "npc_zombie_torso" ) || FClassnameIs( this, "npc_czombie_torso" ) )
+	if( FClassnameIs( this, "npc_zombie_torso" ) )
 		m_fIsTorso = true;
 	else
 		m_fIsTorso = false;
@@ -267,7 +260,10 @@ void CClassicZombie::Spawn( void )
 	SetBloodColor( BLOOD_COLOR_GREEN );
 #endif // HL2_EPISODIC
 
-	m_iHealth			= sk_zombie_health.GetFloat();
+
+	if ( GetHealth() == 0 )
+		SetHealth(sk_zombie_health.GetFloat());
+
 	m_flFieldOfView		= 0.8;
 
 	CapabilitiesClear();
@@ -305,11 +301,6 @@ void CClassicZombie::PrescheduleThink( void )
 //-----------------------------------------------------------------------------
 int CClassicZombie::SelectSchedule( void )
 {
-	if( HasCondition( COND_PHYSICS_DAMAGE ) && !m_ActBusyBehavior.IsActive() )
-	{
-		return SCHED_FLINCH_PHYSICS;
-	}
-
 	return BaseClass::SelectSchedule();
 }
 
@@ -356,7 +347,7 @@ const char *CClassicZombie::GetMoanSound( int nSound )
 //-----------------------------------------------------------------------------
 const char *CClassicZombie::GetHeadcrabClassname( void )
 {
-	return "npc_cheadcrab";
+	return "npc_headcrab";
 }
 
 //-----------------------------------------------------------------------------
@@ -438,7 +429,6 @@ void CClassicZombie::GatherConditions( void )
 	{
 		COND_BLOCKED_BY_DOOR,
 		COND_DOOR_OPENED,
-		COND_ZOMBIE_CHARGE_TARGET_MOVED,
 	};
 
 	ClearConditions( conditionsToClear, ARRAYSIZE( conditionsToClear ) );
@@ -456,20 +446,6 @@ void CClassicZombie::GatherConditions( void )
 	}
 	else
 		SetCondition( COND_BLOCKED_BY_DOOR );
-
-	if ( ConditionInterruptsCurSchedule( COND_ZOMBIE_CHARGE_TARGET_MOVED ) )
-	{
-		if ( GetNavigator()->IsGoalActive() )
-		{
-			const float CHARGE_RESET_TOLERANCE = 60.0;
-			if ( !GetEnemy() ||
-				 ( m_vPositionCharged - GetEnemyLKP()  ).Length() > CHARGE_RESET_TOLERANCE )
-			{
-				SetCondition( COND_ZOMBIE_CHARGE_TARGET_MOVED );
-			}
-				 
-		}
-	}
 }
 
 //---------------------------------------------------------
@@ -483,13 +459,6 @@ int CClassicZombie::SelectFailSchedule( int failedSchedule, int failedTask, AI_T
 		if ( m_NextTimeToStartDoorBash.Expired() && failedSchedule != SCHED_ZOMBIE_BASH_DOOR )
 			return SCHED_ZOMBIE_BASH_DOOR;
 		m_hBlockingDoor = NULL;
-	}
-
-	if ( failedSchedule != SCHED_ZOMBIE_CHARGE_ENEMY && 
-		 IsPathTaskFailure( taskFailCode ) &&
-		 random->RandomInt( 1, 100 ) < 50 )
-	{
-		return SCHED_ZOMBIE_CHARGE_ENEMY;
 	}
 
 	if ( failedSchedule != SCHED_ZOMBIE_WANDER_ANGRILY &&
@@ -522,9 +491,6 @@ Activity CClassicZombie::NPC_TranslateActivity( Activity newActivity )
 {
 	newActivity = BaseClass::NPC_TranslateActivity( newActivity );
 
-	if ( newActivity == ACT_RUN )
-		return ACT_WALK;
-		
 	if ( m_fIsTorso && ( newActivity == ACT_ZOMBIE_TANTRUM ) )
 		return ACT_IDLE;
 
@@ -577,20 +543,6 @@ void CClassicZombie::StartTask( const Task_t *pTask )
 			break;
 		}
 
-	case TASK_ZOMBIE_CHARGE_ENEMY:
-		{
-			if ( !GetEnemy() )
-				TaskFail( FAIL_NO_ENEMY );
-			else if ( GetNavigator()->SetVectorGoalFromTarget( GetEnemy()->GetLocalOrigin() ) )
-			{
-				m_vPositionCharged = GetEnemy()->GetLocalOrigin();
-				TaskComplete();
-			}
-			else
-				TaskFail( FAIL_NO_ROUTE );
-			break;
-		}
-
 	default:
 		BaseClass::StartTask( pTask );
 		break;
@@ -616,11 +568,6 @@ void CClassicZombie::RunTask( const Task_t *pTask )
 				else
 					ResetIdealActivity( SelectDoorBash() );
 			}
-			break;
-		}
-
-	case TASK_ZOMBIE_CHARGE_ENEMY:
-		{
 			break;
 		}
 
@@ -767,12 +714,10 @@ AI_BEGIN_CUSTOM_NPC( npc_zombie, CClassicZombie )
 
 	DECLARE_CONDITION( COND_BLOCKED_BY_DOOR )
 	DECLARE_CONDITION( COND_DOOR_OPENED )
-	DECLARE_CONDITION( COND_ZOMBIE_CHARGE_TARGET_MOVED )
 
 	DECLARE_TASK( TASK_ZOMBIE_EXPRESS_ANGER )
 	DECLARE_TASK( TASK_ZOMBIE_YAW_TO_DOOR )
 	DECLARE_TASK( TASK_ZOMBIE_ATTACK_DOOR )
-	DECLARE_TASK( TASK_ZOMBIE_CHARGE_ENEMY )
 	
 	DECLARE_ACTIVITY( ACT_ZOMBIE_TANTRUM );
 	DECLARE_ACTIVITY( ACT_ZOMBIE_WALLPOUND );
@@ -809,24 +754,6 @@ AI_BEGIN_CUSTOM_NPC( npc_zombie, CClassicZombie )
 		"		COND_ENEMY_DEAD"
 		"		COND_NEW_ENEMY"
 		"		COND_DOOR_OPENED"
-	)
-
-	DEFINE_SCHEDULE
-	(
-		SCHED_ZOMBIE_CHARGE_ENEMY,
-
-		"	Tasks"
-		"		TASK_ZOMBIE_CHARGE_ENEMY		0"
-		"		TASK_WALK_PATH					0"
-		"		TASK_WAIT_FOR_MOVEMENT			0"
-		"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_ZOMBIE_TANTRUM" /* placeholder until frustration/rage/fence shake animation available */
-		""
-		"	Interrupts"
-		"		COND_ZOMBIE_RELEASECRAB"
-		"		COND_ENEMY_DEAD"
-		"		COND_NEW_ENEMY"
-		"		COND_DOOR_OPENED"
-		"		COND_ZOMBIE_CHARGE_TARGET_MOVED"
 	)
 
 	DEFINE_SCHEDULE

@@ -35,6 +35,7 @@ public:
 	Class_T Classify ( void );
 	void	HandleAnimEvent( animevent_t *pEvent );
 	int		GetSoundInterests( void );
+	bool	ShouldGib( const CTakeDamageInfo &info ) { return (info.GetDamageType() & DMG_ALWAYSGIB) ? true : false; }
 	void	SetupWithoutParent( void );
 	void	PrescheduleThink( void );
 };

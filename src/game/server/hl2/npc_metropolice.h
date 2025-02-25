@@ -238,16 +238,12 @@ private:
 		SCHED_METROPOLICE_ESTABLISH_LINE_OF_FIRE,
 		SCHED_METROPOLICE_DRAW_PISTOL,
 		SCHED_METROPOLICE_COMBAT_FACE,
-		SCHED_METROPOLICE_RANGE_ATTACK1,
-		SCHED_METROPOLICE_TAKE_COVER,
 		SCHED_METROPOLICE_DEPLOY_MANHACK,
 		SCHED_METROPOLICE_ADVANCE,
 		SCHED_METROPOLICE_CHARGE,
 		SCHED_METROPOLICE_VICTORY_DANCE,
 		SCHED_METROPOLICE_BURNING_RUN,
 		SCHED_METROPOLICE_BURNING_STAND,
-		SCHED_METROPOLICE_SMG_NORMAL_ATTACK,
-		SCHED_METROPOLICE_SMG_BURST_ATTACK,
 		SCHED_METROPOLICE_INVESTIGATE_SOUND,
 		SCHED_METROPOLICE_WARN_AND_ARREST_ENEMY,
 		SCHED_METROPOLICE_ARREST_ENEMY,
@@ -285,12 +281,10 @@ private:
 	int				m_iManhacks;		// How many manhacks the cop has
 	bool			m_fWeaponDrawn;		// Is my weapon drawn? (ready to use)
 	bool			m_fCanPoint;		// Can only point once per time spent in combat state.
-	bool			m_bSimpleCops;		// The easy version of the cops
 	int				m_LastShootSlot;
 	CRandSimTimer	m_TimeYieldShootSlot;
 	CSimpleSimTimer m_BatonSwingTimer;
 	CSimpleSimTimer m_NextChargeTimer;
-//	CSimpleSimTimer m_LeapfrogTimer;
 	Vector			m_vecTossVelocity;
 
 	float			m_flNextGrenadeCheck;	// Last grenade check time

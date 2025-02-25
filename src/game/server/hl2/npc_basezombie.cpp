@@ -43,6 +43,7 @@
 #include "vstdlib/random.h"
 #include "engine/IEngineSound.h"
 #include "props.h"
+#include "func_break.h"
 #include "hl2_gamerules.h"
 #include "weapon_physcannon.h"
 #include "ammodef.h"
@@ -211,10 +212,15 @@ CAngryZombieCounter	AngryZombieCounter( "CAngryZombieCounter" );
 BEGIN_DATADESC( CNPC_BaseZombie )
 
 	DEFINE_SOUNDPATCH( m_pMoanSound ),
+
+	DEFINE_FIELD( m_vPositionCharged, FIELD_POSITION_VECTOR ),
+
 	DEFINE_FIELD( m_fIsTorso, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_fIsHeadless, FIELD_BOOLEAN ),
-	DEFINE_FIELD( m_flNextFlinch, FIELD_TIME ),
 	DEFINE_FIELD( m_bHeadShot, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bIsSlumped, FIELD_BOOLEAN ),
+
+	DEFINE_FIELD( m_flNextFlinch, FIELD_TIME ),
 	DEFINE_FIELD( m_flBurnDamage, FIELD_FLOAT ),
 	DEFINE_FIELD( m_flBurnDamageResetTime, FIELD_TIME ),
 	DEFINE_FIELD( m_hPhysicsEnt, FIELD_EHANDLE ),
@@ -225,7 +231,6 @@ BEGIN_DATADESC( CNPC_BaseZombie )
 	DEFINE_FIELD( m_flMoanPitch, FIELD_FLOAT ),
 	DEFINE_FIELD( m_iMoanSound, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hObstructor, FIELD_EHANDLE ),
-	DEFINE_FIELD( m_bIsSlumped, FIELD_BOOLEAN ),
 
 END_DATADESC()
 
@@ -447,7 +452,7 @@ float CNPC_BaseZombie::MaxYawSpeed( void )
 {
 	if( m_fIsTorso )
 	{
-		return( 60 );
+		return( 45 );
 	}
 	else if (IsMoving() && HasPoseParameter( GetSequence(), m_poseMove_Yaw ))
 	{
@@ -541,7 +546,6 @@ int CNPC_BaseZombie::MeleeAttack1Conditions( float flDot, float flDist )
 		// Translate a hit vehicle into its passenger if found
 		if ( GetEnemy() != NULL )
 		{
-#if defined(HL2_DLL) && !defined(HL2MP)
 			// If the player is holding an object, knock it down.
 			if( GetEnemy()->IsPlayer() )
 			{
@@ -565,7 +569,6 @@ int CNPC_BaseZombie::MeleeAttack1Conditions( float flDot, float flDist )
 						return COND_CAN_MELEE_ATTACK1;
 				}
 			}
-#endif
 		}
 		return COND_TOO_FAR_TO_ATTACK;
 	}
@@ -590,14 +593,9 @@ int CNPC_BaseZombie::MeleeAttack1Conditions( float flDot, float flDist )
 
 	if( tr.fraction == 1.0 || !tr.m_pEnt )
 	{
-
-#ifdef HL2_EPISODIC
-
 		// If our trace was unobstructed but we were shooting 
 		if ( GetEnemy() && GetEnemy()->Classify() == CLASS_BULLSEYE )
 			return COND_CAN_MELEE_ATTACK1;
-
-#endif // HL2_EPISODIC
 
 		// This attack would miss completely. Trick the zombie into moving around some more.
 		return COND_TOO_FAR_TO_ATTACK;
@@ -605,7 +603,8 @@ int CNPC_BaseZombie::MeleeAttack1Conditions( float flDot, float flDist )
 
 	if( tr.m_pEnt == GetEnemy() || 
 		tr.m_pEnt->IsNPC() || 
-		( tr.m_pEnt->m_takedamage == DAMAGE_YES && (dynamic_cast<CBreakableProp*>(tr.m_pEnt) ) ) )
+		tr.m_pEnt->m_takedamage == DAMAGE_YES && 
+		(dynamic_cast<CBreakableProp*>(tr.m_pEnt)) || (dynamic_cast<CBreakable*>(tr.m_pEnt)) )
 	{
 		// -Let the zombie swipe at his enemy if he's going to hit them.
 		// -Also let him swipe at NPC's that happen to be between the zombie and the enemy. 
@@ -996,7 +995,10 @@ void CNPC_BaseZombie::PainSound( const CTakeDamageInfo &info )
 
 void CNPC_BaseZombie::DeathSound( const CTakeDamageInfo &info ) 
 {
+	StopSound( entindex(), "Zombie.Seize" );
 	EmitSound( "Zombie.Die" );
+
+	BaseClass::DeathSound( info );
 }
 
 //-----------------------------------------------------------------------------
@@ -1337,7 +1339,7 @@ void CNPC_BaseZombie::CopyRenderColorTo( CBaseEntity *pOther )
 //
 // Output : The entity hit by claws. NULL if nothing.
 //-----------------------------------------------------------------------------
-CBaseEntity *CNPC_BaseZombie::ClawAttack( float flDist, int iDamage, QAngle &qaViewPunch, Vector &vecVelocityPunch, int BloodOrigin  )
+CBaseEntity *CNPC_BaseZombie::ClawAttack( float flDist, int iDamage, QAngle &qaViewPunch, Vector &vecVelocityPunch, int BloodOrigin )
 {
 	// Added test because claw attack anim sometimes used when for cases other than melee
 	int iDriverInitialHealth = -1;
@@ -1379,18 +1381,13 @@ CBaseEntity *CNPC_BaseZombie::ClawAttack( float flDist, int iDamage, QAngle &qaV
 	vecMins.z = vecMins.x;
 	vecMaxs.z = vecMaxs.x;
 
-	CBaseEntity *pHurt = NULL;
+	CBaseEntity *pHurt = CheckTraceHullAttack( flDist, vecMins, vecMaxs, iDamage, DMG_SLASH );
 	if ( GetEnemy() && GetEnemy()->Classify() == CLASS_BULLSEYE )
 	{ 
 		// We always hit bullseyes we're targeting
 		pHurt = GetEnemy();
 		CTakeDamageInfo info( this, this, vec3_origin, GetAbsOrigin(), iDamage, DMG_SLASH );
 		pHurt->TakeDamage( info );
-	}
-	else 
-	{
-		// Try to hit them with a trace
-		pHurt = CheckTraceHullAttack( flDist, vecMins, vecMaxs, iDamage, DMG_SLASH );
 	}
 
 	if ( pDriver && iDriverInitialHealth != pDriver->GetHealth() )
@@ -1834,7 +1831,8 @@ void CNPC_BaseZombie::Spawn( void )
 	m_NPCState			= NPC_STATE_NONE;
 
 	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_INNATE_MELEE_ATTACK1 );
-	CapabilitiesAdd( bits_CAP_SQUAD );
+	CapabilitiesAdd( bits_CAP_SQUAD );	//For hordes
+	CapabilitiesAdd( bits_CAP_HEAR );
 
 	m_flNextSwat = gpGlobals->curtime;
 	m_flNextSwatScan = gpGlobals->curtime;
@@ -1875,6 +1873,7 @@ void CNPC_BaseZombie::Precache( void )
 	PrecacheScriptSound( "Zombie.Alert" );
 	PrecacheScriptSound( "Zombie.Idle" );
 	PrecacheScriptSound( "Zombie.Attack" );
+	PrecacheScriptSound( "Zombie.Seize" );
 
 	PrecacheModel( GetLegsModel() );
 	PrecacheModel( GetTorsoModel() );
@@ -1916,30 +1915,31 @@ int CNPC_BaseZombie::TranslateSchedule( int scheduleType )
 	switch( scheduleType )
 	{
 	case SCHED_CHASE_ENEMY:
-		if ( HasCondition( COND_ZOMBIE_LOCAL_MELEE_OBSTRUCTION ) && !HasCondition(COND_TASK_FAILED) && IsCurSchedule( SCHED_ZOMBIE_CHASE_ENEMY, false ) )
-		{
+		if ( HasCondition( COND_ZOMBIE_LOCAL_MELEE_OBSTRUCTION ) && !HasCondition(COND_TASK_FAILED) )
 			return SCHED_COMBAT_PATROL;
-		}
+
 		return SCHED_ZOMBIE_CHASE_ENEMY;
 		break;
 
 	case SCHED_ZOMBIE_SWATITEM:
 		// If the object is far away, move and swat it. If it's close, just swat it.
 		if( DistToPhysicsEnt() > ZOMBIE_PHYSOBJ_SWATDIST )
-		{
 			return SCHED_ZOMBIE_MOVE_SWATITEM;
-		}
 		else
-		{
 			return SCHED_ZOMBIE_SWATITEM;
-		}
 		break;
 
-	case SCHED_STANDOFF:
+	case SCHED_FAIL:
 		return SCHED_ZOMBIE_WANDER_STANDOFF;
+		break;
 
 	case SCHED_MELEE_ATTACK1:
 		return SCHED_ZOMBIE_MELEE_ATTACK1;
+		break;
+
+	case SCHED_IDLE_STAND:
+		return SCHED_ZOMBIE_IDLE_STAND;
+		break;
 	}
 
 	return BaseClass::TranslateSchedule( scheduleType );
@@ -1997,6 +1997,13 @@ int	CNPC_BaseZombie::SelectFailSchedule( int failedSchedule, int failedTask, AI_
 		return SCHED_ZOMBIE_WANDER_FAIL;
 	}
 
+	if ( failedSchedule != SCHED_ZOMBIE_CHARGE_ENEMY && 
+		 IsPathTaskFailure( taskFailCode ) &&
+		 random->RandomInt( 1, 100 ) < 50 )
+	{
+		return SCHED_ZOMBIE_CHARGE_ENEMY;
+	}
+
 	// If we can swat physics objects, see if we can swat our obstructor
 	if ( CanSwatPhysicsObjects() )
 	{
@@ -2024,49 +2031,103 @@ int CNPC_BaseZombie::SelectSchedule( void )
 	if ( HasCondition( COND_ZOMBIE_RELEASECRAB ) )
 		return SCHED_ZOMBIE_RELEASECRAB;
 
-	if ( BehaviorSelectSchedule() )
-	{
-		return BaseClass::SelectSchedule();
-	}
+	int nSched = SelectFlinchSchedule();
+	if ( nSched != SCHED_NONE )
+		return nSched;
 
-	switch ( m_NPCState )
+	if( HasCondition( COND_PHYSICS_DAMAGE ) && !m_ActBusyBehavior.IsActive() )
+		return SCHED_FLINCH_PHYSICS;
+
+	if ( HasCondition( COND_CAN_MELEE_ATTACK2 ) )
+		return SCHED_MELEE_ATTACK2;
+	else if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
+		return SCHED_MELEE_ATTACK1;
+	else if ( HasCondition( COND_CAN_RANGE_ATTACK2 ) )
+		return SCHED_RANGE_ATTACK2;
+	else if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+		return SCHED_RANGE_ATTACK1;
+
+	if ( !BehaviorSelectSchedule() )
 	{
-	case NPC_STATE_COMBAT:
-		if ( HasCondition( COND_NEW_ENEMY ) && GetEnemy() )
+		switch ( m_NPCState )
 		{
-			float flDist;
-
-			flDist = ( GetLocalOrigin() - GetEnemy()->GetLocalOrigin() ).Length();
-
-			// If this is a new enemy that's far away, ambush!!
-			if (flDist >= zombie_ambushdist.GetFloat() && MustCloseToAttack() )
+		case NPC_STATE_COMBAT:
+			if ( HasCondition( COND_NEW_ENEMY ) && GetEnemy() )
 			{
-				return SCHED_ZOMBIE_MOVE_TO_AMBUSH;
+				float flDist = ( GetLocalOrigin() - GetEnemy()->GetLocalOrigin() ).Length();
+
+				// If this is a new enemy that's far away, ambush!!
+				if (flDist >= zombie_ambushdist.GetFloat() && MustCloseToAttack() )
+					return SCHED_ZOMBIE_MOVE_TO_AMBUSH;
 			}
-		}
+			else if( HasCondition( COND_ZOMBIE_CAN_SWAT_ATTACK ) )
+				return SCHED_ZOMBIE_SWATITEM;
+			else if ( HasCondition( COND_SEE_ENEMY ) )
+			{
+				if ( HasCondition( COND_ENEMY_TARGETTING_ME ) && random->RandomInt( 0, 32 ) == 0 )
+					return SCHED_EVADE;	// Jump/run to the side
+				else
+					return SCHED_CHASE_ENEMY; // Otherwise give chase!
+			}
+			else if ( HasCondition( COND_ENEMY_OCCLUDED ) )
+			{
+				return SCHED_MOVE_TO_WEAPON_RANGE;	// Go to LKP
+			}
+			else if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
+			{
+				// Set state to alert and recurse!
+				SetState( NPC_STATE_ALERT );
+				return SelectSchedule();
+			}
 
-		if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
-		{
-			return SCHED_ZOMBIE_WANDER_MEDIUM;
-		}
+			// Lastly, always fallback to chase
+			return SCHED_CHASE_ENEMY;
+			break;
 
-		if( HasCondition( COND_ZOMBIE_CAN_SWAT_ATTACK ) )
-		{
-			return SCHED_ZOMBIE_SWATITEM;
-		}
-		break;
+		case NPC_STATE_ALERT:
+			if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
+			{
+				ClearCondition( COND_LOST_ENEMY );
+				ClearCondition( COND_ENEMY_UNREACHABLE );
 
-	case NPC_STATE_ALERT:
-		if ( HasCondition( COND_LOST_ENEMY ) || HasCondition( COND_ENEMY_DEAD ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
-		{
-			ClearCondition( COND_LOST_ENEMY );
-			ClearCondition( COND_ENEMY_UNREACHABLE );
+				// Just lost track of our enemy. 
+				// Wander around a bit so we don't look like a dingus.
+				return SCHED_ZOMBIE_WANDER_MEDIUM;
+			}
 
-			// Just lost track of our enemy. 
-			// Wander around a bit so we don't look like a dingus.
-			return SCHED_ZOMBIE_WANDER_MEDIUM;
+			// Fall through
+		case NPC_STATE_IDLE:
+			// React to sounds
+			if ( HasCondition ( COND_HEAR_DANGER ) ||
+				 HasCondition ( COND_HEAR_COMBAT ) ||
+				 HasCondition ( COND_HEAR_WORLD  ) ||
+				 HasCondition ( COND_HEAR_BULLET_IMPACT ) ||
+				 HasCondition ( COND_HEAR_PLAYER ) )
+			{
+				return SCHED_ALERT_FACE_BESTSOUND;
+			}
+
+			// React to damage
+			if ( HasCondition(COND_LIGHT_DAMAGE) ||
+				 HasCondition(COND_HEAVY_DAMAGE) )
+			{
+				if ( SelectWeightedSequence( ACT_SMALL_FLINCH ) != ACTIVITY_NOT_AVAILABLE )
+					return SCHED_ALERT_SMALL_FLINCH;
+
+				// Not facing the correct dir, and I have no flinch animation
+				return SCHED_ALERT_FACE;
+			}
+
+			// Lastly, go for a snack
+			if ( HasCondition( COND_ENEMY_DEAD ) || HasCondition ( COND_SMELL ) )
+			{
+				if ( SelectWeightedSequence( ACT_VICTORY_DANCE ) != ACTIVITY_NOT_AVAILABLE )
+					return SCHED_VICTORY_DANCE;
+			}
+
+			return SCHED_IDLE_STAND; // Look like a zombie
+			break;
 		}
-		break;
 	}
 
 	return BaseClass::SelectSchedule();
@@ -2165,9 +2226,10 @@ int CNPC_BaseZombie::GetSwatActivity( void )
 //---------------------------------------------------------
 void CNPC_BaseZombie::GatherConditions( void )
 {
-	ClearCondition( COND_ZOMBIE_LOCAL_MELEE_OBSTRUCTION );
-
 	BaseClass::GatherConditions();
+
+	ClearCondition( COND_ZOMBIE_LOCAL_MELEE_OBSTRUCTION );
+	ClearCondition( COND_ZOMBIE_CHARGE_TARGET_MOVED );
 
 	if( m_NPCState == NPC_STATE_COMBAT && !m_fIsTorso )
 	{
@@ -2188,6 +2250,19 @@ void CNPC_BaseZombie::GatherConditions( void )
 	else
 	{
 		ClearCondition( COND_ZOMBIE_CAN_SWAT_ATTACK );
+	}
+
+	if ( ConditionInterruptsCurSchedule( COND_ZOMBIE_CHARGE_TARGET_MOVED ) )
+	{
+		if ( GetNavigator()->IsGoalActive() )
+		{
+			const float CHARGE_RESET_TOLERANCE = 60.0;
+			if ( !GetEnemy() ||
+				 ( m_vPositionCharged - GetEnemyLKP()  ).Length() > CHARGE_RESET_TOLERANCE )
+			{
+				SetCondition( COND_ZOMBIE_CHARGE_TARGET_MOVED );
+			} 
+		}
 	}
 }
 
@@ -2228,6 +2303,20 @@ void CNPC_BaseZombie::StartTask( const Task_t *pTask )
 {
 	switch( pTask->iTask )
 	{
+	case TASK_ZOMBIE_CHARGE_ENEMY:
+		{
+			if ( !GetEnemy() )
+				TaskFail( FAIL_NO_ENEMY );
+			else if ( GetNavigator()->SetVectorGoalFromTarget( GetEnemy()->GetLocalOrigin() ) )
+			{
+				m_vPositionCharged = GetEnemy()->GetLocalOrigin();
+				TaskComplete();
+			}
+			else
+				TaskFail( FAIL_NO_ROUTE );
+		}
+		break;
+
 	case TASK_ZOMBIE_DIE:
 		// Go to ragdoll
 		KillMe();
@@ -2280,6 +2369,8 @@ void CNPC_BaseZombie::StartTask( const Task_t *pTask )
 
 	case TASK_ZOMBIE_RELEASE_HEADCRAB:
 		{
+			// Make a noise cue
+			EmitSound( "Zombie.Seize" );
 			SetIdealActivity( (Activity)ACT_ZOM_RELEASECRAB );
 			SetActivity( GetIdealActivity() );
 			// Seize for a random time, then pop and die
@@ -2318,6 +2409,9 @@ void CNPC_BaseZombie::RunTask( const Task_t *pTask )
 {
 	switch( pTask->iTask )
 	{
+	case TASK_ZOMBIE_CHARGE_ENEMY:
+		break;
+
 	case TASK_ZOMBIE_SWAT_ITEM:
 		if( IsActivityFinished() )
 		{
@@ -2352,6 +2446,7 @@ void CNPC_BaseZombie::RunTask( const Task_t *pTask )
 			}
 		}
 		break;
+
 	default:
 		BaseClass::RunTask( pTask );
 		break;
@@ -2772,7 +2867,7 @@ Activity CNPC_BaseZombie::NPC_TranslateActivity( Activity BaseAct )
 	{
 		switch ( BaseAct )
 		{
-			case ACT_RUN_ON_FIRE:
+			case ACT_RUN:
 				NewActivity = ACT_RUN_ON_FIRE;
 			break;
 
@@ -2888,6 +2983,7 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 	DECLARE_TASK( TASK_ZOMBIE_DIE )
 	DECLARE_TASK( TASK_ZOMBIE_RELEASE_HEADCRAB )
 	DECLARE_TASK( TASK_ZOMBIE_WAIT_POST_MELEE )
+	DECLARE_TASK( TASK_ZOMBIE_CHARGE_ENEMY )
 
 	DECLARE_ACTIVITY( ACT_ZOM_SWATLEFTMID )
 	DECLARE_ACTIVITY( ACT_ZOM_SWATRIGHTMID )
@@ -2898,6 +2994,7 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 	DECLARE_CONDITION( COND_ZOMBIE_CAN_SWAT_ATTACK )
 	DECLARE_CONDITION( COND_ZOMBIE_RELEASECRAB )
 	DECLARE_CONDITION( COND_ZOMBIE_LOCAL_MELEE_OBSTRUCTION )
+	DECLARE_CONDITION( COND_ZOMBIE_CHARGE_TARGET_MOVED )
 
 	//Adrian: events go here
 	DECLARE_ANIMEVENT( AE_ZOMBIE_ATTACK_RIGHT )
@@ -2997,7 +3094,29 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"		COND_HEAVY_DAMAGE"
 	)
 
+	//=========================================================
+	//=========================================================
 
+	DEFINE_SCHEDULE
+	(
+		SCHED_ZOMBIE_CHARGE_ENEMY,
+
+		"	Tasks"
+		"		TASK_ZOMBIE_CHARGE_ENEMY		0"
+		"		TASK_RUN_PATH					0"
+		"		TASK_WAIT_FOR_MOVEMENT			0"
+		"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_IDLE_ANGRY" /* placeholder until frustration/rage/fence shake animation available */
+		""
+		"	Interrupts"
+		"		COND_ZOMBIE_RELEASECRAB"
+		"		COND_ENEMY_DEAD"
+		"		COND_NEW_ENEMY"
+		"		COND_ZOMBIE_CHARGE_TARGET_MOVED"
+		"		COND_CAN_RANGE_ATTACK1"
+		"		COND_CAN_MELEE_ATTACK1"
+		"		COND_CAN_RANGE_ATTACK2"
+		"		COND_CAN_MELEE_ATTACK2"
+	)
 
 	//=========================================================
 	//=========================================================
@@ -3007,7 +3126,7 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 
 		"	Tasks"
 //		"		TASK_PLAY_SEQUENCE					ACTIVITY:ACT_ZOM_RELEASECRAB"
-		"		TASK_ZOMBIE_RELEASE_HEADCRAB				0.8"	//max amount of time to spend seizing
+		"		TASK_ZOMBIE_RELEASE_HEADCRAB				1.2"	//max amount of time to spend seizing
 		"		TASK_ZOMBIE_DIE								0"
 		"	"
 		"	Interrupts"
@@ -3033,11 +3152,12 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"	Interrupts"
 		"		COND_TASK_FAILED"
 		"		COND_NEW_ENEMY"
+		"		COND_CAN_RANGE_ATTACK1"
+		"		COND_CAN_MELEE_ATTACK1"
+		"		COND_CAN_RANGE_ATTACK2"
+		"		COND_CAN_MELEE_ATTACK2"
 	)
 
-
-	//=========================================================
-	//=========================================================
 	DEFINE_SCHEDULE
 	(
 		SCHED_ZOMBIE_WAIT_AMBUSH,
@@ -3107,6 +3227,7 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 		"	Tasks"
 		"		TASK_STOP_MOVING		0"
 		"		TASK_WAIT				1"
+		"		TASK_WAIT_RANDOM		3"
 		"		TASK_SET_SCHEDULE		SCHEDULE:SCHED_ZOMBIE_WANDER_MEDIUM"
 		"	Interrupts"
 		"		COND_NEW_ENEMY"
@@ -3149,6 +3270,34 @@ AI_BEGIN_CUSTOM_NPC( base_zombie, CNPC_BaseZombie )
 
 		"	Tasks"
 		"		TASK_ZOMBIE_WAIT_POST_MELEE		0"
+	)
+
+	//=========================================================
+	// Make the zombie look extra zombie-like
+	//=========================================================
+	DEFINE_SCHEDULE
+	(
+		SCHED_ZOMBIE_IDLE_STAND,
+
+		"	Tasks"
+		"		TASK_STOP_MOVING		1"
+		"		TASK_SET_ACTIVITY		ACTIVITY:ACT_IDLE"
+		"		TASK_WAIT				5"
+		"		TASK_WAIT_PVS			0"
+		""
+		"	Interrupts"
+		"		COND_NEW_ENEMY"
+		"		COND_SEE_FEAR"
+		"		COND_LIGHT_DAMAGE"
+		"		COND_HEAVY_DAMAGE"
+		"		COND_SMELL"
+		"		COND_PROVOKED"
+		"		COND_GIVE_WAY"
+		"		COND_HEAR_PLAYER"
+		"		COND_HEAR_DANGER"
+		"		COND_HEAR_COMBAT"
+		"		COND_HEAR_BULLET_IMPACT"
+		"		COND_IDLE_INTERRUPT"
 	)
 
 AI_END_CUSTOM_NPC()

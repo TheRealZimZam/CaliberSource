@@ -458,8 +458,8 @@ void CFlare::FlareTouch( CBaseEntity *pOther )
 
 			if ( pdata != NULL )
 			{
-				//Only embed into concrete and wood (jdw: too obscure for players?)
-				//if ( ( pdata->gameMaterial == 'C' ) || ( pdata->gameMaterial == 'W' ) )
+				//Only embed into semi-hard materials like concrete and wood (jdw: too obscure for players?)
+				if ( ( pdata->game.material == CHAR_TEX_CONCRETE ) || ( pdata->game.material == CHAR_TEX_WOOD ) || ( pdata->game.material == CHAR_TEX_GLASS ) )
 				{
 					Vector	impactDir = ( tr.endpos - tr.startpos );
 					VectorNormalize( impactDir );
@@ -729,7 +729,7 @@ void CFlaregun::PrimaryAttack( void )
 		return;
 	}
 
-	m_iClip1 = m_iClip1 - 1;
+	m_iClip1 -= 1;
 
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
 	pOwner->SetAnimation( PLAYER_ATTACK1 );

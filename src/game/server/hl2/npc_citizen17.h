@@ -50,21 +50,6 @@ enum CitizenType_t
 	CT_UNIQUE
 };
 
-//-----------------------------------------------------------------------------
-// Citizen expression types
-//-----------------------------------------------------------------------------
-enum CitizenExpressionTypes_t
-{
-	CIT_EXP_UNASSIGNED,	// Defaults to this, selects other in spawn.
-
-	CIT_EXP_SCARED,
-	CIT_EXP_NERVOUS,
-	CIT_EXP_NORMAL,
-	CIT_EXP_ANGRY,
-
-	CIT_EXP_LAST_TYPE,
-};
-
 //-------------------------------------
 
 class CNPC_Citizen : public CNPC_PlayerCompanion
@@ -83,17 +68,18 @@ public:
 	void			Spawn();
 	void			PostNPCInit();
 	virtual void	SelectModel();
-	void			SelectExpressionType();
 	void			Activate();
 	virtual void	OnGivenWeapon( CBaseCombatWeapon *pNewWeapon );
 	void			FixupMattWeapon();
+	void			CalculateClips();
 
-	virtual float	GetJumpGravity() const		{ return 1.8f; }
+	virtual float	GetJumpGravity() const		{ return 1.6f; }
+	float			GetIdealAccel();
+	float			GetIdealSpeed();
 
 	void			OnRestore();
 	
 	//---------------------------------
-	string_t 		GetModelName() const;
 	
 	Class_T 		Classify();
 	Disposition_t	IRelationType( CBaseEntity *pTarget );
@@ -117,8 +103,7 @@ public:
 	int 			SelectSchedulePriorityAction();
 	int 			SelectScheduleHeal();
 	int 			SelectScheduleRetrieveItem();
-	int 			SelectScheduleNonCombat();
-	int 			SelectScheduleManhackCombat();
+	int 			SelectNonCombatSchedule();
 	int 			SelectCombatSchedule();
 	bool			ShouldDeferToFollowBehavior();
 	int 			TranslateSchedule( int scheduleType );
@@ -133,19 +118,19 @@ public:
 	void 			HandleAnimEvent( animevent_t *pEvent );
 	void			TaskFail( AI_TaskFailureCode_t code );
 
-	void 			SimpleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void 			NeutralUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 
 	bool			IgnorePlayerPushing( void );
 
-	int				DrawDebugTextOverlays( void );
+//	int				DrawDebugTextOverlays( void );
 
 	virtual const char *SelectRandomExpressionForState( NPC_STATE state );
 
 	//---------------------------------
 	// Combat
 	//---------------------------------
-//!	int				RangeAttack2Conditions( float flDot, float flDist ); // For thrown/molotov attack
-	
+	int				RangeAttack2Conditions( float flDot, float flDist ); // For thrown/molotov attack
+
 	bool 			OnBeginMoveAndShoot();
 	void 			OnEndMoveAndShoot();
 
@@ -179,9 +164,10 @@ public:
 	bool 			NearCommandGoal();
 	bool 			VeryFarFromCommandGoal();
 	bool 			TargetOrder( CBaseEntity *pTarget, CAI_BaseNPC **Allies, int numAllies );
+	void			OnTargetOrder();
 	void 			MoveOrder( const Vector &vecDest, CAI_BaseNPC **Allies, int numAllies );
 	void			OnMoveOrder();
-	void 			CommanderUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	void 			FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	bool			ShouldSpeakRadio( CBaseEntity *pListener );
 	void			OnMoveToCommandGoalFailed();
 	void			AddToPlayerSquad();
@@ -251,6 +237,7 @@ public:
 	void			FearSound( void );
 
 	bool			UseSemaphore( void );
+	bool			ShouldInvestigateSound();
 
 	virtual void	OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  CAI_BehaviorBase *pNewBehavior );
 
@@ -315,7 +302,6 @@ private:
 	Vector			m_vAutoSummonAnchor;
 
 	CitizenType_t	m_Type;
-	CitizenExpressionTypes_t	m_ExpressionType;
 
 	int				m_iHead;
 
@@ -324,7 +310,8 @@ private:
 	float			m_flTimePlayerStare;	// The game time at which the player started staring at me.
 	float			m_flTimeNextHealStare;	// Next time I'm allowed to heal a player who is staring at me.
 	
-	string_t		m_SecondaryType;	//Secondary thrown weapon
+	string_t		m_ThrowableType;	//Secondary thrown weapon
+	int				m_iNumThrowables;
 
 	//-----------------------------------------------------
 	//	Outputs

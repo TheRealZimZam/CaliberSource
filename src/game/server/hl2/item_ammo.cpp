@@ -70,8 +70,8 @@ int ITEM_GiveAmmo( CBasePlayer *pPlayer, float flCount, const char *pszAmmoName,
 #endif
 
 // Obselete ammo types
-#define SIZE_AMMO_HMG				60
-#define SIZE_AMMO_HMG_LARGE			180
+#define SIZE_AMMO_HMG				100
+#define SIZE_AMMO_HMG_LARGE			200
 #define SIZE_AMMO_AR1				30
 #define SIZE_AMMO_AR1_LARGE			120
 #define SIZE_BOX_FLARE_ROUNDS 5
@@ -102,7 +102,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL, "Pistol"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL, "45acp"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
@@ -144,7 +144,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1, "SMG1"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1, "45acp"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
@@ -187,7 +187,7 @@ public:
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		//This seems super-hacky, find a better solution not-so-pronto
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL_LARGE, "Pistol") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_PISTOL_LARGE, "45acp") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "9mm"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.SRounds_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.SRounds_Touch" );
@@ -229,7 +229,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_HMG, "HMG"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_HMG, "762"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.HMGRounds_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.HMGRounds_Touch" );
@@ -305,7 +305,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SMG1_LARGE, "SMG1") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "HMG"))	//AR1
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_HMG1, "762") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SNIPER, "30-06"))	//AR1
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.MRounds_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.MRounds_Touch" );
@@ -346,7 +346,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2, "AR2"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2, "SPIW"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.Magazine_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.Magazine_Touch" );
@@ -463,7 +463,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_BOX_SNIPER_ROUNDS, "SniperRound"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_BOX_SNIPER_ROUNDS, "30-06"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.LRounds_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.LRounds_Touch" );
@@ -480,7 +480,7 @@ LINK_ENTITY_TO_CLASS(item_ammo_sniper, CItem_BoxSniperRounds);
 
 // ========================================================================
 //	>> LargeBoxLRounds
-// Box of general large/caseless rounds (ar2, magnum, scrapgun)
+// Box of specialty ammo (ar2, magnum, scrapgun)
 // ========================================================================
 class CItem_LargeBoxLRounds : public CItem
 {
@@ -504,7 +504,7 @@ public:
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
 		//This seems super-hacky, find a better solution not-so-pronto
-		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "AR2") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_357_LARGE, "357") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SNIPER, "SniperRound"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_AMMO_AR2_LARGE, "SPIW") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_357_LARGE, "357") && ITEM_GiveAmmo( pPlayer, SIZE_AMMO_SNIPER, "30-06"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.LRounds_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.LRounds_Touch" );
@@ -581,7 +581,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, 1, "FlareRound"))
+		if (ITEM_GiveAmmo( pPlayer, 1, "Flares"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.FlareRound_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.FlareRound_Touch" );
@@ -621,7 +621,7 @@ public:
 
 	bool MyTouch( CBasePlayer *pPlayer )
 	{
-		if (ITEM_GiveAmmo( pPlayer, SIZE_BOX_FLARE_ROUNDS, "FlareRound"))
+		if (ITEM_GiveAmmo( pPlayer, SIZE_BOX_FLARE_ROUNDS, "Flares"))
 		{
 			CPASAttenuationFilter filter( pPlayer, "Item.FlareRound_Touch" );
 			EmitSound( filter, pPlayer->entindex(), "Item.FlareRound_Touch" );
@@ -1109,9 +1109,9 @@ const char *CItem_AmmoCrate::m_lpzModelNames[NUM_AMMO_CRATE_TYPES] =
 // Ammo type names
 const char *CItem_AmmoCrate::m_lpzAmmoNames[NUM_AMMO_CRATE_TYPES] =
 {
-	"Pistol",		
-	"SMG1",			
-	"AR2",			
+	"45acp",		
+	"762",			
+	"SPIW",			
 	"RPGRound",	
 	"Buckshot",		
 	"Grenade",

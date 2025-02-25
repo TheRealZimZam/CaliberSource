@@ -2384,19 +2384,6 @@ void CNPC_Alyx::DeathSound( const CTakeDamageInfo &info )
 	}
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CNPC_Alyx::OnSeeEntity( CBaseEntity *pEntity )
-{
-	BaseClass::OnSeeEntity(pEntity);
-
-	if( pEntity->IsPlayer() &&  pEntity->IsEFlagSet(EFL_IS_BEING_LIFTED_BY_BARNACLE) )
-	{
-		SpeakIfAllowed( TLK_ALLY_IN_BARNACLE );
-	}
-}
-
 
 //---------------------------------------------------------
 // A sort of trivial rejection, this function tells us whether

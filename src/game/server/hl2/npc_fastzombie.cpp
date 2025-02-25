@@ -40,14 +40,17 @@
 #define FASTZOMBIE_MAX_PITCH			130
 #define FASTZOMBIE_SOUND_UPDATE_FREQ	0.5
 
-#define FASTZOMBIE_MAXLEAP_Z		128
+#define FASTZOMBIE_MAXLEAP_Z		224
 
 #define FASTZOMBIE_EXCITE_DIST 480.0
 
 #define FASTZOMBIE_BASE_FREQ 1.5
+#define FASTZOMBIE_MELEE_CIRCLE_DISTANCE	288	// If in a pack, pace around an enemy at roughly this dist
 
 // If flying at an enemy, and this close or closer, start playing the maul animation!!
 #define FASTZOMBIE_MAUL_RANGE	300
+
+#define GURGLE_SOUND		1
 
 #ifdef HL2_EPISODIC
 
@@ -194,7 +197,7 @@ int ACT_FASTZOMBIE_BIG_SLASH;
 //=========================================================
 enum
 {
-	SCHED_FASTZOMBIE_RANGE_ATTACK1 = LAST_SHARED_SCHEDULE + 100, // hack to get past the base zombie's schedules
+	SCHED_FASTZOMBIE_RANGE_ATTACK1 = LAST_BASE_ZOMBIE_SCHEDULE, // hack to get past the base zombie's schedules
 	SCHED_FASTZOMBIE_UNSTICK_JUMP,
 	SCHED_FASTZOMBIE_CLIMBING_UNSTICK_JUMP,
 	SCHED_FASTZOMBIE_MELEE_ATTACK1,
@@ -236,7 +239,7 @@ public:
 	int MeleeAttack1Conditions( float flDot, float flDist );
 	int MeleeAttack2Conditions( float flDot, float flDist );
 
-	virtual float GetClawAttackRange() const { return 50; }
+	virtual float GetClawAttackRange() const { return 54; }
 
 	bool ShouldPlayFootstepMoan( void ) { return false; }
 
@@ -256,6 +259,7 @@ public:
 	int	SelectFailSchedule( int failedSchedule, int failedTask, AI_TaskFailureCode_t taskFailCode );
 
 	const char *GetMoanSound( int nSound );
+	bool CanPlayMoanSound();
 
 	void OnChangeActivity( Activity NewActivity );
 	void OnStateChange( NPC_STATE OldState, NPC_STATE NewState );
@@ -416,6 +420,7 @@ void CFastZombie::Precache( void )
 	PrecacheScriptSound( "NPC_FastZombie.AttackHit" );
 	PrecacheScriptSound( "NPC_FastZombie.AttackMiss" );
 	PrecacheScriptSound( "NPC_FastZombie.Attack" );
+	PrecacheScriptSound( "NPC_FastZombie.Pain" );
 	PrecacheScriptSound( "NPC_FastZombie.Idle" );
 	PrecacheScriptSound( "NPC_FastZombie.AlertFar" );
 	PrecacheScriptSound( "NPC_FastZombie.AlertNear" );
@@ -465,32 +470,20 @@ int CFastZombie::SelectSchedule ( void )
 	if ( HasCondition( COND_FASTZOMBIE_CLIMB_TOUCH ) )
 		return SCHED_FASTZOMBIE_UNSTICK_JUMP;
 
-	if( HasCondition( COND_PHYSICS_DAMAGE ) && !m_ActBusyBehavior.IsActive() )
-		return SCHED_FLINCH_PHYSICS;
-
+	// TODO; Circle/Stalk prey behaviour
+	// Only do this for players, or enemies that dont have a gun
+#if 0
 	switch ( m_NPCState )
 	{
 	case NPC_STATE_COMBAT:
-		if ( HasCondition( COND_CAN_MELEE_ATTACK2 ) )
-			return SCHED_MELEE_ATTACK2;
-		break;
-
-		if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
-			return SCHED_MELEE_ATTACK1;
-		break;
-
-// TODO; Circle/Stalk prey behaviour
-// Only do this for players, or enemies that dont have a gun
-#if 1
 		if ( GetEnemy() && (GetEnemy()->IsPlayer() || !(GetEnemy()->MyNPCPointer()->CapabilitiesGet( ) & bits_CAP_WEAPON_RANGE_ATTACK1)) )
 		{
 			if ( m_pSquad && HasCondition( COND_SEE_ENEMY ) )
 			{
-				#define MELEE_CIRCLE_DISTANCE	288	// If in a pack, pace around an enemy at roughly this dist
 				float flDist = EnemyDistance(GetEnemy());
 
 				// If im within the circle distance, start pacing around the enemy, move in for a swing if possible
-				if ( flDist <= MELEE_CIRCLE_DISTANCE )
+				if ( flDist <= FASTZOMBIE_MELEE_CIRCLE_DISTANCE )
 				{
 					// I have the attack slot
 					if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
@@ -524,44 +517,8 @@ int CFastZombie::SelectSchedule ( void )
 			}
 		}
 		break;
-#endif
-
-		// Jump to the side
-		if ( HasCondition( COND_SEE_ENEMY ) && HasCondition( COND_ENEMY_TARGETTING_ME ) && random->RandomInt( 0, 32 ) == 0 )
-			return SCHED_EVADE;
-		break;
-
-		if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
-		{
-			// Set state to alert and recurse!
-			SetState( NPC_STATE_ALERT );
-			return SelectSchedule();
-		}
-		break;
-
-	case NPC_STATE_ALERT:
-		if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
-		{
-			ClearCondition( COND_LOST_ENEMY );
-			ClearCondition( COND_ENEMY_UNREACHABLE );
-			SetEnemy( NULL );
-
-#ifdef DEBUG_ZOMBIES
-			DevMsg("Wandering\n");
-#endif
-
-			// Just lost track of our enemy. 
-			// Wander around a bit so we don't look like a dingus.
-			return SCHED_ZOMBIE_WANDER_MEDIUM;
-		}
-		// Duck and turn/scream
-		if ( HasCondition( COND_HEAVY_DAMAGE ) && random->RandomInt( 0, 2 ) == 2 )
-		{
-			return SCHED_ALERT_SMALL_FLINCH;
-		}
-		break;
 	}
-
+#endif
 	return BaseClass::SelectSchedule();
 }
 
@@ -642,7 +599,7 @@ void CFastZombie::PrescheduleThink( void )
 //-----------------------------------------------------------------------------
 void CFastZombie::SoundInit( void )
 {
-	if( !m_pMoanSound )
+	if( !m_pMoanSound && CanPlayMoanSound() )
 	{
 		// !!!HACKHACK - kickstart the moan sound. (sjb)
 		MoanSound( envFastZombieMoanVolume, ARRAYSIZE( envFastZombieMoanVolume ) );
@@ -653,6 +610,7 @@ void CFastZombie::SoundInit( void )
 
 	CPASAttenuationFilter filter( this );
 
+#if GURGLE_SOUND
 	if( !m_pLayer2 )
 	{
 		// Set up layer2
@@ -661,6 +619,7 @@ void CFastZombie::SoundInit( void )
 		// Start silent.
 		ENVELOPE_CONTROLLER.Play( m_pLayer2, 0.0, 100 );
 	}
+#endif
 
 	SetIdleSoundState();
 }
@@ -678,11 +637,13 @@ void CFastZombie::SetIdleSoundState( void )
 	}
 
 	// Second Layer
+#if GURGLE_SOUND
 	if ( m_pLayer2 )
 	{
 		ENVELOPE_CONTROLLER.SoundChangePitch( m_pLayer2, 100, 1.0 );
 		ENVELOPE_CONTROLLER.SoundChangeVolume( m_pLayer2, 0.0, 1.0 );
 	}
+#endif
 }
 
 
@@ -696,15 +657,15 @@ void CFastZombie::SetAngrySoundState( void )
 		return;
 	}
 
-//	EmitSound( "NPC_FastZombie.LeapAttack" );
-
 	// Main looping sound
 	ENVELOPE_CONTROLLER.SoundChangePitch( m_pMoanSound, FASTZOMBIE_MIN_PITCH, 0.5 );
 	ENVELOPE_CONTROLLER.SoundChangeVolume( m_pMoanSound, 1.0, 0.5 );
 
+#if GURGLE_SOUND
 	// Second Layer
 	ENVELOPE_CONTROLLER.SoundChangePitch( m_pLayer2, 100, 1.0 );
 	ENVELOPE_CONTROLLER.SoundChangeVolume( m_pLayer2, 0.0, 1.0 );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -733,15 +694,19 @@ void CFastZombie::Spawn( void )
 	SetBloodColor( BLOOD_COLOR_YELLOW );
 #endif // HL2_EPISODIC
 
-	m_iHealth			= sk_fastzombie_health.GetFloat();
+	if ( GetHealth() == 0 )
+		SetHealth(sk_fastzombie_health.GetFloat());
+
 	m_flFieldOfView		= 0.6;
 
 	CapabilitiesClear();
-	CapabilitiesAdd( bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_GROUND | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
-	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_STRAFE );	//For pack attacks
+	if ( !m_fIsTorso )
+		CapabilitiesAdd( bits_CAP_BASIC_MOVEMENT_GROUP | bits_CAP_MOVE_CLIMB | bits_CAP_INNATE_MELEE_ATTACK2 | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_STRAFE );
+	else
+		CapabilitiesAdd( bits_CAP_MOVE_GROUND );
 
-	if ( m_fIsTorso == true )
-		CapabilitiesRemove( bits_CAP_MOVE_JUMP | bits_CAP_MOVE_CLIMB | bits_CAP_SQUAD | bits_CAP_STRAFE | bits_CAP_INNATE_RANGE_ATTACK1 | bits_CAP_INNATE_MELEE_ATTACK2 );
+	CapabilitiesAdd( bits_CAP_INNATE_MELEE_ATTACK1 );	//Basic swipe
+	CapabilitiesAdd( bits_CAP_SQUAD );	//For pack attacks
 
 	m_flNextAttack = gpGlobals->curtime;
 
@@ -753,6 +718,8 @@ void CFastZombie::Spawn( void )
 	m_flDistFactor = 1.0;
 
 	BaseClass::Spawn();
+
+	SetNavType( NAV_GROUND );
 }
 
 //-----------------------------------------------------------------------------
@@ -762,6 +729,8 @@ void CFastZombie::PostNPCInit( void )
 	SoundInit();
 
 	m_flTimeUpdateSound = gpGlobals->curtime;
+
+	BaseClass::PostNPCInit();
 }
 
 //-----------------------------------------------------------------------------
@@ -911,6 +880,11 @@ const char *CFastZombie::GetMoanSound( int nSound )
 	return pMoanSounds[ nSound % ARRAYSIZE( pMoanSounds ) ];
 }
 
+bool CFastZombie::CanPlayMoanSound()
+{
+	return BaseClass::CanPlayMoanSound();
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Sound of a footstep
 //-----------------------------------------------------------------------------
@@ -974,16 +948,21 @@ void CFastZombie::PainSound( const CTakeDamageInfo &info )
 	if ( IsOnFire() )
 		return;
 
-	if ( m_pLayer2 )
-		ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pLayer2, SOUNDCTRL_CHANGE_VOLUME, envFastZombieVolumePain, ARRAYSIZE(envFastZombieVolumePain) );
+	EmitSound( "NPC_FastZombie.Pain" );
+
 	if ( m_pMoanSound )
 		ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pMoanSound, SOUNDCTRL_CHANGE_VOLUME, envFastZombieInverseVolumePain, ARRAYSIZE(envFastZombieInverseVolumePain) );
+#if GURGLE_SOUND
+	if ( m_pLayer2 )
+		ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pLayer2, SOUNDCTRL_CHANGE_VOLUME, envFastZombieVolumePain, ARRAYSIZE(envFastZombieVolumePain) );
+#endif
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 void CFastZombie::DeathSound( const CTakeDamageInfo &info ) 
 {
+	StopSound( entindex(), "Zombie.Seize" );
 	EmitSound( "NPC_FastZombie.Die" );
 }
 
@@ -992,21 +971,25 @@ void CFastZombie::DeathSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CFastZombie::AlertSound( void )
 {
-//!	CBaseEntity *pPlayer = AI_GetSinglePlayer();
+	CBasePlayer *pPlayer = AI_GetNearestPlayer(this);
 
-	if( GetEnemy() )
+	if( pPlayer )
 	{
 		// Measure how far the player is, and play the appropriate type of alert sound. 
 		// Doesn't matter if I'm getting mad at a different character, the player is the
 		// one that hears the sound.
 		float flDist;
 
-		flDist = ( GetAbsOrigin() - GetEnemy()->GetAbsOrigin() ).Length();
+		flDist = ( GetAbsOrigin() - pPlayer->GetAbsOrigin() ).Length();
 
 		if( flDist > 512 )
 			EmitSound( "NPC_FastZombie.AlertFar" );
 		else
 			EmitSound( "NPC_FastZombie.AlertNear" );
+	}
+	else
+	{
+		EmitSound( "NPC_FastZombie.AlertNear" );
 	}
 }
 
@@ -1014,7 +997,7 @@ void CFastZombie::AlertSound( void )
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 #define FASTZOMBIE_MINLEAP			200
-#define FASTZOMBIE_MAXLEAP			300
+#define FASTZOMBIE_MAXLEAP			320
 float CFastZombie::InnateRange1MaxRange( void ) 
 { 
 	return FASTZOMBIE_MAXLEAP; 
@@ -1029,42 +1012,30 @@ float CFastZombie::InnateRange1MaxRange( void )
 int CFastZombie::RangeAttack1Conditions( float flDot, float flDist )
 {
 	if (GetEnemy() == NULL)
-	{
-		return( COND_NONE );
-	}
+		return COND_NONE;
 
 	if( !(GetFlags() & FL_ONGROUND) )
-	{
 		return COND_NONE;
-	}
 
 	if( gpGlobals->curtime < m_flNextAttack )
 	{
-		return( COND_NONE );
+		return COND_NONE;
 	}
 
 	// make sure the enemy isn't on a roof and I'm in the streets (Ravenholm)
 	float flZDist;
 	flZDist = fabs( GetEnemy()->GetLocalOrigin().z - GetLocalOrigin().z );
 	if( flZDist > FASTZOMBIE_MAXLEAP_Z )
-	{
 		return COND_TOO_FAR_TO_ATTACK;
-	}
 
 	if( flDist > InnateRange1MaxRange() )
-	{
 		return COND_TOO_FAR_TO_ATTACK;
-	}
 
 	if( flDist < FASTZOMBIE_MINLEAP )
-	{
-		return COND_NONE;
-	}
+		return COND_TOO_CLOSE_TO_ATTACK;
 
 	if (flDot < 0.8) 
-	{
-		return COND_NONE;
-	}
+		return COND_NOT_FACING_ATTACK;
 
 	if ( !IsMoving() )
 	{
@@ -1072,6 +1043,7 @@ int CFastZombie::RangeAttack1Conditions( float flDot, float flDist )
 		return COND_NONE;
 	}
 
+#if 0
 	// Don't jump at the player unless he's facing me.
 	// This allows the player to get away if he turns and sprints
 	CBasePlayer *pPlayer = static_cast<CBasePlayer*>( GetEnemy() );
@@ -1084,6 +1056,7 @@ int CFastZombie::RangeAttack1Conditions( float flDot, float flDist )
 			return COND_NONE;
 		}
 	}
+#endif
 
 	// Drumroll please!
 	// The final check! Is the path from my position to halfway between me
@@ -1118,12 +1091,13 @@ void CFastZombie::HandleAnimEvent( animevent_t *pEvent )
 {
 	if ( pEvent->event == AE_FASTZOMBIE_CLIMB_LEFT || pEvent->event == AE_FASTZOMBIE_CLIMB_RIGHT )
 	{
+#if GURGLE_SOUND
 		if( ++m_iClimbCount % 3 == 0 )
 		{
 			ENVELOPE_CONTROLLER.SoundChangePitch( m_pLayer2, random->RandomFloat( 100, 150 ), 0.0 );
 			ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pLayer2, SOUNDCTRL_CHANGE_VOLUME, envFastZombieVolumeClimb, ARRAYSIZE(envFastZombieVolumeClimb) );
 		}
-
+#endif
 		return;
 	}
 
@@ -1434,6 +1408,7 @@ void CFastZombie::RunTask( const Task_t *pTask )
 	case TASK_FASTZOMBIE_UNSTICK_JUMP:
 		if( GetFlags() & FL_ONGROUND )
 		{
+			EndAttackJump();
 			TaskComplete();
 		}
 		break;
@@ -1511,15 +1486,6 @@ int CFastZombie::TranslateSchedule( int scheduleType )
 			return SCHED_FASTZOMBIE_UNSTICK_JUMP;
 		}
 		break;
-	case SCHED_MOVE_TO_WEAPON_RANGE:
-		{
-			float flZDist = fabs( GetEnemy()->GetLocalOrigin().z - GetLocalOrigin().z );
-			if ( flZDist > FASTZOMBIE_MAXLEAP_Z )
-				return SCHED_CHASE_ENEMY;
-			else // fall through to default
-				return BaseClass::TranslateSchedule( scheduleType );
-			break;
-		}
 
 	default:
 		return BaseClass::TranslateSchedule( scheduleType );
@@ -1611,12 +1577,13 @@ void CFastZombie::StopLoopingSounds( void )
 		ENVELOPE_CONTROLLER.SoundDestroy( m_pMoanSound );
 		m_pMoanSound = NULL;
 	}
-
+#if GURGLE_SOUND
 	if ( m_pLayer2 )
 	{
 		ENVELOPE_CONTROLLER.SoundDestroy( m_pLayer2 );
 		m_pLayer2 = NULL;
 	}
+#endif
 
 	BaseClass::StopLoopingSounds();
 }
@@ -1641,15 +1608,14 @@ void CFastZombie::BecomeTorso( const Vector &vecTorsoForce, const Vector &vecLeg
 //-----------------------------------------------------------------------------
 bool CFastZombie::IsJumpLegal(const Vector &startPos, const Vector &apex, const Vector &endPos) const
 {
-	const float MAX_JUMP_RISE		= 220.0f;
-	const float MAX_JUMP_DISTANCE	= 512.0f;
-	const float MAX_JUMP_DROP		= 384.0f;
+	const float MAX_JUMP_RISE		= FASTZOMBIE_MAXLEAP_Z - (sv_gravity.GetFloat()/100);
+	const float MAX_JUMP_DISTANCE	= FASTZOMBIE_MAXLEAP - (sv_gravity.GetFloat()/100);
+	const float MAX_JUMP_DROP		= FASTZOMBIE_MAXLEAP;
 
 	if ( BaseClass::IsJumpLegal( startPos, apex, endPos, MAX_JUMP_RISE, MAX_JUMP_DROP, MAX_JUMP_DISTANCE ) )
 	{
 		// Hang onto the jump distance. The AI is going to want it.
 		m_flJumpDist = (startPos - endPos).Length();
-
 		return true;
 	}
 	return false;
@@ -1661,20 +1627,16 @@ bool CFastZombie::IsJumpLegal(const Vector &startPos, const Vector &apex, const 
 bool CFastZombie::MovementCost( int moveType, const Vector &vecStart, const Vector &vecEnd, float *pCost )
 {
 	float delta = vecEnd.z - vecStart.z;
-
-	float multiplier = 1;
 	if ( moveType == bits_CAP_MOVE_JUMP )
 	{
-		multiplier = ( delta < 0 ) ? 0.5 : 1.5;
+		*pCost *= ( delta < 0 ) ? 0.5 : 1.5;
 	}
 	else if ( moveType == bits_CAP_MOVE_CLIMB )
 	{
-		multiplier = ( delta > 0 ) ? 0.5 : 4.0;
+		*pCost *= ( delta > 0 ) ? 0.5 : 3.5;
 	}
 
-	*pCost *= multiplier;
-
-	return ( multiplier != 1 );
+	return BaseClass::MovementCost( moveType, vecStart, vecEnd, pCost );
 }
 
 //-----------------------------------------------------------------------------
@@ -1717,20 +1679,20 @@ void CFastZombie::OnChangeActivity( Activity NewActivity )
 	{
 		// Scream!!!!
 		EmitSound( "NPC_FastZombie.Frenzy" );
-		SetPlaybackRate( random->RandomFloat( .9, 1.1 ) );	
+		SetPlaybackRate( random->RandomFloat( .9, 1.1 ) );
+#if GURGLE_SOUND
+//!		ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pLayer2, SOUNDCTRL_CHANGE_VOLUME, envFastZombieVolumeFrenzy, ARRAYSIZE(envFastZombieVolumeFrenzy) );
+#endif
 	}
 
 	if( NewActivity == ACT_JUMP )
-	{
 		BeginNavJump();
-	}
 	else if( GetActivity() == ACT_JUMP )
-	{
 		EndNavJump();
-	}
 
 	if ( NewActivity == ACT_LAND )
 	{
+		EndNavJump();
 		m_flNextAttack = gpGlobals->curtime + 1.0;
 	}
 
@@ -1793,7 +1755,9 @@ void CFastZombie::BeginNavJump( void )
 	m_fIsNavJumping = true;
 	m_fHitApex = false;
 
+#if GURGLE_SOUND
 	ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pLayer2, SOUNDCTRL_CHANGE_VOLUME, envFastZombieVolumeJump, ARRAYSIZE(envFastZombieVolumeJump) );
+#endif
 }
 
 //=========================================================

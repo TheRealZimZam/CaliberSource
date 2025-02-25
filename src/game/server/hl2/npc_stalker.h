@@ -46,7 +46,7 @@ public:
 	float				m_bPlayingHitFlesh;
 	CBeam*				m_pBeam;
 	CSprite*			m_pLightGlow;
-	int					m_iPlayerAggression;
+	int					m_iPlayerAggression;	//Level of drugs in my system
 	float				m_flNextScreamTime;
 
 	void				KillAttackBeam(void);
@@ -75,6 +75,7 @@ public:
 	void			Precache( void );
 	bool			CreateBehaviors();
 	float			MaxYawSpeed( void );
+	float			GetIdealSpeed( );
 	Class_T			Classify ( void );
 
 	void			PrescheduleThink();
@@ -94,6 +95,8 @@ public:
 
 	int				MeleeAttack1Conditions ( float flDot, float flDist );
 	int				RangeAttack1Conditions ( float flDot, float flDist );
+
+	Activity		NPC_TranslateActivity( Activity baseAct );
 	void			HandleAnimEvent( animevent_t *pEvent );
 
 	bool			FValidateHintType(CAI_Hint *pHint);

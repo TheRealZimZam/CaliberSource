@@ -1206,6 +1206,7 @@ public:
 
 	CWeaponPhysCannon( void );
 
+	bool CanBePickedUpByNPCs( void ) { return false; }
 	void	Drop( const Vector &vecVelocity );
 	void	Precache();
 	virtual void	Spawn();

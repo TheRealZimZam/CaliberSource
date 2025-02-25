@@ -35,7 +35,7 @@ ConVar	sk_combine_s_kick( "sk_combine_s_kick","0");
 ConVar	sk_combine_guard_health( "sk_combine_guard_health", "0");
 ConVar	sk_combine_guard_kick( "sk_combine_guard_kick", "0");
 
-extern ConVar sk_plr_dmg_buckshot;
+extern ConVar sk_buckshot_plr_dmg;
 extern ConVar sk_plr_num_shotgun_pellets;
 extern ConVar npc_combine_drop_health;
 
@@ -57,19 +57,26 @@ void CNPC_CombineS::Spawn( void )
 {
 	Precache();
 	SetModel( STRING( GetModelName() ) );
+	BaseClass::Spawn();
 
 	if( IsDemolition() )
 	{
 		// Extra body-armour.
-		SetHealth( sk_combine_guard_health.GetFloat() );
-		SetMaxHealth( sk_combine_guard_health.GetFloat() );
+		if ( GetHealth() == 0 )
+		{
+			SetHealth( sk_combine_guard_health.GetFloat() );
+			SetMaxHealth( sk_combine_guard_health.GetFloat() );
+		}
 		SetKickDamage( sk_combine_guard_kick.GetFloat() );
 		m_flFieldOfView			= 0.4;	//Eyepatch = -%15 perception
 	}
 	else
 	{
-		SetHealth( sk_combine_s_health.GetFloat() );
-		SetMaxHealth( sk_combine_s_health.GetFloat() );
+		if ( GetHealth() == 0 )
+		{
+			SetHealth( sk_combine_s_health.GetFloat() );
+			SetMaxHealth( sk_combine_s_health.GetFloat() );
+		}
 		SetKickDamage( sk_combine_s_kick.GetFloat() );
 		m_flFieldOfView			= 0.3;	//Normal
 	}
@@ -81,8 +88,6 @@ void CNPC_CombineS::Spawn( void )
 	}
 
 	CapabilitiesAdd( bits_CAP_INNATE_RANGE_ATTACK2 );
-
-	BaseClass::Spawn();
 
 #if HL2_EPISODIC
 	if (m_iUseMarch && !HasSpawnFlags(SF_NPC_START_EFFICIENT))
@@ -360,7 +365,7 @@ bool CNPC_CombineS::IsHeavyDamage( const CTakeDamageInfo &info )
 	// Shotgun blasts where at least half the pellets hit me are heavy damage
 	if ( info.GetDamageType() & DMG_BUCKSHOT )
 	{
-		int iHalfMax = sk_plr_dmg_buckshot.GetFloat() * sk_plr_num_shotgun_pellets.GetInt() * 0.5;
+		int iHalfMax = sk_buckshot_plr_dmg.GetFloat() * sk_plr_num_shotgun_pellets.GetInt() * 0.5;
 		if ( info.GetDamage() >= iHalfMax )
 			return true;
 	}
@@ -372,7 +377,7 @@ bool CNPC_CombineS::IsHeavyDamage( const CTakeDamageInfo &info )
 	}
 
 	// Rifle-grenades (This grenade is too quick to yell "Grenade!", so yell the heavy damage after it hits)
-	if( info.GetAmmoType() == GetAmmoDef()->Index("SMG1_Grenade") )
+	if( info.GetAmmoType() == GetAmmoDef()->Index("AR2Grenade") )
 	{
 		return true;
 	}

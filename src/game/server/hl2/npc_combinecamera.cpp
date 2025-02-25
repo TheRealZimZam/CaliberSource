@@ -332,7 +332,7 @@ void CNPC_CombineCamera::Spawn()
 	SetPoseParameter(COMBINE_CAMERA_BC_YAW, 0);
 	SetPoseParameter(COMBINE_CAMERA_BC_PITCH, 0);
 
-	m_iAmmoType = GetAmmoDef()->Index("Pistol");
+	m_iAmmoType = GetAmmoDef()->Index("9mm");
 
 	// Create our eye sprite
 	m_pEyeGlow = CSprite::SpriteCreate(COMBINE_CAMERA_GLOW_SPRITE, GetLocalOrigin(), false);

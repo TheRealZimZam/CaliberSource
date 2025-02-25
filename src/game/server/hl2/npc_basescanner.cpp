@@ -7,9 +7,9 @@
 #include "cbase.h"
 #include "npcevent.h"
 #include "ai_basenpc_physicsflyer.h"
+#include "npc_basescanner.h"
 #include "weapon_physcannon.h"
 #include "hl2_player.h"
-#include "npc_scanner.h"
 #include "IEffects.h"
 #include "explode.h"
 #include "ai_route.h"
@@ -145,6 +145,7 @@ void CNPC_BaseScanner::Spawn(void)
 	// --------------------------------------------
 
 	CapabilitiesAdd( bits_CAP_MOVE_FLY | bits_CAP_SQUAD | bits_CAP_TURN_HEAD | bits_CAP_SKIP_NAV_GROUND_CHECK );
+	CapabilitiesAdd( bits_CAP_HEAR );
 
 	NPCInit();
 
@@ -996,7 +997,7 @@ void CNPC_BaseScanner::BlendPhyscannonLaunchSpeed()
 void CNPC_BaseScanner::MoveExecute_Alive(float flInterval)
 {
 	// Amount of noise to add to flying
-	float noiseScale = 3.0f;
+	float noiseScale = 4.0f;
 
 	// -------------------------------------------
 	//  Avoid obstacles, unless I'm dive bombing

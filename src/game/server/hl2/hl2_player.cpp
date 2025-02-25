@@ -2,16 +2,7 @@
 //
 // Purpose:	Player for HL2SP/Caliber
 // TODO's: Commander mode fx, red for attack orders, yellow for follow, green for defend
-/*
-	CEffectData data;
-
-	data.m_vOrigin = GetAbsOrigin();
-	data.m_vNormal = vec3_origin;
-	data.m_vAngles = vec3_angle;
-	data.m_nColor = COMMAND_POINT_RED;
-
-	DispatchEffect( "CommandPointer", data );
-*/
+//
 //=============================================================================//
 
 #include "cbase.h"
@@ -130,14 +121,14 @@ ConVar hl2_darkness_flashlight_factor( "hl2_darkness_flashlight_factor", "1" );
 ConVar player_showpredictedposition( "player_showpredictedposition", "0" );
 ConVar player_showpredictedposition_timestep( "player_showpredictedposition_timestep", "1.0" );
 
-ConVar player_squad_transient_commands( "player_squad_transient_commands", "1", FCVAR_REPLICATED );
+ConVar player_squad_transient_commands( "player_squad_transient_commands", "1", FCVAR_ARCHIVE | FCVAR_ARCHIVE_XBOX );
 ConVar player_squad_double_tap_time( "player_squad_double_tap_time", "0.25" );
 
 ConVar sv_infinite_aux_power( "sv_infinite_aux_power", "0", FCVAR_CHEAT );
 
 ConVar autoaim_unlock_target( "autoaim_unlock_target", "0.8666" );
 
-ConVar sv_stickysprint("sv_stickysprint", "0", FCVAR_ARCHIVE | FCVAR_ARCHIVE_XBOX);
+ConVar sv_stickysprint("sv_stickysprint", "0", FCVAR_ARCHIVE | FCVAR_ARCHIVE_XBOX );
 
 ConVar hl2_flashlight_drain_time( "hl2_flashlight_drain_time", "1.1111" );	// 100 units / 90 secs
 ConVar hl2_flashlight_charge_time( "hl2_flashlight_charge_time", "50" );	// 100 units / 2 secs
@@ -261,7 +252,6 @@ bool Flashlight_UseLegacyVersion( void )
 
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
 void CC_ToggleZoom( void )
 {
 	CBasePlayer* pPlayer = UTIL_GetCommandClient();
@@ -278,6 +268,7 @@ void CC_ToggleZoom( void )
 }
 
 static ConCommand toggle_zoom("toggle_zoom", CC_ToggleZoom, "Toggles zoom display" );
+//------------------------------------------------------------------------------
 
 // ConVar cl_forwardspeed( "cl_forwardspeed", "400", FCVAR_CHEAT ); // Links us to the client's version
 ConVar xc_crouch_range( "xc_crouch_range", "0.85", FCVAR_ARCHIVE, "Percentarge [1..0] of joystick range to allow ducking within" );	// Only 1/2 of the range is used
@@ -329,6 +320,7 @@ void CC_ToggleDuck( void )
 }
 
 static ConCommand toggle_duck("toggle_duck", CC_ToggleDuck, "Toggles duck" );
+//------------------------------------------------------------------------------
 
 #ifndef HL2MP
 #ifndef PORTAL
@@ -407,6 +399,7 @@ BEGIN_DATADESC( CHL2_Player )
 	DEFINE_EMBEDDED( m_LowerWeaponTimer ),
 	DEFINE_EMBEDDED( m_AutoaimTimer ),
 
+	DEFINE_INPUTFUNC( FIELD_VOID, "Taunt", InputTaunt ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "IgnoreFallDamage", InputIgnoreFallDamage ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "IgnoreFallDamageWithoutReset", InputIgnoreFallDamageWithoutReset ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "OnSquadMemberKilled", OnSquadMemberKilled ),
@@ -457,8 +450,7 @@ CHL2_Player::CHL2_Player()
 		// Probably not going to spend time fixing because the few additional
 		// features arent really worth it - we only need animations so the player
 		// can admire himself in the mirror anyway.
-/*
-		UseClientSideAnimation();
+
 		// Setup the movement data.
 		MultiPlayerMovementData_t movementData;
 		movementData.m_flRunSpeed = HL2_RUN_SPEED;
@@ -467,8 +459,8 @@ CHL2_Player::CHL2_Player()
 
 		// Create animation state for this player.
 		m_MultiplayerPlayerAnimState = CreateMultiPlayerAnimState( this, movementData );
-*/
 	}
+	UseClientSideAnimation();
 #endif
 	m_angEyeAngles.Init();
 
@@ -578,6 +570,10 @@ void CHL2_Player::CreateCorpse( void )
 	if ( CanBecomeRagdoll() )
 		return;
 
+	// If I've been forced to ragdoll by something or other
+	if ( IsRagdoll() )
+		return;
+
 	CopyToBodyQue( this );
 }
 
@@ -586,20 +582,18 @@ void CHL2_Player::CreateCorpse( void )
 //-----------------------------------------------------------------------------
 void CHL2_Player::CheckSuitZoom( void )
 {
-//#ifndef _XBOX 
 	//Adrian - No zooming without a suit!
 	if ( IsSuitEquipped() )
 	{
 		if ( m_afButtonReleased & IN_ZOOM )
 		{
-			StopZooming();
+			StopZooming(this);
 		}	
 		else if ( m_afButtonPressed & IN_ZOOM )
 		{
-			StartZooming();
+			StartZooming(this);
 		}
 	}
-//#endif//_XBOX
 }
 
 void CHL2_Player::EquipSuit( bool bPlayEffects )
@@ -640,20 +634,15 @@ void CHL2_Player::HandleSpeedChanges( void )
 		if ( bWantSprint )
 		{
 			if ( sv_stickysprint.GetBool() )
-			{
 				StartAutoSprint();
-			}
 			else
-			{
 				StartSprinting();
-			}
 		}
 		else
 		{
 			if ( !sv_stickysprint.GetBool() )
-			{
 				StopSprinting();
-			}
+
 			// Reset key, so it will be activated post whatever is suppressing it.
 			m_nButtons &= ~IN_SPEED;
 		}
@@ -666,13 +655,9 @@ void CHL2_Player::HandleSpeedChanges( void )
 	if( bIsWalking != bWantWalking )
 	{
 		if ( bWantWalking )
-		{
 			StartWalking();
-		}
 		else
-		{
 			StopWalking();
-		}
 	}
 }
 
@@ -781,6 +766,7 @@ void CHL2_Player::PreThink(void)
 
 	VPROF_SCOPE_BEGIN( "CHL2_Player::PreThink-Speed" );
 	HandleSpeedChanges();
+
 #ifdef HL2_EPISODIC
 	HandleArmorReduction();
 #endif
@@ -904,19 +890,19 @@ void CHL2_Player::PostThink( void )
 		// NOTENOTE; Other non-triggered, dynamic speech could go here too
 		if ( GetHealth() < sk_player_critical_health.GetInt() && m_flIdleTime > 3.0f && random->RandomInt(0,99) == 0 )
 		{
-			SpeakPlayerSentence( "PLAYER_INJURED" );	// OBSOLETE - USE RESPONSE SYSTEM!!
 #ifdef HL2_EPISODIC
 			SpeakConceptIfAllowed( MP_CONCEPT_HURT );
 #endif
+			SpeakPlayerSentence( "PLAYER_INJURED" );	// OBSOLETE - USE RESPONSE SYSTEM!!
 		}
 	}
 
 	// Store the eye angles pitch so the client can compute its animation state correctly.
 	m_angEyeAngles = EyeAngles();
 
-	if ( m_PlayerAnimState )
+	if ( GetAnimState() )
 	{
-		m_PlayerAnimState->Update( m_angEyeAngles[YAW], m_angEyeAngles[PITCH] );
+		GetAnimState()->Update( m_angEyeAngles[YAW], m_angEyeAngles[PITCH] );
 	}
 	else
 	{
@@ -1184,7 +1170,7 @@ void CHL2_Player::Spawn(void)
 	// Our player movement speed is set once here. This will override the cl_xxxx
 	// cvars unless they are set to be lower than this.
 	//
-	//SetMaxSpeed( 320 );
+	SetMaxSpeed( 320 );
 
 	InitSprinting();
 
@@ -1224,9 +1210,9 @@ void CHL2_Player::UpdateLocatorPosition( const Vector &vecPosition )
 //-----------------------------------------------------------------------------
 void CHL2_Player::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
 {
-	if ( m_PlayerAnimState )
+	if ( GetAnimState() )
 	{
-		m_PlayerAnimState->DoAnimationEvent( PlayerAnimEvent_t, nData );
+		GetAnimState()->DoAnimationEvent( PlayerAnimEvent_t, nData );
 		TE_PlayerAnimEvent( this, PlayerAnimEvent_t, nData );	// Send to any clients who can see this guy.
 	}
 }
@@ -1234,7 +1220,7 @@ void CHL2_Player::DoAnimationEvent( int PlayerAnimEvent_t, int nData )
 void CHL2_Player::SetAnimation( PLAYER_ANIM playerAnim )
 {
 	// Use the old system to get dead anims
-	if ( m_PlayerAnimState == NULL )
+	if ( GetAnimState() == NULL )
 	{
 		switch (playerAnim) 
 		{
@@ -1338,13 +1324,9 @@ void CHL2_Player::StopSprinting( void )
 	}
 
 	if( IsSuitEquipped() )
-	{
 		SetMaxSpeed( HL2_RUN_SPEED );
-	}
 	else
-	{
 		SetMaxSpeed( HL2_JOG_SPEED );
-	}
 
 	m_fIsSprinting = false;
 
@@ -1384,13 +1366,10 @@ void CHL2_Player::StartWalking( void )
 void CHL2_Player::StopWalking( void )
 {
 	if( IsSuitEquipped() )
-	{
 		SetMaxSpeed( HL2_RUN_SPEED );
-	}
 	else
-	{
 		SetMaxSpeed( HL2_JOG_SPEED );
-	}
+
 	m_fIsWalking = false;
 }
 
@@ -1400,13 +1379,12 @@ void CHL2_Player::StopWalking( void )
 //-----------------------------------------------------------------------------
 bool CHL2_Player::CanZoom( CBaseEntity *pRequester )
 {
-	if ( g_pGameRules->IsMultiplayer() )
+	// Only other entities can make me zoom in MP
+	if ( g_pGameRules->IsMultiplayer() && !m_hZoomOwner )
 		return false;
 
 	if ( IsZooming() )
 		return false;
-
-	//Check our weapon
 
 	return true;
 }
@@ -1416,22 +1394,20 @@ bool CHL2_Player::CanZoom( CBaseEntity *pRequester )
 void CHL2_Player::ToggleZoom(void)
 {
 	if( IsZooming() )
-	{
-		StopZooming();
-	}
+		StopZooming(this);
 	else
-	{
-		StartZooming();
-	}
+		StartZooming(this);
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: +zoom suit zoom
 //-----------------------------------------------------------------------------
-void CHL2_Player::StartZooming( void )
+void CHL2_Player::StartZooming( CBaseEntity *pRequester, int iFOV )
 {
-	int iFOV = 25;
-	if ( SetFOV( this, iFOV, 0.4f ) )
+	if ( !CanZoom(pRequester) )
+		return;
+
+	if ( SetFOV( pRequester, iFOV, 0.4f ) )
 	{
 		m_HL2Local.m_bZooming = true;
 	}
@@ -1440,11 +1416,10 @@ void CHL2_Player::StartZooming( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CHL2_Player::StopZooming( void )
+void CHL2_Player::StopZooming( CBaseEntity *pRequester )
 {
 	int iFOV = GetZoomOwnerDesiredFOV( m_hZoomOwner );
-
-	if ( SetFOV( this, iFOV, 0.2f ) )
+	if ( SetFOV( pRequester, iFOV, 0.2f ) )
 	{
 		m_HL2Local.m_bZooming = false;
 	}
@@ -1500,10 +1475,15 @@ void CHL2_Player::InitVCollision( const Vector &vecAbsOrigin, const Vector &vecA
 CHL2_Player::~CHL2_Player( void )
 {
 	// Clears the animation state.
-	if ( m_PlayerAnimState != NULL )
+	if ( m_PlayerAnimState )
 	{
 		m_PlayerAnimState->Release();
 		m_PlayerAnimState = NULL;
+	}
+	else if ( m_MultiplayerPlayerAnimState )
+	{
+		m_MultiplayerPlayerAnimState->Release();
+		m_MultiplayerPlayerAnimState = NULL;
 	}
 }
 
@@ -1765,12 +1745,10 @@ void CHL2_Player::CommanderExecute( CommanderCommand_t command )
 		}
 	}
 
-#ifdef _DEBUG
 	if( goal.m_pGoalEntity == NULL && goal.m_vecGoalLocation == vec3_invalid )
 	{
 		DevMsg( 1, "**ERROR: Someone sent an invalid goal to CommanderExecute!\n" );
 	}
-#endif // _DEBUG
 
 	AISquadIter_t iter;
 	for ( CAI_BaseNPC *pAllyNpc = m_pPlayerAISquad->GetFirstMember(&iter); pAllyNpc; pAllyNpc = m_pPlayerAISquad->GetNextMember(&iter) )
@@ -1780,7 +1758,7 @@ void CHL2_Player::CommanderExecute( CommanderCommand_t command )
 	}
 
 	//---------------------------------
-	// If the trace hits an NPC, send all ally NPCs a "target" order. Always
+	// If the trace hits an entity, send all ally NPCs a "target" order. Always
 	// goes to targeted one first
 #ifdef DEBUG
 	int nAIs = g_AI_Manager.NumAIs();
@@ -1808,16 +1786,32 @@ void CHL2_Player::CommanderExecute( CommanderCommand_t command )
 //-----------------------------------------------------------------------------
 void CHL2_Player::CommanderMode()
 {
+	CEffectData data;
+	data.m_vNormal = vec3_origin;
+	data.m_vAngles = vec3_angle;
+	data.m_flScale = 4;
+
 	float commandInterval = gpGlobals->realtime - m_RealTimeLastSquadCommand;
 	m_RealTimeLastSquadCommand = gpGlobals->realtime;
 	if ( commandInterval < player_squad_double_tap_time.GetFloat() )
 	{
 		m_QueuedCommand = CC_FOLLOW;
+		// Origin is my feet
+		data.m_vOrigin = GetAbsOrigin();
+		data.m_nColor = COMMAND_POINT_YELLOW;
 	}
 	else
 	{
 		m_QueuedCommand = (player_squad_transient_commands.GetBool()) ? CC_SEND : CC_TOGGLE;
+
+		// Origin is the crosshair
+		trace_t tr;
+		UTIL_TraceLine( EyePosition(), EyePosition() + EyeDirection3D() * MAX_TRACE_LENGTH, MASK_SHOT, this, COLLISION_GROUP_NONE, &tr );
+		data.m_vOrigin = tr.endpos;
+		data.m_nColor = COMMAND_POINT_RED;
 	}
+
+	DispatchEffect( "CommandPointer", data );
 }
 
 //-----------------------------------------------------------------------------
@@ -1875,28 +1869,34 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		EquipSuit();
 
 		// EV-RY-THIIINNGGGG!
-		GiveAmmo( 255,	GetAmmoDef()->Index("AR2"));
-		GiveAmmo( 5,	GetAmmoDef()->Index("AR2AltFire"));
-		GiveAmmo( 255,	GetAmmoDef()->Index("Pistol"));
-		GiveAmmo( 255,	GetAmmoDef()->Index("SMG1"));
-		GiveAmmo( 255,	GetAmmoDef()->Index("HMG"));
-		GiveAmmo( 32,	GetAmmoDef()->Index("357"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("45ACP"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("9MM"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("762"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("357"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("SPIW"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("Flares"));
 		GiveAmmo( 255,	GetAmmoDef()->Index("Buckshot"));
 		GiveAmmo( 255,	GetAmmoDef()->Index("Fragshot"));
-		GiveAmmo( 5,	GetAmmoDef()->Index("AR2Grenade"));
-		GiveAmmo( 5,	GetAmmoDef()->Index("RPGRound"));
-		GiveAmmo( 24,	GetAmmoDef()->Index("SniperRound"));
-		GiveAmmo( 16,	GetAmmoDef()->Index("XBowBolt"));
-		GiveAmmo( 10,	GetAmmoDef()->Index("FlareRound" ));
+		GiveAmmo( 255,	GetAmmoDef()->Index("30-06"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("RPGRound"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("AR2Grenade"));
 		GiveAmmo( 255,	GetAmmoDef()->Index("Flamethrower"));
+		GiveAmmo( 255,	GetAmmoDef()->Index("Extinguisher" ));
+		GiveAmmo( 255,	GetAmmoDef()->Index("XBowBolt"));
+
+		GiveAmmo( 5,	GetAmmoDef()->Index("Molotov"));
 		GiveAmmo( 5,	GetAmmoDef()->Index("Grenade"));
 		GiveAmmo( 5,	GetAmmoDef()->Index("EMPGrenade"));
 		GiveAmmo( 5,	GetAmmoDef()->Index("Slam"));
-		GiveAmmo( 5,	GetAmmoDef()->Index("Molotov"));
 		GiveAmmo( 5,	GetAmmoDef()->Index("Brickbat"));
 #ifdef HL2_EPISODIC
 		GiveAmmo( 5,	GetAmmoDef()->Index("Hopwire"));
 #endif	
+		// Check if I can actually get all this crap
+		bool bSingleSlot = hl2_single_weapon_slot.GetBool();
+		if ( bSingleSlot )
+			hl2_single_weapon_slot.SetValue( false );
+
 //		GiveNamedItem( "weapon_357" );
 		GiveNamedItem( "weapon_44" );
 //		GiveNamedItem( "weapon_alyxgun" );
@@ -1936,12 +1936,16 @@ void CHL2_Player::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_hopwire" );
 		// GiveNamedItem( "weapon_magnade" );
 #endif
+		// Now set it back
+		if ( bSingleSlot )
+			hl2_single_weapon_slot.SetValue( true );
+
 		if ( GetHealth() < 100 )
 		{
 			TakeHealth( 10, DMG_GENERIC );
 		}
-		
-		gEvilImpulse101		= false;
+
+		gEvilImpulse101 = false;
 		break;
 	}
 
@@ -2442,10 +2446,10 @@ void CHL2_Player::OnSquadMemberKilled( inputdata_t &data )
 	MessageEnd();
 
 	// Dammit leeroy!
-	SpeakPlayerSentence( "PLAYER_SQUADMEMBER_DIED" );	// OBSOLETE - USE RESPONSE SYSTEM!!
 #ifdef HL2_EPISODIC
 	SpeakConceptIfAllowed( MP_CONCEPT_PLAYER_NEGATIVE );
 #endif
+	SpeakPlayerSentence( "PLAYER_SQUADMEMBER_DIED" );	// OBSOLETE - USE RESPONSE SYSTEM!!
 }
 
 //-----------------------------------------------------------------------------
@@ -2649,17 +2653,6 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 {
 	BaseClass::Event_KilledOther( pVictim, info );
 
-#ifdef HL2_EPISODIC
-	CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
-	for ( int i = 0; i < g_AI_Manager.NumAIs(); i++ )
-	{
-		if ( ppAIs[i] && ppAIs[i]->IRelationType(this) == D_LI )
-		{
-			ppAIs[i]->OnPlayerKilledOther( pVictim, info );
-		}
-	}
-#endif
-
 	// Killed a npc
 	if ( pVictim->IsNPC() )
 	{
@@ -2701,10 +2694,13 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 				if(info.GetDamageType() & DMG_BULLET)
 				{
 					CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon *>(GetActiveWeapon());
-					if( FClassnameIs( pWeapon, "weapon_sniperrifle" ))
-						pSentenceName = "PLAYER_FRAG_SNIPER";
-					else if( FClassnameIs( pWeapon, "weapon_shotgun" ))
-						pSentenceName = "PLAYER_FRAG_SHOTGUN";
+					if ( pWeapon )
+					{
+						if( FClassnameIs( pWeapon, "weapon_sniperrifle" ))
+							pSentenceName = "PLAYER_FRAG_SNIPER";
+						else if( FClassnameIs( pWeapon, "weapon_shotgun" ))
+							pSentenceName = "PLAYER_FRAG_SHOTGUN";
+					}
 				}
 
 				//TODO; Dominations
@@ -2717,7 +2713,7 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 	else
 	{
 		// Killed a objekt
-
+		//SpeakConceptIfAllowed( MP_CONCEPT_DETONATED_OBJECT );
 	}
 }
 
@@ -2726,10 +2722,11 @@ void CHL2_Player::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 void CHL2_Player::Event_Killed( const CTakeDamageInfo &info )
 {
 	// Dead SP players use the old system for death
-	if ( m_PlayerAnimState && !g_pGameRules->IsMultiplayer() )
+	if ( GetAnimState() && !g_pGameRules->IsMultiplayer() )
 	{
-		m_PlayerAnimState->Release();
+		GetAnimState()->Release();
 		m_PlayerAnimState = NULL;
+		m_MultiplayerPlayerAnimState = NULL;
 	}
 
 #ifdef HL2_EPISODIC
@@ -3074,7 +3071,7 @@ bool CHL2_Player::ClientCommand( const CCommand &args )
 	if ( !Q_stricmp( args[0], "DropPrimary" ) )
 	{
 		// To work with the old system; cant drop exhaustibles
-		if ( GetActiveWeapon()->CanDrop() && !(GetActiveWeapon()->GetWpnData().iFlags & ITEM_FLAG_EXHAUSTIBLE) )
+		if ( GetActiveWeapon() && GetActiveWeapon()->CanDrop() && !(GetActiveWeapon()->GetWpnData().iFlags & ITEM_FLAG_EXHAUSTIBLE) )
 		{
 			if( hl2_single_primary_weapon_mode.GetBool() )
 			{
@@ -3251,19 +3248,21 @@ void CHL2_Player::PlayerUse( void )
 		if ( m_afButtonPressed & IN_USE )
 		{
 			// Robin: Don't play sounds for NPCs, because NPCs will allow respond with speech.
-			if ( !pUseEntity->MyNPCPointer() )
-				EmitSound( "HL2Player.Use" );
-			//TEST
-/*
-			else if (hl2_playertalk.GetBool() && gPrecachedSpeech)
+			if ( pUseEntity->MyNPCPointer() )
 			{
-				if( m_flNextPlayerTalk <= gpGlobals->curtime )
+/*
+				if (hl2_playertalk.GetBool() && gPrecachedSpeech)
 				{
-					m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
-					SENTENCEG_PlayRndSz( edict(), "PLAYER_USE_NPC", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
+					if( m_flNextPlayerTalk <= gpGlobals->curtime )
+					{
+						m_flNextPlayerTalk = gpGlobals->curtime + PLAYER_TALK_DELAY;
+						SENTENCEG_PlayRndSz( edict(), "PLAYER_USE_NPC", PLAYER_SENTENCE_VOLUME, PLAYER_ATTN, 0, PLAYER_PITCH);
+					}
 				}
-			}
 */
+			}
+			else
+				EmitSound( "HL2Player.Use" );
 		}
 
 		if ( ( (m_nButtons & IN_USE) && (caps & FCAP_CONTINUOUS_USE) ) ||
@@ -3785,7 +3784,7 @@ bool CHL2_Player::Weapon_Switch( CBaseCombatWeapon *pWeapon, int viewmodelindex 
 	// Come out of suit zoom mode
 	if ( IsZooming() )
 	{
-		StopZooming();
+		StopZooming(this);
 	}
 
 	return BaseClass::Weapon_Switch( pWeapon, viewmodelindex );
@@ -3945,45 +3944,6 @@ bool IntersectRayWithAACylinder( const Ray_t &ray,
 	return true;
 }
 #endif
-
-/*
-bool CHL2_Player::TestHitboxes( const Ray_t &ray, unsigned int fContentsMask, trace_t& tr )
-{
-	if( g_pGameRules->IsMultiplayer() )
-	{
-		return BaseClass::TestHitboxes( ray, fContentsMask, tr );
-	}
-	else
-	{
-		Assert( ray.m_IsRay );
-
-		Vector mins, maxs;
-
-		mins = WorldAlignMins();
-		maxs = WorldAlignMaxs();
-
-		if ( IntersectRayWithAACylinder( ray, WorldSpaceCenter(), maxs.x * PLAYER_HULL_REDUCTION, maxs.z - mins.z, &tr ) )
-		{
-			tr.hitbox = 0;
-			CStudioHdr *pStudioHdr = GetModelPtr( );
-			if (!pStudioHdr)
-				return false;
-
-			mstudiohitboxset_t *set = pStudioHdr->pHitboxSet( m_nHitboxSet );
-			if ( !set || !set->numhitboxes )
-				return false;
-
-			mstudiobbox_t *pbox = set->pHitbox( tr.hitbox );
-			mstudiobone_t *pBone = pStudioHdr->pBone(pbox->bone);
-			tr.surface.name = "**studio**";
-			tr.surface.flags = SURF_HITBOX;
-			tr.surface.surfaceProps = physprops->GetSurfaceIndex( pBone->pszSurfaceProp() );
-		}
-		
-		return true;
-	}
-}
-*/
 
 //---------------------------------------------------------
 // Show the player's scaled down bbox that we use for
@@ -4158,7 +4118,7 @@ void CHL2_Player::Splash( void )
 	}
 
 	float flSpeed = GetAbsVelocity().Length();
-	if ( flSpeed < HL2_RUN_SPEED )
+	if ( flSpeed < HL2_JOG_SPEED )
 	{
 		data.m_flScale = random->RandomFloat( 10, 12 );
 		DispatchEffect( "waterripple", data );
@@ -4197,6 +4157,15 @@ void CHL2_Player::FirePlayerProxyOutput( const char *pszOutputName, variant_t va
 }
 
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void CHL2_Player::InputTaunt( inputdata_t &inputdata )
+{
+	// TODO; Need alot more here!
+	SetAnimation( PLAYER_TAUNT );
+	SpeakPlayerSentence( "PLAYER_TAUNT" );
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: OBSOL77T player sentences - replaced by response system
 //-----------------------------------------------------------------------------
 void CHL2_Player::SpeakPlayerSentence( const char *pszSentenceName, float fVolume )
@@ -4226,7 +4195,27 @@ void CHL2_Player::SpeakPlayerSentence( const char *pszSentenceName, float fVolum
 		}
 	}
 }
-	
+
+//------------------------------------------------------------------------------
+void CC_Insult( void )
+{
+	CBasePlayer* pPlayer = UTIL_GetCommandClient();
+
+	if( pPlayer )
+	{
+		// TODO;
+		// Check for NPC, if there is one, make it come from him!
+		// Otherwise, just print to console/chat
+
+		// Print both in chat AND over the offender
+		// nearestNPC->EntityText( 0, "#listofinsults", 0);
+		//UTIL_SayText( "#listofinsults", pPlayer );
+	}
+}
+
+static ConCommand insult("insult", CC_Insult, "Make the nearest ai, or just the game itslf, insult your pitiful existence." );
+//------------------------------------------------------------------------------
+
 //-----------------------------------------------------------------------------
 // MP Stuff
 //-----------------------------------------------------------------------------

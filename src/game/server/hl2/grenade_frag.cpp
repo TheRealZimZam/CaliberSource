@@ -28,9 +28,9 @@ ConVar	grenade_glow_enable	( "grenade_glow_enable",	"1");
 
 const float GRENADE_COEFFICIENT_OF_RESTITUTION = 0.2f;
 
-ConVar sk_plr_dmg_fraggrenade	( "sk_plr_dmg_fraggrenade","0");
-ConVar sk_npc_dmg_fraggrenade	( "sk_npc_dmg_fraggrenade","0");
-ConVar sk_fraggrenade_radius	( "sk_fraggrenade_radius", "0");
+ConVar sk_frag_plr_dmg	( "sk_frag_plr_dmg","0");
+ConVar sk_frag_npc_dmg	( "sk_frag_npc_dmg","0");
+ConVar sk_frag_radius	( "sk_frag_radius", "0");
 
 #define GRENADE_MODEL "models/Weapons/w_grenade.mdl"
 
@@ -115,13 +115,13 @@ void CGrenadeFrag::Spawn( void )
 
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
 	{
-		m_flDamage		= sk_plr_dmg_fraggrenade.GetFloat();
-		m_DmgRadius		= sk_fraggrenade_radius.GetFloat();
+		m_flDamage		= sk_frag_plr_dmg.GetFloat();
+		m_DmgRadius		= sk_frag_radius.GetFloat();
 	}
 	else
 	{
-		m_flDamage		= sk_npc_dmg_fraggrenade.GetFloat();
-		m_DmgRadius		= sk_fraggrenade_radius.GetFloat();
+		m_flDamage		= sk_frag_npc_dmg.GetFloat();
+		m_DmgRadius		= sk_frag_radius.GetFloat();
 	}
 
 	m_takedamage	= DAMAGE_YES;

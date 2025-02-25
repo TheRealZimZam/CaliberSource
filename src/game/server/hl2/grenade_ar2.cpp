@@ -39,7 +39,7 @@ extern ConVar    sk_plr_dmg_smg_grenade;
 extern ConVar    sk_npc_dmg_smg_grenade;
 //extern ConVar    sk_max_smg_grenade;
 
-ConVar		sk_ar2_grenade_bounce_velocity_to_preserve	( "sk_ar2_grenade_bounce_velocity_to_preserve","0.1");
+ConVar		sk_ar2_grenade_bounce_velocity_to_preserve	( "sk_ar2_grenade_bounce_velocity_to_preserve","0.15");
 #define		AR2_GRENADE_BOUNCE_VELOCITY_TO_PRESERVE	sk_ar2_grenade_bounce_velocity_to_preserve.GetFloat()	//HL2 is 0.3, Quake is 0.8
 
 ConVar		sk_ar2_grenade_activation_delay	( "sk_ar2_grenade_activation_delay","0.6");
@@ -75,7 +75,7 @@ void CGrenadeAR2::Precache( void )
 #ifndef OLD_SMOKE_TRAIL
 	PrecacheModel( "sprites/smoke1.vmt" );
 #endif
-	m_nAirburstSprite = PrecacheModel("sprites/fexplo1.vmt");
+	m_nAirburstSprite = PrecacheModel("sprites/fexplo.vmt");
 
 	PrecacheScriptSound( "BaseGrenade.BounceSound" );
 }
@@ -90,7 +90,7 @@ void CGrenadeAR2::Spawn( void )
 {
 	Precache( );
 
-	SetModel( "models/Weapons/ar2_grenade.mdl");
+	SetModel( "models/Weapons/ar2_grenade.mdl" );
 
 #ifdef NEW_MOVEMENT
 	SetMoveType( MOVETYPE_VPHYSICS );
@@ -111,22 +111,19 @@ void CGrenadeAR2::Spawn( void )
 	SetNextThink( gpGlobals->curtime + 0.1f );
 
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
-	{
-		m_flDamage = sk_plr_dmg_smg_grenade.GetFloat();
-	}
+		SetDamage( sk_plr_dmg_smg_grenade.GetFloat() );
 	else
-	{
-		m_flDamage = sk_npc_dmg_smg_grenade.GetFloat();
-	}
+		SetDamage( sk_npc_dmg_smg_grenade.GetFloat() );
 
 	m_DmgRadius		= sk_ar2_grenade_radius.GetFloat();
 	m_takedamage	= DAMAGE_YES;
 	m_bIsLive		= false;
-	m_iHealth		= 1;		//Can be blown-up midair by other explosives n' such
+	m_iHealth		= 2;		//Can be blown-up midair by other explosives n' such
 
 	SetGravity( UTIL_ScaleForGravity( 450 ) );	// use a lower gravity for grenades to make them easier to shoot
 	SetFriction( 0.8 );
 	SetSequence( 0 );
+	SetElasticity( 1.0 );
 
 	m_fDangerRadius = 100;
 
@@ -198,10 +195,18 @@ void CGrenadeAR2::GrenadeAR2Think( void )
 	// the floor already when I went solid so blow up
 	if (m_bIsLive)
 	{
-		if (GetAbsVelocity().Length() == 0.0 ||
+		if ( GetAbsVelocity().Length() == 0.0 ||
 			GetGroundEntity() != NULL )
 		{
 			Detonate();
+		}
+		else if ( GetWaterLevel() >= 1 )
+		{
+			// Slow down to near nothing in water, if ive slowed down enough just go boom
+			if ( GetAbsVelocity().Length() > 15.0 )
+				SetAbsVelocity( GetAbsVelocity() * 0.8 );
+			else
+				Detonate();
 		}
 	}
 
@@ -249,8 +254,6 @@ void CGrenadeAR2::GrenadeAR2Touch( CBaseEntity *pOther )
 		}
 	}
 
-//!	BaseClass::BounceTouch( pOther );
-
 	BounceSound();
 }
 
@@ -258,8 +261,8 @@ void CGrenadeAR2::BounceSound( void )
 {
 	if ( GetAbsVelocity().Length() > 99.0 )
 	{
-		EmitSound( "BaseGrenade.BounceSound" );
-		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 200, 1.0, this );
+		BaseClass::BounceSound();
+		CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), 200, 0.5, this );
 	}
 }
 
@@ -325,6 +328,7 @@ void CGrenadeAR2::Detonate(void)
 //-----------------------------------------------------------------------------
 void CGrenadeAR2::ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity )
 {
+	// No sliding, just bouncing
 	ResolveFlyCollisionBounce( trace, vecVelocity, AR2_GRENADE_BOUNCE_VELOCITY_TO_PRESERVE );
 }
 
@@ -409,37 +413,44 @@ void CGrenadeAR2Airburst::Detonate(void)
 		m_DmgRadius,
 		m_flDamage );
 
-	te->Sprite( filter, 0.0,
-		&GetAbsOrigin(),
-		m_nAirburstSprite,
-		(0.5 + m_DmgRadius * .01),
-		255, 40 );
+	if ( GetWaterLevel() == 0 )
+	{
+		te->Sprite( filter, 0.0,
+			&GetAbsOrigin(),
+			m_nAirburstSprite,
+			(0.5 + m_DmgRadius * .01),
+			255, 40 );
 
-	// TODO; vecforward needs to be fixed here
-	Vector vecForward = GetAbsVelocity();
-	VectorNormalize(vecForward);
-	trace_t		tr;
-	UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward, MASK_SHOT, 
-		this, COLLISION_GROUP_NONE, &tr);
-	UTIL_DecalTrace( &tr, "SmallScorch" );	//FIXME; Hook to unique/smaller decal 
-	UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
+		// TODO; vecforward needs to be fixed here
+		Vector vecForward = GetAbsVelocity();
+		VectorNormalize(vecForward);
+		trace_t		tr;
+		UTIL_TraceLine ( GetAbsOrigin(), GetAbsOrigin() + 60*vecForward, MASK_SHOT, 
+			this, COLLISION_GROUP_NONE, &tr);
+		UTIL_DecalTrace( &tr, "SmallScorch" );	//FIXME; Hook to unique/smaller decal 
+		UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 750, SHAKE_START );
+
+		// Fire out a whole bunch of bullets through the front
+		FireBulletsInfo_t info;
+		info.m_pAttacker = this;	//GetOwnerEntity()
+		info.m_iShots = sk_ar2_airburst_bullet_amt.GetInt();
+		info.m_vecSrc = GetAbsOrigin();
+		info.m_vecDirShooting = vecForward;
+		info.m_flDistance =  sk_ar2_airburst_radius.GetInt();
+		info.m_iTracerFreq = 1;
+		CAmmoDef *pAmmoDef = GetAmmoDef();
+		info.m_iAmmoType = pAmmoDef->Index( "9mm" );
+		info.m_iDamage = sk_ar2_airburst_bullet_dmg.GetInt();
+		info.m_vecSpread = sk_ar2_airburst_cone.GetFloat();
+		info.m_nFlags = (FIRE_BULLETS_NO_IMPACTS|FIRE_BULLETS_TEMPORARY_DANGER_SOUND);
+		FireBullets( info );
+	}
+	else
+	{
+		UTIL_Bubbles( GetAbsOrigin() + Vector( -2, -2, -2 ), GetAbsOrigin() + Vector( 2, 2, 2 ), 8 );
+	}
 
 	RadiusDamage( CTakeDamageInfo( this, GetThrower(), m_flDamage, DMG_BLAST ), GetAbsOrigin(), m_DmgRadius, CLASS_NONE, NULL );
-
-	// Fire out a whole bunch of bullets through the front
-	FireBulletsInfo_t info;
-	info.m_pAttacker = this;	//GetOwnerEntity()
-	info.m_iShots = sk_ar2_airburst_bullet_amt.GetInt();
-	info.m_vecSrc = GetAbsOrigin();
-	info.m_vecDirShooting = vecForward;
-	info.m_flDistance =  sk_ar2_airburst_radius.GetInt();
-	info.m_iTracerFreq = 1;
-	CAmmoDef *pAmmoDef = GetAmmoDef();
-	info.m_iAmmoType = pAmmoDef->Index( "Pistol" );
-	info.m_iDamage = sk_ar2_airburst_bullet_dmg.GetInt();
-	info.m_vecSpread = sk_ar2_airburst_cone.GetFloat();
-	info.m_nFlags = (FIRE_BULLETS_NO_IMPACTS|FIRE_BULLETS_TEMPORARY_DANGER_SOUND);
-	FireBullets( info );
 
 	UTIL_Remove( this );
 }

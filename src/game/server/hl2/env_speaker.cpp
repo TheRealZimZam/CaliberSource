@@ -57,19 +57,19 @@ void CSpeaker::Spawn( void )
 {
 	const char *soundfile = (const char *)STRING( m_iszRuleScriptFile );
 
-	if ( Q_strlen( soundfile ) < 1 )
+	if ( ( m_iszRuleScriptFile == NULL_STRING || Q_strlen( soundfile ) < 1 ) )
 	{
-		Warning( "'speaker' entity with no Level/Sentence! at: %f, %f, %f\n", GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z );
+		Warning( "SPEAKER entity with no Level/Sentence! at: %f, %f, %f\n", GetAbsOrigin().x, GetAbsOrigin().y, GetAbsOrigin().z );
 		SetNextThink( gpGlobals->curtime + 0.1f );
 		SetThink( &CSpeaker::SUB_Remove );
 		return;
 	}
 
-//	const char *concept = (const char *)STRING( m_iszConcept );
-//	if ( Q_strlen( concept ) < 1 )
-//	{
-//		Warning( "'speaker' entity using rule set %s with empty concept string\n", soundfile );
-//	}
+	const char *concept = (const char *)STRING( m_iszConcept );
+	if ( Q_strlen( concept ) < 1 )
+	{
+		Warning( "'speaker' entity using rule set %s with empty concept string\n", soundfile );
+	}
 
     SetSolid( SOLID_NONE );
     SetMoveType( MOVETYPE_NONE );
@@ -78,10 +78,10 @@ void CSpeaker::Spawn( void )
 	SetNextThink( TICK_NEVER_THINK );
 
 	// allow on/off switching via 'use' function.
+	SetUse( &CSpeaker::ToggleUse );
 
 	Precache( );
 }
-
 
 void CSpeaker::Precache( void )
 {
@@ -188,18 +188,16 @@ void CSpeaker::InputTurnOn( inputdata_t &inputdata )
 	SetNextThink( gpGlobals->curtime + 0.1 );
 }
 
-
 void CSpeaker::InputTurnOff( inputdata_t &inputdata )
 {
 	// turn off announcements
 	SetNextThink( TICK_NEVER_THINK );
 }
 
-
 //
-// If an announcement is pending, cancel it.  If no announcement is pending, start one.
+// ToggleUse - if an announcement is pending, cancel it.  If no announcement is pending, start one.
 //
-void CSpeaker::InputToggle( inputdata_t &inputdata )
+void CSpeaker::ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	int fActive = (GetNextThink() > 0.0 );
 
@@ -213,5 +211,10 @@ void CSpeaker::InputToggle( inputdata_t &inputdata )
 	{
 		// turn on announcements
 		SetNextThink( gpGlobals->curtime + 0.1f );
-	} 
+	}
+}
+
+void CSpeaker::InputToggle( inputdata_t &inputdata )
+{
+	Use( inputdata.pActivator, inputdata.pCaller, USE_TOGGLE, 0);
 }

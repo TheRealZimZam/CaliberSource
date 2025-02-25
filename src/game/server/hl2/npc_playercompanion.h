@@ -2,7 +2,7 @@
 // This class should really be renamed
 //
 // Purpose: Base class for advanced humanoid NPCs that can fight along side the player.
-//
+// Can get in cars, do advanced squad commands, has multiple readiness states, etc.
 // For the most part, squads are not needed as each entity has most of its AI act independently
 //
 //=============================================================================//
@@ -129,6 +129,7 @@ public:
 	bool			QueryHearSound( CSound *pSound );
 	bool			QuerySeeEntity( CBaseEntity *pEntity, bool bOnlyHateOrFearIfNPC = false );
 	bool			ShouldIgnoreSound( CSound * );
+	bool			ShouldReturnToIdleState();
 	
 	int 			SelectSchedule();
 
@@ -138,13 +139,12 @@ public:
 	virtual int 	SelectCombatSchedule();
 	int 			SelectSchedulePlayerPush();
 
-	virtual bool	CanReload( void );
-
 	virtual bool	ShouldDeferToFollowBehavior();
 	bool			ShouldDeferToPassengerBehavior( void );
 
 	bool			IsValidReasonableFacing( const Vector &vecSightDir, float sightDist );
-	
+	virtual bool	CanReload( void );
+
 	int 			TranslateSchedule( int scheduleType );
 
 	void 			StartTask( const Task_t *pTask );
@@ -156,7 +156,8 @@ public:
 	bool			HandleInteraction(int interactionType, void *data, CBaseCombatCharacter* sourceEnt);
 
 	int				GetSoundInterests();
-	
+	virtual bool	ShouldInvestigateSound() { return true; }
+
 	void 			Touch( CBaseEntity *pOther );
 	void 			PickupItem( CBaseEntity *pItem );
 
@@ -223,16 +224,12 @@ public:
 	virtual CBaseEntity *GetVehicleEntity( void );
 
 	virtual bool CanRunAScriptedNPCInteraction( bool bForced = false );
-	virtual bool IsAllowedToDodge( void );
+	virtual bool IsAllowedToDodge( bool bRoll = false );
 
 #endif // HL2_EPISODIC
 
 public:
 
-	virtual void	OnPlayerKilledOther( CBaseEntity *pVictim, const CTakeDamageInfo &info );
-
-	//---------------------------------
-	//---------------------------------
 	bool PickTacticalLookTarget( AILookTargetArgs_t *pArgs );
 
 	//---------------------------------
@@ -256,10 +253,12 @@ public:
 	virtual void 	LocateEnemySound() {};
 
 	bool			IsValidEnemy( CBaseEntity *pEnemy );
-	bool			IsInjured() { return ((float)GetHealth() / (float)GetMaxHealth() <= 0.25f); }
 	bool			IsLightDamage( const CTakeDamageInfo &info );
 	bool			IsHeavyDamage( const CTakeDamageInfo &info );
 	bool 			IsSafeFromFloorTurret( const Vector &vecLocation, CBaseEntity *pTurret );
+#ifdef HL2_DLL
+	bool			ShouldRegenerateHealth( void );
+#endif
 
 	bool			ShouldMoveAndShoot( void );
 	void			OnUpdateShotRegulator();
@@ -269,7 +268,7 @@ public:
 	Vector 			GetActualShootPosition( const Vector &shootOrigin );
 	WeaponProficiency_t CalcWeaponProficiency( CBaseCombatWeapon *pWeapon );
 	bool			ShouldLookForBetterWeapon();
-	bool			Weapon_CanUse( CBaseCombatWeapon *pWeapon );
+//	bool			Weapon_CanUse( CBaseCombatWeapon *pWeapon );
 	void			Weapon_Equip( CBaseCombatWeapon *pWeapon );
 	void			PickupWeapon( CBaseCombatWeapon *pWeapon );
 	
@@ -304,8 +303,9 @@ public:
 	bool 			ValidateNavGoal();
 	bool 			OverrideMove( float flInterval );				// Override to take total control of movement (return true if done so)
 	bool			MovementCost( int moveType, const Vector &vecStart, const Vector &vecEnd, float *pCost );
-	float			GetIdealSpeed() const;
-	float			GetIdealAccel() const;
+//!	bool			IsJumpLegal( const Vector &startPos, const Vector &apex, const Vector &endPos ) const;
+	float			GetIdealSpeed();
+	float			GetIdealAccel();
 	bool			OnObstructionPreSteer( AILocalMoveGoal_t *pMoveGoal, float distClear, AIMoveResult_t *pResult );
 
 	//---------------------------------

@@ -52,6 +52,7 @@
 #define STALKER_LASER_DURATION		6.0
 #define STALKER_LASER_RECHARGE		2.0
 #define STALKER_PLAYER_AGGRESSION	1
+#define STALKER_PLAYER_MAX_AGGRESSION	3	// 1 = hostile, 2 = more aggressive attacking, 3 = banzai
 
 enum StalkerBeamPower_e
 {
@@ -68,7 +69,7 @@ ConVar	sk_stalker_lbeam_dmg( "sk_stalker_lbeam_dmg","0");
 ConVar	sk_stalker_mbeam_dmg( "sk_stalker_mbeam_dmg","0");
 ConVar	sk_stalker_hbeam_dmg( "sk_stalker_hbeam_dmg","0");
 ConVar	sk_stalker_melee_dmg( "sk_stalker_melee_dmg","0");
-
+extern ConVar temp_demofixes;	//TEMPTEMP
 extern void		SpawnBlood(Vector vecSpot, const Vector &vAttackDir, int bloodColor, float flDamage);
 
 LINK_ENTITY_TO_CLASS( npc_stalker, CNPC_Stalker );
@@ -181,25 +182,20 @@ void CNPC_Stalker::SetScriptedTarget( CScriptedTarget *pScriptedTarget )
 // Input  :
 // Output :
 //-----------------------------------------------------------------------------
-int	CNPC_Stalker::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
+int	CNPC_Stalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
-	CTakeDamageInfo info = inputInfo;
-
-#ifdef HL2_EPISODIC
-	// --------------------------------------------
-	//	Don't take a lot of damage from Vortigaunt
-	// --------------------------------------------
-	if (info.GetAttacker()->Classify() == CLASS_VORTIGAUNT)
+#if STALKER_PLAYER_AGGRESSION
+	// If player shot me make sure I'm mad at him even if I wasn't earlier
+	Class_T enemyClass = info.GetAttacker()->Classify();
+	if( (info.GetAttacker()->GetFlags() & FL_CLIENT) || enemyClass == CLASS_PLAYER_ALLY || enemyClass == CLASS_PLAYER_ALLY_VITAL )
 	{
-		info.ScaleDamage( 0.25 );
+		// Get more aggressive the more damage I take
+		if ( m_iPlayerAggression == 0 )
+			m_iPlayerAggression = 1;
+		else if ( random->RandomInt(0, 4) == 4 )
+			m_iPlayerAggression += 1;
 	}
 #endif
-
-	// If player shot me make sure I'm mad at him even if I wasn't earlier
-	if ( (info.GetAttacker()->GetFlags() & FL_CLIENT) )
-	{
-		AddClassRelationship( CLASS_PLAYER, D_HT, 0 );
-	}
 
 	return BaseClass::OnTakeDamage_Alive( info );
 }
@@ -231,6 +227,16 @@ float CNPC_Stalker::MaxYawSpeed( void )
 	}
 }
 
+float CNPC_Stalker::GetIdealSpeed(void) //const
+{
+	// Set speed manually
+	if ( temp_demofixes.GetBool() )
+		return (35+(25*m_iPlayerAggression));
+
+	// Use the anim
+	return BaseClass::GetIdealSpeed();
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //
@@ -260,14 +266,16 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 {
 	Class_T enemyClass = pEnemy->Classify();
 
+#if STALKER_PLAYER_AGGRESSION
 	if( enemyClass == CLASS_PLAYER || enemyClass == CLASS_PLAYER_ALLY || enemyClass == CLASS_PLAYER_ALLY_VITAL )
 	{
 		// Don't get angry at these folks unless provoked.
-		if( InSquad() && m_iPlayerAggression < STALKER_PLAYER_AGGRESSION )
+		if( InSquad() && m_iPlayerAggression < 1 )
 		{
 			return false;
 		}
 	}
+#endif
 
 	if( enemyClass == CLASS_BULLSEYE && pEnemy->GetParent() )
 	{
@@ -290,9 +298,9 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 		}
 	}
 
-// This is assuming retail hl2 model, which has a speed of 2
-/*	// Disabled for Caliber
-#ifdef HL2_EPISODIC
+// This is assuming retail hl2 model, which has a speed of 0.001
+// Disabled for Caliber
+#if 0
 	if( IsStrategySlotRangeOccupied( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) && !HasStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 	{
 		return false;
@@ -307,7 +315,6 @@ bool CNPC_Stalker::IsValidEnemy( CBaseEntity *pEnemy )
 		return false;
 	}
 #endif
-*/
 
 	return BaseClass::IsValidEnemy(pEnemy);
 }
@@ -330,7 +337,10 @@ void CNPC_Stalker::Spawn( void )
 	SetMoveType( MOVETYPE_STEP );
 //	m_bloodColor		= DONT_BLEED;
 	SetBloodColor( BLOOD_COLOR_BLUE );	//DONT_BLEED - Temp until decent flinch anims are added
-	m_iHealth			= sk_stalker_health.GetFloat();
+
+	if ( m_iHealth == 0 )
+		m_iHealth = sk_stalker_health.GetFloat();
+
 	m_flFieldOfView		= 0.8;// indicates the width of this NPC's forward view cone ( as a dotproduct result )
 	m_NPCState			= NPC_STATE_NONE;
 	CapabilitiesAdd( bits_CAP_SQUAD | bits_CAP_MOVE_GROUND );
@@ -441,7 +451,8 @@ void CNPC_Stalker::OnScheduleChange()
 //-----------------------------------------------------------------------------
 void CNPC_Stalker::Event_Killed( const CTakeDamageInfo &info )
 {
-	if( InSquad() && info.GetAttacker()->IsPlayer() )
+	// Make my squadmates madder
+	if( InSquad() )	//info.GetAttacker()->IsPlayer()
 	{
 		AISquadIter_t iter;
 		for ( CAI_BaseNPC *pSquadMember = GetSquad()->GetFirstMember( &iter ); pSquadMember; pSquadMember = GetSquad()->GetNextMember( &iter ) )
@@ -947,13 +958,6 @@ int CNPC_Stalker::SelectSchedule( void )
 			{
 				if ( OccupyStrategySlotRange( SQUAD_SLOT_ATTACK1, SQUAD_SLOT_ATTACK2 ) )
 				{
-					if (gpGlobals->curtime > m_flNextAttackSoundTime)
-					{
-//						EmitSound( "NPC_Stalker.Attack" );
-						m_flNextScrambleSoundTime	= gpGlobals->curtime + 0.5;
-						m_flNextBreatheSoundTime	= gpGlobals->curtime + 0.5;
-						m_flNextAttackSoundTime		= gpGlobals->curtime + 0.5;	
-					}
 					if ( gpGlobals->curtime > m_fBeamRechargeTime )
 					{
 						return SCHED_RANGE_ATTACK1;
@@ -1160,20 +1164,6 @@ void CNPC_Stalker::StartAttackBeam( void )
 		m_pLightGlow->SetBrightness( 255 );
 		m_pLightGlow->SetScale( 0.65 );
 
-#if 0
-		CBaseEntity *pEnemy = GetEnemy();
-		// --------------------------------------------------------
-		// Play start up sound - client should always hear this!
-		// --------------------------------------------------------
-		if (pEnemy != NULL && (pEnemy->IsPlayer()) ) 
-		{
-			EmitAmbientSound( 0, pEnemy->GetAbsOrigin(), "NPC_Stalker.AmbientLaserStart" );
-		}
-		else
-		{
-			EmitAmbientSound( 0, GetAbsOrigin(), "NPC_Stalker.AmbientLaserStart" );
-		}
-#endif
 		EmitAmbientSound( 0, GetAbsOrigin(), "NPC_Stalker.AmbientLaserStart" );
 	}
 
@@ -1547,6 +1537,32 @@ void CNPC_Stalker::HandleAnimEvent( animevent_t *pEvent )
 			BaseClass::HandleAnimEvent( pEvent );
 			break;
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+Activity CNPC_Stalker::NPC_TranslateActivity( Activity baseAct )
+{
+	// Change animation depending on aggression
+	switch ( baseAct )
+	{
+		// Jittering mess
+		case ACT_IDLE:
+			if ( m_iPlayerAggression == STALKER_PLAYER_MAX_AGGRESSION )
+				baseAct = ACT_IDLE_ANGRY;
+		break;
+		// Spastic running
+		case ACT_WALK:
+		case ACT_RUN:
+			if ( m_iPlayerAggression < 2 )
+				baseAct = ACT_WALK;
+			else if ( m_iPlayerAggression == STALKER_PLAYER_MAX_AGGRESSION )
+				baseAct = ACT_SPRINT;
+		break;
+	}
+
+	return BaseClass::NPC_TranslateActivity( baseAct );
 }
 
 //-----------------------------------------------------------------------------

@@ -46,7 +46,7 @@ public:
 	
 	Class_T		Classify( void )			{ return CLASS_STALKER;	}
 	int			GetSoundInterests( void )	{ return (SOUND_WORLD|SOUND_COMBAT|SOUND_PLAYER|SOUND_DANGER|SOUND_BULLET_IMPACT|SOUND_MOVE_AWAY|SOUND_VEHICLE|SOUND_WEAPON);	}
-	virtual float	GetJumpGravity() const		{ return 1.8f; }
+	virtual float	GetJumpGravity() const		{ return 1.6f; }
 	
 	void		Precache( void );
 	void		Spawn( void );

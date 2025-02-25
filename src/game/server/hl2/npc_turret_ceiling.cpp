@@ -301,7 +301,7 @@ void CNPC_CeilingTurret::Spawn( void )
 	SetPoseParameter( m_poseAim_Yaw, 0 );
 	SetPoseParameter( m_poseAim_Pitch, 0 );
 
-	m_iAmmoType = GetAmmoDef()->Index( "HMG" );
+	m_iAmmoType = GetAmmoDef()->Index( "762" );
 
 	//Create our eye sprite
 	m_pEyeGlow = CSprite::SpriteCreate( CEILING_TURRET_GLOW_SPRITE, GetLocalOrigin(), false );

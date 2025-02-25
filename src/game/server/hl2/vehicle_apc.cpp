@@ -179,9 +179,7 @@ void CPropAPC::CreateAPCLaserDot( void )
 {
 	// Create a laser if we don't have one
 	if ( m_hLaserDot == NULL )
-	{
 		m_hLaserDot = CreateLaserDot( GetAbsOrigin(), this, false );
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -714,7 +712,7 @@ void CPropAPC::Think( void )
 //-----------------------------------------------------------------------------
 // Aims the secondary weapon at a target 
 //-----------------------------------------------------------------------------
-void CPropAPC::AimSecondaryWeaponAt( Vector vecTarget )
+void CPropAPC::AimSecondaryWeaponAt( Vector &vecTarget )
 {
 	m_vecGrenadeTarget = vecTarget;
 
@@ -897,7 +895,7 @@ void CPropAPC::FireMachineGun( void )
 	m_bLeftBarrel = !m_bLeftBarrel;
 
 	// Fire the round
-	int	bulletType = GetAmmoDef()->Index("AR2");
+	int	bulletType = GetAmmoDef()->Index("SPIW");
 	FireBullets( 1, shotOfs, vecMachineGunDir, VECTOR_CONE_8DEGREES, MAX_TRACE_LENGTH, bulletType, 1 );
 	DoMuzzleFlash();
 

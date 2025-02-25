@@ -22,10 +22,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-#define	FRAGGRENADE_TIMER	sk_fraggrenade_timer.GetFloat()
-ConVar sk_fraggrenade_timer( "sk_fraggrenade_timer","3.0");
-#define	FRAGGRENADE_TIMER_MIN	sk_fraggrenade_timer_min.GetFloat()
-ConVar sk_fraggrenade_timer_min( "sk_fraggrenade_timer_min","0.6");
+#define	FRAGGRENADE_TIMER	sk_frag_timer.GetFloat()
+ConVar sk_frag_timer( "sk_frag_timer","3.0");
+#define	FRAGGRENADE_TIMER_MIN	sk_frag_timer_min.GetFloat()
+ConVar sk_frag_timer_min( "sk_frag_timer_min","0.6");
 
 #define FRAGGRENADE_RADIUS	4.0f // inches
 

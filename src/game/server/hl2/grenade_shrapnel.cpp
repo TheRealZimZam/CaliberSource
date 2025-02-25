@@ -25,8 +25,8 @@
 extern short	g_sModelIndexFireball;			// (in combatweapon.cpp) holds the index for the smoke cloud
 
 // Moved to HL2_SharedGameRules because these are referenced by shared AmmoDef functions
-extern ConVar    sk_plr_dmg_buckshot;
-extern ConVar    sk_npc_dmg_buckshot;
+extern ConVar    sk_buckshot_plr_dmg;
+extern ConVar    sk_buckshot_npc_dmg;
 
 ConVar	sk_shrapnel_cone			("sk_shrapnel_cone","0.105");
 #define SHRAPNEL_VECTOR_CONE		sk_shrapnel_cone.GetFloat()	//Vector( 0.10461, 0.10461, 0.10461 )
@@ -77,11 +77,11 @@ void CGrenadeShrapnel::Spawn( void )
 
 	if( GetOwnerEntity() && GetOwnerEntity()->IsPlayer() )
 	{
-		m_flDamage = sk_plr_dmg_buckshot.GetFloat();
+		m_flDamage = sk_buckshot_plr_dmg.GetFloat();
 	}
 	else
 	{
-		m_flDamage = sk_npc_dmg_buckshot.GetFloat();
+		m_flDamage = sk_buckshot_npc_dmg.GetFloat();
 	}
 
 	m_DmgRadius		= 0;
@@ -159,9 +159,8 @@ void CGrenadeShrapnel::GrenadeShrapnelTouch( CBaseEntity *pOther )
 void CGrenadeShrapnel::Detonate(void)
 {
 	if (!m_bIsLive)
-	{
 		return;
-	}
+
 	m_bIsLive		= false;
 	m_takedamage	= DAMAGE_NO;	
 
@@ -172,9 +171,6 @@ void CGrenadeShrapnel::Detonate(void)
 		this, COLLISION_GROUP_NONE, &tr);
 	UTIL_DecalTrace( &tr, "SmallScorch" );	//FIXME; Hook to unique/smaller decal 
 	UTIL_ScreenShake( GetAbsOrigin(), 25.0, 150.0, 1.0, 300, SHAKE_START );
-
-	EmitSound( "GrenadeShrapnel.Detonate" );
-	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), 100, 1.0 );	//BASEGRENADE_EXPLOSION_VOLUME
 
 	// Fire out a whole bunch of bullets through the front
 	FireBulletsInfo_t info;
@@ -201,8 +197,16 @@ void CGrenadeShrapnel::Detonate(void)
 		TE_EXPLFLAG_NOSOUND | TE_EXPLFLAG_NOFIREBALL | TE_EXPLFLAG_NOFIREBALLSMOKE,
 		0,
 		0 );
-	// Dont use explosion smoke, use the smaller smoke instead
-	UTIL_Smoke( GetAbsOrigin(), random->RandomInt( 15, 20 ), 10 );
+
+	EmitSound( "GrenadeShrapnel.Detonate" );
+	CSoundEnt::InsertSound( SOUND_DANGER, GetAbsOrigin(), 100, 1.0 );	//BASEGRENADE_EXPLOSION_VOLUME
+
+	// Do a bunch of small smokepuffs for each bullet firing
+	for ( int i = 0; i < sk_shrapnel_bullet_amt.GetInt(); i++ )
+	{
+		Vector vecSmoke = GetAbsOrigin() + (vecForward * random->RandomFloat(1,3));
+		UTIL_Smoke( vecSmoke, random->RandomInt( 15, 20 ) );
+	}
 
 	UTIL_Remove( this );
 }

@@ -14,8 +14,10 @@
 #pragma once
 #endif
 
-#include "basegrenade_shared.h"
-#include "weapon_rpg.h"
+#include "baseprojectile.h"
+#include "beam_shared.h"
+
+class RocketTrail;
 
 enum HomerRocketTrail_t
 {
@@ -25,7 +27,7 @@ enum HomerRocketTrail_t
 	HOMER_SMOKE_TRAIL_ALIEN,		// Alien colors on smoke trail
 };
 
-enum MissileType_t
+enum HomerMissileType_t
 {
 	EXPLOSIVE,				// Default
 	EXPLOSIVEINCENDIARY,	// Explode + Incendiary
@@ -33,20 +35,23 @@ enum MissileType_t
 	ARMORPIERCING,			// Does full damage to hit entity, half to everything else
 };
 
-class CGrenadeHomer : public CBaseGrenade
+class CGrenadeHomer : public CBaseProjectile
 {
 public:
-	DECLARE_CLASS( CGrenadeHomer, CBaseGrenade );
+	DECLARE_CLASS( CGrenadeHomer, CBaseProjectile );
 
 	static CGrenadeHomer* CreateGrenadeHomer(  string_t nModelName, string_t sFlySound, const Vector &vecOrigin, const QAngle &vecAngles, edict_t *pentOwner );
 
+	Class_T		Classify( void);
 	virtual void Precache( void );
 	void		Spawn( void );
-	void		Launch( CBaseEntity *pOwner, CBaseEntity *pTarget, const Vector &vInitVelocity, float m_flHomingSpeed, float fFallSpeed, int nRocketTrailType);
+	void		Launch(CBaseEntity *pOwner, CBaseEntity *pTarget, const Vector &vInitVelocity, float m_flHomingSpeed, float flGravity = 1.0, int nRocketTrailType = 1, int nRocketType = 0);
 	void		SetSpin(float flSpinMagnitude, float flSpinSpeed);
 	void		SetHoming(float flStrength, float flDelay, float flRampUp, float flDuration, float flRampDown);
 
 	void		SetRocketType(int iRocketType) { m_nRocketType = iRocketType; }
+	void		SetRocketTrail(int iRocketTrailType) { m_nRocketTrailType = iRocketTrailType; }
+	void		SetWaterproof(bool bWaterproof) { m_bWaterproof = bWaterproof; }
 
 	CHandle<RocketTrail>	m_hRocketTrail[3];
 
@@ -67,6 +72,7 @@ private:
 	int			m_nRocketTrailType;
 	int			m_nRocketType;
 	int			m_spriteTexture;
+	bool		m_bWaterproof;
 
 	// In flight data
 	float		m_flHomingLaunchTime;
@@ -74,15 +80,14 @@ private:
 	float		m_flHomingEndTime;
 	float		m_flSpinOffset;				// For randomization
 
-	EHANDLE		m_hTarget;
-
-	void		AimThink( void );
+	void		FlyThink( void );
+	void		DeadThink( void );
 	void		StartRocketTrail(bool bTrail1 = true, bool bTrail2 = true, bool bTrail3 = true);
 	void		UpdateRocketTrail(float fScale);
 	void		StopRocketTrail(void);
 	void		StopCosmeticTrails(bool bTrail1 = true, bool bTrail2 = true);
 	void		PlayFlySound( void );
-	void 		GrenadeHomerTouch( CBaseEntity *pOther );
+	void 		Touch( CBaseEntity *pOther );
 	void		Event_Killed( const CTakeDamageInfo &info );
 	int			OnTakeDamage( const CTakeDamageInfo &info );
 

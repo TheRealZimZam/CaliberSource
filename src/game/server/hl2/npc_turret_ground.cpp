@@ -110,7 +110,7 @@ void CNPC_GroundTurret::Spawn( void )
 
 	CapabilitiesAdd( bits_CAP_SIMPLE_RADIUS_DAMAGE );
 
-	m_iAmmoType = GetAmmoDef()->Index( "HMG" );
+	m_iAmmoType = GetAmmoDef()->Index( "762" );
 
 	m_pSmoke = NULL;
 

@@ -3350,7 +3350,7 @@ bool CSniperBullet::Start( const Vector &vecOrigin, const Vector &vecTarget, CBa
 		// This guy doesn't have a REAL weapon, per say, but he does fire
 		// sniper rounds. Since there's no weapon to index the ammo type,
 		// do it manually here.
-		m_AmmoType = GetAmmoDef()->Index("SniperRound"); 
+		m_AmmoType = GetAmmoDef()->Index("30-06"); 
 
 		// This is the bullet that is used for all subsequent FireBullets() calls after the first
 		// call penetrates a surface and keeps going.

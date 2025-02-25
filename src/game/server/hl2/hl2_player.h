@@ -111,14 +111,14 @@ public:
 //	Vector GetAttackSpread( CBaseCombatWeapon *pWeapon, CBaseEntity *pTarget = NULL );
 
 	void				DoAnimationEvent( int PlayerAnimEvent_t, int nData = 0 );
-	virtual void		CreateCorpse( void );	//CopyToBodyQue( this );
+	virtual void		CreateCorpse( void );
 
 	virtual void		Precache( void );
 	virtual void		Spawn(void);
 	virtual void		Activate( void );
 	virtual void		CheatImpulseCommands( int iImpulse );
 	virtual void		PlayerRunCommand( CUserCmd *ucmd, IMoveHelper *moveHelper);
-	virtual void		PlayerUse ( void );
+	virtual void		PlayerUse( void );
 	virtual void		SuspendUse( float flDuration ) { m_flTimeUseSuspended = gpGlobals->curtime + flDuration; }
 	virtual void		UpdateClientData( void );
 	virtual void		OnRestore();
@@ -193,8 +193,8 @@ public:
 
 	bool CanZoom( CBaseEntity *pRequester );
 	void ToggleZoom(void);
-	void StartZooming( void );
-	void StopZooming( void );
+	void StartZooming( CBaseEntity *pRequester, int iFOV = 25 );
+	void StopZooming( CBaseEntity *pRequester );
 	bool IsZooming( void );
 	void CheckSuitZoom( void );
 
@@ -266,9 +266,6 @@ public:
 	virtual void		Event_Killed( const CTakeDamageInfo &info );
 	void				NotifyScriptsOfDeath( void );
 
-	// override the test for getting hit
-	//virtual bool		TestHitboxes( const Ray_t &ray, unsigned int fContentsMask, trace_t& tr );
-
 	LadderMove_t		*GetLadderMove() { return &m_HL2Local.m_LadderMove; }
 	virtual void		ExitLadder();
 	virtual surfacedata_t *GetLadderSurface( const Vector &origin );
@@ -303,6 +300,7 @@ public:
 	CSoundPatch *m_sndWaterSplashes;
 
 	// Inputs
+	void				InputTaunt( inputdata_t &inputdata );
 	void				InputIgnoreFallDamage( inputdata_t &inputdata );
 	void				InputIgnoreFallDamageWithoutReset( inputdata_t &inputdata );
 	void				InputEnableFlashlight( inputdata_t &inputdata );

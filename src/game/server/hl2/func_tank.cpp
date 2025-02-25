@@ -28,11 +28,8 @@
 #include "IEffects.h"
 #include "ai_basenpc.h"
 #include "ai_behavior_functank.h"
-#if 0
 #include "weapon_rpg.h"
-#else
 #include "grenade_homer.h"
-#endif
 #include "effects.h"
 #include "iservervehicle.h"
 #include "soundenvelope.h"
@@ -742,9 +739,9 @@ void CFuncTank::Spawn( void )
 #ifdef HL2_EPISODIC
 	m_iAmmoType = GetAmmoDef()->Index( STRING( m_iszAmmoType ) );
 #else
-	m_iSmallAmmoType	= GetAmmoDef()->Index("Pistol");
-	m_iMediumAmmoType	= GetAmmoDef()->Index("SMG1");
-	m_iLargeAmmoType	= GetAmmoDef()->Index("AR2");
+	m_iSmallAmmoType	= GetAmmoDef()->Index("45acp");
+	m_iMediumAmmoType	= GetAmmoDef()->Index("762");
+	m_iLargeAmmoType	= GetAmmoDef()->Index("SPIW");
 #endif // HL2_EPISODIC
 
 	SetMoveType( MOVETYPE_PUSH );  // so it doesn't get pushed by anything
@@ -2760,7 +2757,7 @@ void CFuncTankRocket::Fire( int bulletCount, const Vector &barrelEnd, const Vect
 			pGrenade->SetDamage( m_iBulletDamage );
 		else
 			pGrenade->SetDamage( m_iBulletDamageVsPlayer );
-		pGrenade->Launch(this,NULL,(forward*GetShotSpeed()),GetShotSpeed(),0,1);
+		pGrenade->Launch(this,NULL,(forward*GetShotSpeed()),GetShotSpeed(),0,HOMER_SMOKE_TRAIL_ON);
 	}
 #endif
 	CFuncTank::Fire( bulletCount, barrelEnd, forward, this, bIgnoreSpread );

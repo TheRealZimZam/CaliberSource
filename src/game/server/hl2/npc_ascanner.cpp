@@ -4,7 +4,7 @@
 //
 //
 // TODO; Code this thing!
-// Note; "Pods" refer to disposable missile pods, like manhacks for cops
+// Note; "Pods" refer to disposable missile pods, like manhacks for cops but nastier
 //=============================================================================//
 
 //-----------------------------------------------------------------------------
@@ -54,8 +54,8 @@
 
 #define	ASCANNER_MAX_SPEED			400
 #define ASCANNER_MIN_GROUND_DIST	96
-#define ASCANNER_HOVER_NEAR_DIST	400		//At this distance use laserbeam
-#define ASCANNER_HOVER_FAR_DIST		750		//At this distance use grenades
+#define ASCANNER_HOVER_NEAR_DIST	450		//At this distance use laserbeam
+#define ASCANNER_HOVER_FAR_DIST		950		//At this distance use grenades
 #define	ASCANNER_BANK_RATE	35
 
 #define	ASCANNER_MAX_ATTACK_RADIUS	5000	//Dont engage targets further than this, just observe
@@ -341,6 +341,7 @@ void CNPC_ADrone::Precache(void)
 	//
 	engine->PrecacheModel("models/ascanner.mdl");
 	engine->PrecacheModel("models/ascanner_pod.mdl");
+	engine->PrecacheModel("models/Weapons/wscanner_grenade.mdl");
 	engine->PrecacheModel("models/Weapons/wscanner_grenade.mdl"); 
 	
 	engine->PrecacheModel("sprites/lgtning.vmt");	
@@ -937,7 +938,7 @@ void CNPC_ADrone::MoveExecute_Alive(float flInterval)
 	}
 	PlayFlySound();
 	AdjustAntenna(flInterval);
-	FlyMove( GetCurrentVelocity() * flInterval, MASK_NPCSOLID );
+	WalkMove( GetCurrentVelocity() * flInterval, MASK_NPCSOLID );
 }
 
 

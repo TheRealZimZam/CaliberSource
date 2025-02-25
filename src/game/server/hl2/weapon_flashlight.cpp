@@ -223,8 +223,6 @@ void CWeaponFlashlight::PrimaryAttack( void )
 	// player "shoot" animation
 	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
-	pPlayer->SetAimTime( 3.0f );
-
 	if ( m_bLightOn )
 	{
 		pPlayer->FlashlightTurnOff();
@@ -237,8 +235,8 @@ void CWeaponFlashlight::PrimaryAttack( void )
 	}
 
 	m_iPrimaryAttacks++;
-	m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
-	m_flNextSecondaryAttack = gpGlobals->curtime + 0.2;
+	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
 	gamestats->Event_WeaponFired( pPlayer, true, GetClassname() );
 }
 
@@ -272,7 +270,6 @@ void CWeaponFlashlight::ItemPostFrame( void )
 		return;
 	}
 #endif
-
 }
 
 //-----------------------------------------------------------------------------

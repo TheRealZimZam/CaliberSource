@@ -27,10 +27,10 @@
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-class CNPC_Mossman : public CAI_BaseTalker
+class CNPC_Mossman : public CAI_BaseActor
 {
 public:
-	DECLARE_CLASS( CNPC_Mossman, CAI_BaseTalker );
+	DECLARE_CLASS( CNPC_Mossman, CAI_BaseActor );
 	DECLARE_DATADESC();
 
 	void	Spawn( void );

@@ -27,12 +27,15 @@ public:
 
 	void			Precache( void );
 	void			Spawn( void );
-	void			BounceSound( void );
 	void			UpdateSlideSound( void );
 	void			KillSlideSound(void);
 	void			SatchelTouch( CBaseEntity *pOther );
 	void			SatchelThink( void );
 	void			SatchelUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+
+	// Movement
+	void			ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity );
+	void			BounceSound( void );
 
 	// Input handlers
 	void			InputExplode( inputdata_t &inputdata );

@@ -42,7 +42,6 @@ void ClientPutInServer( edict_t *pEdict, const char *playername )
 	pPlayer->SetPlayerName( playername );
 }
 
-
 void ClientActive( edict_t *pEdict, bool bLoadGame )
 {
 	CHL2_Player *pPlayer = dynamic_cast< CHL2_Player* >( CBaseEntity::Instance( pEdict ) );
@@ -55,6 +54,7 @@ void ClientActive( edict_t *pEdict, bool bLoadGame )
 	if ( !bLoadGame )
 		pPlayer->Spawn();
 
+	ConVarRef showchat( "hud_chat" );
 	if ( g_pGameRules->IsMultiplayer() || gpGlobals->deathmatch || gpGlobals->teamplay )
 	{
 		char sName[128];
@@ -70,7 +70,17 @@ void ClientActive( edict_t *pEdict, bool bLoadGame )
 
 		// notify other clients of player joining the game
 		if ( !pPlayer->IsFakeClient() )
-			UTIL_ClientPrintAll( HUD_PRINTNOTIFY, "#Game_connected", sName[0] != 0 ? sName : "<unconnected>" );
+			UTIL_ClientPrintAll( HUD_PRINTTALK, "#Game_connected", sName[0] != 0 ? sName : "<unconnected>" );
+
+		// Default show messages
+		if ( !showchat.GetBool() )
+			showchat.SetValue( true );
+	}
+	else
+	{
+		// Default hide messages
+		if ( showchat.GetBool() )
+			showchat.SetValue( false );
 	}
 }
 
@@ -117,9 +127,10 @@ void ClientGamePrecache( void )
 
 	if ( !pValues->LoadFromFile( filesystem, pFilename, "GAME" ) )
 	{
-		Error( "Can't open %s for client precache info. Resorting to hard-coded list.", pFilename );
+		Warning( "Can't open %s for client precache info. Resorting to hard-coded list.", pFilename );
 
 		// Do the default list
+		CBaseEntity::PrecacheModel("effects/coconut.vmt");
 		CBaseEntity::PrecacheModel("sprites/hud1.vmt");
 		CBaseEntity::PrecacheModel("models/player.mdl");
 		CBaseEntity::PrecacheModel("models/gibs/agibs.mdl");
@@ -161,6 +172,12 @@ void ClientGamePrecache( void )
 	}
 
 	pValues->deleteThis();
+
+	// Check for coconut
+	if ( modelinfo->GetModelIndex( "effects/coconut.vmt" ) == -1 )
+		Error( "THE COCONUT IS GONE!!!" );
+	else
+		Msg( "The coconut is present.\n" );
 }
 
 

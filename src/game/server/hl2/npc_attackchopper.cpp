@@ -398,13 +398,20 @@ void CNPC_AttackHelicopter::Precache( void )
 {
 	BaseClass::Precache();
 
-	PrecacheModel( CHOPPER_MODEL_NAME );
+	if( !GetModelName() )
+		SetModelName( AllocPooledString(CHOPPER_MODEL_NAME) );
+
+	PrecacheModel( STRING( GetModelName() ) );
+
 	if ( HasSpawnFlags(SF_HELICOPTER_ELECTRICAL_DRONE) )
 	{
 		PrecacheModel( CHOPPER_DRONE_NAME );
 	}
 
 	PrecacheModel( CHOPPER_RED_LIGHT_SPRITE );
+#if CHOPPER_BLAST
+	m_spriteTexture = PrecacheModel( "sprites/lgtning.vmt" );
+#endif
 
 	UTIL_PrecacheOther("missile");
 
@@ -500,7 +507,7 @@ void CNPC_AttackHelicopter::Spawn( void )
 
 	if ( !HasSpawnFlags(SF_HELICOPTER_ELECTRICAL_DRONE) )
 	{
-		SetModel( CHOPPER_MODEL_NAME );
+		SetModel( STRING( GetModelName() ) );
 	}
 	else
 	{
@@ -3198,14 +3205,14 @@ void Chopper_BecomeChunks( CBaseEntity *pChopper )
 {
 #if CHOPPER_BLAST
 	//hl1 osprey effect port
-	CBroadcastRecipientFilter filter2;
-	te->BeamRingPoint( filter2, 0, pChopper->GetAbsOrigin(),	//origin
+	CBroadcastRecipientFilter filter1;
+	te->BeamRingPoint( filter1, 0, pChopper->GetAbsOrigin(),	//origin
 		0,			//start radius
 		2000,		//end radius
-		CHOPPER_RED_LIGHT_SPRITE, //texture -TEMP
+		m_spriteTexture, //texture
 		0,			//halo index
 		0,			//start frame
-		0,			//framerate
+		1,			//framerate
 		4,			//life
 		32,			//width
 		0,			//spread
@@ -3214,7 +3221,7 @@ void Chopper_BecomeChunks( CBaseEntity *pChopper )
 		255,	//g
 		192,	//b
 		128,	//a
-		0,		//speed
+		10,		//speed
 		FBEAM_FADEOUT
 		);
 #endif
@@ -5038,7 +5045,7 @@ void CGrenadeHelicopter::ExplodeThink(void)
 //------------------------------------------------------------------------------
 void CGrenadeHelicopter::ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity )
 {
-	ResolveFlyCollisionBounce( trace, vecVelocity, 0.1f );
+	ResolveFlyCollisionBounce( trace, vecVelocity, 0.2f );
 }
 
 

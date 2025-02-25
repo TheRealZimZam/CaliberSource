@@ -1,13 +1,13 @@
 # Caliber Source
 
 //==========================================================================
-//Caliber: Source Codebase -- Half-Life but with fancy lightbulbs.
+//Caliber: Source Codebase -- Unreal on the Source Engine
 //==========================================================================
 /*
 Currently very WIP - use at your own discretion!
 
 
-Latest build 4/3/2024 - Alpha Demo Build
+Latest build 2/25/2025 - Cursed ImSim Build 
 
 Variably compatible with all existing source maps, including Half-Life:Source and PlatinumSrc(hl2beta)
 

@@ -37,7 +37,7 @@ public:
 	bool	ShouldMoveAndShoot();
 
 	// Speed/Movement
-	float	GetIdealAccel( void ) const{ return GetIdealSpeed() * 2.0; };
+	float	GetIdealAccel( void ) { return GetIdealSpeed() * 2.0; };
 	float	MaxYawSpeed( void );
 
 	// Hearing

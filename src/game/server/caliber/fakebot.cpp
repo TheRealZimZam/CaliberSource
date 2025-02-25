@@ -190,7 +190,7 @@ void CFakeBot::Spawn()
 	SetSimulatedEveryTick( true );
 	SetAnimatedEveryTick( true );
 
-	CapabilitiesAdd( bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_CLIMB | bits_CAP_DOORS_GROUP | bits_CAP_USE );
+	CapabilitiesAdd( bits_CAP_HUMAN_MOVEMENT_GROUP | bits_CAP_DOORS_GROUP | bits_CAP_USE );
 	CapabilitiesAdd( bits_CAP_USE_WEAPONS | bits_CAP_DUCK | bits_CAP_MOVE_SHOOT | bits_CAP_STRAFE );
 
 	NPCInit();

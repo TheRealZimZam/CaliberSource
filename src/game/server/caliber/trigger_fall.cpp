@@ -99,10 +99,10 @@ void CTriggerFall::FallTouch( CBaseEntity *pOther )
 		}
 */
 
-		pPlayer->TakeDamage( CTakeDamageInfo( this, this, 999, DMG_FALL ) );
-		m_bDidDamage = true;
-
 		pPlayer->SetAnimation( PLAYER_FALL );
+		pPlayer->TakeDamage( CTakeDamageInfo( this, this, 999, DMG_FALL ) );
+
+		m_bDidDamage = true;
 	}
 	else 
 	{

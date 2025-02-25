@@ -32,6 +32,10 @@
 #include "particle_parse.h"
 #include "globalstate.h"
 
+#if defined( TERROR )
+#include "music.h"
+#endif
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -436,6 +440,12 @@ bool CWorld::KeyValue( const char *szKeyName, const char *szValue )
 			wateramp->SetValue( m_flWaveHeight );
 		}
 	}
+	else if ( FStrEq(szKeyName, "MaxRange") )
+	{
+		// TODO; somehow set the farz
+	//	if ( UTIL_GetLocalPlayer() )
+	//		UTIL_GetLocalPlayer()->GetFogParams()->farz = atof(szValue);
+	}
 	else if ( FStrEq(szKeyName, "newunit") )
 	{
 		// Single player only.  Clear save directory if set
@@ -444,6 +454,14 @@ bool CWorld::KeyValue( const char *szKeyName, const char *szValue )
 			extern void Game_SetOneWayTransition();
 			Game_SetOneWayTransition();
 		}
+	}
+	else if ( FStrEq(szKeyName, "message") )
+	{
+		m_mapText = AllocPooledString(szValue);
+	}
+	else if ( FStrEq(szKeyName, "author") )
+	{
+		m_authorText = AllocPooledString(szValue);
 	}
 	else if ( FStrEq(szKeyName, "world_mins") )
 	{
@@ -484,6 +502,9 @@ CWorld::CWorld( )
 	SetMoveType( MOVETYPE_NONE );
 
 	m_bColdWorld = false;
+
+	// Set this in the constructor for legacy maps (sjb)
+	m_iTimeOfDay.Set( TIME_MIDNIGHT );
 }
 
 CWorld::~CWorld( )
@@ -547,6 +568,13 @@ void CWorld::Spawn( void )
 	Precache( );
 	GlobalEntity_Add( "is_console", STRING(gpGlobals->mapname), ( IsConsole() ) ? GLOBAL_ON : GLOBAL_OFF );
 	GlobalEntity_Add( "is_pc", STRING(gpGlobals->mapname), ( !IsConsole() ) ? GLOBAL_ON : GLOBAL_OFF );
+
+	if (m_mapText != NULL_STRING)
+	{
+		Msg( "Map title: %s\n", m_mapText );
+		if (m_authorText != NULL_STRING)
+			Msg( "Map author: %s\n", m_authorText );
+	}
 }
 
 static const char *g_DefaultLightstyles[] =
@@ -708,7 +736,7 @@ void CWorld::Precache( void )
 			m_iszChapterTitle = NULL_STRING;
 
 			// send the message entity a play message command, delayed by 1 second
-			pMessage->AddSpawnFlags( SF_MESSAGE_ONCE );
+			pMessage->AddSpawnFlags((SF_MESSAGE_ONCE|SF_MESSAGE_ALL));
 			pMessage->SetThink( &CMessage::SUB_CallUseToggle );
 			pMessage->SetNextThink( gpGlobals->curtime + 1.0f );
 		}
@@ -750,4 +778,14 @@ void CWorld::SetStartDark( bool startdark )
 bool CWorld::IsColdWorld( void )
 {
 	return m_bColdWorld;
+}
+
+int CWorld::GetTimeOfDay() const
+{
+	return m_iTimeOfDay;
+}
+
+void CWorld::SetTimeOfDay( int iTimeOfDay )
+{
+	m_iTimeOfDay = iTimeOfDay;
 }

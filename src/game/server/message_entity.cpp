@@ -80,7 +80,6 @@ void CMessageEntity::Spawn( void )
 {
 	SetNextThink( gpGlobals->curtime + 0.1f );
 	m_drawText = false;
-	m_bDeveloperOnly = false;
 	m_bEnabled = !HasSpawnFlags( SF_MESSAGE_DISABLED );
 	//m_debugOverlays |= OVERLAY_TEXT_BIT;		// make sure we always show the text
 }
@@ -141,13 +140,13 @@ void CMessageEntity::Think( void )
 //-------------------------------------------
 void CMessageEntity::DrawOverlays(void) 
 {
-	if ( !m_drawText )
-		return;
-
-	if ( m_bDeveloperOnly && !g_pDeveloper->GetInt() )
+	if ( m_bDeveloperOnly && g_pDeveloper->GetInt() <= 0 )
 		return;
 
 	if ( !m_bEnabled )
+		return;
+
+	if ( !m_drawText )
 		return;
 
 	// display text if they are within range

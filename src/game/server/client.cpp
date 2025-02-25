@@ -1155,7 +1155,23 @@ static ConCommand god("god", CC_God_f, "Toggle. Player becomes invulnerable.", F
 static ConCommand iddqd("iddqd", CC_God_f, "Toggle. Player becomes invulnerable.", FCVAR_CHEAT );
 
 //------------------------------------------------------------------------------
-// Sets client to godmode
+// Move player to position
+//------------------------------------------------------------------------------
+CON_COMMAND_F( showall, "Move player to specified origin (must have sv_cheats).", FCVAR_CHEAT )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( UTIL_GetCommandClient() ); 
+	if ( pPlayer && (gpGlobals->maxClients == 1 || sv_cheats->GetBool()))
+	{
+		ClientPrint( pPlayer, HUD_PRINTCONSOLE, "Showing all Triggers/Logic entities...\n");
+		engine->ClientCommand( UTIL_GetCommandClient()->edict(), "showlogic 1" );
+		engine->ClientCommand( UTIL_GetCommandClient()->edict(), "showtriggers_toggle" );
+		engine->ClientCommand( UTIL_GetCommandClient()->edict(), "ai_nodes" );
+		engine->ClientCommand( UTIL_GetCommandClient()->edict(), "ai_show_connect" );
+	}
+}
+
+//------------------------------------------------------------------------------
+// Move player to position
 //------------------------------------------------------------------------------
 CON_COMMAND_F( setpos, "Move player to specified origin (must have sv_cheats).", FCVAR_CHEAT )
 {
@@ -1187,9 +1203,8 @@ CON_COMMAND_F( setpos, "Move player to specified origin (must have sv_cheats).",
 	}
 }
 
-
 //------------------------------------------------------------------------------
-// Sets client to godmode
+// Set player angles
 //------------------------------------------------------------------------------
 void CC_setang_f (const CCommand &args)
 {

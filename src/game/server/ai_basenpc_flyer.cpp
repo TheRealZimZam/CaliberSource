@@ -44,6 +44,13 @@ void CAI_BaseFlyingBot::GetVelocity(Vector *vVelocity, AngularImpulse *vAngVeloc
 	}
 }
 
+void CAI_BaseFlyingBot::NPCThink( void )
+{
+	// Update my velocity every think
+//!	SetAbsVelocity( m_vCurrentVelocity );
+	BaseClass::NPCThink();
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: Turn head yaw into facing direction
 // Input  :
@@ -51,7 +58,7 @@ void CAI_BaseFlyingBot::GetVelocity(Vector *vVelocity, AngularImpulse *vAngVeloc
 //-----------------------------------------------------------------------------
 QAngle CAI_BaseFlyingBot::BodyAngles()
 {
-	return QAngle(0,m_fHeadYaw,0);
+	return QAngle(GetAbsAngles().x,m_fHeadYaw,GetAbsAngles().z);
 }
 
 //-----------------------------------------------------------------------------
@@ -66,9 +73,7 @@ void CAI_BaseFlyingBot::TurnHeadToTarget(float flInterval, const Vector &MoveTar
 	float newYaw = AI_ClampYaw( GetHeadTurnRate() * 10.0f, m_fHeadYaw, flDestYaw, gpGlobals->curtime - GetLastThink() );
 		
 	if ( newYaw != m_fHeadYaw )
-	{
 		m_fHeadYaw = newYaw;
-	}
 
 	// Set us to face that way
 	SetBoneController( 0, m_fHeadYaw );
@@ -132,13 +137,15 @@ Vector CAI_BaseFlyingBot::VelocityToAvoidObstacles(float flInterval)
 void CAI_BaseFlyingBot::StartTask( const Task_t *pTask )
 {
 	switch (pTask->iTask)
-	{	
+	{
+#if 0
 		// Skip as done via bone controller
 		case TASK_FACE_ENEMY:
 		{
 			TaskComplete();
 			break;
 		}
+#endif
 		// Activity is just idle (have no run)
 		case TASK_RUN_PATH:
 		{

@@ -81,6 +81,7 @@ BEGIN_DATADESC( CBaseNPCMaker )
 	DEFINE_KEYFIELD( m_nMaxNumNPCs,			FIELD_INTEGER,	"MaxNPCCount" ),
 	DEFINE_KEYFIELD( m_nMaxLiveChildren,		FIELD_INTEGER,	"MaxLiveChildren" ),
 	DEFINE_KEYFIELD( m_flSpawnFrequency,		FIELD_FLOAT,	"SpawnFrequency" ),
+	DEFINE_KEYFIELD( m_flRadius,				FIELD_FLOAT, "Radius" ),
 	DEFINE_KEYFIELD( m_bDisabled,			FIELD_BOOLEAN,	"StartDisabled" ),
 
 	DEFINE_FIELD(	m_nLiveChildren,		FIELD_INTEGER ),
@@ -277,14 +278,10 @@ void CBaseNPCMaker::ToggleUse( CBaseEntity *pActivator, CBaseEntity *pCaller, US
 	if ( !ShouldToggle( useType, m_bDisabled ) )
 		return;
 
-	if ( m_bDisabled )
-	{
+	if (m_bDisabled)
 		Enable();
-	}
 	else
-	{
 		Disable();
-	}
 }
 
 
@@ -438,7 +435,14 @@ void CNPCMaker::MakeNPC( void )
 		SetThink( NULL );
 		return;
 	}
-	
+
+	if ( m_flRadius != 0 && !PlaceNPCInRadius( pent ) )
+	{
+		// Failed to place the NPC. Abort
+		UTIL_RemoveImmediate( pent );
+		return;
+	}
+
 	// ------------------------------------------------
 	//  Intialize spawned NPC's relationships
 	// ------------------------------------------------
@@ -564,6 +568,65 @@ void CBaseNPCMaker::DeathNotice( CBaseEntity *pVictim )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Find a place to spawn an npc within my radius.
+//			Right now this function tries to place them on the perimeter of radius.
+// Output : false if we couldn't find a spot!
+//-----------------------------------------------------------------------------
+bool CBaseNPCMaker::PlaceNPCInRadius( CAI_BaseNPC *pNPC )
+{
+	Vector vPos;
+
+	if ( CAI_BaseNPC::FindSpotForNPCInRadius( &vPos, GetAbsOrigin(), pNPC, m_flRadius ) )
+	{
+		pNPC->SetAbsOrigin( vPos );
+		return true;
+	}
+
+	DevMsg("**Failed to place NPC in radius!\n");
+	return false;
+}
+
+//-----------------------------------------------------------------------------
+bool CBaseNPCMaker::PlaceNPCInLine( CAI_BaseNPC *pNPC )
+{
+	Vector vecPlace;
+	Vector vecLine;
+
+	GetVectors( &vecLine, NULL, NULL );
+
+	// invert this, line up NPC's BEHIND the maker.
+	vecLine *= -1;
+
+	trace_t tr;
+	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() - Vector( 0, 0, 8192 ), MASK_SHOT, pNPC, COLLISION_GROUP_NONE, &tr );
+	vecPlace = tr.endpos;
+	float flStepSize = pNPC->GetHullWidth();
+
+	// Try 10 times to place this npc.
+	for( int i = 0 ; i < 10 ; i++ )
+	{
+		UTIL_TraceHull( vecPlace,
+						vecPlace + Vector( 0, 0, 10 ),
+						pNPC->GetHullMins(),
+						pNPC->GetHullMaxs(),
+						MASK_SHOT,
+						pNPC,
+						COLLISION_GROUP_NONE,
+						&tr );
+
+		if( tr.fraction == 1.0 )
+		{
+			pNPC->SetAbsOrigin( tr.endpos );
+			return true;
+		}
+
+		vecPlace += vecLine * flStepSize;
+	}
+
+	DevMsg("**Failed to place NPC in line!\n");
+	return false;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Creates new NPCs from a template NPC. The template NPC must be marked
@@ -575,7 +638,6 @@ LINK_ENTITY_TO_CLASS( npc_template_maker, CTemplateNPCMaker );
 BEGIN_DATADESC( CTemplateNPCMaker )
 
 	DEFINE_KEYFIELD( m_iszTemplateName, FIELD_STRING, "TemplateName" ),
-	DEFINE_KEYFIELD( m_flRadius, FIELD_FLOAT, "radius" ),
 	DEFINE_FIELD( m_iszTemplateData, FIELD_STRING ),
 	DEFINE_KEYFIELD( m_iszDestinationGroup, FIELD_STRING, "DestinationGroup" ),
 	DEFINE_KEYFIELD( m_CriterionVisibility, FIELD_INTEGER, "CriterionVisibility" ),
@@ -942,47 +1004,6 @@ void CTemplateNPCMaker::MakeNPCInLine( void )
 }
 
 //-----------------------------------------------------------------------------
-bool CTemplateNPCMaker::PlaceNPCInLine( CAI_BaseNPC *pNPC )
-{
-	Vector vecPlace;
-	Vector vecLine;
-
-	GetVectors( &vecLine, NULL, NULL );
-
-	// invert this, line up NPC's BEHIND the maker.
-	vecLine *= -1;
-
-	trace_t tr;
-	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() - Vector( 0, 0, 8192 ), MASK_SHOT, pNPC, COLLISION_GROUP_NONE, &tr );
-	vecPlace = tr.endpos;
-	float flStepSize = pNPC->GetHullWidth();
-
-	// Try 10 times to place this npc.
-	for( int i = 0 ; i < 10 ; i++ )
-	{
-		UTIL_TraceHull( vecPlace,
-						vecPlace + Vector( 0, 0, 10 ),
-						pNPC->GetHullMins(),
-						pNPC->GetHullMaxs(),
-						MASK_SHOT,
-						pNPC,
-						COLLISION_GROUP_NONE,
-						&tr );
-
-		if( tr.fraction == 1.0 )
-		{
-			pNPC->SetAbsOrigin( tr.endpos );
-			return true;
-		}
-
-		vecPlace += vecLine * flStepSize;
-	}
-
-	DevMsg("**Failed to place NPC in line!\n");
-	return false;
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: Place NPC somewhere on the perimeter of my radius.
 //-----------------------------------------------------------------------------
 void CTemplateNPCMaker::MakeNPCInRadius( void )
@@ -1041,25 +1062,6 @@ void CTemplateNPCMaker::MakeNPCInRadius( void )
 			SetUse( NULL );
 		}
 	}
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Find a place to spawn an npc within my radius.
-//			Right now this function tries to place them on the perimeter of radius.
-// Output : false if we couldn't find a spot!
-//-----------------------------------------------------------------------------
-bool CTemplateNPCMaker::PlaceNPCInRadius( CAI_BaseNPC *pNPC )
-{
-	Vector vPos;
-
-	if ( CAI_BaseNPC::FindSpotForNPCInRadius( &vPos, GetAbsOrigin(), pNPC, m_flRadius ) )
-	{
-		pNPC->SetAbsOrigin( vPos );
-		return true;
-	}
-
-	DevMsg("**Failed to place NPC in radius!\n");
-	return false;
 }
 
 

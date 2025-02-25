@@ -33,6 +33,7 @@ public:
 	void	Spawn( void );
 	void	Precache( void );
 	void	Activate( void );
+	bool	KeyValue( const char *szKeyName, const char *szValue );
 
 	void	StrikeThink( void );
 	void	UpdateThink( void );
@@ -128,6 +129,21 @@ BEGIN_DATADESC( CEnvBeam )
 
 END_DATADESC()
 
+
+//-----------------------------------------------------------------------------
+bool CEnvBeam::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if (FStrEq(szKeyName, "amplitude"))
+	{
+		m_noiseAmplitude = atoi(szValue);
+	}
+	else
+	{
+		return BaseClass::KeyValue( szKeyName, szValue );
+	}
+
+	return true;
+}
 
 
 //-----------------------------------------------------------------------------

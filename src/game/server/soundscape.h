@@ -47,6 +47,7 @@ private:
 
 public:
 	COutputEvent	m_OnPlay;
+	COutputEvent	m_OnExit;
 	float	m_flRadius;
 	string_t m_soundscapeName;
 	int		m_soundscapeIndex;

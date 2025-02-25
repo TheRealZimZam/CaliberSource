@@ -9,10 +9,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-class CTextureToggle : public CPointEntity
+class CTextureToggle : public CLogicalEntity
 {
 public:
-	DECLARE_CLASS( CTextureToggle, CPointEntity );
+	DECLARE_CLASS( CTextureToggle, CLogicalEntity );
 
 	void	InputIncrementBrushTexIndex( inputdata_t &inputdata );
 	void	InputSetBrushTexIndex( inputdata_t &inputdata );

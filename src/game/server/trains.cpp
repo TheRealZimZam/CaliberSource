@@ -14,6 +14,7 @@
 #include "physics_npc_solver.h"
 #include "vphysics/friction.h"
 #include "hierarchy.h"
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -277,12 +278,12 @@ void CFuncPlat::Setup( void )
 
 	if ( m_flHeight != 0 )
 	{
-		m_vecPosition2.z = GetLocalOrigin().z - m_flHeight;
+		m_vecPosition2.z = GetLocalOrigin().z + m_flHeight;
 	}
 	else
 	{
 		// NOTE: This works because the angles were set to vec3_angle above
-		m_vecPosition2.z = GetLocalOrigin().z - CollisionProp()->OBBSize().z + 8;
+		m_vecPosition2.z = GetLocalOrigin().z + CollisionProp()->OBBSize().z + 8;
 	}
 
 	if (m_flSpeed == 0)
@@ -759,10 +760,18 @@ void CFuncTrain::Blocked( CBaseEntity *pOther )
 	if ( gpGlobals->curtime < m_flNextBlockTime )
 		return;
 
-	m_flNextBlockTime = gpGlobals->curtime + 0.5;
-	
+	DevWarning( 2, "TRAIN(%s): Blocked by %s (dmg:%.2f)\n", GetDebugName(), pOther->GetClassname(), m_flBlockDamage );
+	m_flNextBlockTime = gpGlobals->curtime + 0.2;
+
 	//Inflict damage
 	pOther->TakeDamage( CTakeDamageInfo( this, this, m_flBlockDamage, DMG_CRUSH ) );
+
+	// Attempt to push the blocking object
+	// TODO; Getting the actual size of the train would be good here
+	Vector forward, up;
+	AngleVectors( GetLocalAngles(), &forward, NULL, &up );
+	Vector vecPush = ( (forward * m_flSpeed + up * (m_flSpeed/2)) * random->RandomFloat( 0.75f, 1.5f ) );
+	pOther->ApplyAbsVelocityImpulse( vecPush );
 }
 
 
@@ -1013,12 +1022,8 @@ void CFuncTrain::Spawn( void )
 	if ( m_volume == 0.0f )
 		m_volume = 0.85f;
 
-	// ??? If its set to 0 designer doesnt want to do damage...
-//	if ( m_flBlockDamage == 0 )
-//		m_flBlockDamage = 2;
-
 	if ( !m_target )
-		Warning("FuncTrain '%s' has no target.\n", GetDebugName());
+		Warning("CFuncTrain '%s' has no target.\n", GetDebugName());
 
 	SetMoveType( MOVETYPE_PUSH );
 	SetSolid( SOLID_BSP );
@@ -1178,6 +1183,7 @@ BEGIN_DATADESC( CFuncTrackTrain )
 	DEFINE_INPUTFUNC( FIELD_VOID, "Resume", InputResume ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "Reverse", InputReverse ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeed", InputSetSpeed ),
+	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetMaxSpeed", InputSetMaxSpeed ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeedDir", InputSetSpeedDir ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeedReal", InputSetSpeedReal ),
 	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetSpeedDirAccel", InputSetSpeedDirAccel ),
@@ -1302,7 +1308,7 @@ void CFuncTrackTrain::InputStop( inputdata_t &inputdata )
 //------------------------------------------------------------------------------
 void CFuncTrackTrain::InputStart( inputdata_t &inputdata )
 {
-	InputResume(inputdata);
+	InputStartForward(inputdata);
 }
 
 void CFuncTrackTrain::InputResume( inputdata_t &inputdata )
@@ -1499,6 +1505,15 @@ void CFuncTrackTrain::SetSpeedForwardModifier( float flModifier )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Input handler that sets the speed of the train.
+// Input  : Float speed from 0 to max speed, in units per second.
+//-----------------------------------------------------------------------------
+void CFuncTrackTrain::InputSetMaxSpeed( inputdata_t &inputdata )
+{
+	m_maxSpeed = inputdata.value.Float();
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::InputTeleportToPathTrack( inputdata_t &inputdata )
@@ -1651,11 +1666,12 @@ void CFuncTrackTrain::Blocked( CBaseEntity *pOther )
 	}
 	else
 	{
+		// Attempt to push the blocking object
 		Vector vecNewVelocity;
 		vecNewVelocity = pOther->GetAbsOrigin() - GetAbsOrigin();
 		VectorNormalize(vecNewVelocity);
 		vecNewVelocity *= m_flBlockDamage;
-		pOther->SetAbsVelocity( vecNewVelocity );
+		pOther->ApplyAbsVelocityImpulse( vecNewVelocity );
 	}
 	if ( HasSpawnFlags(SF_TRACKTRAIN_UNBLOCKABLE_BY_PLAYER) )
 	{
@@ -1694,11 +1710,11 @@ void CFuncTrackTrain::Blocked( CBaseEntity *pOther )
 			return;
 	}
 
-	DevWarning( 2, "TRAIN(%s): Blocked by %s (dmg:%.2f)\n", GetDebugName(), pOther->GetClassname(), m_flBlockDamage );
+	// we can't hurt this thing, so we're not concerned with it
 	if ( GetBlockDamage() <= 0 )
 		return;
 
-	// we can't hurt this thing, so we're not concerned with it
+	DevWarning( 2, "TRAIN(%s): Blocked by %s (dmg:%.2f)\n", GetDebugName(), pOther->GetClassname(), m_flBlockDamage );
 	pOther->TakeDamage( CTakeDamageInfo( this, this, GetBlockDamage(), DMG_CRUSH ) );
 }
 
@@ -2628,18 +2644,18 @@ CFuncTrackTrain *CFuncTrackTrain::Instance( edict_t *pent )
 //-----------------------------------------------------------------------------
 void CFuncTrackTrain::Spawn( void )
 {
-	if ( m_flSpeed == 0 )
-		m_maxSpeed = 100;
-	else
+	// If our designer messed up and put my inital speed higher than my max,
+	// assume thats the intended max speed
+	if ( m_flSpeed > m_maxSpeed )
 		m_maxSpeed = m_flSpeed;
 
 	SetLocalVelocity(vec3_origin);
-	SetLocalAngularVelocity( vec3_angle );
+	SetLocalAngularVelocity(vec3_angle);
 
 	m_dir = 1;
 
 	if ( !m_target )
-		Msg("FuncTrackTrain '%s' has no target.\n", GetDebugName());
+		Warning("CFuncTrackTrain '%s' has no target.\n", GetDebugName());
 
 	SetModel( STRING( GetModelName() ) );
 	SetMoveType( MOVETYPE_PUSH );

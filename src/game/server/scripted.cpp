@@ -217,6 +217,7 @@ void CAI_ScriptedSequence::Spawn( void )
 		StartThink();
 		SetNextThink( gpGlobals->curtime + 1.0f );
 
+#ifndef HL1_DLL
 		//
 		// If we have a name, wait for a BeginSequence input to play the
 		// action animation. Otherwise, we'll play the action animation
@@ -226,6 +227,7 @@ void CAI_ScriptedSequence::Spawn( void )
 		{
 			m_bWaitForBeginSequence = true;
 		}
+#endif
 	}
 
 	if ( m_spawnflags & SF_SCRIPT_NOINTERRUPT )
@@ -284,7 +286,7 @@ void CAI_ScriptedSequence::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, U
 {
 	inputdata_t inputdata;
 	inputdata.pActivator = pActivator;
-	InputMoveToPosition( inputdata );
+	InputBeginSequence( inputdata );
 }
 
 //-----------------------------------------------------------------------------
@@ -1870,6 +1872,7 @@ void CAI_ScriptedSchedule::StartSchedule( CAI_BaseNPC *pTarget )
 				COND_HEAR_BULLET_IMPACT,
 				COND_HEAR_COMBAT,
 				COND_HEAR_DANGER,
+				COND_HEAR_PLAYER,
 				COND_HEAR_PHYSICS_DANGER,
 				COND_NEW_ENEMY,
 				COND_PROVOKED,

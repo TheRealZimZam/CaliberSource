@@ -51,6 +51,7 @@ public:
 	void	FizzThink( void );
 
 	// Input handlers.
+	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void	InputActivate( inputdata_t &inputdata );
 	void	InputDeactivate( inputdata_t &inputdata );
 	void	InputToggle( inputdata_t &inputdata );
@@ -73,6 +74,7 @@ private:
 	int		m_state;
 };
 
+LINK_ENTITY_TO_CLASS( air_bubbles, CBubbling );	//Quake1
 LINK_ENTITY_TO_CLASS( env_bubbles, CBubbling );
 
 BEGIN_DATADESC( CBubbling )
@@ -114,7 +116,7 @@ void CBubbling::Spawn( void )
 	if ( !HasSpawnFlags(SF_BUBBLES_STARTOFF) )
 	{
 		SetThink( &CBubbling::FizzThink );
-		SetNextThink( gpGlobals->curtime + 2.0 );
+		SetNextThink( gpGlobals->curtime + 1.0 );
 		m_state = 1;
 	}
 	else
@@ -129,6 +131,14 @@ void CBubbling::Precache( void )
 }
 
 
+void CBubbling::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	if ( !ShouldToggle( useType, m_state ) )
+		return;
+
+	Toggle();
+}
+
 void CBubbling::Toggle()
 {
 	if (!m_state)
@@ -140,7 +150,6 @@ void CBubbling::Toggle()
 		TurnOff();
 	}
 }
-
 
 void CBubbling::TurnOn()
 {
@@ -228,7 +237,7 @@ void CBubbling::FizzThink( void )
 
 	if ( m_frequency > 19 )
 	{
-		SetNextThink( gpGlobals->curtime + 0.5f );
+		SetNextThink( gpGlobals->curtime + 0.4f );
 	}
 	else
 	{
@@ -1817,6 +1826,7 @@ class CEnvSplash : public CPointEntity
 
 public:
 	// Input handlers
+	void	Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void	InputSplash( inputdata_t &inputdata );
 
 protected:
@@ -1841,7 +1851,7 @@ LINK_ENTITY_TO_CLASS( env_splash, CEnvSplash );
 // Input  : &inputdata -
 //-----------------------------------------------------------------------------
 #define SPLASH_MAX_DEPTH	120.0f
-void CEnvSplash::InputSplash( inputdata_t &inputdata )
+void CEnvSplash::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	CEffectData	data;
 
@@ -1897,20 +1907,43 @@ void CEnvSplash::InputSplash( inputdata_t &inputdata )
 	data.m_vNormal = Vector( 0, 0, 1 );
 	data.m_flScale = scale;
 
+	bool bAttemptScreenEffect = false;
 	switch( m_iSplashType )
 	{
 	case 1:
-		DispatchEffect( "waterfall", data );
+		DispatchEffect( "watermist", data );
 		break;
 	case 2:
+		bAttemptScreenEffect = true;
 		DispatchEffect( "waterspray", data );
 		break;
 
 	case 0:
 	default:
+		bAttemptScreenEffect = true;
 		DispatchEffect( "watersplash", data );
 		break;
 	}
+
+	// Check for nearby players
+#if 0
+	if ( bAttemptScreenEffect )
+	{
+		CBaseEntity *pEntity = NULL;
+		while ( ( pEntity = gEntList.FindEntityInSphere( pEntity, GetAbsOrigin(), (scale*4) ) ) != NULL )
+		{
+			CBasePlayer *pPlayer = ToBasePlayer( pEntity );
+			if( pPlayer )
+			{
+				// TODO; Trigger a splash effect
+			}
+	}
+#endif
+}
+
+void CEnvSplash::InputSplash( inputdata_t &inputdata )
+{
+	Use( inputdata.pActivator, inputdata.pCaller, USE_ON, 0);
 }
 
 

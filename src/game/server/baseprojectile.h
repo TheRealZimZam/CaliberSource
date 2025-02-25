@@ -1,6 +1,6 @@
 //====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
 //
-// Purpose: 	Base class for simple projectiles
+// Purpose: 	Base class for projectiles
 //
 //=============================================================================
 
@@ -12,16 +12,6 @@
 
 #include "basegrenade_shared.h"
 
-// Creation.
-struct baseprojectilecreate_t
-{
-	Vector vecOrigin;
-	Vector vecVelocity;
-	CBaseEntity *pOwner;
-	string_t iszModel;
-	int iDamageType;
-	float flDamageScale;
-};
 
 //=============================================================================
 //
@@ -36,14 +26,11 @@ public:
 	void	Spawn( void );
 	void	Precache( void );
 
-	virtual void	ProjectileTouch( CBaseEntity *pOther );
-	void			FlyThink( void );
+	virtual void	Touch( CBaseEntity *pOther );
+	virtual void	FlyThink( void );
 
 	// Damage
-	void			SetDamageScale( float &flScale ) { m_flDamageScale = flScale; }
 	void			SetDamageType( int iType ) { m_iDamageType = iType; }
-
-	virtual float	GetDamageScale( void ) { return m_flDamageScale; }
 	virtual int		GetDamageType( void ) { return m_iDamageType; }
 
 private:
@@ -51,7 +38,8 @@ private:
 
 protected:
 	int				m_iDamageType;
-	float			m_flDamageScale;
+	EHANDLE			m_hIntendedTarget;
+
 };
 
 #endif // BASEPROJECTILE_H

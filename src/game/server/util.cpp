@@ -607,16 +607,14 @@ CBasePlayer* UTIL_PlayerByUserId( int userID )
 // Return the local player.
 // If this is a multiplayer game, return NULL.
 // 
-CBasePlayer *UTIL_GetLocalPlayer( void )
+CBasePlayer *UTIL_GetLocalPlayer( bool bWarning )
 {
 	if ( gpGlobals->maxClients > 1 )
 	{
-		if ( developer.GetBool() )
+		if ( bWarning )
 		{
 			Assert( !"UTIL_GetLocalPlayer" );
-#ifdef	DEBUG
-			Warning( "UTIL_GetLocalPlayer() called in multiplayer game.\n" );
-#endif
+			DevWarning( "UTIL_GetLocalPlayer() called in multiplayer game!\n" );
 		}
 
 		return NULL;
@@ -1428,49 +1426,80 @@ void UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, 
 			UTIL_Smoke(origin, random->RandomInt(10, 15), 10);
 		}
 	}
-	else
-	{
-		int	r, g, b;
-		switch ( color )
-		{
-		default:
-		case BLOOD_COLOR_RED:
-			if ( g_pGameRules->IsMultiplayer() )
-			{
-				r = 255;
-				g = 32;
-				b = 32;
-			}
-			else
-			{
-				r = 128;
-				g = 0;
-				b = 0;
-			}
-			break;
 
-		case BLOOD_COLOR_YELLOW:
+	int	r, g, b;
+	switch ( color )
+	{
+	default:
+	case BLOOD_COLOR_RED:
+		if ( g_pGameRules->IsMultiplayer() )
+		{
+			r = 255;
+			g = 32;
+			b = 32;
+		}
+		else
+		{
+			r = 128;
+			g = 0;
+			b = 0;
+		}
+		break;
+
+	case BLOOD_COLOR_YELLOW:
+		if ( g_pGameRules->IsMultiplayer() )
+		{
+			r = 192;
+			g = 192;
+			b = 32;
+		}
+		else
+		{
 			r = 128;
 			g = 128;
 			b = 0;
-			break;
+		}
+		break;
 
-		case BLOOD_COLOR_GREEN:
+	case BLOOD_COLOR_GREEN:
+		if ( g_pGameRules->IsMultiplayer() )
+		{
+			r = 64;
+			g = 255;
+			b = 32;
+		}
+		else
+		{
 			r = 32;
 			g = 128;
 			b = 0;
-			break;
+		}
+		break;
 
-		case BLOOD_COLOR_BLUE:
+	case BLOOD_COLOR_BLUE:
+		if ( g_pGameRules->IsMultiplayer() )
+		{
+			r = 64;
+			g = 64;
+			b = 255;
+		}
+		else
+		{
 			r = 32;
 			g = 32;
 			b = 128;
-			break;
 		}
+		break;
 
-		CPVSFilter filter( origin );
-		te->BloodSprite( filter, 0.0, &origin, &direction, r, g, b, 255, min( max( 3, amount / 10 ), 16 ) );
+	case BLOOD_COLOR_MECH:
+			r = 32;
+			g = 32;
+			b = 32;
+		break;
 	}
+
+	CPVSFilter filter( origin );
+	te->BloodSprite( filter, 0.0, &origin, &direction, r, g, b, 255, min( max( 3, amount / 10 ), 16 ) );
 }
 
 Vector UTIL_RandomBloodVector( void )
@@ -1776,6 +1805,32 @@ void UTIL_Beam( Vector &Start, Vector &End, int nModelIndex, int nHaloIndex, uns
 		Brightness,
 		Speed );
 }
+
+/*
+void UTIL_BeamRing( Vector &Start, Vector &End, int nModelIndex, int nHaloIndex, unsigned char FrameStart, unsigned char FrameRate,
+				float Life, unsigned char Width, unsigned char Spread, unsigned char Noise, unsigned char Red, unsigned char Green,
+				unsigned char Blue, unsigned char Brightness, unsigned char Speed)
+{
+	CBroadcastRecipientFilter filter;
+
+	te->BeamRing( filter, 0.0,
+		&Start, 
+		&End, 
+		nModelIndex, 
+		nHaloIndex, 
+		FrameStart,
+		FrameRate, 
+		Life,
+		Width,
+		Spread,
+		Noise,
+		Red,
+		Green,
+		Blue,
+		Brightness,
+		Speed );
+}
+*/
 
 bool UTIL_IsValidEntity( CBaseEntity *pEnt )
 {

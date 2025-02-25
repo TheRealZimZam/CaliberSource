@@ -8,6 +8,7 @@
 #ifndef LOGICRELAY_H
 #define LOGICRELAY_H
 
+#include "logicentities.h"
 #include "entityinput.h"
 #include "entityoutput.h"
 #include "eventqueue.h"

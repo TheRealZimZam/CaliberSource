@@ -99,7 +99,7 @@ void CLogicPlayerProxy::Activate( void )
 		if ( GameRules()->IsMultiplayer() )
 		{
 			Assert( 0 );
-			Warning( "You shouldnt use logic_playerproxy in multiplayer!\n" );
+			Warning( "Cant use logic_playerproxy in multiplayer!\n" );
 		}
 
 		m_hPlayer = UTIL_GetLocalPlayer();

@@ -13,6 +13,7 @@
 #include "ai_speech.h"
 #include "ai_behavior.h"
 #include "ai_utils.h"
+#include "vehicle_base.h"
 #include "vehicle_jeep_episodic.h"
 
 #define STOPPED_VELOCITY_THRESHOLD		32.0f
@@ -130,7 +131,7 @@ public:
 	virtual string_t GetRoleName( void ) { return MAKE_STRING( "passenger" ); }
 
 	// Enable/disable code
-	void	Enable( CPropJeepEpisodic *pVehicle, bool bImmediateEntrance = false );
+	void	Enable( CPropVehicleDriveable *pVehicle, bool bImmediateEntrance = false );
 	void	Disable( void );
 	bool	IsEnabled( void ) const { return m_bEnabled; }
 

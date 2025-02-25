@@ -128,6 +128,10 @@ enum
 // !!!set this bit on guns and stuff that should never respawn.
 #define	SF_NORESPAWN	( 1 << 20 )	//1 << 30
 
+// when we are within this close to running out of entities,  items 
+// marked with the ITEM_FLAG_LIMITINWORLD will delay their respawn
+#define ENTITY_INTOLERANCE	100
+
 class CAI_BaseNPC;
 class CAI_ScriptedSequence;
 class CSound;

@@ -99,6 +99,7 @@ BEGIN_DATADESC( CEnvSoundscape )
 	DEFINE_INPUTFUNC( FIELD_VOID, "ToggleEnabled", InputToggleEnabled ),
 
 	DEFINE_OUTPUT( m_OnPlay, "OnPlay" ),
+	DEFINE_OUTPUT( m_OnExit, "OnExit" ),
 
 
 END_DATADESC()
@@ -189,7 +190,6 @@ bool CEnvSoundscape::KeyValue( const char *szKeyName, const char *szValue )
 
 // returns true if the given sound entity is in range 
 // and can see the given player entity (pTarget)
-
 bool CEnvSoundscape::InRangeOfPlayer( CBasePlayer *pTarget ) 
 {
 	Vector vecSpot1 = EarPosition();
@@ -303,7 +303,10 @@ void CEnvSoundscape::Update()
 			continue;
 
 		if ( !InRangeOfPlayer( pPlayer ) )
+		{
+			m_OnExit.FireOutput( pPlayer, this );
 			continue;
+		}
 
 		// check to see if this is the sound entity that is 
 		// currently affecting this player

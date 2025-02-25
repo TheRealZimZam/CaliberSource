@@ -503,7 +503,6 @@ public:
 	virtual void			ItemPostFrame( void );
 	virtual CBaseEntity		*GiveNamedItem( const char *szName, int iSubType = 0 );
 	void					EnableControl(bool fControl);
-	virtual void			CheckTrainUpdate( void );
 	void					AbortReload( void );
 
 	void					SendAmmoUpdate(void);

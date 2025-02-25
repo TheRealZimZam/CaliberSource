@@ -916,9 +916,7 @@ void CRotButton::Spawn( void )
 		m_flWait = 1;
 
 	if (m_iHealth > 0)
-	{
 		m_takedamage = DAMAGE_YES;
-	}
 
 	m_toggle_state = TS_AT_BOTTOM;
 	m_vecAngle1	= GetLocalAngles();

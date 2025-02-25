@@ -31,7 +31,7 @@ public:
 
 	void	SetDispenseTime( float time ) {m_flDispenseTime = time;}
 	// SetDispenserState: Gotta check if we have a parent every time its called, which is often, sadly
-	void	SetDispenserState( int state ) { if(GetMoveParent()){GetMoveParent()->SetTextureFrameIndex( state );} }
+	void	SetDispenserState( int state ) { if(GetMoveParent()){GetMoveParent()->SetTextureFrameIndex( state );} m_iDispenserState = state; }
 
 	// For breaking
 	void	Break( bool bDoEffect = true );
@@ -43,8 +43,9 @@ public:
 	DECLARE_DATADESC();
 
 public:
-	bool	m_CanInDispenser;
+	bool	m_ItemInDispenser;
 	int		m_nBeverageType;
+	int		m_iDispenserState;
 private:
 //	bool	m_bOldBeverage;	//This is an old env_beverage - dont do any of the new stuff, as the mapper has already addressed it...
 	bool	m_bAskedToRemove;
@@ -53,6 +54,8 @@ private:
 	COutputEvent m_OnBreak;
 };
 
+
+//-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 class CItemSoda : public CBaseAnimating
 {

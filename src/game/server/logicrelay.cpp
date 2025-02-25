@@ -79,6 +79,8 @@ void CLogicRelay::Think()
 	{
 		UTIL_Remove(this);
 	}
+
+	BaseClass::Think();
 }
 
 

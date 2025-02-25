@@ -54,6 +54,8 @@ BEGIN_DATADESC( CBaseDoor )
 	DEFINE_KEYFIELD( m_bLoopMoveSound, FIELD_BOOLEAN, "loopmovesound" ),
 	DEFINE_KEYFIELD( m_bIgnoreDebris, FIELD_BOOLEAN, "ignoredebris" ),
 
+	DEFINE_KEYFIELD( m_damageType, FIELD_INTEGER, "damagetype" ),
+
 	DEFINE_INPUTFUNC( FIELD_VOID, "Open", InputOpen ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "Close", InputClose ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "Toggle", InputToggle ),
@@ -286,10 +288,11 @@ void CBaseDoor::Spawn()
 	SetMoveType( MOVETYPE_PUSH );
 	
 	if (m_flSpeed == 0)
-	{
 		m_flSpeed = 100;
-	}
-	
+
+	if (m_iHealth > 0)
+		m_takedamage = DAMAGE_YES;
+
 	SetTouch( &CBaseDoor::DoorTouch );
 
 	if ( !FClassnameIs( this, "func_water" ) )
@@ -401,6 +404,19 @@ bool CBaseDoor::ShouldSavePhysics()
 {
 	// don't save physics if you're func_water
 	return !FClassnameIs( this, "func_water" );
+}
+
+bool CBaseDoor::ShouldMakeSound()
+{
+	// Should this door make sounds?
+	if (HasSpawnFlags( SF_DOOR_SILENT ))
+		return false;
+
+	// No moving OR arriving sound
+	if ( m_NoiseMoving == NULL_STRING && m_NoiseArrived == NULL_STRING )
+		return false;
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -901,6 +917,46 @@ void CBaseDoor::InputSetSpeed( inputdata_t &inputdata )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: We have been damaged. Possibly activate, depending on our flags.
+// Input  : pInflictor - 
+//			pAttacker - 
+//			flDamage - 
+//			bitsDamageType - 
+// Output : 
+//-----------------------------------------------------------------------------
+int CBaseDoor::OnTakeDamage( const CTakeDamageInfo &info )
+{
+	if (m_bLocked)
+	{
+	//!	PlayLockSounds(this, &m_ls, TRUE, FALSE);
+		return 0;
+	}
+
+	m_hActivator = info.GetAttacker();
+
+	// dvsents2: why would activator be NULL here?
+	if ( m_hActivator == NULL )
+		return 0;
+
+	// No damage specified
+	if (m_iHealth == 0)
+		return 0;
+
+	// Not enough to open
+	if (info.GetDamage() < m_iHealth)
+		return 0;
+
+	// Wrong damage type!
+	if (m_damageType != 0 && info.GetDamageType() != m_damageType)
+		return 0;
+
+	// Just assume its a "touch" activation
+	DoorTouch(m_hActivator);
+
+	return 1;
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Locks the door so that it cannot be opened.
 //-----------------------------------------------------------------------------
 void CBaseDoor::Lock( void )
@@ -961,7 +1017,7 @@ void CBaseDoor::DoorGoUp( void )
 
 	// emit door moving and stop sounds on CHAN_STATIC so that the multicast doesn't
 	// filter them out and leave a client stuck with looping door sounds!
-	if ( !HasSpawnFlags(SF_DOOR_SILENT ) )
+	if ( ShouldMakeSound() )
 	{
 		// If we're not moving already, start the moving noise
 		if ( m_toggle_state != TS_GOING_UP && m_toggle_state != TS_GOING_DOWN )
@@ -1023,7 +1079,7 @@ void CBaseDoor::DoorGoUp( void )
 //-----------------------------------------------------------------------------
 void CBaseDoor::DoorHitTop( void )
 {
-	if ( !HasSpawnFlags( SF_DOOR_SILENT ) )
+	if ( ShouldMakeSound() )
 	{
 		CPASAttenuationFilter filter( this );
 		filter.MakeReliable();
@@ -1077,7 +1133,7 @@ void CBaseDoor::DoorHitTop( void )
 //-----------------------------------------------------------------------------
 void CBaseDoor::DoorGoDown( void )
 {
-	if ( !HasSpawnFlags( SF_DOOR_SILENT ) )
+	if ( ShouldMakeSound() )
 	{
 		// If we're not moving already, start the moving noise
 		if ( m_toggle_state != TS_GOING_UP && m_toggle_state != TS_GOING_DOWN )
@@ -1107,7 +1163,7 @@ void CBaseDoor::DoorGoDown( void )
 //-----------------------------------------------------------------------------
 void CBaseDoor::DoorHitBottom( void )
 {
-	if ( !HasSpawnFlags( SF_DOOR_SILENT ) )
+	if ( ShouldMakeSound() )
 	{
 		CPASAttenuationFilter filter( this );
 		filter.MakeReliable();

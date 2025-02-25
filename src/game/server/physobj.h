@@ -119,6 +119,7 @@ public:
 	int DrawDebugTextOverlays(void);
 
 	// Input handlers
+	virtual void Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	void InputExplode( inputdata_t &inputdata );
 
 	DECLARE_DATADESC();

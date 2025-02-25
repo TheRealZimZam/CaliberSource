@@ -56,6 +56,8 @@ public:
 	void MakerThink( void );
 	bool HumanHullFits( const Vector &vecLocation );
 	bool CanMakeNPC( bool bIgnoreSolidEntities = false );
+	bool PlaceNPCInRadius( CAI_BaseNPC *pNPC );
+	bool PlaceNPCInLine( CAI_BaseNPC *pNPC );
 
 	virtual void DeathNotice( CBaseEntity *pChild );// NPC maker children use this to tell the NPC maker that they have died.
 	virtual void MakeNPC( void ) = 0;
@@ -84,9 +86,11 @@ public:
 	virtual bool IsDepleted( void );
 
 	DECLARE_DATADESC();
-	
+
+protected:
 	int			m_nMaxNumNPCs;			// max number of NPCs this ent can create
 	float		m_flSpawnFrequency;		// delay (in secs) between spawns 
+	float		m_flRadius;				// Radius in which to spawn the NPC
 
 	COutputEHANDLE m_OnSpawnNPC;
 	COutputEvent m_OnAllSpawned;
@@ -138,15 +142,12 @@ public:
 
 	virtual CNPCSpawnDestination *FindSpawnDestination();
 	virtual void MakeNPC( void );
+	virtual void MakeMultipleNPCS( int nNPCs );
 	void MakeNPCInRadius( void );
 	void MakeNPCInLine( void );
-	virtual void MakeMultipleNPCS( int nNPCs );
 
 protected:
 	virtual void PrecacheTemplateEntity( CBaseEntity *pEntity );
-
-	bool PlaceNPCInRadius( CAI_BaseNPC *pNPC );
-	bool PlaceNPCInLine( CAI_BaseNPC *pNPC );
 
 	// Inputs
 	void InputSpawnInRadius( inputdata_t &inputdata ) { MakeNPCInRadius(); }
@@ -154,8 +155,6 @@ protected:
 	void InputSpawnMultiple( inputdata_t &inputdata );
 	void InputChangeDestinationGroup( inputdata_t &inputdata );
 	void InputSetMinimumSpawnDistance( inputdata_t &inputdata );
-	
-	float	m_flRadius;
 
 	DECLARE_DATADESC();
 

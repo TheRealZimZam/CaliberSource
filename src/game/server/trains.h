@@ -66,15 +66,6 @@ public:
 #define SF_TRACKTRAIN_UNBLOCKABLE_BY_PLAYER		0x0200
 #define SF_TRACKTRAIN_ALLOWROLL					0x0400
 
-#define TRAIN_ACTIVE	0x80 
-#define TRAIN_NEW		0xc0
-#define TRAIN_OFF		0x00
-#define TRAIN_NEUTRAL	0x01
-#define TRAIN_SLOW		0x02
-#define TRAIN_MEDIUM	0x03
-#define TRAIN_FAST		0x04 
-#define TRAIN_BACK		0x05
-
 enum TrainVelocityType_t
 {
         TrainVelocity_Instantaneous = 0,
@@ -137,6 +128,7 @@ public:
 	void InputSetSpeed( inputdata_t &inputdata );
 	void InputSetSpeedDir( inputdata_t &inputdata );
 	void InputSetSpeedReal( inputdata_t &inputdata );
+	void InputSetMaxSpeed( inputdata_t &inputdata );
 	void InputStop( inputdata_t &inputdata );
 	void InputStart( inputdata_t &inputdata );
 	void InputResume( inputdata_t &inputdata );

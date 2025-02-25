@@ -49,7 +49,7 @@ ConVar ref_db_distance( "ref_db_distance", "36.0" );
 #define	REFERENCE_dB_DISTANCE	ref_db_distance.GetFloat()
 #endif//HL1_DLL
 
-static soundlevel_t ComputeSoundlevel( float radius, bool playEverywhere )
+soundlevel_t UTIL_ComputeSoundlevel( float radius, bool playEverywhere )
 {
 	soundlevel_t soundlevel = SNDLVL_NONE;
 
@@ -245,7 +245,7 @@ END_DATADESC()
 //-----------------------------------------------------------------------------
 void CAmbientGeneric::Spawn( void )
 {
-	m_iSoundLevel = ComputeSoundlevel( m_radius, FBitSet( m_spawnflags, SF_AMBIENT_SOUND_EVERYWHERE )?true:false );
+	m_iSoundLevel = UTIL_ComputeSoundlevel( m_radius, FBitSet( m_spawnflags, SF_AMBIENT_SOUND_EVERYWHERE )?true:false );
 	ComputeMaxAudibleDistance( );
 
 	char *szSoundFile = (char *)STRING( m_iszSound );

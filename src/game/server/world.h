@@ -11,6 +11,15 @@
 #pragma once
 #endif
 
+enum
+{
+	TIME_MIDNIGHT	= 0,
+	TIME_DAWN,
+	TIME_MORNING,
+	TIME_AFTERNOON,
+	TIME_DUSK,
+	TIME_EVENING,
+};
 
 class CWorld : public CBaseEntity
 {
@@ -50,7 +59,16 @@ public:
 	void SetDisplayTitle( bool display );
 	void SetStartDark( bool startdark );
 
+	int GetTimeOfDay() const;
+	void SetTimeOfDay( int iTimeOfDay );
+
 	bool IsColdWorld( void );
+
+	int GetTimeOfDay()	{ return m_iTimeOfDay; }
+
+	// NOTENOTE; Should these be public?? -M.M
+	string_t m_mapText;
+	string_t m_authorText;
 
 private:
 	DECLARE_DATADESC();
@@ -69,6 +87,7 @@ private:
 	// start flags
 	CNetworkVar( bool, m_bStartDark );
 	CNetworkVar( bool, m_bColdWorld );
+	CNetworkVar( int, m_iTimeOfDay );
 	bool m_bDisplayTitle;
 };
 

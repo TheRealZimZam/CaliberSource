@@ -30,6 +30,9 @@
 #include "engine/IEngineSound.h"
 #include "te_effect_dispatch.h"
 #include "Sprite.h"
+#if 0
+#include "HL2_Player.h"
+#endif
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -40,7 +43,6 @@
 //=========================================================
 void CEnvBeverage::Precache ( void )
 {
-//	PrecacheModel( "models/can.mdl" );
 	if ( FClassnameIs( this, "env_snacks" ) )
 		UTIL_PrecacheOther("item_candybar");
 	else
@@ -58,8 +60,10 @@ BEGIN_DATADESC( CEnvBeverage )
 	DEFINE_FUNCTION( DispenserWait ),
 	DEFINE_FUNCTION( DispenserReset ),
 
-	DEFINE_FIELD( m_CanInDispenser, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_ItemInDispenser, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_nBeverageType, FIELD_INTEGER ),
+	DEFINE_FIELD( m_iDispenserState, FIELD_INTEGER ),
+	DEFINE_FIELD( m_flDispenseTime, FIELD_FLOAT ),
 
 	// Inputs
 	DEFINE_OUTPUT(m_OnBreak, "OnBreak"),
@@ -77,9 +81,10 @@ void CEnvBeverage::Spawn( void )
 	AddEffects( EF_NODRAW );
 	m_takedamage = false;
 
-	m_CanInDispenser = false;
+	m_ItemInDispenser = false;
 	m_bAskedToRemove = false;
-	m_flDispenseTime = 0;
+	if ( m_flDispenseTime == 0 )
+		m_flDispenseTime = 1.5f;
 
 	SetDispenserState( ON );
 
@@ -93,7 +98,7 @@ bool CEnvBeverage::KeyValue( const char *szKeyName, const char *szValue )
 	if (FStrEq(szKeyName, "beveragetype"))
 		m_nBeverageType = atoi(szValue);
 	else if (FStrEq(szKeyName, "playspeech"))
-		m_bUseSpeech = atoi(szValue);
+		m_bUseSpeech = (atoi(szValue) != 0);
 	else
 		return BaseClass::KeyValue( szKeyName, szValue );
 
@@ -102,8 +107,12 @@ bool CEnvBeverage::KeyValue( const char *szKeyName, const char *szValue )
 
 void CEnvBeverage::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
+	// Cant be used while im dispensing
+	if (m_iDispenserState == DISPENSING)
+		return;
+
 	// no more cans while one is waiting in the dispenser, or if I'm out of cans.
-	if ( m_CanInDispenser )
+	if ( m_ItemInDispenser )
 	{
 		// Always beep, but only say the line once
 		EmitSound( "VendingMachine.Deny" );
@@ -157,29 +166,21 @@ void CEnvBeverage::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 	SetDispenserState( DISPENSING );
 
 	SetThink( &CEnvBeverage::DispenserWait );
-	SetNextThink( gpGlobals->curtime + 1.5f );	//m_flDispenseTime
+	SetNextThink( gpGlobals->curtime + m_flDispenseTime );
 }
 
 void CEnvBeverage::DispenserWait( void )
 {
-	// Change the graphic of my parent
-//	if ( !m_CanInDispenser )
-//	{
-//		if ( GetMoveParent() )
-//			GetMoveParent()->SetTextureFrameIndex( DISPENSING );
-//
-		Dispense();
-//		SetNextThink( gpGlobals->curtime + 0.3f );	//0.2
-//	}
+	Dispense();
 }
 
 void CEnvBeverage::Dispense( void )
 {
 	if ( FClassnameIs( this, "env_snacks" ) )
-		CBaseEntity::Create( "item_candybar", GetLocalOrigin(), GetLocalAngles(), this );
+		CBaseEntity::Create( "item_candybar", GetAbsOrigin(), GetLocalAngles(), this );
 	else
 	{
-		CBaseAnimating *pCan = (CBaseAnimating *)CBaseEntity::Create( "item_sodacan", GetLocalOrigin(), GetLocalAngles(), this );
+		CBaseAnimating *pCan = (CBaseAnimating *)CBaseEntity::Create( "item_sodacan", GetAbsOrigin(), GetLocalAngles(), this );
 		if ( m_nBeverageType == 6 )
 		{
 			// random
@@ -189,17 +190,15 @@ void CEnvBeverage::Dispense( void )
 		{
 			pCan->m_nSkin = m_nBeverageType;
 		}
-		m_CanInDispenser = true;
+		m_ItemInDispenser = true;
 	}
 
 	m_iHealth -= 1;
-	m_bAskedToRemove = false;
 
 	// Thank you, come again!
 	EmitSound( "VendingMachine.FinishDispense" );
 
 	SetDispenserState( DISPENSE_FINISHED );
-
 	SetThink( &CEnvBeverage::DispenserReset );
 	SetNextThink( gpGlobals->curtime + 1.0f );	//m_flDispenseTime
 }
@@ -226,7 +225,21 @@ void CEnvBeverage::Break( bool bDoEffect )
 {
 	if ( bDoEffect )
 	{
-		//!!TODO; Spew out your guts, spawn some gibs with sodacan model
+		// Spew out your guts, spawn some gibs with my beverage model
+		const char *stModel = "models/can.mdl";
+		bool bSpew = true;
+		if ( FClassnameIs( this, "env_snacks" ) )
+		{
+			stModel = "models/candybar.mdl";
+			bSpew = false;
+		}
+
+		CGib::SpawnSpecificGibs(this, random->RandomInt( (m_iHealth/2), m_iHealth ), 200, 400, stModel);
+		if ( bSpew )
+		{
+			// Spew some "soda" out aswell
+			UTIL_BloodDrips( GetAbsOrigin(), vec3_origin, BLOOD_COLOR_MECH, m_iHealth ); //FIXME; need a better Soda color here...
+		}
 	}
 
 	// Remove thyself after a couple seconds
@@ -319,7 +332,7 @@ void CItemSoda::CanThink( void )
 	}
 	else
 	{
-		SetNextThink( gpGlobals->curtime + 0.8f );	//0.5f
+		SetNextThink( gpGlobals->curtime + 1.0f );	//0.5f
 	}
 }
 
@@ -360,7 +373,7 @@ void CItemSoda::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 	{
 		// tell the machine the can was taken
 		CEnvBeverage *bev = (CEnvBeverage *)GetOwnerEntity();
-		bev->m_CanInDispenser = false;
+		bev->m_ItemInDispenser = false;
 	}
 
 	AddSolidFlags( FSOLID_NOT_SOLID );

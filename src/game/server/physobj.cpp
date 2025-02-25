@@ -920,9 +920,18 @@ CBaseEntity *CPhysExplosion::FindEntity( CBaseEntity *pEntity, CBaseEntity *pAct
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+void CPhysExplosion::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
+{
+	// +USE'd by a player
+	if ( pActivator && pActivator->IsPlayer() && HasSpawnFlags(SF_PHYSBOX_IGNOREUSE))
+		return;
+
+	Explode( pActivator, pCaller );
+}
+
 void CPhysExplosion::InputExplode( inputdata_t &inputdata )
 {
-	Explode( inputdata.pActivator, inputdata.pCaller );
+	Use( inputdata.pActivator, inputdata.pCaller, USE_ON, 0 );
 }
 
 

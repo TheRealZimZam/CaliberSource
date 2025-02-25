@@ -2296,7 +2296,7 @@ static AI_FollowFormation_t g_WideFollowFormation =
 	168,						// followPointTolerance
 	32,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
-	190,						// walkTolerance
+	250,						// walkTolerance
 	600,						// coverTolerance
 	600,						// enemyLOSTolerance
 	600,						// chaseEnemyTolerance
@@ -2305,16 +2305,16 @@ static AI_FollowFormation_t g_WideFollowFormation =
 
 //-------------------------------------
 // Tight wedge - Used for commander mode orders
-#define COMMANDER_TOLERANCE 16	//13.0 * 1.415
+#define COMMANDER_TOLERANCE 32	//13.0 * 1.415
 
 static AI_FollowSlot_t g_CommanderFollowFormationSlots[] = 
 {
 //priority, position, positionVariability, rangemin, rangemax, zrange, tolerance
-	{ 2, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, -COMMANDER_TOLERANCE, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { 0, COMMANDER_TOLERANCE, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 48 },
-	{ 1, { -COMMANDER_TOLERANCE, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
-	{ 1, { COMMANDER_TOLERANCE, 0, 0 }, 0, COMMANDER_TOLERANCE, COMMANDER_TOLERANCE, -1, 64 },
+	{ 2, { 0, 0, 0 }, 0, COMMANDER_TOLERANCE, (COMMANDER_TOLERANCE*2), -1, 48 },
+	{ 1, {0, -(COMMANDER_TOLERANCE), 0}, 0, COMMANDER_TOLERANCE, (COMMANDER_TOLERANCE*2), -1, 48 },
+	{ 1, {0, (COMMANDER_TOLERANCE), 0}, 0, COMMANDER_TOLERANCE, (COMMANDER_TOLERANCE*2), -1, 48 },
+	{ 1, {0, -(COMMANDER_TOLERANCE*2), 0}, 0, COMMANDER_TOLERANCE, (COMMANDER_TOLERANCE*2), -1, 64 },
+	{ 1, {0, (COMMANDER_TOLERANCE*2), 0}, 0, COMMANDER_TOLERANCE, (COMMANDER_TOLERANCE*2), -1, 64 },
 };
 
 static AI_FollowFormation_t g_CommanderFollowFormation = 
@@ -2323,11 +2323,11 @@ static AI_FollowFormation_t g_CommanderFollowFormation =
 	AIFF_DEFAULT | AIFF_USE_FOLLOW_POINTS,
 	ARRAYSIZE(g_CommanderFollowFormationSlots),
 	144,						// followPointTolerance
-	8,							// targetMoveTolerance
+	16,							// targetMoveTolerance
 	60,							// repathOnRouteTolerance
 	16,	// Always run			// walkTolerance
-	400,						// coverTolerance
-	300,						// enemyLOSTolerance
+	600,						// coverTolerance
+	500,						// enemyLOSTolerance
 	300,						// chaseEnemyTolerance
 	g_CommanderFollowFormationSlots,
 };
@@ -2539,8 +2539,8 @@ AI_FollowFormation_t *g_AI_Formations[] =
 {
 	&g_SimpleFollowFormation,
 	&g_WideFollowFormation,
-	&g_AntlionFollowFormation,
 	&g_CommanderFollowFormation,
+	&g_AntlionFollowFormation,
 	&g_TightFollowFormation,
 	&g_MediumFollowFormation,
 	&g_SidekickFollowFormation,

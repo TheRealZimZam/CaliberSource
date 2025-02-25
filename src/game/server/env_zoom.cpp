@@ -84,7 +84,7 @@ void CEnvZoom::InputZoom( inputdata_t &inputdata )
 		{
 			CHL2_Player *pHLPlayer = static_cast<CHL2_Player*>( pPlayer );
 
-			pHLPlayer->StopZooming();
+			pHLPlayer->StopZooming(this);
 		}
 #endif
 

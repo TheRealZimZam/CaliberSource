@@ -2,7 +2,14 @@
 //
 // Purpose: 
 //
-// $NoKeywords: $
+// TODO; Optimize Entcount;
+// The way the system works right now spikes the entity limit bad,
+// one molotov takes up around 12 ent slots after detonation because of the
+// way all this is coded. Halving it would be very much welcome.
+// One idea to do this is to take a bunch of small fires that are close together,
+// and combine them into a super-fire, with a different sprite and some extra
+// clientside fx. This would probably have something to do with FireSystem_GetFiresInSphere.
+// - MM
 //
 //=============================================================================//
 //---------------------------------------------------------
@@ -59,6 +66,7 @@
 #define	FIRE_MINS				Vector(-20,-20,0 )   // Sould be FIRE_WIDTH in size
 #define FIRE_MAXS				Vector( 20, 20,20)	 // Sould be FIRE_WIDTH in size
 #define FIRE_SPREAD_DAMAGE_MULTIPLIER 2.0
+#define	FIRE_DEFAULT_COMBINE_RADIUS		16.0f		// Radius for code-generated fires to combine
 
 #define FIRE_MAX_HEAT_LEVEL		64.0f
 #define	FIRE_NORMAL_ATTACK_TIME	20.0f
@@ -348,7 +356,6 @@ bool FireSystem_CanAddFire( Vector *position, float separationRadius, fireType_e
 	}
 
 
-
 	// Check if fire is in a wall, if so try shifting around a bit
 	if (FireSystem_IsFireInWall( *position, type ))
 	{
@@ -398,7 +405,7 @@ bool FireSystem_StartFire( const Vector &position, float fireHeight, float attac
 	if ( FireSystem_CanAddFire( &testPos, 16.0f, type, flags ) == false )
 	{
 		CFire *pFires[16];
-		int fireCount = FireSystem_GetFiresInSphere( pFires, ARRAYSIZE(pFires), true, position, 16.0f );
+		int fireCount = FireSystem_GetFiresInSphere( pFires, ARRAYSIZE(pFires), true, position, FIRE_DEFAULT_COMBINE_RADIUS );
 		for ( int i = 0; i < fireCount; i++ )
 		{
 			// add to this fire
@@ -410,7 +417,6 @@ bool FireSystem_StartFire( const Vector &position, float fireHeight, float attac
 
 	//Create a new fire entity
 	CFire *fire = (CFire *) CreateEntityByName( "env_fire" );
-	
 	if ( fire == NULL )
 		return false;
 
@@ -449,7 +455,7 @@ bool FireSystem_StartFire( CBaseAnimating *pEntity, float fireHeight, float atta
 	{
 		// Contribute heat to all fires within 16 units of this fire.
 		CFire *pFires[16];
-		int fireCount = FireSystem_GetFiresInSphere( pFires, ARRAYSIZE(pFires), true, position, 16.0f );
+		int fireCount = FireSystem_GetFiresInSphere( pFires, ARRAYSIZE(pFires), true, position, FIRE_DEFAULT_COMBINE_RADIUS );
 		for ( int i = 0; i < fireCount; i++ )
 		{
 			pFires[i]->AddHeat( fireHeight, false );
@@ -461,9 +467,7 @@ bool FireSystem_StartFire( CBaseAnimating *pEntity, float fireHeight, float atta
 	// Create a new fire entity
 	CFire *fire = (CFire *) CreateEntityByName( "env_fire" );
 	if ( fire == NULL )
-	{
 		return false;
-	}
 
 	// Spawn the fire.
 	// Fires not placed by a designer should be cleaned up automatically (not catch fire again).
@@ -706,12 +710,13 @@ void CFire::StartFire( void )
 	{
 		vFirePos = GetAbsOrigin();
 	}
+#ifndef HL1_DLL
 	else
 	{
 		UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() - Vector( 0, 0, 1024 ), MASK_FIRE_SOLID, this, COLLISION_GROUP_NONE, &tr );
 		vFirePos = tr.endpos;
 	}
-
+#endif
 	int spawnflags = m_spawnflags;
 	m_spawnflags |= SF_FIRE_START_ON;
 	Init( vFirePos, m_flFireSize, m_flAttackTime, GetHealth(), m_spawnflags, (fireType_e) m_nFireType );
@@ -738,15 +743,11 @@ void CFire::Spawn( void )
 	m_flHeatAbsorb = m_flHeatLevel * 0.05;
 	m_flHeatLevel = 0;
 	Init( GetAbsOrigin(), m_flFireSize, m_flAttackTime, m_flFuel, m_spawnflags, m_nFireType );
-	
+//!	m_bEnabled = (m_spawnflags & SF_FIRE_START_DISABLED) ? false : true;
 	if( m_bStartDisabled )
-	{
 		Disable();
-	}
 	else
-	{
 		m_bEnabled = true;
-	}
 }
 
 int CFire::UpdateTransmitState()

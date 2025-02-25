@@ -931,12 +931,6 @@ void CTriggerMultiple::ActivateMultiTrigger(CBaseEntity *pActivator)
 	if (GetNextThink() > gpGlobals->curtime)
 		return;         // still waiting for reset time
 
-/*
-	if (FClassnameIs(this, "trigger_secret"))
-	{
-		gpGlobals->found_secrets++;
-	}
-*/
 	m_hActivator = pActivator;
 	SUB_UseTargets( m_hActivator, USE_TOGGLE, 0 );
 
@@ -953,7 +947,7 @@ void CTriggerMultiple::ActivateMultiTrigger(CBaseEntity *pActivator)
 		// called while C code is looping through area links...
 		SetTouch( NULL );
 		SetNextThink( gpGlobals->curtime + 0.1f );
-		SetThink(  &CTriggerMultiple::SUB_Remove );
+		SetThink( &CTriggerMultiple::SUB_Remove );
 	}
 }
 
@@ -984,6 +978,83 @@ void CTriggerOnce::Spawn( void )
 	BaseClass::Spawn();
 
 	m_flWait = -1;
+}
+
+
+// ##################################################################################
+//	>> CTriggerSecret
+// ##################################################################################
+class CTriggerSecret : public CTriggerOnce
+{
+public:
+	DECLARE_CLASS( CTriggerSecret, CTriggerOnce );
+
+	void Precache( void );
+	void Spawn( void );
+	void Touch( CBaseEntity *pOther );
+	DECLARE_DATADESC();
+};
+
+
+BEGIN_DATADESC( CTriggerSecret )
+
+END_DATADESC()
+
+LINK_ENTITY_TO_CLASS( trigger_secret, CTriggerSecret );
+
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CTriggerSecret::Precache( void )
+{
+	PrecacheSound("common/secret.wav");
+	BaseClass::Precache();
+}
+
+void CTriggerSecret::Spawn( void )
+{
+	Precache();
+
+	if ( g_pGameRules->IsDeathmatch() )
+	{
+		UTIL_Remove( this );
+		return;
+	}
+
+	InitTrigger();
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  : pOther - 
+//-----------------------------------------------------------------------------
+void CTriggerSecret::Touch( CBaseEntity *pOther )
+{
+	// Only players
+	if ( !pOther->IsPlayer() || !FClassnameIs(pOther, "player"))
+		return;
+
+	// Must be alive (not spectator)
+	if ( !pOther->IsAlive() )
+		return;
+
+	//!gpGlobals->found_secrets++;
+
+//	UTIL_SayTextAll( "You Found A Secret Area!" );
+	UTIL_ClientPrintAll( HUD_PRINTCENTER, "You Found A Secret Area!" );
+
+	CPASAttenuationFilter filter( this, ATTN_NONE );
+	EmitSound_t ep;
+	ep.m_nChannel = CHAN_VOICE;
+	ep.m_pSoundName = "common/secret.wav";
+	ep.m_flVolume = 0.99f;
+	ep.m_SoundLevel = SNDLVL_NONE;
+	EmitSound( filter, entindex(), ep );
+
+	ActivateMultiTrigger( pOther );
+	UTIL_Remove(this);
 }
 
 
@@ -1208,6 +1279,9 @@ void CTriggerLook::Trigger(CBaseEntity *pActivator, bool bTimeout)
 		SetNextThink( TICK_NEVER_THINK );
 	}
 
+	// If my target is a multiman, fire it now
+	SUB_UseTargets( pActivator, USE_TOGGLE, 0 );
+
 	if (HasSpawnFlags(SF_TRIGGERLOOK_FIREONCE))
 	{
 		SetThink(&CTriggerLook::SUB_Remove);
@@ -1392,7 +1466,7 @@ bool CChangeLevel::KeyValue( const char *szKeyName, const char *szValue )
 void CChangeLevel::Precache( void )
 {
 	BaseClass::Precache();
-//	PrecacheModel( "editor/logic_changelevel.vmt" );
+	PrecacheModel( "editor/logic_changelevel.vmt" );
 }
 
 void CChangeLevel::Spawn( void )
@@ -1401,12 +1475,12 @@ void CChangeLevel::Spawn( void )
 
 	if ( FStrEq( m_szMapName, "" ) )
 	{
-		Msg( "a trigger_changelevel doesn't have a map" );
+		Msg( "%s doesn't have a map\n", GetDebugName() );
 	}
 
 	if ( FStrEq( m_szLandmarkName, "" ) )
 	{
-		Msg( "trigger_changelevel to %s doesn't have a landmark", m_szMapName );
+		Msg( "trigger_changelevel to %s doesn't have a landmark\n", m_szMapName );
 	}
 
 	InitTrigger();
@@ -1421,7 +1495,7 @@ void CChangeLevel::Spawn( void )
 /*
 	extern ConVar showlogic;
 	if ( showlogic.GetBool() )
-
+		CSprite::SpriteCreate( "editor/logic_changelevel.vmt", GetAbsOrigin(), TRUE );
 */
 }
 
@@ -1640,7 +1714,7 @@ void CChangeLevel::ChangeLevelNow( CBaseEntity *pActivator )
 		// NOTENOTE;
 		// Never, ever do this in MP!!! Really, this should only be done in developer mode, 
 		// but the functionality could be useful for some maps, or modders... -MM
-		DevMsg( "CHANGE LEVEL: %s\n", m_szMapName );
+		Msg( "CHANGE LEVEL: %s\n", m_szMapName );
 		engine->ClientCommand( pPlayer->edict(), "map %s", m_szMapName);
 		return;
 	}
@@ -2244,7 +2318,7 @@ void CTriggerPush::Activate()
 //-----------------------------------------------------------------------------
 void CTriggerPush::Touch( CBaseEntity *pOther )
 {
-	if ( !pOther->IsSolid() || (pOther->GetMoveType() == MOVETYPE_PUSH || pOther->GetMoveType() == MOVETYPE_NONE ) )
+	if ( !pOther->IsSolid() || pOther->GetMoveType() == MOVETYPE_NONE )
 		return;
 
 	if (!PassesTriggerFilters(pOther))
@@ -2346,6 +2420,7 @@ class CTriggerTeleport : public CBaseTrigger
 public:
 	DECLARE_CLASS( CTriggerTeleport, CBaseTrigger );
 
+	void Precache( void );
 	void Spawn( void );
 	void Touch( CBaseEntity *pOther );
 
@@ -2363,9 +2438,18 @@ BEGIN_DATADESC( CTriggerTeleport )
 END_DATADESC()
 
 
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CTriggerTeleport::Precache( void )
+{
+	PrecacheScriptSound("Trigger.Teleport");
+	BaseClass::Precache();
+}
 
 void CTriggerTeleport::Spawn( void )
 {
+	Precache();
 	InitTrigger();
 }
 
@@ -2386,9 +2470,7 @@ void CTriggerTeleport::Touch( CBaseEntity *pOther )
 	CBaseEntity	*pentTarget = NULL;
 
 	if (!PassesTriggerFilters(pOther))
-	{
 		return;
-	}
 
 	// The activator and caller are the same
 	pentTarget = gEntList.FindEntityByName( pentTarget, m_target, NULL, pOther, pOther );
@@ -2445,6 +2527,9 @@ void CTriggerTeleport::Touch( CBaseEntity *pOther )
 
 	tmp += vecLandmarkOffset;
 	pOther->Teleport( &tmp, pAngles, pVelocity );
+	pOther->EmitSound( "Trigger.Teleport" );
+
+	SUB_UseTargets( this, USE_TOGGLE, 0 );
 }
 
 
@@ -2628,15 +2713,20 @@ class CTriggerEndSection : public CBaseTrigger
 public:
 	void Spawn( void );
 	void EndSectionTouch( CBaseEntity *pOther );
-	void InputEndSection( inputdata_t &data  );
+	bool KeyValue( const char *szKeyName, const char *szValue );
+	void InputEndSection( inputdata_t &data );
+	void EXPORT EndSectionUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
 	
 	DECLARE_DATADESC();
+private:
+	int n_iMessage;	//Type of ending to use
 };
 
 LINK_ENTITY_TO_CLASS( trigger_endsection, CTriggerEndSection );
 
 BEGIN_DATADESC( CTriggerEndSection )
 	DEFINE_INPUTFUNC( FIELD_VOID, "EndSection", InputEndSection ),
+	DEFINE_FIELD( n_iMessage, FIELD_INTEGER ),
 END_DATADESC()
 
 void CTriggerEndSection::Spawn( void )
@@ -2649,45 +2739,113 @@ void CTriggerEndSection::Spawn( void )
 
 	InitTrigger();
 
+	SetUse( &CTriggerEndSection::EndSectionUse );
 	// If it is a "use only" trigger, then don't set the touch function.
 	if ( !HasSpawnFlags(SF_ENDSECTION_USEONLY) )
 		SetTouch( &CTriggerEndSection::EndSectionTouch );
 }
 
-void CTriggerEndSection::EndSectionTouch( CBaseEntity *pOther )
+void CTriggerEndSection::EndSectionUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	// Only save on clients
+	if ( pActivator && !pActivator->IsNetClient() )
+		return;
+  
+	// In MP, we need to check that ALL the players are in
+	if ( g_pGameRules->IsMultiplayer() )
+	{
+		//!!!TODO;
+		g_pGameRules->EndMultiplayerGame();
+		return;
+	}
+	else
+	{
+		CBaseEntity *pPlayer = UTIL_GetLocalPlayer();
+		if ( pPlayer )
+		{
+			SetUse( NULL );
+
+			if ( n_iMessage != 0 )
+			{
+				// Use a special ending function
+				//g_engfuncs.pfnEndSection(n_iMessage);
+				switch ( n_iMessage )
+				{
+					//_oem_end_training
+					// End hazard course
+					case 1:
+					{
+						break;
+					}
+					
+					//_oem_end_logo
+					// End the game with a quick logo animation
+					case 2:
+					{
+						break;
+					}
+
+					//_oem_end_demo
+					// Ends the game with a marketable ad
+					case 3:
+					{
+						break;
+					}
+				}
+
+				//TEMPTEMP;
+				engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
+				return;
+			}
+			else
+			{
+				//HACKY MCHACK - This works, but it's nasty. Alfred is going to fix a
+				//bug in gameui that prevents you from dropping to the main menu after
+				// calling disconnect.
+				engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
+
+				UTIL_Remove( this );
+			}
+		}
+	}
+}
+
+void CTriggerEndSection::EndSectionTouch( CBaseEntity *pOther )
+{
 	if ( !pOther->IsPlayer() )
 		return;
 
 	SetTouch( NULL );
-
-	CBaseEntity *pPlayer = UTIL_PlayerByIndex( 1 );
-
-//	if (pev->message)
-//		g_engfuncs.pfnEndSection(STRING(pev->message));
-	if ( pPlayer )
-		engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
-
-	UTIL_Remove( this );
+	EndSectionUse( pOther, this, USE_ON, 0 );
 }
 
 void CTriggerEndSection::InputEndSection( inputdata_t &data )
 {
-	CBaseEntity *pPlayer = UTIL_PlayerByIndex( 1 );
+	EndSectionUse(data.pActivator, this, USE_ON, 0);
+}
 
-	if ( pPlayer )
+bool CTriggerEndSection::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if (FStrEq(szKeyName, "section"))
 	{
-		//HACKY MCHACK - This works, but it's nasty. Alfred is going to fix a
-		//bug in gameui that prevents you from dropping to the main menu after
-		// calling disconnect.
-		engine->ClientCommand( pPlayer->edict(), "toggleconsole;disconnect\n");
-	}
+//		m_iszSectionName = ALLOC_STRING( pkvd->szValue );
+		// Store this in message so we don't have to write save/restore for this ent
+//		pev->message = ALLOC_STRING( pkvd->szValue );
+		n_iMessage = atoi(szValue);
 
-	UTIL_Remove( this );
+		return true;
+	}
+	else
+		return BaseClass::KeyValue( szKeyName, szValue );
+
+	return true;
 }
 
 
+//
+// Trigger Gravity
+// Changes the gravity of anything in its bounds, independently of the server's setting.
+//
 class CTriggerGravity : public CBaseTrigger
 {
 public:
@@ -2696,10 +2854,15 @@ public:
 
 	void Spawn( void );
 	void GravityTouch( CBaseEntity *pOther );
+	void EndTouch(CBaseEntity *pOther);
+private:
+	float m_flOldGravity;
 };
 LINK_ENTITY_TO_CLASS( trigger_gravity, CTriggerGravity );
 
 BEGIN_DATADESC( CTriggerGravity )
+	
+	DEFINE_FIELD( m_flOldGravity, FIELD_FLOAT ),
 
 	// Function Pointers
 	DEFINE_FUNCTION(GravityTouch),
@@ -2709,19 +2872,54 @@ END_DATADESC()
 void CTriggerGravity::Spawn( void )
 {
 	BaseClass::Spawn();
+
+	m_flOldGravity = 1;
+
 	InitTrigger();
 	SetTouch( &CTriggerGravity::GravityTouch );
 }
 
 void CTriggerGravity::GravityTouch( CBaseEntity *pOther )
 {
+#ifdef HL1_DLL
 	// Only save on clients
 	if ( !pOther->IsPlayer() )
 		return;
 
 	pOther->SetGravity( GetGravity() );
+#else
+	if (!PassesTriggerFilters(pOther))
+		return;
+
+	// Players need some extra treatment to reset their gravity when they leave
+	// TODO; This is really unstable for MP! -MM
+	if ( pOther->IsPlayer() )
+	{
+		// Store the old gravity of our toucher
+		m_flOldGravity = pOther->GetGravity();
+
+		// Set gravity, but only once
+		if ( pOther->GetGravity() == m_flOldGravity )
+			pOther->SetGravity( GetGravity() );
+	}
+	else
+	{
+		// Already passed the filter, just set it
+		pOther->SetGravity( GetGravity() );
+	}
+
+	BaseClass::StartTouch(pOther);
+#endif
 }
 
+void CTriggerGravity::EndTouch( CBaseEntity *pOther )
+{
+#ifndef HL1_DLL
+	if ( pOther->IsPlayer() )
+		pOther->SetGravity( m_flOldGravity );
+#endif
+	BaseClass::EndTouch(pOther);
+}
 
 // this is a really bad idea.
 class CAI_ChangeTarget : public CBaseEntity
@@ -2765,10 +2963,6 @@ void CAI_ChangeTarget::InputActivate( inputdata_t &inputdata )
 		}
 	}
 }
-
-
-
-
 
 
 
@@ -3576,14 +3770,14 @@ static void PlayCDTrack( int iTrack )
 
 	if ( iTrack == -1 )
 	{
-		engine->ClientCommand ( pClient, "cd pause\n");
+		engine->ClientCommand( pClient, "cd pause\n");
 	}
 	else
 	{
 		char string [ 64 ];
 
 		Q_snprintf( string,sizeof(string), "cd play %3d\n", iTrack );
-		engine->ClientCommand ( pClient, string);
+		engine->ClientCommand( pClient, string);
 	}
 }
 
@@ -4571,7 +4765,7 @@ void CBaseVPhysicsTrigger::EndTouch( CBaseEntity *pOther )
 //-----------------------------------------------------------------------------
 bool CBaseVPhysicsTrigger::PassesTriggerFilters( CBaseEntity *pOther )
 {
-	if ( pOther->GetMoveType() != MOVETYPE_VPHYSICS && !pOther->IsPlayer() )
+	if ( pOther->GetMoveType() != MOVETYPE_VPHYSICS && (!pOther->IsPlayer() && !FClassnameIs(pOther, "func_pushable")) )
 		return false;
 
 	// First test spawn flag filters

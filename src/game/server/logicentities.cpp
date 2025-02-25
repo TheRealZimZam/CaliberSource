@@ -6,6 +6,7 @@
 //=============================================================================
 
 #include "cbase.h"
+#include "logicentities.h"
 #include "entityinput.h"
 #include "entityoutput.h"
 #include "eventqueue.h"
@@ -15,7 +16,6 @@
 #include "saverestore_utlvector.h"
 #include "vstdlib/random.h"
 #include "gameinterface.h"
-//#include "sprite.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -24,34 +24,57 @@ extern CServerGameDLL g_ServerGameDLL;
 
 // Draw the editor sprites in-game for debug purposes
 ConVar showlogic( "showlogic", "0", FCVAR_CHEAT | FCVAR_DEVELOPMENTONLY, "Show sprites of logic entities" );
-#if 0
+
 //-----------------------------------------------------------------------------
 // Purpose: CLogicalEntitySprite
 // Can only be used for dormant entities. logics that are removed
 // at map start or otherwise do not exist for long (i.e logic_auto)
 // should not use this class.
 //-----------------------------------------------------------------------------
-class CLogicalEntitySprite : public CLogicalEntity
-{
-	DECLARE_CLASS( CLogicalEntitySprite, CLogicalEntity );
-
-public:
-	CLogicalEntitySprite( void );
-	void Think( void );
-
-private:
-	string_t m_iszSpriteName;
-};
-
 BEGIN_DATADESC( CLogicalEntitySprite )
-	DEFINE_KEYFIELD( m_iszSpriteName,		FIELD_STRING, "devsprite" ),
+	DEFINE_KEYFIELD( m_iszSprite, FIELD_STRING, "devsprite" ),
 END_DATADESC()
 
-//TODO; Code this thing
-//Make a sprite, remove it when this thing is removed
-#endif
+CLogicalEntitySprite::CLogicalEntitySprite(void)
+{
+}
+
+void CLogicalEntitySprite::Precache( void )
+{
+	// Precache and set my sprite
+	if ( m_iszSprite != NULL_STRING )
+	{
+		PrecacheModel(STRING(m_iszSprite));
+		SetModel(STRING(m_iszSprite));
+	}
+}
+
+void CLogicalEntitySprite::Spawn( void )
+{
+	Precache();
+
+	// Not solid, never move, and dont draw
+	SetSolid( SOLID_NONE );
+	SetMoveType( MOVETYPE_NONE );
+
+	if ( !showlogic.GetBool() )
+		AddEffects( EF_NODRAW );
+}
+
+void CLogicalEntitySprite::Think( void )
+{
+	// Show thyself if thy server demands it
+	if ( showlogic.GetBool() )
+		RemoveEffects( EF_NODRAW );
+	else
+		AddEffects( EF_NODRAW );
+}
+
+
+//=============================================================================
 
 //-----------------------------------------------------------------------------
+// CLogicCompareInteger
 // Purpose: Compares a set of integer inputs to the one main input
 //			Outputs true if they are all equivalant, false otherwise
 //-----------------------------------------------------------------------------
@@ -152,16 +175,18 @@ void CLogicCompareInteger::InputCompareValues( inputdata_t &inputdata )
 }
 
 
-//-----------------------------------------------------------------------------
-// Purpose: Timer entity. Fires an output at regular or random intervals.
-//-----------------------------------------------------------------------------
+//=============================================================================
+
 //
 // Spawnflags and others constants.
 //
 const int SF_TIMER_UPDOWN = 1;
 const float LOGIC_TIMER_MIN_INTERVAL = 0.01;
 
-
+//-----------------------------------------------------------------------------
+// CTimerEntity
+// Purpose: Timer entity. Fires an output at regular or random intervals.
+//-----------------------------------------------------------------------------
 class CTimerEntity : public CLogicalEntity
 {
 public:
@@ -237,7 +262,6 @@ BEGIN_DATADESC( CTimerEntity )
 	DEFINE_OUTPUT( m_OnTimerLow, "OnTimerLow" ),
 
 END_DATADESC()
-
 
 
 //-----------------------------------------------------------------------------
@@ -491,7 +515,10 @@ int CTimerEntity::DrawDebugTextOverlays( void )
 }
 
 
+//=============================================================================
+
 //-----------------------------------------------------------------------------
+// CLogicLineToEntity
 // Purpose: Computes a line between two entities
 //-----------------------------------------------------------------------------
 class CLogicLineToEntity : public CLogicalEntity
@@ -529,7 +556,6 @@ BEGIN_DATADESC( CLogicLineToEntity )
 	DEFINE_OUTPUT( m_Line, "Line" ),
 
 END_DATADESC()
-
 
 
 //-----------------------------------------------------------------------------
@@ -609,7 +635,10 @@ void CLogicLineToEntity::Think(void)
 }
 
 
+//=============================================================================
+
 //-----------------------------------------------------------------------------
+// CMathRemap
 // Purpose: Remaps a given input range to an output range.
 //-----------------------------------------------------------------------------
 const int SF_MATH_REMAP_IGNORE_OUT_OF_RANGE = 1;
@@ -741,6 +770,8 @@ void CMathRemap::InputValue( inputdata_t &inputdata )
 }
 
 
+//=============================================================================
+
 //-----------------------------------------------------------------------------
 // Purpose: Remaps a given input range to an output range.
 //-----------------------------------------------------------------------------
@@ -786,8 +817,6 @@ BEGIN_DATADESC( CMathColorBlend )
 END_DATADESC()
 
 
-
-
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -812,7 +841,6 @@ void CMathColorBlend::Spawn(void)
 		m_flInMax = flTemp;
 	}
 }
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Input handler that is called when the input value changes.
@@ -840,6 +868,8 @@ void CMathColorBlend::InputValue( inputdata_t &inputdata )
 	}
 }
 
+
+//=============================================================================
 
 //-----------------------------------------------------------------------------
 // Console command to set the state of a global
@@ -870,7 +900,6 @@ void CC_Global_Set( const CCommand &args )
 }
 
 static ConCommand global_set( "global_set", CC_Global_Set, "global_set <globalname> <state>: Sets the state of the given env_global (0 = OFF, 1 = ON, 2 = DEAD).", FCVAR_CHEAT );
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Holds a global state that can be queried by other entities to change
@@ -1124,6 +1153,9 @@ int CEnvGlobal::DrawDebugTextOverlays(void)
 	return text_offset;
 }
 
+
+//=============================================================================
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -1318,6 +1350,8 @@ void CMultiSource::Register(void)
 }
 
 
+//=============================================================================
+
 //-----------------------------------------------------------------------------
 // Purpose: Holds a value that can be added to and subtracted from.
 //-----------------------------------------------------------------------------
@@ -1385,8 +1419,8 @@ BEGIN_DATADESC( CMathCounter )
 	DEFINE_INPUTFUNC(FIELD_FLOAT, "SetHitMax", InputSetHitMax),
 	DEFINE_INPUTFUNC(FIELD_FLOAT, "SetHitMin", InputSetHitMin),
 	DEFINE_INPUTFUNC(FIELD_VOID, "GetValue", InputGetValue),
-	DEFINE_INPUTFUNC( FIELD_VOID, "Enable", InputEnable ),
-	DEFINE_INPUTFUNC( FIELD_VOID, "Disable", InputDisable ),
+	DEFINE_INPUTFUNC(FIELD_VOID, "Enable", InputEnable ),
+	DEFINE_INPUTFUNC(FIELD_VOID, "Disable", InputDisable ),
 
 	// Outputs
 	DEFINE_OUTPUT(m_OutValue, "OutValue"),
@@ -1422,6 +1456,8 @@ bool CMathCounter::KeyValue(const char *szKeyName, const char *szValue)
 //-----------------------------------------------------------------------------
 void CMathCounter::Spawn( void )
 {
+//	BaseClass::Spawn();
+
 	//
 	// Make sure max and min are ordered properly or clamp won't work.
 	//
@@ -1440,6 +1476,8 @@ void CMathCounter::Spawn( void )
 		float flStartValue = clamp(m_OutValue.Get(), m_flMin, m_flMax);
 		m_OutValue.Init(flStartValue);
 	}
+
+//	Think();
 }
 
 //-----------------------------------------------------------------------------
@@ -1689,6 +1727,7 @@ void CMathCounter::UpdateOutValue(CBaseEntity *pActivator, float fNewValue)
 }
 
 
+//=============================================================================
 
 //-----------------------------------------------------------------------------
 // Purpose: Compares a single string input to up to 16 case values, firing an
@@ -1939,6 +1978,8 @@ void CLogicCase::InputPickRandomShuffle( inputdata_t &inputdata )
 }
 
 
+//=============================================================================
+
 //-----------------------------------------------------------------------------
 // Purpose: Compares a floating point input to a predefined value, firing an
 //			output to indicate the result of the comparison.
@@ -2082,6 +2123,9 @@ int CLogicCompare::DrawDebugTextOverlays( void )
 	}
 	return text_offset;
 }
+
+
+//=============================================================================
 
 //-----------------------------------------------------------------------------
 // Purpose: Tests a boolean value, firing an output to indicate whether the
@@ -2290,6 +2334,9 @@ int CLogicBranch::DrawDebugTextOverlays( void )
 	return text_offset;
 }
 
+
+//=============================================================================
+
 //-----------------------------------------------------------------------------
 // Purpose: Autosaves when triggered
 //-----------------------------------------------------------------------------
@@ -2472,6 +2519,12 @@ IPhysicsObject *FindPhysicsObjectByNameOrWorld( string_t name, CBaseEntity *pErr
 	return pPhysics;
 }
 
+
+//=============================================================================
+
+//-----------------------------------------------------------------------------
+// CLogicCollisionPair
+//-----------------------------------------------------------------------------
 class CLogicCollisionPair : public CLogicalEntity
 {
 	DECLARE_CLASS( CLogicCollisionPair, CLogicalEntity );
@@ -2550,7 +2603,10 @@ END_DATADESC()
 LINK_ENTITY_TO_CLASS( logic_collision_pair, CLogicCollisionPair );
 
 
+//=============================================================================
+
 //-----------------------------------------------------------------------------
+// CLogicBranchList
 //-----------------------------------------------------------------------------
 #define MAX_LOGIC_BRANCH_NAMES 16
 
@@ -2592,7 +2648,6 @@ private:
 };
 
 LINK_ENTITY_TO_CLASS(logic_branch_listener, CLogicBranchList);
-
 
 BEGIN_DATADESC( CLogicBranchList )
 
@@ -2641,7 +2696,6 @@ void CLogicBranchList::Spawn( void )
 {
 }
 
-
 //-----------------------------------------------------------------------------
 // Finds all the logic_branches that we are monitoring and register ourselves with them.
 //-----------------------------------------------------------------------------
@@ -2668,7 +2722,6 @@ void CLogicBranchList::Activate( void )
 	BaseClass::Activate();
 }
 
-
 //-----------------------------------------------------------------------------
 // Called when a monitored logic branch is deleted from the world, since that
 // might affect our final result.
@@ -2685,7 +2738,6 @@ void CLogicBranchList::Input_OnLogicBranchRemoved( inputdata_t &inputdata )
 	DoTest( inputdata.pActivator );
 }
 
-
 //-----------------------------------------------------------------------------
 // Called when the value of a monitored logic branch changes.
 //-----------------------------------------------------------------------------
@@ -2693,7 +2745,6 @@ void CLogicBranchList::Input_OnLogicBranchChanged( inputdata_t &inputdata )
 {
 	DoTest( inputdata.pActivator );
 }
-
 
 //-----------------------------------------------------------------------------
 // Input handler to manually test the monitored logic branches and fire the
@@ -2706,7 +2757,6 @@ void CLogicBranchList::InputTest( inputdata_t &inputdata )
 
 	DoTest( inputdata.pActivator );
 }
-
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -2780,6 +2830,9 @@ int CLogicBranchList::DrawDebugTextOverlays( void )
 
 	return text_offset;
 }
+
+
+//=============================================================================
 
 //=============================================================================
 // OBSOLETE ENTITIES

@@ -456,15 +456,15 @@ void DrawAllDebugOverlays( void )
 		}
 	}
 
-	// For not just using one big AI Network
-	if ( g_pAINetworkManager )
-	{
-		g_pAINetworkManager->GetEditOps()->DrawAINetworkOverlay();
-	}
-
 	// PERFORMANCE: only do this in developer mode
-	if ( g_pDeveloper->GetInt() )
+	if ( g_pDeveloper->GetInt() != 0 )
 	{
+		// For not just using one big AI Network
+		if ( g_pAINetworkManager )
+		{
+			g_pAINetworkManager->GetEditOps()->DrawAINetworkOverlay();
+		}
+
 		// iterate through all objects for debug overlays
 		const CEntInfo *pInfo = gEntList.FirstEntInfo();
 
@@ -500,7 +500,6 @@ void DrawAllDebugOverlays( void )
 		}
 	}
 
-	// A hack to draw point_message entities w/o developer required
 	DrawMessageEntities();
 }
 
@@ -1186,7 +1185,7 @@ void CServerGameDLL::PreClientUpdate( bool simulating )
 	}
 	*/
 
-//#ifdef _DEBUG  - allow this in release for now
+//#ifdef _DEBUG
 	DrawAllDebugOverlays();
 //#endif
 	
@@ -1496,7 +1495,7 @@ static TITLECOMMENT gTitleComments[] =
 
 	{ "d1_trainstation_05", "#HL2_Chapter2_Title" },
 	{ "d1_trainstation_06", "#HL2_Chapter2_Title" },
-	
+
 	{ "d1_trainstation_", "#HL2_Chapter1_Title" },
 
 	{ "d1_canals_06", "#HL2_Chapter4_Title" },
@@ -1504,7 +1503,7 @@ static TITLECOMMENT gTitleComments[] =
 	{ "d1_canals_08", "#HL2_Chapter4_Title" },
 	{ "d1_canals_09", "#HL2_Chapter4_Title" },
 	{ "d1_canals_1", "#HL2_Chapter4_Title" },
-	
+
 	{ "d1_canals_0", "#HL2_Chapter3_Title" },
 
 	{ "d1_eli_", "#HL2_Chapter5_Title" },
@@ -1532,7 +1531,6 @@ static TITLECOMMENT gTitleComments[] =
 	{ "d3_citadel_", "#HL2_Chapter12_Title" },
 
 	{ "d3_breen_", "#HL2_Chapter13_Title" },
-	{ "credits", "#HL2_Chapter14_Title" },
 
 	{ "ep1_citadel_00", "#episodic_Chapter1_Title" },
 	{ "ep1_citadel_01", "#episodic_Chapter1_Title" },
@@ -1548,28 +1546,34 @@ static TITLECOMMENT gTitleComments[] =
 	{ "ep1_c17_05", "#episodic_Chapter5_Title" },
 	{ "ep1_c17_06", "#episodic_Chapter5_Title" },
 
-	{ "ep2_outland_01a", "#ep2_Chapter1_Title" },
-	{ "ep2_outland_01", "#ep2_Chapter1_Title" },
-	{ "ep2_outland_02", "#ep2_Chapter2_Title" },
-	{ "ep2_outland_03", "#ep2_Chapter2_Title" },
-	{ "ep2_outland_04", "#ep2_Chapter2_Title" },
-	{ "ep2_outland_05", "#ep2_Chapter3_Title" },
-	
-	{ "ep2_outland_06a", "#ep2_Chapter4_Title" },
-	{ "ep2_outland_06", "#ep2_Chapter3_Title" },
+	// CALIBER
+	{ "c0_training_", "#Caliber_Chapter1_Title" },
 
-	{ "ep2_outland_07", "#ep2_Chapter4_Title" },
-	{ "ep2_outland_08", "#ep2_Chapter4_Title" },
-	{ "ep2_outland_09", "#ep2_Chapter5_Title" },
-	
-	{ "ep2_outland_10a", "#ep2_Chapter5_Title" },
-	{ "ep2_outland_10", "#ep2_Chapter5_Title" },
+	{ "c1_projects_", "#Caliber_Chapter3_Title" },
+	{ "c1_hobotown_", "#Caliber_Chapter4_Title" },
 
-	{ "ep2_outland_11a", "#ep2_Chapter6_Title" },
-	{ "ep2_outland_11", "#ep2_Chapter6_Title" },
-	
-	{ "ep2_outland_12a", "#ep2_Chapter7_Title" },
-	{ "ep2_outland_12", "#ep2_Chapter6_Title" },
+	{ "c2_docks_", "#Caliber_Chapter5_Title" },
+	{ "c2_downtown_", "#Caliber_Chapter6_Title" },
+	{ "c2_oldtown_", "#Caliber_Chapter8_Title" },
+
+	{ "c3_under_", "#Caliber_Chapter9_Title" },
+	{ "c3_refinery_", "#Caliber_Chapter10_Title" },
+	{ "c3_riverside_", "#Caliber_Chapter12_Title" },
+
+	{ "c4_metro_", "#Caliber_Chapter15_Title" },
+	{ "c4_hydro_", "#Caliber_Hydrodam_Title" },
+
+	{ "hyper_", "#Caliber_Hyper_Title" },
+	{ "city_", "#Caliber_City17_Title" },
+	{ "subt_", "#Caliber_Subt_Title" },
+	{ "wasteland_", "#Caliber_Wasteland_Title" },
+	{ "caves_", "#Caliber_Caves_Title" },
+	{ "airex_", "#Caliber_Airex_Title" },
+	{ "kraken_", "#Caliber_Kraken_Title" },
+	{ "vert_", "#Caliber_Vert_Title" },
+	{ "streetwars_", "#Caliber_Streetwars_Title" },
+	{ "citadel_", "#Caliber_Citadel_Title" },
+
 #endif
 };
 

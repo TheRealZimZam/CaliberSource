@@ -26,7 +26,7 @@ enum SCOND_t
 	COND_LOW_PRIMARY_AMMO,
 	COND_NO_PRIMARY_AMMO,
 	COND_NO_SECONDARY_AMMO,
-	COND_NO_WEAPON,
+	COND_NO_WEAPON,			// Put your reading glasses on
 	COND_SEE_HATE,			// A hated/normal priority enemy
 	COND_SEE_FEAR,			// A feared enemy
 	COND_SEE_DISLIKE,		// A somewhat hated/low priority enemy
@@ -81,7 +81,7 @@ enum SCOND_t
 
 	COND_HEAR_COMBAT,				// Heard combat sounds
 	COND_HEAR_WORLD,				// World sounds (machines, doors, non-player footsteps, etc.)
-	COND_HEAR_PLAYER,
+	COND_HEAR_PLAYER,				// Heard the player thumping around
 	COND_HEAR_DANGER,				// Near something dangerous (grenade, map-danger, etc.)
 	COND_HEAR_BULLET_IMPACT,		// Heard a bullet/weapon impact
 	COND_HEAR_THUMPER,

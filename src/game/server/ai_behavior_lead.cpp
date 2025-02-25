@@ -196,7 +196,7 @@ void CAI_LeadBehavior::BeginScheduleSelection()
 	if ( AI_IsSinglePlayer() )
 		SetTarget( AI_GetSinglePlayer() );
 	else
-		SetTarget( AI_GetNearestPlayer(GetOuter()) );
+		SetTarget( AI_GetNearestPlayer(GetOuter()));
 
 	if ( pExpresser )
 	{

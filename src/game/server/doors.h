@@ -64,7 +64,7 @@ public:
 
 	void Activate( void );
 
-	virtual int	ObjectCaps( void ) 
+	virtual int ObjectCaps( void ) 
 	{
 		int flags = BaseClass::ObjectCaps();
 		if ( HasSpawnFlags( SF_DOOR_PUSE ) )
@@ -81,6 +81,8 @@ public:
 
 	virtual bool IsRotatingDoor() { return false; }
 	virtual bool ShouldSavePhysics();
+	virtual bool ShouldMakeSound();
+
 	// used to selectivly override defaults
 	void DoorTouch( CBaseEntity *pOther );
 
@@ -102,6 +104,7 @@ public:
 	void InputToggle( inputdata_t &inputdata );
 	void InputUnlock( inputdata_t &inputdata );
 	void InputSetSpeed( inputdata_t &inputdata );
+	virtual int OnTakeDamage( const CTakeDamageInfo &info );
 
 	Vector m_vecMoveDir;		// The direction of motion for linear moving doors.
 
@@ -114,7 +117,7 @@ public:
 	bool	m_bDoorGroup;
 	bool	m_bLocked;				// Whether the door is locked
 	bool	m_bIgnoreDebris;
-	
+
 	FuncDoorSpawnPos_t m_eSpawnPosition;
 
 	float	m_flBlockDamage;		// Damage inflicted when blocked.
@@ -153,6 +156,8 @@ private:
 	void ChainTouch( CBaseEntity *pOther );	///< Chains touch on through to m_ChainTarget
 	void SetChaining( bool chaining )	{ m_isChaining = chaining; }	///< Latch to prevent recursion
 	bool m_isChaining;
+
+	int	m_damageType;	//Damage type that opens
 
 	void CloseAreaPortalsThink( void );	///< Delays turning off area portals when closing doors to prevent visual artifacts
 };

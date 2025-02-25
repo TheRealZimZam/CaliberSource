@@ -3249,14 +3249,14 @@ float CAI_Navigator::MovementCost( int moveType, Vector &vecStart, Vector &vecEn
 	
 	cost = (vecStart - vecEnd).Length();
 
-	if ( moveType == bits_CAP_MOVE_JUMP || moveType == bits_CAP_MOVE_CLIMB )
-	{
+	if ( moveType == bits_CAP_MOVE_JUMP || bits_CAP_MOVE_CRAWL )
+		cost *= 1.5;
+	else if ( moveType == bits_CAP_MOVE_CLIMB || moveType == bits_CAP_MOVE_SWIM )
 		cost *= 2.0;
-	}
 
 	// Allow the NPC to override the movement cost
 	GetOuter()->MovementCost( moveType, vecStart, vecEnd, &cost );
-	
+
 	return cost;
 }
 

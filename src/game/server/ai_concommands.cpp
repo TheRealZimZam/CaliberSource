@@ -861,7 +861,6 @@ CON_COMMAND( ai_test_los, "Test AI LOS from the player's POV" )
 }
 
 #ifdef VPROF_ENABLED
-
 CON_COMMAND(ainet_generate_report, "Generate a report to the console.")
 {
 	g_VProfCurrentProfile.OutputReport( VPRT_FULL, "AINet" );
@@ -871,5 +870,5 @@ CON_COMMAND(ainet_generate_report_only, "Generate a report to the console.")
 {
 	g_VProfCurrentProfile.OutputReport( VPRT_FULL, "AINet", g_VProfCurrentProfile.BudgetGroupNameToBudgetGroupID( "AINet" ) );
 }
-
 #endif
+

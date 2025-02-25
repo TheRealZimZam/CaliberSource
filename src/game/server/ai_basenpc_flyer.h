@@ -26,6 +26,7 @@ public:
 	void			StartTask( const Task_t *pTask );
 	void			GetVelocity(Vector *vVelocity, AngularImpulse *vAngVelocity);
 	virtual QAngle	BodyAngles();
+	virtual void	NPCThink( void );
 
 protected:
 	
@@ -115,6 +116,7 @@ protected:
 	void SetNoiseMod( const Vector &noise )			{ m_vNoiseMod = noise; }
 
 	virtual void MoveToTarget(float flInterval, const Vector &MoveTarget) = 0;
+	virtual	bool CanMoveDead( void ) { return true; }
 
 	void TranslateNavGoal( CBaseEntity *pTarget, Vector &chasePosition );
 

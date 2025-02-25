@@ -1,6 +1,9 @@
 //====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
 //
-// Purpose: 	Base class for simple projectiles
+// Purpose: 	Base class for projectiles
+// Does some basic lifting and provides helper functions for launched projectiles
+// (rockets, fireballs, launched grenades, etc.)
+// Thrown grenades/slow moving physical projectiles should still use CBaseGrenade
 //
 //=============================================================================
 
@@ -9,16 +12,15 @@
 
 BEGIN_DATADESC( CBaseProjectile )
 	DEFINE_FIELD( m_iDamageType, FIELD_INTEGER ),
-	DEFINE_FIELD( m_flDamageScale, FIELD_FLOAT ),
+	DEFINE_FIELD( m_hIntendedTarget, FIELD_EHANDLE ),
 
-	DEFINE_ENTITYFUNC( ProjectileTouch ),
 	DEFINE_THINKFUNC( FlyThink ),
 END_DATADESC()
 
-//LINK_ENTITY_TO_CLASS( proj_base, CBaseProjectile );
+LINK_ENTITY_TO_CLASS( baseprojectile, CBaseProjectile );
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: This is usually overridden by subclass
 //-----------------------------------------------------------------------------
 void CBaseProjectile::Spawn( void )
 {
@@ -33,11 +35,11 @@ void CBaseProjectile::Spawn( void )
 	UTIL_SetSize( this, -Vector( 1.0f, 1.0f, 1.0f ), Vector( 1.0f, 1.0f, 1.0f ) );
 
 	// Setup attributes.
-	SetGravity( 0.001f );
+	SetGravity( 0.01f );
 	m_takedamage = DAMAGE_NO;
 
 	// Setup the touch and think functions.
-	SetTouch( &CBaseProjectile::ProjectileTouch );
+	SetTouch( &CBaseProjectile::Touch );
 	SetThink( &CBaseProjectile::FlyThink );
 	SetNextThink( gpGlobals->curtime );
 }
@@ -57,13 +59,13 @@ void CBaseProjectile::Precache( void )
 //-----------------------------------------------------------------------------
 unsigned int CBaseProjectile::PhysicsSolidMaskForEntity( void ) const
 { 
-	return BaseClass::PhysicsSolidMaskForEntity() | CONTENTS_HITBOX;
+	return (BaseClass::PhysicsSolidMaskForEntity() | CONTENTS_HITBOX);
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CBaseProjectile::ProjectileTouch( CBaseEntity *pOther )
+void CBaseProjectile::Touch( CBaseEntity *pOther )
 {
 	// Verify a correct "other."
 	Assert( pOther );
@@ -72,28 +74,18 @@ void CBaseProjectile::ProjectileTouch( CBaseEntity *pOther )
 
 	// Handle hitting skybox (disappear).
 	const trace_t *pTrace = &CBaseEntity::GetTouchTrace();
-	trace_t *pNewTrace = const_cast<trace_t*>( pTrace );
-
 	if( pTrace->surface.flags & SURF_SKY )
 	{
 		UTIL_Remove( this );
 		return;
 	}
 
-	CTakeDamageInfo info;
-	info.SetAttacker( GetOwnerEntity() );
-	info.SetInflictor( this );
-	info.SetDamage( GetDamage() );
-	info.SetDamageType( GetDamageType() );
-	GuessDamageForce( &info, GetAbsVelocity(), GetAbsOrigin(), GetDamageScale() );
-
-	Vector dir;
-	AngleVectors( GetAbsAngles(), &dir );
-
-	pOther->DispatchTraceAttack( info, dir, pNewTrace );
-	ApplyMultiDamage();
-
-	UTIL_Remove( this );
+	// Did i hit my intended target?
+	if ( pOther == m_hIntendedTarget )
+	{
+		Detonate();
+		return;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -101,6 +93,12 @@ void CBaseProjectile::ProjectileTouch( CBaseEntity *pOther )
 //-----------------------------------------------------------------------------
 void CBaseProjectile::FlyThink( void )
 {
+	if (!IsInWorld())
+	{
+		UTIL_Remove(this);
+		return;
+	}
+
 	QAngle angles;
 	VectorAngles( -(GetAbsVelocity()), angles );
 	SetAbsAngles( angles );

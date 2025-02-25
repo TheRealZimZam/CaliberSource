@@ -216,6 +216,7 @@ void CAI_BaseNPC::RemoveFromSquad()
 }
 
 //-----------------------------------------------------------------------------
+extern ConVar ai_strict_infighting;
 void CAI_BaseNPC::CheckSquad()
 {
 	if( !InSquad() )
@@ -235,25 +236,10 @@ void CAI_BaseNPC::CheckSquad()
 	CAI_BaseNPC *pSquadmate = m_pSquad->GetFirstMember( &iter );
 	while ( pSquadmate )
 	{
-		if( IRelationType(pSquadmate) < D_LI )
+		if( IRelationType(pSquadmate) == D_HT )
 		{
-			bool bWarn = true;
-
-			// Rollermines and manhacks set their Class to NONE when held by the player, which makes all of 
-			// their squadmates complain that an enemy is in the squad. Suppress this.
-			if( pSquadmate->VPhysicsGetObject() != NULL )
-			{
-				if (pSquadmate->VPhysicsGetObject()->GetGameFlags() & FVPHYSICS_PLAYER_HELD)
-				{
-					bWarn = false;
-				}
-			}	
-
-			if( bWarn )
-			{
-				Warning( "ERROR: Squad '%s' has enemies in it!\n", GetSquad()->GetName() );
-				Warning( "%s doesn't like %s\n\n", GetDebugName(), pSquadmate->GetDebugName() );
-			}
+			if ( !ai_strict_infighting.GetBool() )
+				RemoveFromSquad();
 		}
 
 		pSquadmate = m_pSquad->GetNextMember( &iter );
@@ -261,7 +247,8 @@ void CAI_BaseNPC::CheckSquad()
 }
 
 //-----------------------------------------------------------------------------
-// Returns the number of weapons of this type currently owned by squad members.
+// Returns the number of weapons in this squad.
+// If specified, can count a certain type of weapon aswell.
 //-----------------------------------------------------------------------------
 int CAI_BaseNPC::NumWeaponsInSquad( const char *pszWeaponClassname )
 {
@@ -269,26 +256,30 @@ int CAI_BaseNPC::NumWeaponsInSquad( const char *pszWeaponClassname )
 
 	if( !GetSquad() )
 	{
-		if( GetActiveWeapon() && GetActiveWeapon()->m_iClassname == iszWeaponClassname )
+		// I'm alone in my squad, but I do have a weapon.
+		if( GetActiveWeapon() )
 		{
-			// I'm alone in my squad, but I do have this weapon.
-			return 1;
+			if ( iszWeaponClassname == NULL_STRING || (GetActiveWeapon()->m_iClassname == iszWeaponClassname) )
+				return 1;
 		}
 
 		return 0;
 	}
-
-	int count = 0;
-	AISquadIter_t iter;
-	CAI_BaseNPC *pSquadmate = m_pSquad->GetFirstMember( &iter );
-	while ( pSquadmate )
+	else
 	{
-		if( pSquadmate->GetActiveWeapon() && pSquadmate->GetActiveWeapon()->m_iClassname == iszWeaponClassname )
+		int count = 0;
+		AISquadIter_t iter;
+		CAI_BaseNPC *pSquadmate = m_pSquad->GetFirstMember( &iter );
+		while ( pSquadmate )
 		{
-			count++;
+			if( pSquadmate->GetActiveWeapon() )
+			{
+				if ( iszWeaponClassname == NULL_STRING || (pSquadmate->GetActiveWeapon()->m_iClassname == iszWeaponClassname) )
+					count++;
+			}
+			pSquadmate = m_pSquad->GetNextMember( &iter );
 		}
-		pSquadmate = m_pSquad->GetNextMember( &iter );
-	}
 
-	return count;
+		return count;
+	}
 }

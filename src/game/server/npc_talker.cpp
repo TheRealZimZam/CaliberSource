@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Half life port
+// Purpose: Humanoid Talking NPCS
 //
 // NOTENOTE; Alot of stuff in here is #ifdef'd because said things are handled in
 // the baseclass (ai_basetalker). If you're compiling HL1, it will automagically
@@ -11,8 +11,16 @@
 #include "cbase.h"
 
 #include "npc_talker.h"
+#include "basemultiplayerplayer.h"
 #include "npcevent.h"
 #include "scriptevent.h"
+#include "props.h"
+#include "ai_memory.h"
+#include "ai_senses.h"
+#include "ai_squad.h"
+#ifdef HL2_EPISODIC
+#include "grenade_frag.h"
+#endif
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -28,10 +36,13 @@ END_DATADESC()
 
 BEGIN_DATADESC( CNPC_SimpleTalker )
 	DEFINE_FIELD( m_useTime, FIELD_TIME ),
-	DEFINE_FIELD( m_flNextIdleSpeechTime, FIELD_TIME ),
 	DEFINE_FIELD( m_nSpeak, FIELD_INTEGER ),
 	DEFINE_FIELD( m_iszUse, FIELD_STRING ),
 	DEFINE_FIELD( m_iszUnUse, FIELD_STRING ),
+	DEFINE_FIELD( m_fLastBarrelExploded, FIELD_TIME ),
+	DEFINE_FIELD( m_iNumConsecutiveBarrelsExploded, FIELD_INTEGER ),
+	DEFINE_FIELD( m_fLastPlayerKill, FIELD_TIME ),
+	DEFINE_FIELD( m_iNumConsecutivePlayerKills, FIELD_INTEGER ),
 	// 							m_FollowBehavior (auto saved by AI)
 	// Function Pointers
 	DEFINE_USEFUNC( FollowerUse ),
@@ -41,9 +52,9 @@ END_DATADESC()
 // array of friend names
 char *CNPC_SimpleTalker::m_szFriends[TLK_CFRIENDS] = 
 {
-	"NPC_barney",
-	"NPC_scientist",
-	"NPC_sitting_scientist",
+	"monster_barney",
+	"monster_scientist",
+	"monster_sitting_scientist",
 	NULL,
 };
 
@@ -206,13 +217,32 @@ void CNPC_SimpleTalker::StartTask( const Task_t *pTask )
 		break;
 
 	case TASK_TALKER_BETRAYED:
-		SpeakIfAllowed( TLK_BETRAYED );
+		if (IsOkToSpeak(SPEECH_PRIORITY, true))
+			Speak( TLK_BETRAYED );
+
+		// Player is sussy
+		if ( HasMemory( bits_MEMORY_SUSPICIOUS ) )
+			Remember( bits_MEMORY_PROVOKED );
+		else
+			Remember( bits_MEMORY_SUSPICIOUS );
+
+		TaskComplete();
+		break;
+
+	case TASK_TALKER_PROVOKED:
+		if (IsOkToSpeak(SPEECH_PRIORITY, true))
+			Speak( TLK_PROVOKED );
+
+		Remember( bits_MEMORY_PROVOKED );
+
 		TaskComplete();
 		break;
 
 	case TASK_TALKER_STOPSHOOTING:
 		// tell player to stop shooting
-		SpeakIfAllowed( TLK_NOSHOOT );
+		if(IsOkToSpeak(SPEECH_PRIORITY))
+			Speak( TLK_NOSHOOT );
+
 		TaskComplete();
 		break;
 	default:
@@ -303,20 +333,14 @@ void CNPC_SimpleTalker::RunTask( const Task_t *pTask )
 // Input   :
 // Output  :
 //------------------------------------------------------------------------------
-
 Activity CNPC_SimpleTalker::NPC_TranslateActivity( Activity eNewActivity )
 {
-	if ((eNewActivity == ACT_IDLE)										&& 
-		(GetExpresser()->IsSpeaking())										&&
-		(SelectWeightedSequence ( ACT_SIGNAL3 ) != ACTIVITY_NOT_AVAILABLE)	)
-	{
-		return ACT_SIGNAL3;
-	}
-	else if ((eNewActivity == ACT_SIGNAL3)									&& 
-			 (SelectWeightedSequence ( ACT_SIGNAL3 ) == ACTIVITY_NOT_AVAILABLE)	)
-	{
-		return ACT_IDLE;
-	}
+#if 0
+	if ((eNewActivity == ACT_IDLE) && (GetExpresser()->IsSpeaking()) && 
+		(SelectWeightedSequence ( ACT_SIGNAL2 ) != ACTIVITY_NOT_AVAILABLE) )
+		return ACT_SIGNAL2;
+#endif
+
 	return BaseClass::NPC_TranslateActivity( eNewActivity );
 }
 
@@ -331,6 +355,125 @@ void CNPC_SimpleTalker::Event_Killed( const CTakeDamageInfo &info )
 	}
 #endif
 	BaseClass::Event_Killed( info );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Player in our squad killed something
+// Input  : *pVictim - Who he killed
+//			&info - How they died
+//-----------------------------------------------------------------------------
+void CNPC_SimpleTalker::OnPlayerKilledOther( CBaseEntity *pVictim, const CTakeDamageInfo &info )
+{
+	// filter everything that comes in here that isn't an NPC
+	CAI_BaseNPC *pCombatVictim = dynamic_cast<CAI_BaseNPC *>( pVictim );
+	if ( !pCombatVictim )
+		return;
+
+	// don't comment on kills when we can't see the victim
+	if ( !FVisible( pVictim ) )
+		return;
+
+	// Only do the expensive playerkill logic if its against someone or thing i dont like
+	if ( IRelationType( pCombatVictim ) == D_LI )
+	{
+		// Squadmates scold the player first, then go hostile the second time around
+		if ( (IsInPlayerSquad() || FindNearestFriend(true)) )
+		{
+			SetSchedule( SCHED_TALKER_BETRAYED );
+		}
+		else
+		{
+#ifdef ALLIES_CAN_BE_PROVOKED
+			// Non-squadmates get instantly provoked IF the victim is in the same squad
+			if ( m_pSquad && m_pSquad->SquadIsMember( pCombatVictim ))
+				SetSchedule( SCHED_TALKER_PROVOKED );	//Go straight to provoked
+			else
+#endif
+			{
+				// TODO; Gotta see if the player is justified... self-defence situation, etc.etc. -MM
+				SetSchedule( SCHED_TALKER_BETRAYED );
+			}
+		}
+	}
+	else
+	{
+		if ( IRelationType( pCombatVictim ) != D_HT )
+			return;	// Neutral or ERROR
+
+		CBaseEntity *pInflictor = info.GetInflictor();
+		int		iNumBarrels = 0;
+		int		iConsecutivePlayerKills = 0;
+		bool	bPuntedGrenade = false;
+		bool	bVictimWasEnemy = false;
+		bool	bVictimWasMob = false;
+		bool	bVictimWasAttacker = false;
+		bool	bHeadshot = false;
+		bool	bOneShot = false;
+
+		if ( dynamic_cast<CBreakableProp *>( pInflictor ) && ( info.GetDamageType() & DMG_BLAST ) )
+		{
+			// if a barrel explodes that was initiated by the player within a few seconds of the previous one,
+			// increment a counter to keep track of how many have exploded in a row.
+			if ( gpGlobals->curtime - m_fLastBarrelExploded >= MAX_TIME_BETWEEN_BARRELS_EXPLODING )
+			{
+				m_iNumConsecutiveBarrelsExploded = 0;
+			}
+			m_iNumConsecutiveBarrelsExploded++;
+			m_fLastBarrelExploded = gpGlobals->curtime;
+
+			iNumBarrels = m_iNumConsecutiveBarrelsExploded;
+		}
+		else
+		{
+			// if player kills an NPC within a few seconds of the previous kill,
+			// increment a counter to keep track of how many he's killed in a row.
+			if ( gpGlobals->curtime - m_fLastPlayerKill >= MAX_TIME_BETWEEN_CONSECUTIVE_PLAYER_KILLS )
+			{
+				m_iNumConsecutivePlayerKills = 0;
+			}
+			m_iNumConsecutivePlayerKills++;
+			m_fLastPlayerKill = gpGlobals->curtime;
+			iConsecutivePlayerKills = m_iNumConsecutivePlayerKills;
+		}
+
+		// check if the player killed an enemy by punting a grenade
+#if HL2_EPISODIC
+		if ( pInflictor && Fraggrenade_WasPunted( pInflictor ) && Fraggrenade_WasCreatedByCombine( pInflictor ) )
+			bPuntedGrenade = true;
+#endif
+		// check if the victim was my enemy
+		if ( GetEnemy() == pVictim )
+			bVictimWasEnemy = true;
+
+		AI_EnemyInfo_t *pEMemory = GetEnemies()->Find( pVictim );
+		if ( pEMemory != NULL ) 
+		{
+			// was Alyx being mobbed by this enemy?
+			bVictimWasMob = pEMemory->bMobbedMe;
+
+			// has Alyx recieved damage from this enemy?
+			if ( pEMemory->timeLastReceivedDamageFrom > 0 )
+				bVictimWasAttacker = true;
+		}
+
+		// Was it a headshot?
+		if ( ( pCombatVictim->LastHitGroup() == HITGROUP_HEAD ) && ( info.GetDamageType() & DMG_BULLET ) )
+			bHeadshot = true;
+
+		// Did the player kill the enemy with 1 shot?
+		if ( ( pCombatVictim->GetDamageCount() == 1 ) && ( info.GetDamageType() & DMG_BULLET ) )
+			bOneShot = true;
+
+		// set up the speech modifiers
+		CFmtStrN<512> modifiers( "num_barrels:%d,distancetoplayerenemy:%f,playerammo:%s,consecutive_player_kills:%d,"
+			"punted_grenade:%d,victim_was_enemy:%d,victim_was_mob:%d,victim_was_attacker:%d,headshot:%d,oneshot:%d",
+			iNumBarrels, EnemyDistance( pVictim ), info.GetAmmoName(), iConsecutivePlayerKills,
+			bPuntedGrenade, bVictimWasEnemy, bVictimWasMob, bVictimWasAttacker, bHeadshot, bOneShot );
+
+		SpeakIfAllowed( TLK_PLAYER_KILLED_NPC, modifiers );
+	}
+
+	BaseClass::OnPlayerKilledOther( pVictim, info );
 }
 
 //-----------------------------------------------------------------------------
@@ -391,12 +534,7 @@ void CNPC_SimpleTalker::AlertFriends( CBaseEntity *pKiller )
 				if ( pKiller->GetFlags() & FL_CLIENT )
 				{
 					CNPC_SimpleTalker*pTalkNPC = (CNPC_SimpleTalker *)pFriend;
-#if 0
-					if (pTalkNPC && pTalkNPC->IsOkToCombatSpeak())
-						pTalkNPC->Speak( TLK_BETRAYED );
-#else
 					pTalkNPC->SetSchedule( SCHED_TALKER_BETRAYED );
-#endif
 				}
 				else
 				{
@@ -407,7 +545,7 @@ void CNPC_SimpleTalker::AlertFriends( CBaseEntity *pKiller )
 						
 						if( pAlly && pAlly->GetExpresser()->CanSpeakConcept( TLK_ALLY_KILLED ) )
 						{
-							pAlly->Speak( TLK_ALLY_KILLED );
+							pAlly->SpeakIfAllowed( TLK_ALLY_KILLED );
 						}
 					}
 				}
@@ -519,15 +657,6 @@ void CNPC_SimpleTalker::IdleRespond( void )
 	DeferAllIdleSpeech( random->RandomFloat( TALKER_DEFER_IDLE_SPEAK_MIN, TALKER_DEFER_IDLE_SPEAK_MAX ) );
 }
 
-bool CNPC_SimpleTalker::IsOkToSpeak( void )
-{
-	if ( m_flNextIdleSpeechTime > gpGlobals->curtime )
-		return false;
-
-	return BaseClass::IsOkToSpeak();
-}
-
-
 //-----------------------------------------------------------------------------
 // Purpose: Find a nearby friend to stare at
 //-----------------------------------------------------------------------------
@@ -577,7 +706,7 @@ void CNPC_SimpleTalker::SayHelloToPlayer( CBaseEntity *pPlayer )
 
 	SetSpeechTarget( pPlayer );
 
-	Speak( TLK_HELLO );
+	SpeakIfAllowed( TLK_HELLO );
 	DeferAllIdleSpeech( random->RandomFloat( 5, 10 ) );
 
 	CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
@@ -603,6 +732,7 @@ void CNPC_SimpleTalker::SayHelloToPlayer( CBaseEntity *pPlayer )
 void CNPC_SimpleTalker::DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore )
 {
 	// Brute force. Just plow through NPC list looking for talkers.
+#ifdef HL1_DLL
 	CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
 	CNPC_SimpleTalker *pTalker;
 
@@ -620,6 +750,7 @@ void CNPC_SimpleTalker::DeferAllIdleSpeech( float flDelay, CAI_BaseNPC *pIgnore 
 			}
 		}
 	}
+#endif
 
 	BaseClass::DeferAllIdleSpeech( flDelay, pIgnore );
 }
@@ -642,7 +773,7 @@ void CNPC_SimpleTalker::IdleHeadTurn( CBaseEntity *pTarget, float flDuration, fl
 		 flDuration = random->RandomFloat( 2.0, 4.0 );
 
 	// Add a look target
-	AddLookTarget( pTarget, 1.0, flDuration );
+	AddLookTarget( pTarget, flImportance, flDuration, 0.1 );
 }
 
 //=========================================================
@@ -741,7 +872,7 @@ int CNPC_SimpleTalker::FIdleSpeak( void )
 			}
 		}
 
-		if ( Speak( TLK_IDLE ) )
+		if ( SpeakIfAllowed( TLK_IDLE ) )
 		{
 			DeferAllIdleSpeech( random->RandomFloat( TALKER_DEFER_IDLE_SPEAK_MIN, TALKER_DEFER_IDLE_SPEAK_MAX ) );
 			m_nSpeak++;
@@ -751,7 +882,6 @@ int CNPC_SimpleTalker::FIdleSpeak( void )
 			// We failed to speak. Don't try again for a bit.
 			m_flNextIdleSpeechTime = gpGlobals->curtime + 3;
 		}
-
 		return true;
 	}
 
@@ -765,7 +895,7 @@ int CNPC_SimpleTalker::FIdleSpeak( void )
 //-----------------------------------------------------------------------------
 bool CNPC_SimpleTalker::SpeakQuestionFriend( CBaseEntity *pFriend )
 {
-	return Speak( TLK_QUESTION );
+	return SpeakIfAllowed( TLK_QUESTION );
 }
 
 //-----------------------------------------------------------------------------
@@ -773,7 +903,7 @@ bool CNPC_SimpleTalker::SpeakQuestionFriend( CBaseEntity *pFriend )
 //-----------------------------------------------------------------------------
 bool CNPC_SimpleTalker::SpeakAnswerFriend( CBaseEntity *pFriend )
 {
-	return Speak( TLK_ANSWER );
+	return SpeakIfAllowed( TLK_ANSWER );
 }
 
 //-----------------------------------------------------------------------------
@@ -781,7 +911,7 @@ bool CNPC_SimpleTalker::SpeakAnswerFriend( CBaseEntity *pFriend )
 //-----------------------------------------------------------------------------
 void CNPC_SimpleTalker::FIdleSpeakWhileMoving( void )
 {
-	if ( GetExpresser()->CanSpeak() )
+	if ( GetExpresser() && GetExpresser()->CanSpeak() )
 	{
 		if (!GetExpresser()->IsSpeaking() || GetSpeechTarget() == NULL)
 		{
@@ -835,11 +965,11 @@ void CNPC_SimpleTalker::SetAnswerQuestion( CNPC_SimpleTalker *pSpeaker )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-#ifdef HL1_DLL
 int CNPC_SimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 {
 	CTakeDamageInfo subInfo = info;
 
+#ifdef HL1_DLL
 	// if player damaged this entity, have other friends talk about it.
 	if (subInfo.GetAttacker() && (subInfo.GetAttacker()->GetFlags() & FL_CLIENT) && subInfo.GetDamage() < GetHealth() )
 	{
@@ -855,13 +985,117 @@ int CNPC_SimpleTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 				pTalkNPC->Speak( TLK_NOSHOOT );
 			}
 #else
-			pTalkNPC->SetSchedule( SCHED_TALKER_IDLE_STOP_SHOOTING );
+			pTalkNPC->SetSchedule( SCHED_TALKER_STOP_SHOOTING );
 #endif
 		}
 	}
+#endif
+
+	// A supposed ally has shot me and im not in a barnacle
+	if ( m_NPCState != NPC_STATE_PRONE )
+	{
+		CBaseCombatCharacter *jackAss = info.GetAttacker()->MyCombatCharacterPointer();
+		bool bAttackedByPlayer = false;
+		bool bWasAccidental = true;
+
+		//CFmtStrN<128> modifiers( "attacked_by_player:%d,distance_from_attack:%f,was_accidental:%d", bAttackedByPlayer, EnemyDistance( jackAss ), bWasAccidental );
+
+		// its hopefully in good faith
+		if ( (jackAss && jackAss->IRelationType( this ) >= D_LI) )
+		{
+			if ( (info.GetAttacker()->GetFlags() & FL_CLIENT) )
+			{
+				// Player attacked me
+				bAttackedByPlayer = true;
+
+				// Store the players body direction
+				Vector	idiotDir = GetAbsOrigin() - jackAss->GetAbsOrigin();
+				VectorNormalize( idiotDir );
+				Vector	idiotBodyDir = jackAss->BodyDirection3D();
+				float idiotDot = DotProduct( idiotBodyDir, idiotDir );
+				if ( idiotDot > 0.97f )
+					bWasAccidental = false;
+
+				// I've already been attacked in bad faith, so it makes this easy
+				if (m_afMemory & bits_MEMORY_SUSPICIOUS)
+				{
+					// 50/50 roll for instant aggression
+					if ( random->RandomInt( 0, 1 ) )
+					{
+#ifdef ALLIES_CAN_BE_PROVOKED
+						SetCondition( COND_PROVOKED );
+						SetSchedule( SCHED_TALKER_PROVOKED );
+#endif
+						CapabilitiesRemove(bits_CAP_NO_HIT_PLAYER);
+					}
+					else
+					{
+						// Look at the player very intensely
+						if ( !GetEnemy() )
+							SetSchedule( SCHED_TALKER_STOP_SHOOTING );
+						else
+						{
+							GetMotor()->SetIdealYawToTarget( jackAss->WorldSpaceCenter() );
+							if (IsMoving())
+								AddFacingTarget( jackAss, 1.0, 0.2, 0 );
+						}
+					}
+				}
+				else
+				{
+					// Alright fine... lets do the logics now
+					if ( GetEnemy() == NULL )
+					{
+						if ( HasCondition( COND_HEAR_COMBAT ) )
+						{
+							// There's some shooting over there, it might have been a ricochet - lower chances of suspicion
+							if ( !bWasAccidental || HasCondition( COND_HEAVY_DAMAGE ) )
+							{
+								Remember( bits_MEMORY_SUSPICIOUS );
+							}
+						}
+						else
+						{
+							// I know that was on purpose...
+							Remember( bits_MEMORY_SUSPICIOUS );
+						}
+					}
+					else
+					{
+						// We are properly fighting, so be a little more forgiving
+						if ( subInfo.GetDamageType() & (DMG_BURN|DMG_BLAST|DMG_SONIC) )
+						{
+							// Watch what you're doing!
+							bWasAccidental = true;
+						}
+						else
+						{
+							// That was a little too close!
+							if ( !bWasAccidental || random->RandomInt( 0, 3 ) == 3 )
+								Remember( bits_MEMORY_SUSPICIOUS );
+						}
+					}
+
+					if ( IsOkToSpeak(SPEECH_PRIORITY) )
+						Speak( TLK_NOSHOOT );
+				}
+			}
+			else
+			{
+				if (IsOkToCombatSpeak())
+					Speak( TLK_NOSHOOT );
+
+				// Also tell the jackass to say sorry
+				CNPC_SimpleTalker *pTalkNPC = dynamic_cast<CNPC_SimpleTalker *>( jackAss );
+				if( pTalkNPC && pTalkNPC->GetExpresser()->CanSpeakConcept( TLK_ANSWER ) )
+					pTalkNPC->SpeakIfAllowed( TLK_ANSWER );
+			}
+		}
+	}
+
 	return BaseClass::OnTakeDamage_Alive( subInfo );
 }
-#endif
+
 
 int CNPC_SimpleTalker::SelectNonCombatSpeechSchedule()
 {
@@ -881,7 +1115,7 @@ int CNPC_SimpleTalker::SelectNonCombatSpeechSchedule()
 #endif
 
 	// failed to speak, so look at the player if he's around
-	if ( AI_IsSinglePlayer() && GetExpresser()->CanSpeak() && HasCondition ( COND_SEE_PLAYER ) && random->RandomInt( 0, 6 ) == 0 )
+	if ( AI_IsSinglePlayer() && GetExpresser()->CanSpeak() && HasCondition( COND_SEE_PLAYER ) && random->RandomInt( 0, 6 ) == 0 )
 	{
 		CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
 		Assert( pPlayer );
@@ -939,7 +1173,7 @@ void CNPC_SimpleTalker::OnStartingFollow( CBaseEntity *pTarget )
 
 void CNPC_SimpleTalker::OnStoppingFollow( CBaseEntity *pTarget )
 {
-	if ( !(m_afMemory & bits_MEMORY_PROVOKED) )
+	if ( IsPlayerAlly() )
 	{
 		if ( IsOkToCombatSpeak() )
 		{
@@ -955,8 +1189,10 @@ void CNPC_SimpleTalker::OnStoppingFollow( CBaseEntity *pTarget )
 void CNPC_SimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
 	// Don't allow use during a scripted_sentence
-	if ( m_useTime > gpGlobals->curtime )
+	if ( GetUseTime() > gpGlobals->curtime )
 		return;
+
+	m_useTime = gpGlobals->curtime + 0.2;
 
 	if ( pCaller != NULL && pCaller->IsPlayer() )
 	{
@@ -969,7 +1205,7 @@ void CNPC_SimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCall
 #endif
 		if ( !m_FollowBehavior.GetFollowTarget() && IsInterruptable() )
 		{
-			LimitFollowers( pCaller , 1 );
+			LimitFollowers( pCaller, 1 );
 			if ( m_afMemory & bits_MEMORY_PROVOKED )
 				DevMsg( "I'm not following you, you evil person!\n" );
 			else
@@ -977,27 +1213,58 @@ void CNPC_SimpleTalker::FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCall
 				StartFollowing( pCaller );
 			}
 		}
-		else
+		else if ( m_FollowBehavior.GetFollowTarget() )
 		{
 			StopFollowing();
 		}
+		else
+		{
+			SelectPlayerUseSpeech(pCaller);
+		}
 	}
+
+	BaseClass::NPCUse(pActivator,pCaller,useType,value);
+}
+
+bool CNPC_SimpleTalker::SelectPlayerUseSpeech( CBaseEntity *pPlayer )
+{
+	bool bTalked = false;	//At least one party talked
+
+	// See if I have a custom use response
+	if( IsOkToSpeakInResponseToPlayer() )
+	{
+		if ( m_iszUse != NULL_STRING )
+			SpeakIfAllowed( STRING( m_iszUse ));
+		else
+			SpeakIfAllowed( TLK_USE );
+
+		DeferAllIdleSpeech(random->RandomFloat( TALKER_DEFER_IDLE_SPEAK_MIN, TALKER_DEFER_IDLE_SPEAK_MAX ));
+		bTalked = true;
+	}
+
+	// See if I want the player to reply
+	if ( pPlayer != NULL )
+	{
+		CBaseMultiplayerPlayer *pTalkPlayer = ToBaseMultiplayerPlayer( pPlayer );
+		if ( pTalkPlayer && m_iszUnUse != NULL_STRING )
+		{
+			if ( pTalkPlayer->SpeakIfAllowed( STRING( m_iszUnUse )))
+				bTalked = true;
+		}
+	}
+
+	return bTalked;
 }
 
 void CNPC_SimpleTalker::StartFollowing( CBaseEntity *pLeader )
 {
+	if ( (m_afMemory & bits_MEMORY_PROVOKED) )
+		return;
+
 	if ( !HasSpawnFlags( SF_NPC_GAG ) )
 	{
-		if ( m_iszUse != NULL_STRING )
-		{
-			PlaySentence( STRING( m_iszUse ), 0.0f );
-		}
-		else
-		{
-			SpeakIfAllowed( TLK_STARTFOLLOW );
-		}
-
 		SetSpeechTarget( pLeader );
+		SpeakIfAllowed( TLK_STARTFOLLOW );
 	}
 
 	m_FollowBehavior.SetFollowTarget( pLeader ); 
@@ -1006,21 +1273,10 @@ void CNPC_SimpleTalker::StartFollowing( CBaseEntity *pLeader )
 
 void CNPC_SimpleTalker::StopFollowing( void )
 {
-	if ( !(m_afMemory & bits_MEMORY_PROVOKED) )
+	if ( !HasSpawnFlags( SF_NPC_GAG ) )
 	{
-		if ( !HasSpawnFlags( SF_NPC_GAG ) )
-		{
-			if ( m_iszUnUse != NULL_STRING )
-			{
-				PlaySentence( STRING( m_iszUnUse ), 0.0f );
-			}
-			else
-			{
-				SpeakIfAllowed( TLK_STOPFOLLOW );
-			}
-
-			SetSpeechTarget( GetFollowTarget() );
-		}
+		SetSpeechTarget( GetFollowTarget() );
+		SpeakIfAllowed( TLK_STOPFOLLOW );
 	}
 
 	m_FollowBehavior.SetFollowTarget( NULL ); 
@@ -1180,14 +1436,16 @@ void CNPC_SimpleTalkerExpresser::ResumeMonolog( void )
 	m_fMonologSuspended = false;
 }
 
-// try to smell something
+//-----------------------------------------------------------------------------
+// Purpose: try to smell something
+//-----------------------------------------------------------------------------
 void CNPC_SimpleTalker::TrySmellTalk( void )
 {
 	if ( !IsOkToSpeak() )
 		return;
 
 	if ( HasCondition( COND_SMELL ) && GetExpresser()->CanSpeakConcept( TLK_SMELL ) )
-		Speak( TLK_SMELL );
+		SpeakIfAllowed( TLK_SMELL );
 }
 
 void CNPC_SimpleTalker::OnChangeRunningBehavior( CAI_BehaviorBase *pOldBehavior,  CAI_BehaviorBase *pNewBehavior )
@@ -1244,6 +1502,7 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 	DECLARE_TASK(TASK_TALKER_SPEAK)
 	DECLARE_TASK(TASK_TALKER_HELLO)
 	DECLARE_TASK(TASK_TALKER_BETRAYED)
+	DECLARE_TASK(TASK_TALKER_PROVOKED)
 	DECLARE_TASK(TASK_TALKER_HEADRESET)
 	DECLARE_TASK(TASK_TALKER_STOPSHOOTING)
 	DECLARE_TASK(TASK_TALKER_STARE)
@@ -1263,15 +1522,15 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 		"	Tasks"
 		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"	// Stop and listen
 		"		TASK_WAIT						0.5"				// Wait until sure it's me they are talking to
-		"		TASK_TALKER_IDEALYAW			0"					// look at who I'm talking to
+		"		TASK_TALKER_IDEALYAW			0"			// face who I'm talking to
 		"		TASK_FACE_IDEAL					0"
 		"		TASK_TALKER_EYECONTACT			0"					// Wait until speaker is done
 		"		TASK_TALKER_WAIT_FOR_SEMAPHORE	0"
 		"		TASK_TALKER_EYECONTACT			0"					// Wait until speaker is done
 		"		TASK_TALKER_RESPOND				0"					// Wait and then say my response
-		"		TASK_TALKER_IDEALYAW			0"					// look at who I'm talking to
+		"		TASK_TALKER_IDEALYAW			0"					// face who I'm talking to
 		"		TASK_FACE_IDEAL					0"
-		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL3"
+		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL2"
 		"		TASK_TALKER_EYECONTACT			0"					// Wait until speaker is done
 		""
 		"	Interrupts"
@@ -1293,10 +1552,10 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 
 		"	Tasks"
 		"		TASK_TALKER_SPEAK			0"			// question or remark
-		"		TASK_TALKER_IDEALYAW		0"			// look at who I'm talking to
+		"		TASK_TALKER_IDEALYAW		0"			// face who I'm talking to
 		"		TASK_FACE_IDEAL				0"
-		"		TASK_SET_ACTIVITY			ACTIVITY:ACT_SIGNAL3"
-		"		TASK_TALKER_EYECONTACT		0"
+		"		TASK_SET_ACTIVITY			ACTIVITY:ACT_SIGNAL2"
+		"		TASK_TALKER_EYECONTACT		0"		// make sure you're looking at him
 		"		TASK_WAIT_RANDOM			0.5"
 		""
 		"	Interrupts"
@@ -1317,19 +1576,19 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 		SCHED_TALKER_IDLE_HELLO,
 
 		"	Tasks"
-		"		 TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL3"	// Stop and talk
+		"		 TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL1"	// Stop and talk
 		"		 TASK_TALKER_HELLO				0"			// Try to say hello to player
-		"		 TASK_TALKER_EYECONTACT			0"
+		"		 TASK_TALKER_EYECONTACT			0"		// make sure you're looking at him
 		"		 TASK_WAIT						0.5"		// wait a bit
 		"		 TASK_TALKER_HELLO				0"			// Try to say hello to player
-		"		 TASK_TALKER_EYECONTACT			0"
+		"		 TASK_TALKER_EYECONTACT			0"		// make sure you're looking at him
 		"		 TASK_WAIT						0.5"		// wait a bit
 		"		 TASK_TALKER_HELLO				0"			// Try to say hello to player
-		"		 TASK_TALKER_EYECONTACT			0"
+		"		 TASK_TALKER_EYECONTACT			0"		// make sure you're looking at him
 		"		 TASK_WAIT						0.5"		// wait a bit
 		"		 TASK_TALKER_HELLO				0"			// Try to say hello to player
-		"		 TASK_TALKER_EYECONTACT			0"
-		"		 TASK_WAIT						0.5	"		// wait a bit
+		"		 TASK_TALKER_EYECONTACT			0"		// make sure you're looking at him
+		"		 TASK_WAIT						0.5"		// wait a bit
 		""
 		"	Interrupts"
 		"		COND_NEW_ENEMY"
@@ -1343,19 +1602,23 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 	)
 
 	//=========================================================
-	// > SCHED_TALKER_IDLE_STOP_SHOOTING
+	// > SCHED_TALKER_STOP_SHOOTING
 	//=========================================================
 	DEFINE_SCHEDULE 
 	(
-		SCHED_TALKER_IDLE_STOP_SHOOTING,
+		SCHED_TALKER_STOP_SHOOTING,
 
 		"	Tasks"
-		"		 TASK_TALKER_STOPSHOOTING	0"	// tell player to stop shooting friend
+		"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_ALERT_FACE"
+		"		TASK_TALKER_STOPSHOOTING		0"	// tell player to stop shooting friend
+		"		TASK_TALKER_IDEALYAW			0"	// face who I'm talking to
+		"		TASK_WAIT_FOR_SPEAK_FINISH		0"
 		""
 		"	Interrupts"
 		"		COND_NEW_ENEMY"
 		"		COND_LIGHT_DAMAGE"
 		"		COND_HEAVY_DAMAGE"
+		"		COND_HEAR_DANGER"
 	)
 
 	//=========================================================
@@ -1366,8 +1629,24 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 		SCHED_TALKER_BETRAYED,
 
 		"	Tasks"
-		"		TASK_TALKER_BETRAYED	0"
-		"		TASK_WAIT				0.5"
+		"		TASK_SET_FAIL_SCHEDULE		SCHEDULE:SCHED_ALERT_FACE"
+		"		TASK_TALKER_BETRAYED		0"	// call the player a dumbass
+		"		TASK_TALKER_IDEALYAW		0"	// face who I'm talking to
+		"		TASK_WAIT_FOR_SPEAK_FINISH	0"
+		""
+		"	Interrupts"
+		"		COND_HEAR_DANGER"
+	)
+
+	DEFINE_SCHEDULE 
+	(
+		SCHED_TALKER_PROVOKED,
+
+		"	Tasks"
+		"		TASK_TALKER_PROVOKED		0"	// call the player a dumbass
+		"		TASK_SET_FAIL_SCHEDULE		SCHEDULE:SCHED_ALERT_FACE"
+		"		TASK_TALKER_IDEALYAW		0"	// face who I'm talking to
+		"		TASK_WAIT_FOR_SPEAK_FINISH	0"
 		""
 		"	Interrupts"
 		"		COND_HEAR_DANGER"
@@ -1412,8 +1691,7 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 		"		 TASK_TALKER_CLIENT_STARE		6"
 		"		 TASK_TALKER_STARE				0"
 		"		 TASK_TALKER_IDEALYAW			0"			// look at who I'm talking to
-		"		 TASK_FACE_IDEAL				0			 "
-		"		 TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL3"
+		"		 TASK_FACE_IDEAL				0"
 		"		 TASK_TALKER_EYECONTACT			0"
 		""
 		"	Interrupts"
@@ -1440,7 +1718,6 @@ AI_BEGIN_CUSTOM_NPC(talk_monster,CNPC_SimpleTalker)
 		"	Tasks"
 		"		TASK_TALKER_IDEALYAW			0"			// look at who I'm talking to
 		"		TASK_FACE_IDEAL					0"
-//		"		TASK_SET_ACTIVITY				ACTIVITY:ACT_SIGNAL3"
 		"		TASK_TALKER_EYECONTACT			0"			// Wait until speaker is done
 		""
 		"	Interrupts"

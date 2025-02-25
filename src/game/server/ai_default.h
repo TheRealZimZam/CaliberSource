@@ -38,6 +38,7 @@ enum
 	SCHED_VICTORY_DANCE,	// Give the enemy a complimentary Tea-Bag
 	SCHED_TARGET_FACE,
 	SCHED_TARGET_CHASE,
+	SCHED_TARGET_USE,
 	SCHED_SMALL_FLINCH,	// Legacy small flinch (small flinching is usually done through gestures)
 	SCHED_BIG_FLINCH,	// Big flinch (always full animation)
 	SCHED_BACK_AWAY_FROM_ENEMY,
@@ -57,7 +58,8 @@ enum
 	SCHED_FAIL_ESTABLISH_LINE_OF_FIRE,
 	SCHED_SHOOT_ENEMY_COVER,	// Mostly the same as range_attack1???
 	SCHED_COWER, // usually a last resort!
-	SCHED_STUNNED, // Knockdown from damage-different than a flinch
+	SCHED_STUNNED, // Knockdown from damage, different than a flinch
+	SCHED_GETUP,
 	SCHED_MELEE_ATTACK1,
 	SCHED_MELEE_ATTACK2,
 	SCHED_RANGE_ATTACK1,
@@ -84,6 +86,7 @@ enum
 	SCHED_NEW_WEAPON,
 	SCHED_NEW_WEAPON_CHEAT,
 	SCHED_SWITCH_TO_PENDING_WEAPON,
+	SCHED_DROP_WEAPON,
 	SCHED_GET_HEALTHKIT,
 	SCHED_WAIT_FOR_SPEAK_FINISH,
 
@@ -110,7 +113,8 @@ enum
 	SCHED_BURNING_RUN,
 	SCHED_BURNING_STAND,
 
-	SCHED_DUCK_DODGE,	// Dodge anim
+	SCHED_DODGE,		// Dodge roll
+	SCHED_DUCK_DODGE,	// Dodge duck
 
 	SCHED_INTERACTION_MOVE_TO_PARTNER,
 	SCHED_INTERACTION_WAIT_FOR_PARTNER,

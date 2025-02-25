@@ -60,8 +60,9 @@ public:
 
 	virtual CBaseAnimating*	GetBaseAnimating() { return this; }
 
-	// Basic think function
+	// Basic think functions
 	void SpinThink( void );
+	void TumbleThink( void );
 
 	// Cycle access
 	void SetCycle( float flCycle );
@@ -80,8 +81,8 @@ public:
 
 
 	// Basic NPC Animation functions
-	virtual float	GetIdealSpeed( ) const;
-	virtual float	GetIdealAccel( ) const;
+	virtual float	GetIdealSpeed();	//const
+	virtual float	GetIdealAccel();	//const
 	virtual void	StudioFrameAdvance(); // advance animation frame to some time in the future
 	void StudioFrameAdvanceManual( float flInterval );
 	bool	IsValidSequence( int iSequence );

@@ -67,9 +67,7 @@ void W_Precache(void)
 	g_sModelIndexLaserDot = CBaseEntity::PrecacheModel("sprites/laserdot.vmt");
 #endif // HL1_DLL
 
-#ifndef TF_DLL
 	g_sModelIndexFireball = CBaseEntity::PrecacheModel ("sprites/zerogxplode.vmt");// fireball
-
 	g_sModelIndexSmoke = CBaseEntity::PrecacheModel ("sprites/steam1.vmt");// smoke
 	g_sModelIndexBubbles = CBaseEntity::PrecacheModel ("sprites/bubble.vmt");//bubbles
 	g_sModelIndexLaser = CBaseEntity::PrecacheModel( (char *)g_pModelNameLaser );
@@ -81,9 +79,7 @@ void W_Precache(void)
 #endif
 
 	CBaseEntity::PrecacheModel("effects/bubble.vmt");	//bubble trails
-
 	CBaseEntity::PrecacheModel("models/weapons/w_bullet.mdl");
-#endif
 
 	CBaseEntity::PrecacheScriptSound( "BaseCombatWeapon.WeaponDrop" );
 	CBaseEntity::PrecacheScriptSound( "BaseCombatWeapon.WeaponMaterialize" );
@@ -559,7 +555,19 @@ void CBaseCombatWeapon::SpinThink( void )
 {
 	// Weapons add some vertical velocity to the spin so they slightly hover up and down,
 	// because guns are so self-centered and flamboyant
-	//!!!TODO;
+	//!!!TODO; Use a Sine wave
+#if 0
+	float fOffset;
+	float freq;
+	float step = M_PI / (float)divs;
+
+	freq = 0;
+	for ( i = 0; i < divs; i++ )
+	{
+		noise[i] = sin( freq );
+		freq += step;
+	}
+#endif
 
 	// Baseclass takes care of the horizontal spin
 	BaseClass::SpinThink();

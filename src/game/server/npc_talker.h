@@ -1,6 +1,6 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: Half life port
+// Purpose: Humanoid Talking NPCS
 //
 // $Workfile:     $
 // $Date:         $
@@ -52,6 +52,8 @@
 
 #define SF_NPC_PREDISASTER			( 1 << 16 )	// This is a predisaster scientist or barney. Influences how they speak.
 #define TLK_CFRIENDS		4
+#define MAX_TIME_BETWEEN_BARRELS_EXPLODING			5.0f
+#define MAX_TIME_BETWEEN_CONSECUTIVE_PLAYER_KILLS	3.0f
 
 //=============================================================================
 // >> CNPC_SimpleTalker
@@ -112,9 +114,7 @@ public:
 
 	virtual CAI_Expresser *CreateExpresser() { return new CNPC_SimpleTalkerExpresser(this); }
 	
-//	virtual void			StartFollowing( CBaseEntity *pLeader ) { m_FollowBehavior.SetFollowTarget( pLeader ); DeferSchedulingToBehavior( &m_FollowBehavior ); }
 	virtual void			StartFollowing( CBaseEntity *pLeader );
-//	virtual void			StopFollowing( ) { m_FollowBehavior.SetFollowTarget( NULL ); DeferSchedulingToBehavior( NULL ); }
 	virtual void			StopFollowing( void );
 	CBaseEntity		*GetFollowTarget( void ) { return m_FollowBehavior.GetFollowTarget(); }
 
@@ -123,10 +123,10 @@ public:
 
 	int				PlayScriptedSentence( const char *pszSentence, float delay, float volume, soundlevel_t soundlevel, bool bConcurrent, CBaseEntity *pListener );
 	virtual void 	FollowerUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value );
+	virtual bool	SelectPlayerUseSpeech( CBaseEntity *pPlayer = NULL );
 	void			Event_Killed( const CTakeDamageInfo &info );
-#ifdef HL1_DLL
+	virtual void	OnPlayerKilledOther( CBaseEntity *pVictim, const CTakeDamageInfo &info );
 	int				OnTakeDamage_Alive( const CTakeDamageInfo &info );
-#endif
 
 	bool CreateBehaviors()
 	{
@@ -167,11 +167,12 @@ public:
 		SCHED_TALKER_IDLE_RESPONSE = BaseClass::NEXT_SCHEDULE,
 		SCHED_TALKER_IDLE_SPEAK,
 		SCHED_TALKER_IDLE_HELLO,
-		SCHED_TALKER_IDLE_STOP_SHOOTING,
 		SCHED_TALKER_IDLE_WATCH_CLIENT,
 		SCHED_TALKER_IDLE_WATCH_CLIENT_STARE,
 		SCHED_TALKER_IDLE_EYE_CONTACT,
+		SCHED_TALKER_STOP_SHOOTING,
 		SCHED_TALKER_BETRAYED,
+		SCHED_TALKER_PROVOKED,
 
 		// !ALWAYS LAST!
 		NEXT_SCHEDULE,	
@@ -186,6 +187,7 @@ public:
 		TASK_TALKER_SPEAK,			// question or remark
 		TASK_TALKER_HELLO,			// Try to say hello to player
 		TASK_TALKER_BETRAYED,		// Player killed an ally
+		TASK_TALKER_PROVOKED,		// Player killed multiple allies
 		TASK_TALKER_HEADRESET,		// reset head position
 		TASK_TALKER_STOPSHOOTING,	// tell player to stop shooting friend
 		TASK_TALKER_STARE,			// let the player know I know he's staring at me.
@@ -204,8 +206,6 @@ public:
 	virtual bool IsValidSpeechTarget( int flags, CBaseEntity *pEntity );
 	
 	CBaseEntity		*FindNearestFriend(bool fPlayer);
-
-	bool IsOkToSpeak( void );
 
 	void SayHelloToPlayer( CBaseEntity *pPlayer );
 	virtual bool CanSayHello( void );
@@ -230,7 +230,6 @@ public:
 	void OnResumeMonolog() 		{	Speak( TLK_RESUME ); }
 	
 	int			m_nSpeak;						// number of times initiated talking
-//	float		m_flNextIdleSpeechTime;
 
 	static char *m_szFriends[TLK_CFRIENDS];		// array of friend names
 	CBaseEntity		*EnumFriends( CBaseEntity *pentPrevious, int listNumber, bool bTrace );
@@ -245,6 +244,10 @@ public:
 protected:
 	CAI_FollowBehavior m_FollowBehavior;
 	float		m_useTime;						// Don't allow +USE until this time
+	float	m_fLastBarrelExploded;
+	float	m_fLastPlayerKill;
+	int		m_iNumConsecutiveBarrelsExploded;  // Companions keep track of the # of consecutive barrels exploded by the player and speaks a response as it increases
+	int		m_iNumConsecutivePlayerKills;  // Alyx keeps track of the # of consecutive kills by the player and speaks a response as it increases
 
 	//---------------------------------
 

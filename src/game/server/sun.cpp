@@ -79,13 +79,15 @@ BEGIN_DATADESC( CSun )
 	DEFINE_KEYFIELD( m_nOverlaySize, FIELD_INTEGER, "overlaysize" ),
 	DEFINE_KEYFIELD( m_strMaterial, FIELD_STRING, "material" ),
 	DEFINE_KEYFIELD( m_strOverlayMaterial, FIELD_STRING, "overlaymaterial" ),
-	
+
 	// NOT SAVED
 	// m_nOverlayMaterial
 	// m_nMaterial
 
 	DEFINE_FIELD( m_bOn, FIELD_BOOLEAN ),
 
+	DEFINE_INPUT( m_nSize, FIELD_INTEGER, "SetScale" ),
+	DEFINE_INPUT( m_nOverlaySize, FIELD_INTEGER, "SetOverlayScale" ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "TurnOn", InputTurnOn ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "TurnOff", InputTurnOff ),
 	DEFINE_INPUTFUNC( FIELD_COLOR32, "SetColor", InputSetColor ),
@@ -133,9 +135,7 @@ void CSun::Activate()
 
 	// Default behavior
 	if ( m_nOverlaySize == -1 )
-	{
 		m_nOverlaySize = m_nSize;
-	}
 
 	// Cache off our image indices
 	if ( m_strMaterial == NULL_STRING )

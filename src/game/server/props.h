@@ -19,8 +19,8 @@
 //=============================================================================================================
 // PROP TYPES
 // static_prop - don't move, don't animate, don't do anything.
-// dynamic_prop - move (if enabled), take damage, and animate
-// physics_prop - move, take damage, but don't animate
+// dynamic_prop - don't move, take damage, and animate
+// physics_prop - move, take damage, and animate if enabled
 //=============================================================================================================
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -347,6 +347,7 @@ public:
 	void Precache();
 	bool CreateVPhysics( void );
 	bool OverridePropdata( void );
+	virtual bool UseSimplePhysics() { return FClassnameIs( this, "prop_physics_simple"); }
 
 	virtual void VPhysicsUpdate( IPhysicsObject *pPhysics );
 	virtual void VPhysicsCollision( int index, gamevcollisionevent_t *pEvent );
@@ -361,6 +362,7 @@ public:
 	bool CanBePickedUpByPhyscannon( void );
 	void OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_t reason );
 	void OnPhysGunDrop( CBasePlayer *pPhysGunUser, PhysGunDrop_t reason );
+	void PhysicsPropTouch( CBaseEntity *pOther );
 
 	bool GetPropDataAngles( const char *pKeyName, QAngle &vecAngles );
 	float GetCarryDistanceOffset( void );
@@ -371,9 +373,14 @@ public:
 	void GetMassCenter( Vector *pMassCenter );
 	float GetMass() const;
 
+	void	TumbleThink( void );
+
 	void ClearFlagsThink( void );
 
 	virtual int OnTakeDamage( const CTakeDamageInfo &info );
+	void	CascadePush( const Vector &vecForce );
+	void	ToggleTumble();
+
 	int DrawDebugTextOverlays(void);
 	bool IsGib();
 	DECLARE_DATADESC();
@@ -405,10 +412,36 @@ private:
 	bool		m_bThrownByPlayer;
 	bool		m_bFirstCollisionAfterLaunch;
 
+	// Simpleprop
+	bool		m_bTumbling;	// Used by simple props to fake tumble
+	bool		m_bCanTumble;
+
+	int			m_iLandDirection;
+	enum LandDirection_t
+	{
+		UPRIGHT = 0,
+		LEFT,
+		RIGHT,					
+		BACKWARDS,
+		FORWARDS,
+	};
+
 protected:
 	CNetworkVar( bool, m_bAwake );
 };
 
+// For entities that want simple physics
+class CPhysicsPropSimple : public CPhysicsProp
+{
+	DECLARE_CLASS( CPhysicsPropSimple, CPhysicsProp );
+
+public:
+	CPhysicsPropSimple( void ) 
+	{
+	}
+	virtual bool UseSimplePhysics() { return true; }
+
+};
 
 // An interface so that objects parented to props can receive collision interaction events.
 enum parentCollisionInteraction_t

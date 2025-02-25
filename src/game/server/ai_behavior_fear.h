@@ -42,7 +42,9 @@ public:
 	//void OnStartSchedule( int scheduleType );
 
 	bool EnemyDislikesMe();
-	
+	bool ShouldSurrender();
+	bool CanSurrenderToEnemy();
+
 	void MarkAsUnsafe();
 	bool IsInASafePlace();
 	void SpoilSafePlace();
@@ -58,6 +60,7 @@ public:
 		SCHED_FEAR_MOVE_TO_SAFE_PLACE = BaseClass::NEXT_SCHEDULE,		
 		SCHED_FEAR_FLEE_TO_SAFE_PLACE,
 		SCHED_FEAR_STAY_IN_SAFE_PLACE,
+		SCHED_FEAR_SURRENDER,
 		NEXT_SCHEDULE,
 
 		TASK_FEAR_GET_PATH_TO_SAFETY_HINT = BaseClass::NEXT_TASK,
@@ -79,6 +82,7 @@ private:
 	virtual int		SelectSchedule();
 
 	bool			m_bPlayerIsAlly;
+	bool			m_bSurrendering;
 
 	float			m_flTimeToSafety;
 	float			m_flTimePlayerLastVisible;

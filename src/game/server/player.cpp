@@ -667,6 +667,30 @@ void CBasePlayer::SetupVisibility( CBaseEntity *pViewEntity, unsigned char *pvs,
 	org = EyePosition();
 
 	engine->AddOriginToPVS( org );
+
+#ifdef HL1_DLL
+	CPointCamera *pCameraEnt = NULL;
+	while( pCameraEnt = gEntList.NextEntByClass( pCameraEnt ) )
+	{
+		pCameraEnt->SetActive( false );
+	}
+	
+	// FIXME: cache previously seen monitor as a first guess?  Probably doesn't make sense to
+	// optimize for the case where we are seeing a monitor.
+	CFuncMonitor *pMonitorEnt = NULL;
+	while( pMonitorEnt = gEntList.NextEntByClass( pMonitorEnt ) )
+	{
+		if( pMonitorEnt->IsOn() && pMonitorEnt->IsInPVS( edict(), pvs ) )
+		{
+			CPointCamera *pCameraEnt = pMonitorEnt->GetCamera();
+			if( pCameraEnt )
+			{
+				engine->AddOriginToPVS( pCameraEnt->GetAbsOrigin() );
+				pCameraEnt->SetActive( true );
+			}
+		}
+	}
+#endif
 }
 
 int	CBasePlayer::UpdateTransmitState()
@@ -1052,17 +1076,17 @@ void CBasePlayer::Cough( int CoughType )
 	{
 	case 1:
 		// Normal cough (mustiness, dust, etc.), just a little shake
-		ViewPunch(QAngle(random->RandomInt(-0.2,0.2), random->RandomInt(-0.2,0.2), random->RandomInt(-0.2,0.2)));
+		ViewPunch(QAngle(random->RandomInt(-0.5,0.5), random->RandomInt(-0.5,0.5), random->RandomInt(-0.5,0.5)));
 		EmitSound( "Player.Cough" );
 		break;
 	case 2:
 		// Poison cough (World hazards, minor poisons, etc.)
-		ViewPunch(QAngle(random->RandomInt(-0.75,0.75), random->RandomInt(-0.75,0.75), random->RandomInt(-0.75,0.75)));
+		ViewPunch(QAngle(random->RandomInt(-1.0,1.0), random->RandomInt(-1.0,1.0), random->RandomInt(-1.0,1.0)));
 		EmitSound( "Player.Cough" );
 		break;
 	case 3:
 		// Huge whooping cough (Huge poison attacks, stunned, etc.)
-		ViewPunch(QAngle(random->RandomInt(-1.0,1.0), random->RandomInt(-1.0,1.0), random->RandomInt(-1.0,1.0)));
+		ViewPunch(QAngle(random->RandomInt(-1.5,1.5), random->RandomInt(-1.5,1.5), random->RandomInt(-1.5,1.5)));
 		EmitSound( "Player.BigCough" );
 		break;
 	default:
@@ -1501,9 +1525,9 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 // Purpose: 
 // Input  : &info - 
 //-----------------------------------------------------------------------------
-#define MIN_SHOCK_AND_CONFUSION_DAMAGE	35.0f	// 30.0
+#define MIN_SHOCK_AND_CONFUSION_DAMAGE	20.0f	// 30.0
 #define MIN_EAR_RINGING_DISTANCE		240.0f	// 20 feet
-#define MIN_EAR_RINGING_DAMAGE			15.0f
+#define MIN_EAR_RINGING_DAMAGE			35.0f
 
 void CBasePlayer::OnDamagedByExplosion( const CTakeDamageInfo &info )
 {
@@ -1525,15 +1549,37 @@ void CBasePlayer::OnDamagedByExplosion( const CTakeDamageInfo &info )
 		return;
 
 	DevMsg( "expl dist %f damage %f\n", distanceFromPlayer, lastDamage );
-	int effect = shock ? 
-		random->RandomInt( 35, 37 ) : 
-		random->RandomInt( 32, 34 );
+	int effect = shock ? random->RandomInt( 35, 37 ) : random->RandomInt( 32, 34 );
 
 	CSingleUserRecipientFilter user( this );
 	enginesound->SetPlayerDSP( user, effect, false );
 	// Add a bit of trembling after the explosion, ontop of the big punchback of critical damage effects
 	UTIL_ScreenShake( info.GetInflictor()->GetAbsOrigin(), 2.0, 0.5, 3.0, 1000, SHAKE_START, true );
 }
+
+/*
+void CBasePlayer::CheckExplosionEffects( void )
+{
+	if ( !m_nExplosionFX )
+		return;
+
+	if ( gpGlobals->curtime < m_flExplosionFXEndTime )
+		return;
+
+	ClearExplosionEffects();
+}
+
+void CBasePlayer::ClearExplosionEffects( void )
+{
+	m_nExplosionFX = FEXPLOSION_NONE;
+	m_flExplosionFXEndTime = 0;
+}
+
+int CBasePlayer::GetExplosionEffects( void ) const
+{
+	return m_nExplosionFX;
+}
+*/
 
 //=========================================================
 // PackDeadPlayerItems - call this when a player dies to
@@ -1721,7 +1767,8 @@ int CBasePlayer::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 		if ( attacker->IsPlayer() )
 		{
 			CBasePlayer *player = ToBasePlayer( attacker );
-			event->SetInt("attacker", player->GetUserID() ); // hurt by other player
+			if ( player )
+				event->SetInt("attacker", player->GetUserID() ); // hurt by other player
 		}
 		else
 		{
@@ -1898,6 +1945,10 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 
 			case PLAYER_SUPERJUMP:
 				idealActivity = ACT_LEAP;
+			break;
+
+			case PLAYER_FALL:
+				idealActivity = ACT_FALL;
 			break;
 
 			case PLAYER_DIE:
@@ -2775,12 +2826,12 @@ bool CBasePlayer::IsValidObserverTarget(CBaseEntity * target)
 
 	CBasePlayer * player = ToBasePlayer( target );
 
-	/* Don't spec observers or players who haven't picked a class yet
- 	if ( player->IsObserver() )
-		return false;	*/
-
 	if( player == this )
 		return false; // We can't observe ourselves.
+
+	// Don't spec observers or players who haven't picked a class yet
+ 	if ( player->IsObserver() )
+		return false;
 
 	if ( player->IsEffectActive( EF_NODRAW ) ) // don't watch invisible players
 		return false;
@@ -3784,7 +3835,7 @@ void CBasePlayer::HandleFuncTrain(void)
 	
 	if ( !pTrain )
 	{
-		if ( GetActiveWeapon()->ObjectCaps() & FCAP_DIRECTIONAL_USE )
+		if ( GetActiveWeapon() && GetActiveWeapon()->ObjectCaps() & FCAP_DIRECTIONAL_USE )
 		{
 			m_iTrain = TRAIN_ACTIVE | TRAIN_NEW;
 
@@ -3813,7 +3864,7 @@ void CBasePlayer::HandleFuncTrain(void)
 				pTrain = trainTrace.m_pEnt;
 
 
-			if ( !pTrain || !(pTrain->ObjectCaps() & FCAP_DIRECTIONAL_USE) || !pTrain->OnControls(this) )
+			if ( !pTrain || !(pTrain->ObjectCaps() & FCAP_DIRECTIONAL_USE) || !pTrain->OnControls(this) )	//GetContainingEntity
 			{
 				m_afPhysicsFlags &= ~PFLAG_DIROVERRIDE;
 				m_iTrain = TRAIN_NEW|TRAIN_OFF;
@@ -3872,6 +3923,7 @@ void CBasePlayer::PreThink(void)
 	UpdateClientData();
 	
 	CheckTimeBasedDamage();
+//!	CheckExplosionEffects();
 
 	CheckSuitUpdate();
 
@@ -4394,7 +4446,7 @@ void CBasePlayer::SetSuitUpdate(char *name, int fgroup, int iNoRepeatTime)
 // UpdatePlayerSound - updates the position of the player's
 // reserved sound slot in the sound list.
 //=========================================================
-ConVar player_showsound( "player_showsound", "0", FCVAR_CHEAT, "Visualize the sound the player makes - for testing."  );
+ConVar player_showsound( "player_showsound", "0", FCVAR_CHEAT, "Visualize the sound the player makes."  );
 void CBasePlayer::UpdatePlayerSound( void )
 {
 	int iBodyVolume;
@@ -4620,7 +4672,7 @@ void CBasePlayer::PostThink()
 				m_Local.m_flFallVelocity = 0;
 			}
 
-			// select the proper animation for the singleplayer character	
+			// select the proper animation for the singleplayer character
 			VPROF( "CBasePlayer::PostThink-Animation" );
 			// If he's in a vehicle, sit down
 			if ( IsInAVehicle() )
@@ -5215,6 +5267,7 @@ void CBasePlayer::Precache( void )
 	PrecacheScriptSound( "Player.Wade" );
 	PrecacheScriptSound( "Player.AmbientUnderWater" );
 	enginesound->PrecacheSentenceGroup( "HEV" );
+	PrecacheSound("items/qdmg.wav");
 
 	// These are always needed
 #ifndef TF_DLL
@@ -5348,6 +5401,12 @@ int CBasePlayer::Restore( IRestore &restore )
 void CBasePlayer::OnRestore( void )
 {
 	BaseClass::OnRestore();
+
+	// If we are controlling a train, resend our train status
+	if( !FBitSet( m_iTrain, TRAIN_OFF ) )
+	{
+		m_iTrain |= TRAIN_NEW;
+	}
 
 	SetViewEntity( m_hViewEntity );
 	SetDefaultFOV(m_iDefaultFOV);		// force this to reset if zero
@@ -6036,19 +6095,21 @@ void CBasePlayer::ImpulseCommands( )
 		break;
 
 	case 200:
-		if ( IsSuitEquipped() )
 		{
+			// Manually Holster weapon
 			CBaseCombatWeapon *pWeapon;
-
 			pWeapon = GetActiveWeapon();
-			
-			if( pWeapon->IsEffectActive( EF_NODRAW ) )
+
+			if ( pWeapon )
 			{
-				pWeapon->Deploy();
-			}
-			else
-			{
-				pWeapon->Holster();
+				if( pWeapon->IsEffectActive( EF_NODRAW ) )
+				{
+					pWeapon->Deploy();
+				}
+				else
+				{
+					pWeapon->Holster();
+				}
 			}
 		}
 		break;
@@ -6119,7 +6180,7 @@ static void CreateJalopy( CBasePlayer *pPlayer )
 		pJeep->SetAbsAngles( vecAngles );
 		pJeep->KeyValue( "model", "models/vehicle.mdl" );
 		pJeep->KeyValue( "solid", "6" );
-		pJeep->KeyValue( "targetname", "jeep" );
+		pJeep->KeyValue( "targetname", "jalopy" );
 		pJeep->KeyValue( "vehiclescript", "scripts/vehicles/jalopy.txt" );
 		DispatchSpawn( pJeep );
 		pJeep->Activate();
@@ -6835,17 +6896,12 @@ QAngle CBasePlayer::BodyAngles()
 Vector CBasePlayer::BodyTarget( const Vector &posSrc, bool bNoisy ) 
 { 
 	if ( IsInAVehicle() )
-	{
 		return GetVehicle()->GetVehicleEnt()->BodyTarget( posSrc, bNoisy );
-	}
+
 	if (bNoisy)
-	{
 		return GetAbsOrigin() + (GetViewOffset() * random->RandomFloat( 0.7, 1.0 )); 
-	}
-	else
-	{
-		return EyePosition(); 
-	}
+
+	return EyePosition(); 
 };		
 
 /*
@@ -6863,6 +6919,32 @@ void CBasePlayer::UpdateClientData( void )
 {
 	CSingleUserRecipientFilter user( this );
 	user.MakeReliable();
+
+	// HACKHACK -- send the message to display the game title
+	CWorld *world = GetWorldEntity();
+	if ( world )
+	{
+		if ( world->GetDisplayTitle() )
+		{
+			UserMessageBegin( user, "GameTitle" );
+			MessageEnd();
+			world->SetDisplayTitle( false );
+		}
+
+		// Only do this if the HUD hasnt been init'ed
+		if (m_fInitHUD)
+		{
+			// If we have a valid chapter message, dont show this!
+			if (world->m_mapText != NULL_STRING && developer.GetInt() > 0)
+			{
+				const char *line1 = "", *line2 = "";
+				line1 = STRING( world->m_mapText );
+				line2 = STRING( world->m_authorText );
+
+				ClientPrint( this, g_pGameRules->IsMultiplayer() ? HUD_PRINTTALK : HUD_PRINTCENTER, "%s\n%s", line1, line2 );
+			}
+		}
+	}
 
 	if (m_fInitHUD)
 	{
@@ -6887,15 +6969,6 @@ void CBasePlayer::UpdateClientData( void )
 
 		variant_t value;
 		g_EventQueue.AddEvent( "game_player_manager", "OnPlayerSpawn", value, 0, this, this );
-	}
-
-	// HACKHACK -- send the message to display the game title
-	CWorld *world = GetWorldEntity();
-	if ( world && world->GetDisplayTitle() )
-	{
-		UserMessageBegin( user, "GameTitle" );
-		MessageEnd();
-		world->SetDisplayTitle( false );
 	}
 
 	if (m_ArmorValue != m_iClientBattery)
@@ -6939,7 +7012,17 @@ void CBasePlayer::UpdateClientData( void )
 	}
 #endif 
 
-	CheckTrainUpdate();
+	if (m_iTrain & TRAIN_NEW)
+	{
+//		ASSERT( gmsgTrain > 0 );
+
+		// send "Train" update message
+		UserMessageBegin( user, "Train" );
+			WRITE_BYTE(m_iTrain & 0xF);
+		MessageEnd();
+
+		m_iTrain &= ~TRAIN_NEW;
+	}
 
 	// Update all the items
 	for ( int i = 0; i < WeaponCount(); i++ )
@@ -6987,21 +7070,6 @@ void CBasePlayer::EnableControl(bool fControl)
 
 }
 
-void CBasePlayer::CheckTrainUpdate( void )
-{
-	if ( ( m_iTrain & TRAIN_NEW ) )
-	{
-		CSingleUserRecipientFilter user( this );
-		user.MakeReliable();
-
-		// send "Train" update message
-		UserMessageBegin( user, "Train" );
-			WRITE_BYTE(m_iTrain & 0xF);
-		MessageEnd();
-
-		m_iTrain &= ~TRAIN_NEW;
-	}
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: Returns whether the player should autoaim or not
@@ -8688,14 +8756,10 @@ void CBasePlayer::InputCough( inputdata_t &inputdata )
 {
 	int iCoughType = inputdata.value.Int();
 
-	if ( iCoughType > 1 )
-	{
+	if ( iCoughType > 0 )
 		Cough( iCoughType );
-	}
 	else
-	{
 		Cough( 1 );
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -9267,6 +9331,15 @@ void CBasePlayer::Event_KilledOther( CBaseEntity *pVictim, const CTakeDamageInfo
 	if ( pVictim != this )
 	{
 		gamestats->Event_PlayerKilledOther( this, pVictim, info );
+
+		CAI_BaseNPC **ppAIs = g_AI_Manager.AccessAIs();
+		for ( int i = 0; i < g_AI_Manager.NumAIs(); i++ )
+		{
+			if ( ppAIs[i] )
+			{
+				ppAIs[i]->OnPlayerKilledOther( pVictim, info );
+			}
+		}
 	}
 }
 

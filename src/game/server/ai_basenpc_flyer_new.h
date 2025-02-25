@@ -39,7 +39,7 @@ public:
 	virtual void	StartTask( const Task_t *pTask );
 	virtual void	RunTask( const Task_t *pTask );
 
-	virtual float	GetIdealSpeed( ) const;
+	virtual float	GetIdealSpeed( );
 	virtual float	MinGroundDist(void);
 
 	CAI_BaseNPCFlyerNew();

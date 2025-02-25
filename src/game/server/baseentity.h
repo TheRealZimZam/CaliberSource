@@ -632,6 +632,7 @@ public:
 	void InputAlpha( inputdata_t &inputdata );
 	void InputColor( inputdata_t &inputdata );
 	void InputSetParent( inputdata_t &inputdata );
+	void InputSetFriction( inputdata_t &inputdata );
 	void SetParentAttachment( const char *szInputName, const char *szAttachment, bool bMaintainOffset );
 	void InputSetParentAttachment( inputdata_t &inputdata );
 	void InputSetParentAttachmentMaintainOffset( inputdata_t &inputdata );
@@ -1427,7 +1428,7 @@ protected:
 
 	// Performs the collision resolution for fliers.
 	void					PerformFlyCollisionResolution( trace_t &trace, Vector &move );
-	void					ResolveFlyCollisionBounce( trace_t &trace, Vector &vecVelocity, float flMinTotalElasticity = 0.0f );
+	void					ResolveFlyCollisionBounce( trace_t &trace, Vector &vecVelocity, float flMinTotalElasticity = 0.1f );
 	void					ResolveFlyCollisionSlide( trace_t &trace, Vector &vecVelocity );
 	virtual void			ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity );
 

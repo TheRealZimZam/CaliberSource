@@ -26,6 +26,58 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#if 0
+namespace ResponseRules
+{
+	// ick
+	// Wrap string lookup with a hash on the string so that all of the repetitive playerxxx type strings get bucketed out better
+	#define STRING_BUCKETS_COUNT 64		// Must be power of two
+	#define STRING_BUCKETS_MASK ( STRING_BUCKETS_COUNT - 1 )
+
+	CUtlRBTree<const char *> g_ResponseStrings[ STRING_BUCKETS_COUNT ];
+	class CResponseStringBuckets
+	{
+	public:
+		CResponseStringBuckets()
+		{
+			for ( int i = 0; i < ARRAYSIZE( g_ResponseStrings ); ++i )
+			{
+				g_ResponseStrings[ i ].SetLessFunc( &StringLessThan );
+			}
+		}
+	} g_ReponseStringBucketInitializer;
+
+	const char *ResponseCopyString( const char *in )
+	{
+		if ( !in )
+			return NULL;
+		if ( !*in )
+			return "";
+
+		int	bucket = ( RR_HASH( in ) & STRING_BUCKETS_MASK );
+
+		CUtlRBTree<const char *> &list = g_ResponseStrings[ bucket ];
+
+		int i = list.Find( in );
+		if ( i != list.InvalidIndex() )
+{
+			return list[i];
+		}
+
+		int len = Q_strlen( in );
+		char *out = new char[ len + 1 ];
+		Q_memcpy( out, in, len );
+		out[ len ] = 0;
+		list.Insert( out );
+		return out;
+	}
+}
+#endif
+
+//-----------------------------------------------------------------------------
+// Convars 
+//-----------------------------------------------------------------------------
+
 ConVar rr_debugresponses( "rr_debugresponses", "0", FCVAR_NONE, "Show verbose matching output (1 for simple, 2 for rule scoring). If set to 3, it will only show response success/failure for npc_selected NPCs." );
 ConVar rr_debugrule( "rr_debugrule", "", FCVAR_NONE, "If set to the name of the rule, that rule's score will be shown whenever a concept is passed into the response rules system.");
 ConVar rr_dumpresponses( "rr_dumpresponses", "0", FCVAR_NONE, "Dump all response_rules.txt and rules (requires restart)" );
@@ -36,6 +88,8 @@ inline static char *CopyString( const char *in )
 {
 	if ( !in )
 		return NULL;
+	if ( !*in )
+		return "";
 
 	int len = Q_strlen( in );
 	char *out = new char[ len + 1 ];
@@ -201,6 +255,8 @@ struct Response
 	byte						type : 6;							// 8
 	byte						first : 1;							// 
 	byte						last : 1;							// 
+
+//	ALIGN32 AI_ResponseFollowup	m_followup; // info on whether I should force the other guy to say something
 };
 
 struct ResponseGroup
@@ -544,9 +600,11 @@ struct Rule
 };
 #pragma pack()
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------
+	// Purpose: The database of all available responses.
+	// The Rules are partitioned based on a variety of factors (presently,
+	// speaker and concept) for faster lookup, basically a seperate-chained hash.
+	//-----------------------------------------------------------------------------
 abstract_class CResponseSystem : public IResponseSystem 
 {
 public:
@@ -1760,6 +1818,7 @@ bool CResponseSystem::FindBestResponse( const AI_CriteriaSet& set, AI_Response& 
 			Q_strncpy( responseName, result.action->value, sizeof( responseName ) );
 			responseType = result.action->GetType();
 			rp = result.group->rp;
+//			rp.m_pFollowup = &result.action->m_followup;
 		}
 
 		Q_strncpy( ruleName, m_Rules.GetElementName( bestRule ), sizeof( ruleName ) );
@@ -2077,9 +2136,11 @@ void CResponseSystem::ParseOneResponse( const char *responseGroupName, ResponseG
 
 		if ( !Q_stricmp( token, "defaultdelay" ) )
 		{
-			rp->flags |= AI_ResponseParams::RG_DELAYAFTERSPEAK;
+			rp->flags |= (AI_ResponseParams::RG_DELAYAFTERSPEAK|AI_ResponseParams::RG_RESPEAKDELAY);
 			rp->delay.start = AIS_DEF_MIN_DELAY;
 			rp->delay.range = ( AIS_DEF_MAX_DELAY - AIS_DEF_MIN_DELAY );
+			rp->respeakdelay.start = AIS_DEF_MIN_DELAY;
+			rp->respeakdelay.range = ( AIS_DEF_MAX_DELAY - AIS_DEF_MIN_DELAY );
 			continue;
 		}
 	
@@ -2090,13 +2151,13 @@ void CResponseSystem::ParseOneResponse( const char *responseGroupName, ResponseG
 			rp->delay.FromInterval( ReadInterval( token ) );
 			continue;
 		}
-		
+
 		if ( !Q_stricmp( token, "speakonce" ) )
 		{
 			rp->flags |= AI_ResponseParams::RG_SPEAKONCE;
 			continue;
 		}
-		
+
 		if ( !Q_stricmp( token, "noscene" ) )
 		{
 			rp->flags |= AI_ResponseParams::RG_DONT_USE_SCENE;
@@ -2108,7 +2169,7 @@ void CResponseSystem::ParseOneResponse( const char *responseGroupName, ResponseG
 			rp->flags |= AI_ResponseParams::RG_STOP_ON_NONIDLE;
 			continue;
 		}
-		
+
 		if ( !Q_stricmp( token, "odds" ) )
 		{
 			ParseToken();
@@ -2154,7 +2215,49 @@ void CResponseSystem::ParseOneResponse( const char *responseGroupName, ResponseG
 			group.m_bHasLast= true;
 			continue;
 		}
+#if 0
+		if ( !Q_stricmp( token, "fire" ) )
+		{
+			// get target name
+			bool bSuc = ParseToken();
+			if (!bSuc)
+				ResponseWarning( "FIRE token in response has invalid parameters.\n" );
+			else
+				newResponse.m_followup.followup_entityiotarget = ResponseCopyString(token);
 
+			continue;
+		}
+
+		if ( !Q_stricmp( token, "then" ) )
+		{
+			// eg, "subject TALK_ANSWER saidunplant:1 3"
+			bool bSuc = ParseToken();
+			if (!bSuc)
+				ResponseWarning( "THEN token in response lacked any further info.\n" );
+			else
+				newResponse.m_followup.followup_target = ResponseCopyString(token);
+
+			bSuc = ParseToken(); // get another token
+			if (!bSuc)
+				ResponseWarning( "THEN token in response had a target '%s', but lacked any further info.\n", newResponse.m_followup.followup_target );
+			else
+				newResponse.m_followup.followup_concept = ResponseCopyString( token );
+
+			// Okay, this is totally asinine.
+			// Because the ParseToken() function will split foo:bar into three tokens
+			// (which is reasonable), but we have no safe way to parse the file otherwise
+			// because it's all behind an engine interface, it's necessary to parse all
+			// the tokens to the end of the line and catenate them, except for the last one
+			// which is the delay. That's crap.
+			bSuc = ParseToken();
+			if (!bSuc)
+				ResponseWarning( "THEN token in response lacked contexts.\n" );
+			else
+				newResponse.m_followup.followup_contexts = ResponseCopyString( token );
+
+			continue;
+		}
+#endif
 		ResponseWarning( "response entry '%s' with unknown command '%s'\n", responseGroupName, token );
 	}
 
@@ -2257,9 +2360,11 @@ void CResponseSystem::ParseResponse( void )
 
 		if ( !Q_stricmp( token, "defaultdelay" ) )
 		{
-			rp->flags |= AI_ResponseParams::RG_DELAYAFTERSPEAK;
+			rp->flags |= (AI_ResponseParams::RG_DELAYAFTERSPEAK|AI_ResponseParams::RG_RESPEAKDELAY);
 			rp->delay.start = AIS_DEF_MIN_DELAY;
 			rp->delay.range = ( AIS_DEF_MAX_DELAY - AIS_DEF_MIN_DELAY );
+			rp->respeakdelay.start = AIS_DEF_MIN_DELAY;
+			rp->respeakdelay.range = ( AIS_DEF_MAX_DELAY - AIS_DEF_MIN_DELAY );
 			continue;
 		}
 	

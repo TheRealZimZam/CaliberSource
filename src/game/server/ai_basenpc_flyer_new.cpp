@@ -77,7 +77,7 @@ float CAI_BaseNPCFlyerNew::MinGroundDist(void)
 //-----------------------------------------------------------------------------
 // Sets the ground speed appropriately: 
 //-----------------------------------------------------------------------------
-float CAI_BaseNPCFlyerNew::GetIdealSpeed( )	const
+float CAI_BaseNPCFlyerNew::GetIdealSpeed( )
 {
 	return m_flSpeed;
 }

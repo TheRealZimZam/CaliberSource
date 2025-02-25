@@ -62,6 +62,7 @@ END_DATADESC()
 // These are the new entry points to entities. 
 #if !defined( SDK_DLL )		//Tony; don't use the normal info_player_deathmatch in the SDK, use the custom one.
 LINK_ENTITY_TO_CLASS(info_player_deathmatch,CBaseDMStart);
+LINK_ENTITY_TO_CLASS(info_player_coop,CBaseDMStart);
 #endif
 
 LINK_ENTITY_TO_CLASS(info_player_start,CPointEntity);
@@ -116,13 +117,6 @@ bool CBaseEntity::SUB_AllowedToFade( void )
 		if( VPhysicsGetObject()->GetGameFlags() & FVPHYSICS_PLAYER_HELD || GetEFlags() & EFL_IS_BEING_LIFTED_BY_BARNACLE )
 			return false;
 	}
-
-	// on Xbox, allow these to fade out even if a player is looking
-#ifndef _XBOX
-	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
-	if ( pPlayer && pPlayer->FInViewCone( this ) )
-		return false;
-#endif
 
 	return true;
 }

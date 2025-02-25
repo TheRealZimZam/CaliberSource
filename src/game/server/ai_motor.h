@@ -77,8 +77,8 @@ public:
 	
 	//---------------------------------
 	
-	float				GetIdealSpeed() const;
-	float				GetIdealAccel() const;
+	float				GetIdealSpeed();	//const
+	float				GetIdealAccel();	//const
 	float				GetCurSpeed() const			{ return m_vecVelocity.Length(); }
 	const Vector &		GetCurVel() const			{ return m_vecVelocity;			 }
 

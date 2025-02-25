@@ -9,12 +9,14 @@
 
 #include "cbase.h"
 
-#include "BasePropDoor.h"
-
+#include "activitylist.h"
+#include "npcevent.h"
 #include "ai_basehumanoid.h"
 #include "ai_blended_movement.h"
 #include "ai_navigator.h"
 #include "ai_memory.h"
+#include "movevars_shared.h"
+#include "BasePropDoor.h"
 
 #ifdef HL2_DLL
 #include "ai_interactions.h"
@@ -23,17 +25,44 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar ai_stun_duration		( "ai_stun_duration","5");
-ConVar ai_stun_duration_max	( "ai_stun_duration_max","8");
+extern ConVar temp_demofixes;	//TEMPTEMP
+ConVar ai_limited_ammo( "ai_limited_ammo", "0", FCVAR_NONE, "Do NPCs that use weapons have limited ammo?" );
+ConVar ai_stun_duration( "ai_stun_duration","5");
+ConVar ai_stun_duration_max( "ai_stun_duration_max","8");
 
 BEGIN_DATADESC( CAI_BaseHumanoid )
-	DEFINE_FIELD( m_bHeadGibbed,	FIELD_BOOLEAN ),
+	DEFINE_KEYFIELD( m_iClips, FIELD_INTEGER, "ammo" ),
+	DEFINE_KEYFIELD( m_spawnEquipmentSecondary, FIELD_STRING, "secondaryequipment" ),
+	DEFINE_FIELD( m_bHeadGibbed, FIELD_BOOLEAN ),
 END_DATADESC()
 
 IMPLEMENT_SERVERCLASS_ST( CAI_BaseHumanoid, DT_BaseHumanoid )
 	// Send it to the client, that part takes care of the bone shrinkage
 	SendPropBool( SENDINFO( m_bHeadGibbed ) ),
 END_SEND_TABLE()
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//
+//
+//-----------------------------------------------------------------------------
+void CAI_BaseHumanoid::Precache( void )
+{
+	if ( m_spawnEquipmentSecondary != NULL_STRING && strcmp(STRING(m_spawnEquipmentSecondary), "0") )
+	{
+		UTIL_PrecacheOther( STRING(m_spawnEquipmentSecondary) );
+	}
+
+	BaseClass::Precache();
+}
+
+void CAI_BaseHumanoid::Spawn( void )
+{
+	BaseClass::Spawn();
+
+	CalculateClips();
+}
 
 //-----------------------------------------------------------------------------
 // Purpose:  This is a generic function (to be implemented by sub-classes) to
@@ -63,6 +92,24 @@ bool CAI_BaseHumanoid::HandleInteraction(int interactionType, void *data, CBaseC
 	return BaseClass::HandleInteraction( interactionType, data, sourceEnt);
 }
 
+void CAI_BaseHumanoid::HandleAnimEvent( animevent_t *pEvent )
+{
+	switch( pEvent->event )
+	{
+	// EVENT_WEAPON_RELOAD is the old way of doing it
+	// a EVENT_WEAPON_RELOAD_SOUND + EVENT_WEAPON_RELOAD_FILL_CLIP is the new way of doing it
+	case EVENT_WEAPON_RELOAD:
+	case EVENT_WEAPON_RELOAD_FILL_CLIP:
+		// Remove a clip
+		if (GetActiveWeapon() && m_iClips > 0)
+			m_iClips -= 1;
+		break;
+	}
+
+	// Baseclass handles the rest
+	BaseClass::HandleAnimEvent( pEvent );
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: check ammo
 //-----------------------------------------------------------------------------
@@ -71,34 +118,72 @@ void CAI_BaseHumanoid::CheckAmmo( void )
 	BaseClass::CheckAmmo();
 
 	// FIXME: why isn't this a baseclass function? NPCS with inate weapons could easily overwrite it
-	if (!GetActiveWeapon())
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	if (!pWeapon)
 		return;
 
 	// Don't do this while holstering / unholstering
 	if ( IsWeaponStateChanging() )
 		return;
 
-	if (GetActiveWeapon()->UsesPrimaryAmmo())
+	if (pWeapon->UsesPrimaryAmmo())
 	{
-		if (!GetActiveWeapon()->HasPrimaryAmmo() )
+		// Set the conditions
+		if (!pWeapon->HasPrimaryAmmo() )
 		{
 			SetCondition(COND_NO_PRIMARY_AMMO);
 		}
-		else if (GetActiveWeapon()->UsesClipsForAmmo1() && GetActiveWeapon()->Clip1() < (GetActiveWeapon()->GetMaxClip1() / 4 + 1))
+		else if (pWeapon->UsesClipsForAmmo1() && pWeapon->Clip1() < (pWeapon->GetMaxClip1() / 4 + 1))
 		{
 			SetCondition(COND_LOW_PRIMARY_AMMO);
 		}
 	}
 
-	if (!GetActiveWeapon()->HasSecondaryAmmo() )
+	if (!pWeapon->HasSecondaryAmmo() )
 	{
-		if ( GetActiveWeapon()->UsesClipsForAmmo2() )
+		if ( pWeapon->UsesClipsForAmmo2() )
 		{
 			SetCondition(COND_NO_SECONDARY_AMMO);
 		}
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+bool CAI_BaseHumanoid::CanReload( void )
+{
+	if ( !GetActiveWeapon() || HasCondition( COND_NO_WEAPON ) )
+		return false;
+
+	if ( ai_limited_ammo.GetBool() )
+	{
+		if ( GetActiveWeapon()->UsesClipsForAmmo1() && m_iClips == 0 )
+			return false;
+	}
+
+	if ( IsRunningDynamicInteraction() )
+		return false;
+
+	if ( IsWeaponStateChanging() )
+		return false;
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: check ammo
+//-----------------------------------------------------------------------------
+void CAI_BaseHumanoid::CalculateClips( void )
+{
+	// If our clips are negative, then mapmaker wants us to have no limit
+	if ( m_iClips < 0 )
+		m_iClips = 900001;	//WOW
+
+	// Otherwise default to lucky number 7
+	if ( m_iClips == 0 )
+		m_iClips = 7;
+}
 
 //-----------------------------------------------------------------------------
 // TASK_RANGE_ATTACK1
@@ -135,7 +220,76 @@ bool CAI_BaseHumanoid::ShouldMoveAndShoot( void )
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
+float CAI_BaseHumanoid::GetIdealAccel()
+{
+	// Normal accel based on animation
+	float fAccel = sqrt(sv_accelerate.GetFloat() * GetIdealSpeed()) * sv_accelerate.GetFloat();
 
+	// Change accel rate based on my activity
+	// TODO; This should be offloaded somehow
+	switch( GetActivity() )
+	{
+	case ACT_IDLE_HURT:
+	case ACT_IDLE_PRONE:
+	case ACT_CROUCHIDLE:
+	case ACT_COVER_LOW:
+	case ACT_COVER_MED:
+		fAccel *= 0.80;
+		break;
+
+	case ACT_IDLE_ANGRY:
+	case ACT_IDLE_AGITATED:
+	case ACT_IDLE_STIMULATED:
+	case ACT_IDLE_ON_FIRE:
+	case ACT_JUMP:
+	case ACT_GLIDE:
+		fAccel *= 1.20;
+		break;
+
+	case ACT_SWIM:
+	case ACT_IDLE_STEALTH:
+	case ACT_IDLE_RELAXED:
+	case ACT_IDLE_SCARED:
+		fAccel *= 0.60;
+		break;
+
+		default:
+		break;
+	}
+
+	// Return a rounded number
+	return fAccel;	//Ceil2Int(fAccel)
+}
+
+//-----------------------------------------------------------------------------
+float CAI_BaseHumanoid::GetIdealSpeed()
+{
+	float fSpeed = m_flGroundSpeed;
+	// Wading through water
+	if ( GetWaterLevel() >= WL_Feet && GetActivity() != ACT_SWIM )
+		return fSpeed *= 0.7;
+	else
+	{
+		// Injured, but not using an injured animation
+		if ( IsInjured() && !HaveSequenceForActivity( ACT_RUN_HURT ) ) // && temp_demofixes.GetBool()
+			return fSpeed *= 0.8;
+
+		// Reloading
+		if ( GetActivity() == ACT_RELOAD || 
+			IsPlayingGesture( ACT_GESTURE_RELOAD ) || 
+			IsCurSchedule( SCHED_RELOAD, false ) )
+		{
+			return fSpeed *= 0.7;
+		}
+
+		// Multiply by the friction of the current surface im standing on.
+		// HOWEVER! Clamp to a reasonable amount -MM
+		return fSpeed * clamp( GetFriction(), 0.6, 1.5 );
+	}
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 static bool IsSmall( CBaseEntity *pBlocker )
 {
 	CCollisionProperty *pCollisionProp = pBlocker->CollisionProp();
@@ -195,20 +349,14 @@ bool CAI_BaseHumanoid::OnMoveBlocked( AIMoveResult_t *pResult )
 //-----------------------------------------------------------------------------
 bool CAI_BaseHumanoid::ShouldPickADeathPose( void ) 
 {
-#ifdef HL1_DLL
-	return false;
-#endif
-
 	if ( IsCrouching() )
 		return false;
 
-#ifdef HL2_DLL
 	// Allow unique death animations - deathposes are meant to overwrite the generic ones
 	if ( GetDeathActivity() != ACT_DIESIMPLE )
 		return false;
-#endif
 
-	return true;
+	return BaseClass::ShouldPickADeathPose();
 }
 
 bool CAI_BaseHumanoid::ShouldGib( const CTakeDamageInfo &info )
@@ -423,7 +571,21 @@ void CAI_BaseHumanoid::StartTask( const Task_t *pTask )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Running Tasks
+//-----------------------------------------------------------------------------
+void CAI_BaseHumanoid::RunTask( const Task_t *pTask )
+{
+	switch( pTask->iTask )
+	{
+	case TASK_RANGE_ATTACK1:
+		RunTaskRangeAttack1( pTask );
+		break;
 
+	default:
+		BaseClass::RunTask( pTask );
+	}
+}
 
 //-----------------------------------------------------------------------------
 // TASK_RANGE_ATTACK1 / TASK_RANGE_ATTACK2 / etc.
@@ -479,24 +641,6 @@ void CAI_BaseHumanoid::RunTaskRangeAttack1( const Task_t *pTask )
 	}
 }
 
-
-//-----------------------------------------------------------------------------
-// Running Tasks
-//-----------------------------------------------------------------------------
-void CAI_BaseHumanoid::RunTask( const Task_t *pTask )
-{
-	switch( pTask->iTask )
-	{
-	case TASK_RANGE_ATTACK1:
-		RunTaskRangeAttack1( pTask );
-		break;
-
-	default:
-		BaseClass::RunTask( pTask );
-	}
-}
-
-
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -525,3 +669,68 @@ Activity CAI_BaseHumanoid::NPC_TranslateActivity( Activity NewActivity )
 
 	return BaseClass::NPC_TranslateActivity( NewActivity );
 }
+
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  :
+// Output :
+//-----------------------------------------------------------------------------
+int CAI_BaseHumanoid::TranslateSchedule( int scheduleType ) 
+{
+	switch( scheduleType )
+	{
+	case SCHED_RELOAD:
+			if ( !CanReload() )
+			{
+				// Check if this is because im completely out of ammo
+				if ( GetActiveWeapon() && m_iClips == 0 )
+				{
+					// Drop my active weapon, and pull out my secondary
+					GetActiveWeapon()->m_iClip1 = 0;
+					GetActiveWeapon()->m_iClip2 = 0;
+					return TranslateSchedule( SCHED_DROP_WEAPON );
+				}
+				// Otherwise fail
+				return TranslateSchedule( SCHED_FAIL );
+			}
+
+			return SCHED_RELOAD;
+	break;
+	}
+
+	return BaseClass::TranslateSchedule( scheduleType );
+}
+
+//-----------------------------------------------------------------------------
+//
+// Schedules
+//
+//-----------------------------------------------------------------------------
+
+// MOVED TO BASENPC
+#if 0
+AI_BEGIN_CUSTOM_NPC( base_humanoid, CAI_BaseHumanoid )
+
+	DECLARE_TASK( TASK_FIND_DODGE_POSITION )
+	DECLARE_TASK( TASK_DODGE )
+
+//=========================================================
+// > SCHED_DUCK_DODGE
+// Roll away from an enemy, or incoming danger
+//=========================================================
+DEFINE_SCHEDULE
+(
+SCHED_DODGE,
+
+ "	Tasks"
+ "		TASK_STOP_MOVING			0"
+ "		TASK_FIND_DODGE_POSITION	0"
+ "		TASK_DODGE					0"
+ "		TASK_DEFER_DODGE			10"
+ ""
+ "	Interrupts"
+ ""
+)
+
+AI_END_CUSTOM_NPC()
+#endif

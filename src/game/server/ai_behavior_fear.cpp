@@ -19,6 +19,7 @@
 
 BEGIN_DATADESC( CAI_FearBehavior )
 	DEFINE_FIELD( m_bPlayerIsAlly, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bSurrendering, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flTimeToSafety, FIELD_TIME ),
 	DEFINE_FIELD( m_flTimePlayerLastVisible, FIELD_TIME ),
 	DEFINE_FIELD( m_hSafePlaceHint, FIELD_EHANDLE ),
@@ -180,17 +181,71 @@ bool CAI_FearBehavior::EnemyDislikesMe()
 	if( pEnemy == NULL )
 		return false;
 
-#if 0
 	if( pEnemy->MyNPCPointer() == NULL )
-		return false;
-
-	Disposition_t disposition = pEnemy->MyNPCPointer()->IRelationType(GetOuter());
-	Assert(disposition != D_ER);
-	if( disposition >= D_LI )
-		return false;
-#endif
+	{
+		if ( GetEnemy()->IsPlayer() )
+		{
+			return true;
+		}
+		else
+			return false;
+	}
+	else
+	{
+		Disposition_t disposition = pEnemy->MyNPCPointer()->IRelationType(GetOuter());
+		Assert(disposition != D_ER);
+		if( disposition >= D_LI )
+			return false;
+	}
 
 	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Should I attempt a surrender?
+//-----------------------------------------------------------------------------
+bool CAI_FearBehavior::ShouldSurrender()
+{
+	// Only do this if I'm a weapon user (cant drop my claws/fingernails...)
+	if( !(CapabilitiesGet() & bits_CAP_USE_WEAPONS) )
+		return false;
+
+	if ( !GetEnemy() )
+		return false;
+
+	if ( !CanSurrenderToEnemy() )
+		return false;
+
+	if ( GetEnemy()->IsPlayer() )
+	{
+		// Am I in the players sight?
+		if ( HasCondition( COND_ENEMY_TARGETTING_ME ) )
+		{
+			// Do I still have bullets?
+			if ( GetOuter()->GetActiveWeapon() && !(HasCondition( COND_LOW_PRIMARY_AMMO ) || HasCondition( COND_NO_PRIMARY_AMMO )) )
+			{
+				return false;
+			}
+			else
+				return true;
+		}
+		// TODO; Maybe consider waving the white flag here? -MM
+		return false;
+	}
+
+	return true;
+}
+
+bool CAI_FearBehavior::CanSurrenderToEnemy()
+{
+	// Can only surrender to players and certain enemies (overridden by baseclass)
+	if ( GetEnemy()->IsPlayer() )
+		return true;
+
+	if ( FClassnameIs( GetEnemy(), "npc_barney" ) )
+		return true;
+
+	return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -311,8 +366,8 @@ void CAI_FearBehavior::GatherConditions()
 	}
 
 	// If im running away, the enemy is on my arse and i have a weapon, try to fight back!
-	if (HasCondition(COND_FEAR_ENEMY_TOO_CLOSE))
-		m_flDeferUntil = gpGlobals->curtime + random->RandomFloat( 2.0, 3.5 );
+	if (HasCondition(COND_FEAR_ENEMY_TOO_CLOSE) && !m_bSurrendering)
+		m_flDeferUntil = gpGlobals->curtime + random->RandomFloat( 4, 8 );
 
 	// Check for separation from the player
 	//	-The player is farther away than 60 feet
@@ -343,7 +398,7 @@ void CAI_FearBehavior::GatherConditions()
 		}
 		
 		// Check my relationship to the player, neutrals can still be scared by player
-		if( GetOuter()->IRelationType(pPlayer) == D_LI )
+		if( GetOuter()->IRelationType(pPlayer) == D_LI || GetOuter()->IsInPlayerSquad() )
 			m_bPlayerIsAlly = true;
 		else
 			m_bPlayerIsAlly = false;
@@ -394,8 +449,17 @@ void CAI_FearBehavior::EndScheduleSelection()
 //-----------------------------------------------------------------------------
 int CAI_FearBehavior::SelectSchedule()
 {
+	m_bSurrendering = false;
+
 	if( !HasCondition(COND_HEAR_DANGER) )
 	{
+		// Attempt a surrender if I can
+		if ( ShouldSurrender() )
+		{
+			m_bSurrendering = true;
+			return SCHED_FEAR_SURRENDER;
+		}
+
 		if( !IsInASafePlace() )
 		{
 			// Always move to a safe place if we're not running from a danger sound
@@ -605,5 +669,30 @@ AI_BEGIN_CUSTOM_SCHEDULE_PROVIDER( CAI_FearBehavior )
 		"		COND_CAN_MELEE_ATTACK1"
 	);
 
+	//===============================================
+	//===============================================
+	DEFINE_SCHEDULE
+	(
+		SCHED_FEAR_SURRENDER,
+
+		"	Tasks"
+		"		TASK_STOP_MOVING					0"
+		"		TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FEAR_MOVE_TO_SAFE_PLACE"
+		"		TASK_PLAY_SEQUENCE					ACTIVITY:ACT_DISARM"	//Disarm gun
+		"		TASK_WAIT							1"
+		"		TASK_WAIT_RANDOM					4"
+		"		TASK_WEAPON_DROP					0"
+		"		TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"
+		"		TASK_FEAR_WAIT_FOR_SAFETY			0"
+		""
+		"	Interrupts"
+		""
+		"		COND_NEW_ENEMY"
+		"		COND_HEAR_DANGER"
+		"		COND_REPEATED_DAMAGE"
+		"		COND_FEAR_ENEMY_CLOSE"
+		"		COND_FEAR_ENEMY_TOO_CLOSE"
+		"		COND_CAN_MELEE_ATTACK1"
+	);
 
 AI_END_CUSTOM_SCHEDULE_PROVIDER()

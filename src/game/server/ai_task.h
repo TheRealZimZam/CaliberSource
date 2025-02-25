@@ -268,6 +268,9 @@ enum sharedtasks_e
 		// Prevent dodging for a certain amount of time.
 		TASK_DEFER_DODGE,
 
+		// Do a dodge animation
+		TASK_DODGE,
+
 		// Turn to face ideal yaw
 		TASK_FACE_IDEAL,
 
@@ -405,6 +408,9 @@ enum sharedtasks_e
 		// Find a place to go that can't see to where I am now.
 		TASK_FIND_COVER_FROM_ORIGIN,
 
+		// Find a place roll away from incoming danger
+		TASK_FIND_DODGE_POSITION,
+
 		// Unhook from the AI system.
 		TASK_DIE,
 
@@ -456,9 +462,13 @@ enum sharedtasks_e
 		TASK_WEAPON_PICKUP,
 		TASK_WEAPON_RUN_PATH,	// run to weapon but break if someone else picks it up
 		TASK_WEAPON_CREATE,
+		TASK_WEAPON_DROP,
 
 		TASK_ITEM_PICKUP,
 		TASK_ITEM_RUN_PATH,
+
+		// Use m_hTargetEnt
+		TASK_USE_TARGET,
 
 		// Use small hull for tight navigation
 		TASK_USE_SMALL_HULL,

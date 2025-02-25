@@ -86,15 +86,16 @@ bool CAI_Senses::CanHearSound( CSound *pSound )
 	if ( pSound->m_hOwner.Get() == GetOuter() )
 		return false;
 
-	if( GetOuter()->GetState() == NPC_STATE_SCRIPT && pSound->IsSoundType( SOUND_DANGER ) )
+	// Am I deaf?
+	if ( !(GetOuter()->CapabilitiesGet() & bits_CAP_HEAR) && !pSound->FIsScent() )
+		return false;
+
+	if( (GetOuter()->GetState() == NPC_STATE_SCRIPT || GetOuter()->IsInAScript()) && pSound->IsSoundType( SOUND_DANGER ) )
 	{
 		// For now, don't hear danger in scripted sequences. This probably isn't a
 		// good long term solution, but it makes the Bank Exterior work better.
 		return false;
 	}
-
-	if ( GetOuter()->IsInAScript() )
-		return false;
 
 	// @TODO (toml 10-18-02): what about player sounds and notarget?
 	float flHearDistanceSq = pSound->Volume() * GetOuter()->HearingSensitivity();
@@ -126,7 +127,7 @@ void CAI_Senses::Listen( void )
 		{
 			CSound *pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
 
-			if ( pCurrentSound	&& (iSoundMask & pCurrentSound->SoundType()) && CanHearSound( pCurrentSound ) )
+			if ( pCurrentSound && (iSoundMask & pCurrentSound->SoundType()) && CanHearSound( pCurrentSound ) )
 			{
 	 			// the npc cares about this sound, and it's close enough to hear.
 				pCurrentSound->m_iNextAudible = m_iAudibleList;

@@ -409,13 +409,13 @@ AIMoveResult_t CAI_Motor::MoveJumpStop()
 
 //-----------------------------------------------------------------------------
 
-float CAI_Motor::GetIdealSpeed() const
+float CAI_Motor::GetIdealSpeed() //const
 {
 	return GetOuter()->GetIdealSpeed();
 }
 
 
-float CAI_Motor::GetIdealAccel() const
+float CAI_Motor::GetIdealAccel() //const
 {
 	return GetOuter()->GetIdealAccel();
 }

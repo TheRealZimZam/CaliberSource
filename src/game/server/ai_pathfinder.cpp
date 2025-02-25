@@ -655,9 +655,7 @@ bool CAI_Pathfinder::IsLinkUsable(CAI_Link *pLink, int startID)
 	}
 
 	if (!moveType)
-	{
 		return false;
-	}
 
 	// --------------------------------------------------------------------------
 	// Check if NPC has a reason not to use the desintion node
@@ -849,7 +847,7 @@ AI_Waypoint_t *CAI_Pathfinder::BuildComplexRoute( Navigation_t navType, const Ve
 	int buildFlags, float flYaw, float goalTolerance, float maxLocalNavDistance )
 {
 	AI_PROFILE_SCOPE( CAI_Pathfinder_BuildComplexRoute );
-	
+
 	float flTotalDist = ComputePathDistance( navType, vStart, vEnd );
 	if ( flTotalDist < 0.0625 )
 	{
@@ -1329,13 +1327,24 @@ AI_Waypoint_t *CAI_Pathfinder::BuildLocalRoute(const Vector &vStart, const Vecto
 	}
 
 	// Try a ground route if requested
-	if (buildFlags & bits_BUILD_GROUND)
+	if ( buildFlags & bits_BUILD_GROUND )
 	{
 		AI_Waypoint_t *groundRoute = BuildGroundRoute(vStart,vEnd,pTarget,endFlags,nodeID,buildFlags,flYaw,goalTolerance);
 
 		if (groundRoute)
 		{
 			return groundRoute;
+		}
+	}
+
+	// Try a jump route if NPC can jump and requested
+	if ( buildFlags & bits_BUILD_JUMP )
+	{
+		AI_Waypoint_t *jumpRoute = BuildJumpRoute(vStart,vEnd,pTarget,endFlags,nodeID,buildFlags,flYaw);
+
+		if (jumpRoute)
+		{
+			return jumpRoute;
 		}
 	}
 
@@ -1347,17 +1356,6 @@ AI_Waypoint_t *CAI_Pathfinder::BuildLocalRoute(const Vector &vStart, const Vecto
 		if (flyRoute)
 		{
 			return flyRoute;
-		}
-	}
-
-	// Try a jump route if NPC can jump and requested
-	if ((buildFlags & bits_BUILD_JUMP) && (CapabilitiesGet() & bits_CAP_MOVE_JUMP))
-	{
-		AI_Waypoint_t *jumpRoute = BuildJumpRoute(vStart,vEnd,pTarget,endFlags,nodeID,buildFlags,flYaw);
-
-		if (jumpRoute)
-		{
-			return jumpRoute;
 		}
 	}
 
@@ -1395,19 +1393,25 @@ AI_Waypoint_t *CAI_Pathfinder::BuildRoute( const Vector &vStart, const Vector &v
 		buildFlags = bits_BUILD_CLIMB;
 		bTryLocal = false;
 	}
-	else if ( (CapabilitiesGet() & bits_CAP_MOVE_FLY) || (CapabilitiesGet() & bits_CAP_MOVE_SWIM) )
+	else if (CapabilitiesGet() & bits_CAP_MOVE_FLY)
 	{
 		buildFlags = (bits_BUILD_FLY | bits_BUILD_GIVEWAY | bits_BUILD_TRIANG);
 	}
 	else if (CapabilitiesGet() & bits_CAP_MOVE_GROUND)
 	{
 		buildFlags = (bits_BUILD_GROUND | bits_BUILD_GIVEWAY | bits_BUILD_TRIANG);
-		if ( CapabilitiesGet() & bits_CAP_MOVE_JUMP )
-		{
+		if (CapabilitiesGet() & bits_CAP_MOVE_JUMP)
 			buildFlags |= bits_BUILD_JUMP;
-		}
-	}
 
+	//	if (CapabilitiesGet() & bits_CAP_MOVE_CRAWL)
+	//		buildFlags |= bits_BUILD_GROUND;
+	}
+/*
+	else if (CapabilitiesGet() & bits_CAP_MOVE_SWIM)
+	{
+		buildFlags = (bits_BUILD_FLY | bits_BUILD_GIVEWAY | bits_BUILD_TRIANG);
+	}
+*/
 	// If our local moves can succeed if we get within the goaltolerance, set the flag
 	if ( bLocalSucceedOnWithinTolerance )
 	{
@@ -1426,9 +1430,7 @@ AI_Waypoint_t *CAI_Pathfinder::BuildRoute( const Vector &vStart, const Vector &v
 
 	//  If the fails, try a node route
 	if ( !pResult )
-	{
 		pResult = BuildNodeRoute( vStart, vEnd, buildFlags, goalTolerance );
-	}
 
 	m_bIgnoreStaleLinks = false;
 

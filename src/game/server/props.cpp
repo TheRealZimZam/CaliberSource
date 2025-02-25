@@ -1,11 +1,12 @@
 //===== Copyright © 1996-2005, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: static_prop - don't move, don't animate, don't do anything.
-//			dynamic_prop - move (if enabled), take damage, and animate
+//			dynamic_prop - push (if enabled), take damage, and animate
 //			physics_prop - move, take damage, but don't animate
 //
 // TODO; Simple physics prop - cheaper qphysics prop, for use in caliber
-// basically func_pushable, but model based
+// basically a model-based func_pushable, with some basic code for
+// rotation and such...
 //===========================================================================//
 
 
@@ -239,7 +240,7 @@ void CBaseProp::Spawn( void )
 		}
 	}
 
-	SetMoveType( MOVETYPE_PUSH );
+	SetMoveType( MOVETYPE_NONE );
 	m_takedamage = DAMAGE_NO;
 	SetNextThink( TICK_NEVER_THINK );
 
@@ -1047,6 +1048,8 @@ void CBreakableProp::BreakablePropTouch( CBaseEntity *pOther )
 		}
 	}
 #endif
+
+//	BaseClass::Touch( pOther );
 }
 
 //-----------------------------------------------------------------------------
@@ -1814,8 +1817,9 @@ void CBreakableProp::Break( CBaseEntity *pBreaker, const CTakeDamageInfo &info )
 // Standard interactive props - can animate, and uses QPhysics for movement (when enabled).
 //=============================================================================================================
 LINK_ENTITY_TO_CLASS( dynamic_prop, CDynamicProp );
-LINK_ENTITY_TO_CLASS( prop_dynamic, CDynamicProp );	
-LINK_ENTITY_TO_CLASS( prop_dynamic_override, CDynamicProp );	
+LINK_ENTITY_TO_CLASS( prop_dynamic, CDynamicProp );
+LINK_ENTITY_TO_CLASS( prop_dynamic_override, CDynamicProp );
+LINK_ENTITY_TO_CLASS( model_studio, CDynamicProp );	//OBSOLETE
 
 BEGIN_DATADESC( CDynamicProp )
 
@@ -1879,6 +1883,12 @@ void CDynamicProp::Spawn( )
 	// Condense classname's to one, except for "prop_dynamic_override"
 	if ( FClassnameIs( this, "dynamic_prop" ) )
 		SetClassname( "prop_dynamic" );
+
+	if ( FClassnameIs( this, "model_studio" ) )
+	{
+		Warning("%s '%s' is using an EXTREMELY obsolete classname. Use prop_static or prop_dynamic instead!\n", GetClassname(), GetModelName() );
+		SetClassname( "dynamic_prop" );	//Use a slightly less obsolete name, that will be changed below anyway
+	}
 
 	// If the prop is not-solid, the bounding box needs to be 
 	// OBB to correctly surround the prop as it rotates.
@@ -2015,7 +2025,7 @@ bool CDynamicProp::CreateVPhysics( void )
 		// Allow basic movement if requested
 		SetGravity(GetGravity());
 		SetSolid(GetSolid());
-		SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_SLIDE );
+		SetMoveType( MOVETYPE_PUSH, MOVECOLLIDE_FLY_SLIDE );
 		VPhysicsInitShadow( false, false );
 	}
 	else
@@ -2435,9 +2445,11 @@ BEGIN_DATADESC( CPhysicsProp )
 	DEFINE_OUTPUT( m_OnOutOfWorld, "OnOutOfWorld" ),
 
 	DEFINE_FIELD( m_bThrownByPlayer, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bCanTumble, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bFirstCollisionAfterLaunch, FIELD_BOOLEAN ),
 
 	DEFINE_THINKFUNC( ClearFlagsThink ),
+	DEFINE_ENTITYFUNC( PhysicsPropTouch ),
 
 END_DATADESC()
 
@@ -2499,11 +2511,13 @@ void CPhysicsProp::Spawn( )
 	{
 		SetCollisionGroup( HasSpawnFlags( SF_PHYSPROP_FORCE_TOUCH_TRIGGERS ) ? COLLISION_GROUP_DEBRIS_TRIGGER : COLLISION_GROUP_DEBRIS );
 	}
-
 	if ( HasSpawnFlags( SF_PHYSPROP_NO_ROTORWASH_PUSH ) )
 	{
 		AddEFlags( EFL_NO_ROTORWASH_PUSH );
 	}
+
+	m_bTumbling = false;
+	m_bCanTumble = false;
 
 	CreateVPhysics();
 
@@ -2511,16 +2525,6 @@ void CPhysicsProp::Spawn( )
 	{
 		CalculateBlockLOS();
 	}
-
-	//Episode 1 change:
-#if 0	//HL2_EPISODIC
-	//Hi, since we're trying to ship this game we'll just go ahead and make all these doors not fade out instead of changing all the levels.
-	if ( Q_strcmp( STRING( GetModelName() ), "models/props_c17/door01_left.mdl" ) == 0 )
-	{
-		SetFadeDistance( -1, 0 );
-		DisableAutoFade();
-	}
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -2552,9 +2556,7 @@ bool CPhysicsProp::CreateVPhysics()
 	PhysModelParseSolid( tmpSolid, this, GetModelIndex() );
 	
 	if ( m_massScale > 0 )
-	{
 		tmpSolid.params.mass *= m_massScale;
-	}
 
 	if ( m_inertiaScale > 0 )
 	{
@@ -2570,51 +2572,70 @@ bool CPhysicsProp::CreateVPhysics()
 	}
 	PhysSolidOverride( tmpSolid, m_iszOverrideScript );
 
-	IPhysicsObject *pPhysicsObject = VPhysicsInitNormal( SOLID_VPHYSICS, 0, asleep, &tmpSolid );
-
-	if ( !pPhysicsObject )
+	// -------------------------------------------------------
+	// Is this a simple phys object, or a normal hl2 one?
+	// -------------------------------------------------------
+	if ( UseSimplePhysics() )
 	{
-		SetSolid( SOLID_NONE );
-		SetMoveType( MOVETYPE_NONE );
-		Warning("ERROR!: Can't create physics object for %s\n", STRING( GetModelName() ) );
+		// Simple, use quake phys but with some added interaction
+		SetSolid( SOLID_VPHYSICS );
+		if ( !asleep )
+			SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
+
+		// Since the mass info is now unused, try to fake it with my gravity setting instead
+		SetGravity(GetGravity());
+		SetFriction(m_inertiaScale);
+		SetTouch( &CPhysicsProp::PhysicsPropTouch );
+
+		m_bCanTumble = true;	//Use old tumble logic
+
+		VPhysicsInitShadow( true, true, &tmpSolid );
 	}
 	else
 	{
-		if ( m_damageType == 1 )
+		// Normal, uses vphys
+		IPhysicsObject *pPhysicsObject = VPhysicsInitNormal( SOLID_VPHYSICS, 0, asleep, &tmpSolid );
+		if ( !pPhysicsObject )
 		{
-			PhysSetGameFlags( pPhysicsObject, FVPHYSICS_DMG_SLICE );
+			SetSolid( SOLID_NONE );
+			SetMoveType( MOVETYPE_NONE );
+			Warning("ERROR!: Can't create physics object for %s\n", STRING( GetModelName() ) );
 		}
-		if ( HasSpawnFlags( SF_PHYSPROP_MOTIONDISABLED ) || m_damageToEnableMotion > 0 || m_flForceToEnableMotion > 0 )
+		else
 		{
-			pPhysicsObject->EnableMotion( false );
+			if ( m_damageType == 1 )
+			{
+				PhysSetGameFlags( pPhysicsObject, FVPHYSICS_DMG_SLICE );
+			}
+			if ( HasSpawnFlags( SF_PHYSPROP_MOTIONDISABLED ) || m_damageToEnableMotion > 0 || m_flForceToEnableMotion > 0 )
+			{
+				pPhysicsObject->EnableMotion( false );
+			}
 		}
-	}
 
-	// fix up any noncompliant blades.
-	if( HasInteraction( PROPINTER_PHYSGUN_LAUNCH_SPIN_Z ) )
-	{
-		if( !(VPhysicsGetObject()->GetGameFlags() & FVPHYSICS_DMG_SLICE) )
+		// fix up any noncompliant blades.
+		if( HasInteraction( PROPINTER_PHYSGUN_LAUNCH_SPIN_Z ) )
 		{
-			PhysSetGameFlags( pPhysicsObject, FVPHYSICS_DMG_SLICE );
+			if( !(VPhysicsGetObject()->GetGameFlags() & FVPHYSICS_DMG_SLICE) )
+			{
+				PhysSetGameFlags( pPhysicsObject, FVPHYSICS_DMG_SLICE );
 
 #if 0
-			if( g_pDeveloper->GetInt() )
-			{
-				// Highlight them in developer mode.
-				m_debugOverlays |= (OVERLAY_TEXT_BIT|OVERLAY_BBOX_BIT);
-			}
+				if( g_pDeveloper->GetInt() )
+				{
+					// Highlight them in developer mode.
+					m_debugOverlays |= (OVERLAY_TEXT_BIT|OVERLAY_BBOX_BIT);
+				}
 #endif
+			}
 		}
-	}
 
-	if( HasInteraction( PROPINTER_PHYSGUN_DAMAGE_NONE ) )
-	{
-		PhysSetGameFlags( pPhysicsObject, FVPHYSICS_NO_IMPACT_DMG );
-	}
+		if( HasInteraction( PROPINTER_PHYSGUN_DAMAGE_NONE ) )
+			PhysSetGameFlags( pPhysicsObject, FVPHYSICS_NO_IMPACT_DMG );
 
-	if ( HasSpawnFlags(SF_PHYSPROP_PREVENT_PICKUP) )
-	{
-		PhysSetGameFlags(pPhysicsObject, FVPHYSICS_NO_PLAYER_PICKUP);
+		if ( HasSpawnFlags(SF_PHYSPROP_PREVENT_PICKUP) )
+			PhysSetGameFlags(pPhysicsObject, FVPHYSICS_NO_PLAYER_PICKUP);
+
 	}
 
 	return true;
@@ -2812,6 +2833,48 @@ void CPhysicsProp::OnPhysGunDrop( CBasePlayer *pPhysGunUser, PhysGunDrop_t Reaso
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : *pOther - 
+//-----------------------------------------------------------------------------
+void CPhysicsProp::PhysicsPropTouch( CBaseEntity *pOther )
+{
+	BreakablePropTouch( pOther );
+
+	// Basic pushing/pulling
+	if ( GetMoveType() == MOVETYPE_FLYGRAVITY )
+	{
+		// Is the entity standing on this pushable ?
+		if ( !FBitSet(pOther->GetFlags(),FL_ONGROUND) || pOther->GetGroundEntity() == this )
+			return;
+
+		if ( pOther->IsSolidFlagSet(FSOLID_TRIGGER | FSOLID_VOLUME_CONTENTS) )
+			return;
+
+		// If anything other than a player touches me, just transfer its force into me
+		Vector vVelocity;
+		bool bPlayerTouch = pOther->IsPlayer();
+
+		float fScale = 10/GetMass();
+		vVelocity.x = pOther->GetAbsVelocity().x * fScale;
+		vVelocity.y = pOther->GetAbsVelocity().y * fScale;
+		vVelocity.z = pOther->GetAbsVelocity().z * (fScale/2);
+
+		// Player is trying to push me!
+		if ( bPlayerTouch )
+		{
+			//Assume the player weighs about 200 pounds
+			fScale = (200/GetMass());
+			// Invert the Z velocity and dont apply scale (no bouncing, just sliding)
+			vVelocity.x = pOther->GetAbsVelocity().x + fScale;
+			vVelocity.y = pOther->GetAbsVelocity().y + fScale;
+		}
+
+		// TODO; If velocity is decently high, make a impact sound
+		CascadePush( vVelocity );
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Get the specified key's angles for this prop from the QC's physgun_interactions
 //-----------------------------------------------------------------------------
 bool CPhysicsProp::GetPropDataAngles( const char *pKeyName, QAngle &vecAngles )
@@ -2903,7 +2966,10 @@ void CPhysicsProp::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 			m_OnPlayerUse.FireOutput( this, this );
 		}
 
-		pPlayer->PickupObject( this );
+		if ( GetMoveType() == MOVETYPE_FLYGRAVITY && pPlayer->CanPickupObject( this, 30, 140 ) )
+			PhysicsPropTouch( pPlayer );
+		else
+			pPlayer->PickupObject( this );
 	}
 }
 
@@ -2920,7 +2986,12 @@ void CPhysicsProp::VPhysicsUpdate( IPhysicsObject *pPhysics )
 	{
 		if ( m_bAwake )
 		{
+			// If its a simple, reset the movetype
+			if ( UseSimplePhysics() )
+				SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
+
 			m_OnAwakened.FireOutput(this, this);
+			FireTargets( STRING(m_target), this, this, USE_TOGGLE, 0 );
 			RemoveSpawnFlags( SF_PHYSPROP_START_ASLEEP );
 		}
 	}
@@ -2995,7 +3066,6 @@ void CPhysicsProp::VPhysicsCollision( int index, gamevcollisionevent_t *pEvent )
 	BaseClass::VPhysicsCollision( index, pEvent );
 
 	IPhysicsObject *pPhysObj = pEvent->pObjects[!index];
-
 	if ( m_flForceToEnableMotion )
 	{
 		CBaseEntity *pOther = static_cast<CBaseEntity *>(pPhysObj->GetGameData());
@@ -3153,10 +3223,126 @@ int CPhysicsProp::OnTakeDamage( const CTakeDamageInfo &info )
 			VPhysicsTakeDamage( info );
 		}
 	}
-	
+
+	// I'm assumedly a simple_prop, do old style force calculation
+	if ( GetMoveType() == MOVETYPE_FLYGRAVITY )
+	{
+		// If I have a damage force, use that along with my mass
+		if ( info.GetDamageForce().Length() > 5 )
+		{
+			Vector vecPush = info.GetDamageForce() / (GetMass()/5);
+			CascadePush( vecPush );
+		}
+		else
+		{
+			// Copied from baseentity.cpp
+			Vector vecDir, vecInflictorCentroid;
+			vecDir = WorldSpaceCenter( );
+			vecInflictorCentroid = info.GetInflictor()->WorldSpaceCenter( );
+			vecDir -= vecInflictorCentroid;
+			VectorNormalize( vecDir );
+
+			// Calculate force by ludicrously multiplying the damage, and then
+			// dividing by mass
+			float flForce = (info.GetDamage() * 32)/(GetMass()/8);
+
+			// Minimum of 5 to push
+			if (flForce > 5) 
+			{
+				if (flForce > 1000.0) 
+					flForce = 1000.0;
+
+				CascadePush( vecDir * flForce );
+			}
+		}
+	}
+
 	return ret;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Apply my force into the object that stopped me
+//-----------------------------------------------------------------------------
+void CPhysicsProp::CascadePush( const Vector &vecForce )
+{
+	if ( IsEFlagSet( EFL_NO_DAMAGE_FORCES ) )
+		return;
+
+	// Push me
+	if ( VPhysicsGetObject() && VPhysicsGetObject()->IsMotionEnabled() )
+	{
+		// Full force on me, half on all the others
+		ApplyAbsVelocityImpulse( vecForce );
+
+		// TODO; Make my slide sound
+
+		if ( vecForce.Length() > 99.0 )
+		{
+			// TODO; Make my Impact sound if im going fast enough
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Fake tumbling for simpleprops
+//-----------------------------------------------------------------------------
+void CPhysicsProp::TumbleThink( void )
+{
+	//TODO;
+#if 0
+	// Am I even flying yet?
+	if ( GetFlags() & FL_ONGROUND || GetGroundEntity() != NULL )
+	{
+		m_bTumbling = false;
+		return;
+	}
+
+	if ( !m_bTumbling )
+	{
+		// Determine how im going to land first, to get tumble attributes
+		int iLandDirection = random->RandomInt(0,4);
+		switch (iLandDirection)
+		{
+		case 1:
+			// Left
+			m_iLandDirection = LEFT;
+			break;
+		case 2:
+			// Right
+			m_iLandDirection = RIGHT;
+			break;
+		case 3:
+			// Backwards
+			m_iLandDirection = BACKWARDS;
+			break;
+		case 4:
+			// Forwards
+			m_iLandDirection = FORWARDS;
+			break;
+		default:
+			// Upright
+			m_iLandDirection = UPRIGHT;
+			break;
+		}
+
+		// Set me a tumbling
+		ToggleTumble();
+	}
+	else
+	{
+		// I'm tumbling, do logics
+		//TODO;
+	}
+#endif
+}
+
+void CPhysicsProp::ToggleTumble( void )
+{
+	if (!m_bTumbling)
+		m_bTumbling = true;
+	else
+		m_bTumbling = false;
+}
 
 //-----------------------------------------------------------------------------
 // Mass / mass center

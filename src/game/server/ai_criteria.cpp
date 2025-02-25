@@ -421,6 +421,7 @@ float AI_Response::GetDelay() const
 		m_Params.delay.ToInterval( temp );
 		return RandomInterval( temp );
 	}
+
 	return 0.0f;
 }
 

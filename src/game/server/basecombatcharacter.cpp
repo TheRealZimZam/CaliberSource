@@ -831,9 +831,6 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 	trace_t		tr;
 	bool		gibbed = false;
 
-	EmitSound( "BaseCombatCharacter.CorpseGib" );
-	CSoundEnt::InsertSound( SMELL_MEAT, GetAbsOrigin(), 256, 25, this );
-
 	//Create a big puff of blood
 	Vector vecDamageDir = WorldSpaceCenter() - info.GetDamagePosition();
 	VectorNormalize( vecDamageDir );
@@ -868,7 +865,7 @@ bool CBaseCombatCharacter::CorpseGib( const CTakeDamageInfo &info )
 	if (gibbed)
 	{
 		EmitSound( "BaseCombatCharacter.CorpseGib" );
-		CSoundEnt::InsertSound( SMELL_MEAT, GetAbsOrigin(), 256, 20, this );
+		CSoundEnt::InsertSound( SMELL_MEAT, GetAbsOrigin(), 256, 25, this );
 	}
 	return gibbed;
 }
@@ -943,11 +940,10 @@ Activity CBaseCombatCharacter::GetDeathActivity ( void )
 	}
 
 	// can we perform the prescribed death?
-	if ( SelectWeightedSequence ( deathActivity ) == ACTIVITY_NOT_AVAILABLE )
+	if ( SelectWeightedSequence( deathActivity ) == ACTIVITY_NOT_AVAILABLE )
 	{
 		// if we're still invalid, simple is our only option.
 		deathActivity = ACT_DIESIMPLE;
-
 	//	DevMsg( "ERROR! %s missing ACT_DIESIMPLE\n", STRING(GetModelName()) );
 	}
 
@@ -1491,9 +1487,16 @@ bool CBaseCombatCharacter::BecomeRagdoll( const CTakeDamageInfo &info, const Vec
 	}
 #endif
 
-#ifdef HL2_DLL	
+#ifdef HL2_DLL
+	if( hl2_episodic.GetBool() && Classify() == CLASS_PLAYER_ALLY_VITAL )
+	{
+		CreateServerRagdoll( this, m_nForceBone, newinfo, COLLISION_GROUP_INTERACTIVE_DEBRIS, true );
+		RemoveDeferred();
+		return true;
+	}
+
 	// Mega physgun requires everything to be a server-side ragdoll
-	if ( m_bForceServerRagdoll == true || ( HL2GameRules()->MegaPhyscannonActive() == true ) && !IsPlayer() && Classify() != CLASS_PLAYER_ALLY_VITAL )
+	if ( m_bForceServerRagdoll == true || ( HL2GameRules()->MegaPhyscannonActive() == true ) && !IsPlayer() )
 	{
 		if ( CanBecomeServerRagdoll() == false )
 			return false;
@@ -1504,13 +1507,6 @@ bool CBaseCombatCharacter::BecomeRagdoll( const CTakeDamageInfo &info, const Vec
 		PhysSetEntityGameFlags( pRagdoll, FVPHYSICS_NO_SELF_COLLISIONS );
 		RemoveDeferred();
 
-		return true;
-	}
-
-	if( hl2_episodic.GetBool() && Classify() == CLASS_PLAYER_ALLY_VITAL )
-	{
-		CreateServerRagdoll( this, m_nForceBone, newinfo, COLLISION_GROUP_INTERACTIVE_DEBRIS, true );
-		RemoveDeferred();
 		return true;
 	}
 #endif //HL2_DLL
@@ -1556,9 +1552,8 @@ void CBaseCombatCharacter::Event_Killed( const CTakeDamageInfo &info )
 
 	// if flagged to drop a health kit
 	if (HasSpawnFlags(SF_NPC_DROP_HEALTHKIT))
-	{
 		CBaseEntity::Create( "item_healthvial", GetAbsOrigin(), GetAbsAngles() );
-	}
+
 	// clear the deceased's sound channels.(may have been firing or reloading when killed)
 	EmitSound( "BaseCombatCharacter.StopWeaponSounds" );
 
@@ -1821,25 +1816,16 @@ void CBaseCombatCharacter::Weapon_Drop( CBaseCombatWeapon *pWeapon, const Vector
 	// If I'm an NPC, fill the weapon with ammo before I drop it.
 	if ( GetFlags() & FL_NPC )
 	{
-		if ( pWeapon->UsesClipsForAmmo1() )
+		// Checked if its limited ammo mode
+		extern ConVar ai_limited_ammo;
+		if ( !ai_limited_ammo.GetBool() )
 		{
-			pWeapon->m_iClip1 = pWeapon->GetDefaultClip1();
+			if ( pWeapon->UsesClipsForAmmo1() )
+				pWeapon->m_iClip1 = pWeapon->GetDefaultClip1();
 
-#if 0
-			if( FClassnameIs( pWeapon, "weapon_smg1" ) )
-			{
-				// Drop enough ammo to kill 2 of me.
-				// Figure out how much damage one piece of this type of ammo does to this type of enemy.
-				float flAmmoDamage = g_pGameRules->GetAmmoDamage( UTIL_PlayerByIndex(1), this, pWeapon->GetPrimaryAmmoType() );
-				pWeapon->m_iClip1 = (GetMaxHealth() / flAmmoDamage) * 2;
-			}
-#endif
+			if ( pWeapon->UsesClipsForAmmo2() )
+				pWeapon->m_iClip2 = pWeapon->GetDefaultClip2();
 		}
-		if ( pWeapon->UsesClipsForAmmo2() )
-		{
-			pWeapon->m_iClip2 = pWeapon->GetDefaultClip2();
-		}
-
 		if ( IsXbox() )
 		{
 			pWeapon->AddEffects( EF_ITEM_BLINK );
@@ -2003,9 +1989,8 @@ void CBaseCombatCharacter::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 	// ----------------------
 	// If gun doesn't use clips, just give ammo
 	if (pWeapon->GetMaxClip1() == -1)
-	{
 		GiveAmmo(pWeapon->GetDefaultClip1(), pWeapon->m_iPrimaryAmmoType); 
-	}
+#if 0
 	// If default ammo given is greater than clip
 	// size, fill clips and give extra ammo
 	else if (pWeapon->GetDefaultClip1() >  pWeapon->GetMaxClip1() )
@@ -2013,22 +1998,13 @@ void CBaseCombatCharacter::Weapon_Equip( CBaseCombatWeapon *pWeapon )
 		pWeapon->m_iClip1 = pWeapon->GetMaxClip1();
 		GiveAmmo( (pWeapon->GetDefaultClip1() - pWeapon->GetMaxClip1()), pWeapon->m_iPrimaryAmmoType); 
 	}
-
+#endif
 	// ----------------------
 	//  Give Secondary Ammo
 	// ----------------------
 	// If gun doesn't use clips, just give ammo
 	if (pWeapon->GetMaxClip2() == -1)
-	{
 		GiveAmmo(pWeapon->GetDefaultClip2(), pWeapon->m_iSecondaryAmmoType); 
-	}
-	// If default ammo given is greater than clip
-	// size, fill clips and give extra ammo
-	else if ( pWeapon->GetDefaultClip2() > pWeapon->GetMaxClip2() )
-	{
-		pWeapon->m_iClip2 = pWeapon->GetMaxClip2();
-		GiveAmmo( (pWeapon->GetDefaultClip2() - pWeapon->GetMaxClip2()), pWeapon->m_iSecondaryAmmoType); 
-	}
 
 	pWeapon->Equip( this );
 
@@ -2786,25 +2762,23 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 		if ( pWeapon->CanBePickedUpByNPCs() == false )
 			continue;
 
-		if ( velocity.LengthSqr() > 1 || !Weapon_CanUse(pWeapon) )
+		if ( velocity.LengthSqr() > 2 || !Weapon_CanUse(pWeapon) )
 			continue;
 
 		if ( pWeapon->IsLocked(this) )
 			continue;
 
-		if ( GetActiveWeapon() )
+		// Already armed. Would picking up this weapon improve my situation?
+		if ( GetActiveWeapon() && GetActiveWeapon()->m_iClassname == pWeapon->m_iClassname)
 		{
-			// Already armed. Would picking up this weapon improve my situation?
-			if( GetActiveWeapon()->m_iClassname == pWeapon->m_iClassname )
-			{
-				// No, I'm already using this type of weapon.
-				continue;
-			}
-			if( pWeapon->GetPriority() < 2 )
-			{
-				// No, this weapon sux.
-				continue;
-			}
+			// No, I'm already using this type of weapon.
+			continue;
+		}
+
+		if( pWeapon->GetPriority() < 0 )
+		{
+			// No, this weapon sux.
+			continue;
 		}
 
 		float fCurDist = (pWeapon->GetLocalOrigin() - GetLocalOrigin()).Length();
@@ -2815,32 +2789,19 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 			fCurDist *= 0.75f;
 		}
 
-		if( Weapon_IsOnGround(pWeapon) )
-		{
-			// Weapon appears to be lying on the ground. Make sure this weapon is reachable
-			// by tracing out a human sized hull just above the weapon.  If not, reject
-			trace_t tr;
-
-			Vector	vAboveWeapon = pWeapon->GetAbsOrigin();
-			UTIL_TraceEntity( this, vAboveWeapon, vAboveWeapon + Vector( 0, 0, 1 ), MASK_SOLID, pWeapon, COLLISION_GROUP_NONE, &tr );
-
-			if ( tr.startsolid || (tr.fraction < 1.0) )
-				continue;
-		}
-
 		if ( pBestWeapon )
 		{
-			// Give these weapons a bonus be selected by making it seem closer.
+			// Give these weapons a bonus of being selected by making it seem closer.
 			switch( pWeapon->GetPriority() )
 			{
 				case 0:
 					// Lowest Priority
-					fCurDist *= 1.75f;
+					fCurDist *= 1.9f;
 				break;
 
 				case 1:
 					// Low Priority
-					fCurDist *= 1.35f;
+					fCurDist *= 1.4f;
 				break;
 
 				case 2:
@@ -2857,24 +2818,36 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 					// Highest Priority
 					fCurDist *= 0.25f;
 				break;
+
+				default:
+				break;
 			}
 
 			// choose the last range attack weapon you find or the first available other weapon
-//			if ( ! (pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
-//			{
-//				continue;
-//			}
-			if (fCurDist > fBestDist ) 
+			if ( !(pWeapon->CapabilitiesGet() & bits_CAP_RANGE_ATTACK_GROUP) )
+			{
+				continue;
+			}
+			else if (fCurDist > fBestDist ) 
 			{
 				continue;
 			}
 		}
 
-		if( FVisible(pWeapon) )
+		if( Weapon_IsOnGround(pWeapon) )
 		{
-			fBestDist   = fCurDist;
-			pBestWeapon = pWeapon;
+			// Weapon appears to be lying on the ground. Make sure this weapon is reachable
+			// by tracing out a human sized hull just above the weapon.  If not, reject
+			trace_t tr;
+			Vector	vAboveWeapon = pWeapon->GetAbsOrigin();
+			UTIL_TraceEntity( this, vAboveWeapon, vAboveWeapon + Vector( 0, 0, 1 ), MASK_SOLID, pWeapon, COLLISION_GROUP_NONE, &tr );
+
+			if ( tr.startsolid || (tr.fraction < 1.0) )
+				continue;
 		}
+
+		fBestDist   = fCurDist;
+		pBestWeapon = pWeapon;
 	}
 
 	if( pBestWeapon )
@@ -2883,7 +2856,6 @@ CBaseEntity *CBaseCombatCharacter::Weapon_FindUsable( const Vector &range )
 		// might not actually be able to go pick it up right now.
 		pBestWeapon->Lock( 2.0, this );
 	}
-
 
 	return pBestWeapon;
 }
@@ -3129,7 +3101,7 @@ CBaseEntity *CBaseCombatCharacter::FindMissTarget( void )
 	CBaseEntity *pMissCandidates[ MAX_MISS_CANDIDATES ];
 	int numMissCandidates = 0;
 
-	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer( this );
 	CBaseEntity *pEnts[256];
 	Vector		radius( 100, 100, 100);
 	Vector		vecSource = GetAbsOrigin();
@@ -3141,19 +3113,29 @@ CBaseEntity *CBaseCombatCharacter::FindMissTarget( void )
 		if ( pEnts[i] == NULL )
 			continue;
 
+#ifdef CALIBER_DLL
+		// Dont consider the player a valid miss target... duh!
+		if ( pPlayer )
+			continue;
+#else
 		// New rule for this system. Don't shoot what the player won't see.
 		if ( pPlayer && !pPlayer->FInViewCone( pEnts[ i ] ) )
 			continue;
+#endif
 
 		if ( numMissCandidates >= MAX_MISS_CANDIDATES )
 			break;
 
-		//See if it's a good target candidate
-		//TODO; Func_breakable/func_physbox???
+		// See if it's a good target candidate - Any kind of prop, physbox or breakable
 		if ( FClassnameIs( pEnts[i], "prop_dynamic" ) || 
 			 FClassnameIs( pEnts[i], "prop_physics" ) || 
 			 FClassnameIs( pEnts[i], "physics_prop" ) || 
-			 FClassnameIs( pEnts[i], "func_physbox" ) )
+#ifdef CALIBER_DLL
+			 FClassnameIs( pEnts[i], "prop_physics_simple" ) || 
+			 FClassnameIs( pEnts[i], "func_physbox" ) || 
+			 FClassnameIs( pEnts[i], "func_breakable" )
+#endif
+			 )
 		{
 			pMissCandidates[numMissCandidates++] = pEnts[i];
 			continue;

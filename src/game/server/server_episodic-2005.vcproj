@@ -1933,6 +1933,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\inforemarkable.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\inforemarkable.h"
+				>
+			</File>
+			<File
 				RelativePath=".\init_factory.cpp"
 				>
 				<FileConfiguration
@@ -2114,6 +2122,10 @@
 			</File>
 			<File
 				RelativePath=".\logicentities.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\logicentities.h"
 				>
 			</File>
 			<File
@@ -2422,6 +2434,10 @@
 			</File>
 			<File
 				RelativePath=".\physconstraint.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\physgun.cpp"
 				>
 			</File>
 			<File
@@ -3756,6 +3772,14 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\basespriteprojectile.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\basespriteprojectile.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\citadel_effects.cpp"
 					>
 				</File>
@@ -4240,6 +4264,14 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\npc_cscanner.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl2\npc_cscanner.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\npc_dog.cpp"
 					>
 				</File>
@@ -4345,14 +4377,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\npc_rollermine.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\npc_scanner.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\npc_scanner.h"
 					>
 				</File>
 				<File
@@ -4588,6 +4612,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\weapon_flash.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\weapon_flashlight.cpp"
 					>
 				</File>
@@ -4601,6 +4629,10 @@
 				</File>
 				<File
 					RelativePath=".\hl2\weapon_molotov.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_mp40.cpp"
 					>
 				</File>
 				<File
@@ -4784,6 +4816,14 @@
 				Name="HL1 DLL"
 				>
 				<File
+					RelativePath=".\hl1\hl1_ai_basenpc.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_ai_basenpc.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl1\hl1_env_speaker.cpp"
 					>
 				</File>
@@ -4796,11 +4836,27 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl1\hl1_npc_hornet.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_npc_hornet.h"
+					>
+				</File>
+				<File
 					RelativePath=".\hl1\hl1_npc_scientist.cpp"
 					>
 				</File>
 				<File
 					RelativePath=".\hl1\hl1_npc_scientist.h"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_npc_snark.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\hl1\hl1_npc_snark.h"
 					>
 				</File>
 			</Filter>

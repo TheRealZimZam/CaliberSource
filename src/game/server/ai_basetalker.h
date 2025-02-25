@@ -61,7 +61,8 @@
 #define TLK_COMMANDED		"TLK_COMMANDED" // received orders from player in command mode
 #define TLK_COMMAND_FAILED	"TLK_COMMAND_FAILED" 
 #define TLK_DENY_COMMAND	"TLK_DENY_COMMAND" // designer has asked this NPC to politely deny player commands to move the squad
-#define TLK_BETRAYED		"TLK_BETRAYED"	// player killed an ally in front of me.
+#define TLK_PROVOKED		"TLK_PROVOKED"	// player pissed me off
+#define TLK_BETRAYED		"TLK_BETRAYED"	// player killed an ally in front of me
 #define TLK_ALLY_KILLED		"TLK_ALLY_KILLED" // witnessed an ally die some other way.
 #define TLK_ATTACKING		"TLK_ATTACKING" // about to fire my weapon at a target
 #define TLK_CHASING			"TLK_CHASING" // chasing an enemy
@@ -135,6 +136,7 @@
 
 //-----------------------------------------------------------------------------
 
+#define ALLIES_CAN_BE_PROVOKED	1
 #define TALKRANGE_MIN 500.0				// don't talk to anyone farther away than this
 
 //-----------------------------------------------------------------------------
@@ -285,6 +287,7 @@ public:
 	//---------------------------------
 	void		GatherConditions( void );
 	void		GatherEnemyConditions( CBaseEntity *pEnemy );
+	void		OnSeeEntity( CBaseEntity *pEntity );
 	void		OnStateChange( NPC_STATE OldState, NPC_STATE NewState );
 	void		PrescheduleThink( void );
 	int			SelectSchedule( void );
@@ -303,7 +306,7 @@ public:
 	// Combat
 	//---------------------------------
 	void		OnKilledNPC( CBaseCombatCharacter *pKilled );
-	Disposition_t	IRelationType ( CBaseEntity *pTarget );
+	Disposition_t	IRelationType( CBaseEntity *pTarget );
 
 	//---------------------------------
 	// Damage handling
@@ -319,6 +322,8 @@ public:
 	virtual void DeathSound( const CTakeDamageInfo &info );
 	virtual void BarnacleDeathSound( void );
 	virtual void PainSound( const CTakeDamageInfo &info );
+	virtual void FoundEnemySound( void );
+	virtual void IdleSound( void ) { SelectIdleSpeech(NULL); };
 
 	//---------------------------------
 	// Speech & Acting
@@ -411,12 +416,9 @@ public:
 	
 	void			AnswerQuestion( CAI_BaseTalker *pQuestioner, int iQARandomNum, bool bAnsweringHello );
 
-protected:
-#ifdef HL2_DLL
-	// Health regeneration for friendly allies
-	virtual bool ShouldRegenerateHealth( void ) { return ( Classify() == CLASS_PLAYER_ALLY_VITAL ); }
-#endif
+	float			m_flNextIdleSpeechTime;
 
+protected:
 	inline bool CanSpeakWhileScripting();
 
 	// Whether we are a vital ally (useful for wrting Classify() for classes that are only sometimes vital, 
@@ -444,8 +446,6 @@ protected:
 		NEXT_CONDITION
 	};
 
-	float			m_flNextIdleSpeechTime;
-
 private:
 	void SetCategoryDelay( ConceptCategory_t category, float minDelay, float maxDelay = 0.0 )	{ m_ConceptCategoryTimers[category].Set( minDelay, maxDelay ); }
 	bool CategoryDelayExpired( ConceptCategory_t category )										{ return m_ConceptCategoryTimers[category].Expired(); }
@@ -463,7 +463,6 @@ private:
 	EHANDLE			m_hTalkTarget;	// who to look at while talking
 	float			m_flNextRegenTime;
 	float			m_flTimePlayerStartStare;
-	EHANDLE			m_hPotentialSpeechTarget;	// NPC to tell the response rules about when trying to find a response to talk to them with
 	//float			m_flNextIdleSpeechTime;
 	int				m_iQARandomNumber;
 

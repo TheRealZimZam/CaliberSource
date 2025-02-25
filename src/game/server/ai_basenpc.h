@@ -87,13 +87,17 @@ extern bool AIStrongOpt( void );
 #define TURRET_CLOSE_RANGE	200
 #define TURRET_MEDIUM_RANGE 500
 
-#define COMMAND_GOAL_TOLERANCE	48	// 48 inches.
+#define COMMAND_GOAL_TOLERANCE	48	// 48 inches
 #define TIME_CARE_ABOUT_DAMAGE	3.0
 
 #define ITEM_PICKUP_TOLERANCE	48.0f
 
+#define NPC_JUMP_HEIGHT			60.0f	// units
+#define NPC_JUMP_DISTANCE		250.0f
+#define NPC_MAX_JUMP_DROP		208.0f
+
 // Max's of the box used to search for a weapon to pick up. 45x45x~8 ft.
-#define WEAPON_SEARCH_DELTA	Vector( 540, 540, 100 )
+#define WEAPON_SEARCH_DELTA	Vector( 480, 480, 200 )
 
 enum Interruptability_t
 {
@@ -112,13 +116,14 @@ enum Interruptability_t
 #define bits_MEMORY_INCOVER				( 1 << 1 )// npc knows it is in a covered position.
 #define bits_MEMORY_SUSPICIOUS			( 1 << 2 )// Ally is suspicious of the player, and will move to provoked more easily
 #define	bits_MEMORY_TASK_EXPENSIVE		( 1 << 3 )// NPC has completed a task which is considered costly, so don't do another task this frame
-//#define	bits_MEMORY_ON_PATH			( 1 << 4 )// Moving on a path
+#define	bits_MEMORY_ON_PATH				( 1 << 4 )// Moving on a path
 #define bits_MEMORY_PATH_FAILED			( 1 << 5 )// Failed to find a path
 #define bits_MEMORY_FLINCHED			( 1 << 6 )// Has already flinched
-//#define bits_MEMORY_KILLED 			( 1 << 7 )// HACKHACK -- remember that I've already called my Killed()
+#define bits_MEMORY_KILLED 				( 1 << 7 )// HACKHACK -- remember that I've already called my Killed()
+
 #define bits_MEMORY_TOURGUIDE			( 1 << 8 )// I have been acting as a tourguide.
 //#define bits_MEMORY_					( 1 << 9 )// 
-#define bits_MEMORY_LOCKED_HINT			( 1 << 10 )// 
+#define bits_MEMORY_LOCKED_HINT			( 1 << 10 )//
 //#define bits_MEMORY_					( 1 << 12 )
 
 #define bits_MEMORY_TURNING				( 1 << 13 )// Turning, don't interrupt me.
@@ -146,7 +151,7 @@ enum Interruptability_t
 //										( 1 << 5  )
 //										( 1 << 6  )
 #define SF_NPC_WAIT_FOR_SCRIPT			( 1 << 7  )	// spawnflag that makes npcs wait to check for attacking until the script is done or they've been attacked
-#define SF_NPC_LONG_RANGE				( 1 << 8  )	// makes npcs look far and relaxes weapon range limit 
+#define SF_NPC_LONG_RANGE				( 1 << 8  )	// makes npcs look far and relaxes weapon range limit	//SF_MONSTER_PREDISASTER 
 #define SF_NPC_FADE_CORPSE				( 1 << 9  )	// Fade out corpse after death
 #define SF_NPC_ALWAYSTHINK				( 1 << 10 )	// Simulate even when player isn't in PVS.
 #define SF_NPC_TEMPLATE					( 1 << 11 )	// This NPC will be used as a template by an npc_maker -- do not spawn.
@@ -876,7 +881,7 @@ public:
 	virtual NPC_STATE	SelectIdealState( void );
 
 	void				SetState( NPC_STATE State );
-	virtual bool		ShouldGoToIdleState( void ) 							{ return ( false ); }
+	virtual bool		ShouldReturnToIdleState( void );
 	virtual	void 		OnStateChange( NPC_STATE OldState, NPC_STATE NewState ) {/*Base class doesn't care*/};
 	
 	NPC_STATE			GetState( void )										{ return m_NPCState; }
@@ -996,6 +1001,7 @@ public:
 	virtual CSound *	GetBestScent( void );
 	virtual float		HearingSensitivity( void )		{ return 1.0;	}
 	virtual bool		ShouldIgnoreSound( CSound * )	{ return false; }
+	virtual bool		ShouldInvestigateSound() { return false; }
 	bool				SoundIsVisible( CSound *pSound );
 
 protected:
@@ -1038,7 +1044,8 @@ public:
 	virtual bool		ShouldChooseNewEnemy();
 	virtual void		GatherEnemyConditions( CBaseEntity *pEnemy );
 	virtual float		EnemyDistTolerance() {  return 0; } // Enemy distances within this tolerance of each other are considered equivalent.
-	
+	virtual bool		IsRunningApproachEnemySchedule();
+
 	float				EnemyDistance( CBaseEntity *pEnemy );
 	CBaseCombatCharacter *GetEnemyCombatCharacterPointer();
 	void SetEnemyOccluder(CBaseEntity *pBlocker);
@@ -1105,14 +1112,14 @@ public:
 	virtual void ClearCommandGoal();
 	virtual void OnTargetOrder()										{}
 	virtual void OnMoveOrder()											{}
-	virtual bool IsValidCommandTarget( CBaseEntity *pTarget )			{ return false; }
+	virtual bool IsValidCommandTarget( CBaseEntity *pTarget );
 	const Vector &GetCommandGoal() const								{ return m_vecCommandGoal; }
 	virtual void OnMoveToCommandGoalFailed()							{}
 	string_t GetPlayerSquadName() const									{ Assert( gm_iszPlayerSquad != NULL_STRING ); return gm_iszPlayerSquad; }
 	bool IsInPlayerSquad() const;
 	virtual CAI_BaseNPC *GetSquadCommandRepresentative()				{ return NULL; }
 
-	virtual bool TargetOrder( CBaseEntity *pTarget, CAI_BaseNPC **Allies, int numAllies ) { OnTargetOrder(); return true; }
+	virtual bool TargetOrder( CBaseEntity *pTarget, CAI_BaseNPC **Allies, int numAllies ) { SetCondition( COND_RECEIVED_ORDERS ); OnTargetOrder(); return true; }
 	virtual void MoveOrder( const Vector &vecDest, CAI_BaseNPC **Allies, int numAllies ) { SetCommandGoal( vecDest ); SetCondition( COND_RECEIVED_ORDERS ); OnMoveOrder(); }
 
 	// Return true if you're willing to be idly talked to by other friends.
@@ -1299,13 +1306,14 @@ public:
 	// Methods used by motor to query properties/preferences/move-related state
 	// ------------
 	virtual bool		CanStandOn( CBaseEntity *pSurface ) const;
+	virtual	bool		CanMoveDead( void ) { return false; }
 
 	virtual bool		IsJumpLegal( const Vector &startPos, const Vector &apex, const Vector &endPos ) const; // Override for specific creature types
 	bool				IsJumpLegal( const Vector &startPos, const Vector &apex, const Vector &endPos, float maxUp, float maxDown, float maxDist ) const;
 	bool 				ShouldMoveWait();
 	virtual float		StepHeight() const			{ return 18.0f; }
 	float				GetStepDownMultiplier() const;
-	virtual float		GetMaxJumpSpeed() const		{ return 350.0f; }
+	virtual float		GetMaxJumpSpeed() const		{ return m_flGroundSpeed * 2; }
 	virtual float		GetJumpGravity() const		{ return 1.0f; }
 	
 	//---------------------------------
@@ -1615,16 +1623,16 @@ public:
 	void				VacateStrategySlot( void );
 	bool				IsStrategySlotRangeOccupied( int slotIDStart, int slotIDEnd );	// Returns true if all in the range are occupied
 	
-	CAI_Squad *			GetSquad()						{ return m_pSquad; 		}
+	CAI_Squad *			GetSquad()						{ return m_pSquad; }
 	virtual void		SetSquad( CAI_Squad *pSquad );
 	void				AddToSquad( string_t name );
 	void				RemoveFromSquad();
 	void				CheckSquad();
-	void				SetSquadName( string_t name )	{ m_SquadName = name; 	}
+	void				SetSquadName( string_t name )	{ m_SquadName = name; }
 	bool				InSquad() const					{ return m_pSquad != NULL; }
 	virtual bool		IsSilentSquadMember() const 	{ return false; }
 
-	int					NumWeaponsInSquad( const char *pszWeaponClassname );
+	int					NumWeaponsInSquad( const char *pszWeaponClassname = STRING(NULL_STRING) );
 
 	string_t			GetHintGroup( void )			{ return m_strHintGroup;		}
 	void				ClearHintGroup( void )			{ SetHintGroup( NULL_STRING );	}
@@ -1807,6 +1815,8 @@ public:
 
 	void				DoRadiusDamage( const CTakeDamageInfo &info, int iClassIgnore, CBaseEntity *pEntityIgnore );
 	void				DoRadiusDamage( const CTakeDamageInfo &info, const Vector &vecSrc, int iClassIgnore, CBaseEntity *pEntityIgnore );
+
+	virtual bool		ShouldRegenerateHealth( void );
 
 	//---------------------------------
 
@@ -2912,14 +2922,14 @@ inline void CAI_Component::SetActivity( Activity NewActivity )
 }
 //-----------------------------------------------------------------------------
 
-inline float CAI_Component::GetIdealSpeed() const
+inline float CAI_Component::GetIdealSpeed() //const
 {
 	return GetOuter()->GetIdealSpeed();
 }
 
 //-----------------------------------------------------------------------------
 
-inline float CAI_Component::GetIdealAccel() const
+inline float CAI_Component::GetIdealAccel() //const
 {
 	return GetOuter()->GetIdealAccel();
 }

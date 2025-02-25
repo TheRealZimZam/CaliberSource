@@ -22,7 +22,8 @@ extern ConVar rr_debugresponses;
 
 //-----------------------------------------------------------------------------
 
-ConVar sk_ally_regen_time( "sk_ally_regen_time", "0.3003", FCVAR_NONE, "Time taken for an ally to regenerate a point of health." );
+ConVar sk_ally_regen_time( "sk_ally_regen_time", "0.550", FCVAR_NONE, "Time taken for an ally to regenerate a point of health." );
+ConVar sk_vitalally_regen_time( "sk_vitalally_regen_time", "0.3003", FCVAR_NONE, "Time taken for an ally to regenerate a point of health." );
 ConVar sv_npc_talker_maxdist( "sv_npc_talker_maxdist", "2048", 0, "NPCs over this distance from the player won't attempt to speak." );
 ConVar ai_no_talk_delay( "ai_no_talk_delay", "0" );
 
@@ -37,6 +38,7 @@ ConceptCategoryInfo_t g_ConceptCategoryInfos[] =
 	{	0,	0,	0, 0 },
 };
 
+//concept, category, minGlobalCategoryDelay, maxGlobalCategoryDelay, minPersonalCategoryDelay, maxPersonalCategoryDelay, minConceptDelay, maxConceptDelay, flags
 ConceptInfo_t g_ConceptInfos[] =
 {
 	{ 	TLK_ANSWER,			SPEECH_IMPORTANT,	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT | AICF_ANSWER,	},
@@ -72,6 +74,7 @@ ConceptInfo_t g_ConceptInfos[] =
 	{ 	TLK_COMMANDED,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_COMMAND_FAILED,	SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_DENY_COMMAND,	SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
+	{ 	TLK_PROVOKED,		SPEECH_PRIORITY, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_TARGET_PLAYER,	},
 	{ 	TLK_BETRAYED,		SPEECH_PRIORITY, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
 	{ 	TLK_ALLY_KILLED,	SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		15,		30,		AICF_DEFAULT,	},
 	{ 	TLK_ATTACKING,		SPEECH_IMPORTANT, 	-1,		-1,		-1,		-1,		-1,		-1,		AICF_DEFAULT,	},
@@ -111,6 +114,9 @@ ConceptInfo_t g_ConceptInfos[] =
 	{ 	TLK_DARKNESS_FOUNDENEMY_BY_FLASHLIGHT, SPEECH_IMPORTANT,-1,	-1,	-1,	-1,	 -1,	-1,		AICF_DEFAULT,	},
 	{ 	TLK_DARKNESS_FLASHLIGHT_EXPIRED, SPEECH_IMPORTANT,	-1,	-1,	-1,	-1,	 -1,	-1,		AICF_DEFAULT,	},
 	{ 	TLK_SPOTTED_INCOMING_HEADCRAB, SPEECH_IMPORTANT,-1,		-1,		-1,	-1,	 -1,	-1,		AICF_DEFAULT,	},
+
+	{ 	TLK_ALLY_IN_BARNACLE, SPEECH_IMPORTANT,-1,		-1,		-1,	-1,	 -1,	-1,		AICF_DEFAULT,	},
+	{ 	TLK_SELF_IN_BARNACLE, SPEECH_PRIORITY,-1,		-1,		-1,	-1,	 -1,	-1,		AICF_DEFAULT,	},
 
 	// Lead behaviour
 	{ 	TLK_LEAD_START,		SPEECH_IMPORTANT,-1,	-1,		-1,		-1,		 -1,	-1,		AICF_DEFAULT,	},
@@ -315,8 +321,6 @@ CAI_AllySpeechManager *GetAllySpeechManager()
 //
 //-----------------------------------------------------------------------------
 
-#define ALLIES_CAN_BE_PROVOKED		1
-
 BEGIN_DATADESC( CAI_BaseTalker )
 
 	DEFINE_EMBEDDED( m_PendingResponse ),
@@ -325,7 +329,6 @@ BEGIN_DATADESC( CAI_BaseTalker )
 	DEFINE_FIELD( m_hTalkTarget, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_flNextRegenTime, FIELD_TIME ),
 	DEFINE_FIELD( m_flTimePlayerStartStare, FIELD_TIME ),
-	DEFINE_FIELD( m_hPotentialSpeechTarget, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_flNextIdleSpeechTime, FIELD_TIME ),
 	DEFINE_FIELD( m_iQARandomNumber, FIELD_INTEGER ),
 	DEFINE_FIELD( m_hSpeechFilter, FIELD_EHANDLE ),
@@ -388,9 +391,6 @@ void CAI_BaseTalker::DisplayDeathMessage( void )
 	if ( m_bGameEndAlly == false )
 		return;
 
-	if ( Classify() != CLASS_PLAYER_ALLY_VITAL )
-		return;
-
 	if ( npc_ally_deathmessage.GetBool() == 0 )
 		return;
 
@@ -430,9 +430,7 @@ void CAI_BaseTalker::GatherConditions( void )
 	BaseClass::GatherConditions();
 	
 	if ( !HasCondition( COND_SEE_PLAYER ) )
-	{
 		SetCondition( COND_TALKER_CLIENTUNSEEN );
-	}
 
 	CBasePlayer *pLocalPlayer = AI_GetSinglePlayer();
 
@@ -444,9 +442,7 @@ void CAI_BaseTalker::GatherConditions( void )
 	}
 
 	if ( !pLocalPlayer->IsAlive() )
-	{
 		SetCondition( COND_TALKER_PLAYER_DEAD );
-	}
 	
 	if ( HasCondition( COND_SEE_PLAYER ) )
 	{
@@ -518,24 +514,38 @@ void CAI_BaseTalker::GatherEnemyConditions( CBaseEntity *pEnemy )
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CAI_BaseTalker::OnSeeEntity( CBaseEntity *pEntity )
+{
+	BaseClass::OnSeeEntity(pEntity);
+
+	CAI_BaseNPC *pNPC = pEntity->MyNPCPointer();
+	if( pNPC )
+	{
+		if ( IRelationType( pNPC ) == D_LI && pNPC->IsEFlagSet(EFL_IS_BEING_LIFTED_BY_BARNACLE) )
+			SpeakIfAllowed( TLK_ALLY_IN_BARNACLE );
+		else if ( IRelationType( pNPC ) != D_LI )
+		{
+			if ( pNPC->IsOnFire() )
+				SpeakIfAllowed( TLK_ENEMY_BURNING );
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 void CAI_BaseTalker::OnStateChange( NPC_STATE OldState, NPC_STATE NewState )
 {
 	BaseClass::OnStateChange( OldState, NewState );
 
 	if ( OldState == NPC_STATE_COMBAT )
-	{
 		DeferAllIdleSpeech();
-	}
  
 	if ( GetState() == NPC_STATE_IDLE )
-	{
 		m_flNextIdleSpeechTime = gpGlobals->curtime + random->RandomFloat(5,10);
-	}
 	else
-	{
 		m_flNextIdleSpeechTime = 0;
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -546,22 +556,19 @@ void CAI_BaseTalker::PrescheduleThink( void )
 
 #ifdef HL2_DLL
 	// Vital allies regenerate
-	if( GetHealth() >= GetMaxHealth() )
+	if ( ShouldRegenerateHealth() )
 	{
-		// Avoid huge deltas on first regeneration of health after long period of time at full health.
-		m_flTimeLastRegen = gpGlobals->curtime;
-	}
-	else if ( ShouldRegenerateHealth() )
-	{
-		float flDelta = gpGlobals->curtime - m_flTimeLastRegen;
-		float flHealthPerSecond = 1.0f / sk_ally_regen_time.GetFloat();
+		float flHealthPerSecond = ((Classify() == CLASS_PLAYER_ALLY_VITAL ) ? sk_vitalally_regen_time.GetFloat() : sk_ally_regen_time.GetFloat());
+		float flHealthRegen = flHealthPerSecond;
 
-		float flHealthRegen = flHealthPerSecond * flDelta;
-
-		if ( g_pGameRules->IsSkillLevel(SKILL_HARD) )
-			flHealthRegen *= 0.5f;
-		else if ( g_pGameRules->IsSkillLevel(SKILL_EASY) )
-			flHealthRegen *= 1.5f;
+		// Adjust allies regen rate
+		if ( IsPlayerAlly() )
+		{
+			if ( g_pGameRules->IsSkillLevel(SKILL_HARD) )
+				flHealthRegen *= 0.5f;
+			else if ( g_pGameRules->IsSkillLevel(SKILL_EASY) )
+				flHealthRegen *= 1.5f;
+		}
 
 		m_flTimeLastRegen = gpGlobals->curtime;
 
@@ -600,15 +607,11 @@ int CAI_BaseTalker::SelectSchedule( void )
 	if ( !HasCondition(COND_RECEIVED_ORDERS) )
 	{
 		// sustained light wounds?
-		if ( m_iHealth <= m_iMaxHealth * 0.75 && IsAllowedToSpeak( TLK_WOUND ) && !GetExpresser()->SpokeConcept(TLK_WOUND) )
-		{
-			Speak( TLK_WOUND );
-		}
+		if ( m_iHealth <= m_iMaxHealth * 0.75 && !GetExpresser()->SpokeConcept(TLK_WOUND) )
+			SpeakIfAllowed( TLK_WOUND );
 		// sustained heavy wounds?
-		else if ( m_iHealth <= m_iMaxHealth * 0.35 && IsAllowedToSpeak( TLK_MORTAL ) && !GetExpresser()->SpokeConcept(TLK_MORTAL) )
-		{
-			Speak( TLK_MORTAL );
-		}
+		else if ( m_iHealth <= m_iMaxHealth * 0.35 && !GetExpresser()->SpokeConcept(TLK_MORTAL) )
+			SpeakIfAllowed( TLK_MORTAL );
 	}
 
 	return BaseClass::SelectSchedule();
@@ -697,6 +700,9 @@ bool CAI_BaseTalker::SelectIdleSpeech( AISpeechSelection_t *pSelection )
 //-----------------------------------------------------------------------------
 bool CAI_BaseTalker::SelectAlertSpeech( AISpeechSelection_t *pSelection )
 {
+	if ( !IsOkToSpeak( SPEECH_IMPORTANT ) )
+		return false;
+
 	CBasePlayer *pTarget = assert_cast<CBasePlayer *>(FindSpeechTarget( AIST_PLAYERS | AIST_FACING_TARGET ));
 	if ( pTarget )
 	{
@@ -775,11 +781,11 @@ bool CAI_BaseTalker::SelectPlayerUseSpeech()
 {
 	if( IsOkToSpeakInResponseToPlayer() )
 	{
-		if ( Speak( TLK_USE ) )
+		if ( SpeakIfAllowed( TLK_USE ) )
 			DeferAllIdleSpeech();
 		else
-			return Speak( ( !GetExpresser()->SpokeConcept( TLK_HELLO ) ) ? TLK_HELLO : TLK_IDLE );
-	}	
+			return SpeakIfAllowed( ( !GetExpresser()->SpokeConcept( TLK_HELLO ) ) ? TLK_HELLO : TLK_IDLE );
+	}
 	return false;
 }
 
@@ -788,9 +794,6 @@ bool CAI_BaseTalker::SelectPlayerUseSpeech()
 //-----------------------------------------------------------------------------
 bool CAI_BaseTalker::SelectQuestionAndAnswerSpeech( AISpeechSelection_t *pSelection )
 {
-	if ( !IsOkToSpeak( SPEECH_IDLE ) )
-		return false;
-
 	if ( IsMoving() )
 		return false;
 
@@ -867,8 +870,7 @@ void CAI_BaseTalker::PostSpeakDispatchResponse( AIConcept_t concept, AI_Response
 		}
 	}
 
-	m_hPotentialSpeechTarget = NULL;
-// HL2_EPISODIC
+	SetSpeechTarget(NULL);
 }
 
 //-----------------------------------------------------------------------------
@@ -880,7 +882,7 @@ bool CAI_BaseTalker::SelectQuestionFriend( CBaseEntity *pFriend, AISpeechSelecti
 		return false;
 
 	// Tell the response rules who we're trying to question
-	m_hPotentialSpeechTarget = pFriend;
+	SetSpeechTarget(pFriend);
 	m_iQARandomNumber = RandomInt(0,100);
 
 	// If we haven't said hello, say hello first.
@@ -902,7 +904,7 @@ bool CAI_BaseTalker::SelectQuestionFriend( CBaseEntity *pFriend, AISpeechSelecti
 bool CAI_BaseTalker::SelectAnswerFriend( CBaseEntity *pFriend, AISpeechSelection_t *pSelection, bool bRespondingToHello )
 {
 	// Tell the response rules who we're trying to answer
-	m_hPotentialSpeechTarget = pFriend;
+	SetSpeechTarget(pFriend);
 
 	if ( bRespondingToHello )
 	{
@@ -987,13 +989,9 @@ int CAI_BaseTalker::SelectNonCombatSpeech( AISpeechSelection_t *pSelection )
 	if ( !bResult )
 	{
 		if ( GetState() == NPC_STATE_ALERT ) 
-		{
 			bResult = SelectAlertSpeech( pSelection );
-		}
 		else
-		{
 			bResult = SelectIdleSpeech( pSelection );
-		}
 	}
 
 	return bResult;
@@ -1019,7 +1017,7 @@ int CAI_BaseTalker::SelectNonCombatSpeechSchedule()
 		if ( m_TimePendingSet == gpGlobals->curtime || IsAllowedToSpeak( m_PendingConcept.c_str() ) )
 			return SCHED_TALKER_SPEAK_PENDING_IDLE;
 	}
-	
+
 	return SCHED_NONE;
 } 
 
@@ -1080,10 +1078,10 @@ void CAI_BaseTalker::StartTask( const Task_t *pTask )
 
 	case TASK_MOVE_AWAY_PATH:
 		{
-			if ( HasCondition( COND_PLAYER_PUSHING ) && AI_IsSinglePlayer() )
+			if ( HasCondition( COND_PLAYER_PUSHING ) )
 			{
-				// @TODO (toml 10-22-04): cope with multiplayer push
-				GetMotor()->SetIdealYawToTarget( UTIL_GetLocalPlayer()->WorldSpaceCenter() );
+				// (toml 10-22-04): cope with multiplayer push
+				GetMotor()->SetIdealYawToTarget( AI_GetNearestPlayer(this)->WorldSpaceCenter() );
 			}
 			BaseClass::StartTask( pTask );
 			break;
@@ -1169,6 +1167,8 @@ void CAI_BaseTalker::OnKilledNPC( CBaseCombatCharacter *pKilled )
 			SpeakIfAllowed( TLK_ENEMY_DEAD );
 		}
 	}
+
+	BaseClass::OnKilledNPC( pKilled );
 }
 
 //-----------------------------------------------------------------------------
@@ -1179,8 +1179,6 @@ Disposition_t CAI_BaseTalker::IRelationType( CBaseEntity *pTarget )
 	{
 		if ( HasMemory( bits_MEMORY_PROVOKED ) )
 			return D_HT;
-		else if ( HasMemory( bits_MEMORY_SUSPICIOUS ) )
-			return D_NU;
 	}
 #endif
 
@@ -1195,7 +1193,6 @@ void CAI_BaseTalker::TraceAttack( const CTakeDamageInfo &info, const Vector &vec
 
 	if ( IsOkToSpeak(SPEECH_PRIORITY) )
 	{
-#if 1
 		switch( ptr->hitgroup )
 		{
 			case HITGROUP_HEAD:
@@ -1219,29 +1216,11 @@ void CAI_BaseTalker::TraceAttack( const CTakeDamageInfo &info, const Vector &vec
 			default:
 				break;
 		}
-#else
-		if ( ptr->hitgroup == HITGROUP_HEAD )
-		{
-			pszHitLocCriterion = "shotloc:head";
-		}
-		else if ( ptr->hitgroup == HITGROUP_LEFTLEG || ptr->hitgroup == HITGROUP_RIGHTLEG )
-		{
-			pszHitLocCriterion = "shotloc:leg";
-		}
-		else if ( ptr->hitgroup == HITGROUP_LEFTARM || ptr->hitgroup == HITGROUP_RIGHTARM )
-		{
-			pszHitLocCriterion = "shotloc:arm";
-		}
-		else if ( ptr->hitgroup == HITGROUP_STOMACH )
-		{
-			pszHitLocCriterion = "shotloc:gut";
-		}
-#endif
 
 		// set up the speech modifiers
-		CFmtStrN<128> modifiers( "%s,damageammo:%s,damage:%f", pszHitLocCriterion, info.GetAmmoName(), info.GetDamage() );
+		CFmtStrN<128> modifiers( "%s,damagetype:%i,damageammo:%s,damage:%f", pszHitLocCriterion, info.GetDamageType(), info.GetAmmoName(), info.GetDamage() );
 
-		Speak( TLK_PAIN, modifiers );
+		SpeakIfAllowed( TLK_PAIN, modifiers );
 	}
 
 	BaseClass::TraceAttack( info, vecDir, ptr );
@@ -1269,114 +1248,12 @@ int CAI_BaseTalker::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	}
 #endif
 
-	// A supposed ally has shot me and im not in a barnacle
-	if ( m_NPCState != NPC_STATE_PRONE )
-	{
-		CBaseCombatCharacter *jackAss = info.GetAttacker()->MyCombatCharacterPointer();
-		bool bAttackedByPlayer = false;
-		bool bWasAccidental = true;
-
-		//CFmtStrN<128> modifiers( "attacked_by_player:%d,distance_from_attack:%f,was_accidental:%d", bAttackedByPlayer, EnemyDistance( jackAss ), bWasAccidental );
-
-		// its hopefully in good faith
-		if ( (jackAss && jackAss->IRelationType( this ) >= D_LI) )
-		{
-#ifdef ALLIES_CAN_BE_PROVOKED
-			if ( (info.GetAttacker()->GetFlags() & FL_CLIENT) )
-			{
-				// Player attacked me
-				bAttackedByPlayer = true;
-
-				// Store the players body direction
-				Vector	idiotDir = GetAbsOrigin() - jackAss->GetAbsOrigin();
-				VectorNormalize( idiotDir );
-				Vector	idiotBodyDir = jackAss->BodyDirection3D();
-				float idiotDot = DotProduct( idiotBodyDir, idiotDir );
-				if ( idiotDot > 0.97f )
-					bWasAccidental = false;
-
-				// I've already been attacked in bad faith, so it makes this easy
-				if (m_afMemory & bits_MEMORY_SUSPICIOUS)
-				{
-					// 50/50 roll for instant aggression
-					if ( random->RandomInt( 0, 1 ) )
-					{
-						if (IsOkToSpeak(SPEECH_PRIORITY))
-							Speak( TLK_BETRAYED );	//, modifiers
-
-						Remember( bits_MEMORY_PROVOKED );
-						SetCondition( COND_PROVOKED );
-
-						CapabilitiesRemove(bits_CAP_NO_HIT_PLAYER);
-					}
-					else
-					{
-						// Look at the player very intensely
-						GetMotor()->SetIdealYawToTarget( jackAss->WorldSpaceCenter() );
-						if (IsMoving())
-							AddFacingTarget( jackAss, 1.0, 0.2, 0 );
-
-						//TODO; say a more serious "dont shoot me again"
-						if (IsOkToSpeakInResponseToPlayer())
-							Speak( TLK_NOSHOOT );	//, modifiers
-					}
-				}
-				else
-				{
-					// Alright fine... lets do the logics now
-					if ( GetEnemy() == NULL )
-					{
-						if ( HasCondition( COND_HEAR_COMBAT ) )
-						{
-							// There's some shooting over there, it might have been a ricochet - lower chances of suspicion
-							if ( !bWasAccidental || HasCondition( COND_HEAVY_DAMAGE ) )
-							{
-								Remember( bits_MEMORY_SUSPICIOUS );
-							}
-						}
-						else
-						{
-							// I know that was on purpose...
-							Remember( bits_MEMORY_SUSPICIOUS );
-						}
-					}
-					else
-					{
-						// We are properly fighting, so be a little more forgiving
-						if ( subInfo.GetDamageType() & (DMG_BURN|DMG_BLAST|DMG_SONIC) )
-						{
-							// Watch what you're doing!
-							bWasAccidental = true;
-						}
-						else
-						{
-							// That was a little too close!
-							if ( !bWasAccidental || random->RandomInt( 0, 3 ) == 3 )
-								Remember( bits_MEMORY_SUSPICIOUS );
-						}
-					}
-
-					if (IsOkToSpeakInResponseToPlayer())
-						Speak( TLK_NOSHOOT );	//, modifiers
-				}
-			}
-			else
-#endif
-			{
-				if (IsOkToCombatSpeak())
-					Speak( TLK_NOSHOOT );
+	// Handled in npc_talker now -MM
 #if 0
-				// Tell the jackass to say sorry
-				if( jackAss->GetExpresser()->CanSpeakConcept( TLK_ANSWER ) )
-				{
-					jackAss->SpeakIfAllowed( TLK_ANSWER );
-				}
+	// if player damaged this entity, have other friends talk about it.
+	if (subInfo.GetAttacker() && (subInfo.GetAttacker()->GetFlags() & FL_CLIENT) && IsPlayerAlly() )
+		SpeakIfAllowed( TLK_NOSHOOT );
 #endif
-				//TODO; Make a mental note, and go hostile if this guy shoots me again
-
-			}
-		}
-	}
 
 	return BaseClass::OnTakeDamage_Alive( subInfo );
 }
@@ -1422,11 +1299,10 @@ void CAI_BaseTalker::Event_Killed( const CTakeDamageInfo &info )
 
 	CAI_BaseTalker *pMourner = dynamic_cast<CAI_BaseTalker *>(FindSpeechTarget( AIST_NPCS ));
 	if ( pMourner )
-	{
 		pMourner->SpeakIfAllowed( TLK_ALLY_KILLED );
-	}
 
 	SetTarget( NULL );
+	SetSpeechTarget( NULL );
 	// Don't finish that sentence
 	SentenceStop();
 	SetUse( NULL );
@@ -1450,22 +1326,33 @@ void CAI_BaseTalker::DeathSound( const CTakeDamageInfo &info )
 {
 	// Sentences don't play on dead NPCs
 	SentenceStop();
-
-	Speak( TLK_DEATH );
+	Speak( TLK_DEATH, UTIL_VarArgs("damagetype:%i", info.GetDamageType()) );
 }
 
 void CAI_BaseTalker::BarnacleDeathSound( void )
 {
 	SentenceStop();
-	Speak( TLK_SELF_IN_BARNACLE );
+	SpeakIfAllowed( TLK_SELF_IN_BARNACLE );
 }
 
 void CAI_BaseTalker::PainSound( const CTakeDamageInfo &info )
 {
-	//TraceAttack takes care of this
-//!	SpeakIfAllowed( TLK_PAIN );
+	if ( IsOkToSpeak(SPEECH_IMPORTANT) )
+	{
+		CFmtStrN<128> modifiers( "damagetype:%i,damageammo:%s,damage:%f", info.GetDamageType(), info.GetAmmoName(), info.GetDamage() );
+		Speak( TLK_PAIN, modifiers );
+	}
 
 	return BaseClass::PainSound( info );
+}
+
+void CAI_BaseTalker::FoundEnemySound( void )
+{
+	if ( GetEnemy() )
+	{
+		if ( GetEnemy()->IsPlayer() )
+			SpeakIfAllowed( TLK_FOUNDPLAYER );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -1496,7 +1383,6 @@ CBaseEntity *CAI_BaseTalker::FindNamedEntity( const char *pszName, IEntityFindFi
 	{
 		return FindSpeechTarget( AIST_NPCS );
 	}
-
 
 	return BaseClass::FindNamedEntity( pszName, pFilter );
 }
@@ -1687,7 +1573,7 @@ bool CAI_BaseTalker::IsOkToSpeak( ConceptCategory_t category, bool fRespondingTo
 
 	if ( category == SPEECH_IDLE )
 	{
-		if ( GetState() != NPC_STATE_IDLE && GetState() != NPC_STATE_ALERT )
+		if ( !ShouldPlayIdleSound() )
 			return false;
 		if ( GetSpeechFilter() && GetSpeechFilter()->GetIdleModifier() < 0.001 )
 			return false;
@@ -1824,7 +1710,7 @@ bool CAI_BaseTalker::IsAllowedToSpeak( AIConcept_t concept, bool bRespondingToPl
 		if ( CompareConcepts( concept, TLK_HELLO_NPC ) )
 			return false;
 	}
-			
+
 	if ( !pSpeechManager->ConceptDelayExpired( concept ) )
 		return false;
 
@@ -1833,7 +1719,7 @@ bool CAI_BaseTalker::IsAllowedToSpeak( AIConcept_t concept, bool bRespondingToPl
 
 	if ( !GetExpresser()->CanSpeakConcept( concept ) )
 		return false;
-	
+
 	return true;
 }
 
@@ -1853,12 +1739,12 @@ bool CAI_BaseTalker::SpeakIfAllowed( AIConcept_t concept, const char *modifiers,
 void CAI_BaseTalker::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 {
 	BaseClass::ModifyOrAppendCriteria( set );
+	set.AppendCriteria( "randomnum", UTIL_VarArgs("%d", m_iQARandomNumber) );
 
-	if ( m_hPotentialSpeechTarget )
+	if ( GetSpeechTarget() )
 	{
-		set.AppendCriteria( "speechtarget", m_hPotentialSpeechTarget->GetClassname() );
-		set.AppendCriteria( "speechtargetname", STRING(m_hPotentialSpeechTarget->GetEntityName()) );
-		set.AppendCriteria( "randomnum", UTIL_VarArgs("%d", m_iQARandomNumber) );
+		set.AppendCriteria( "speechtarget", GetSpeechTarget()->GetClassname() );
+		set.AppendCriteria( "speechtargetname", STRING(GetSpeechTarget()->GetEntityName()) );
 	}
 
 	// Do we have a speech filter? If so, append it's criteria too

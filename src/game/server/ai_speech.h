@@ -21,6 +21,9 @@
 class KeyValues;
 class AI_CriteriaSet;
 
+//using ResponseRules::ResponseType_t;
+//using ResponseRules::AI_ResponseFollowup;
+
 //-----------------------------------------------------------------------------
 // Purpose: Used to share a global resource or prevent a system stepping on
 //			own toes.
@@ -64,7 +67,7 @@ extern CAI_TimedSemaphore g_AIFoesTalkSemaphore;
 
 
 const float AIS_DEF_MIN_DELAY 	= 2.8; // Minimum amount of time an NPCs will wait after someone has spoken before considering speaking again
-const float AIS_DEF_MAX_DELAY 	= 3.6; // Maximum amount of time an NPCs will wait after someone has spoken before considering speaking again
+const float AIS_DEF_MAX_DELAY 	= 4.2; // Maximum amount of time an NPCs will wait after someone has spoken before considering speaking again
 const float AIS_NO_DELAY  		= 0;
 const soundlevel_t AIS_DEF_SNDLVL 	 	= SNDLVL_TALKING;
 #define AI_NULL_CONCEPT NULL

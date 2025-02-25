@@ -1051,7 +1051,7 @@ void CAI_NetworkManager::DelayedInit( void )
 #endif
 
 			DevMsg( "Node Graph out of Date. Rebuilding...\n" );
-			UTIL_CenterPrintAll( "Graph Node out of Date. Bollocks...\n" );
+			UTIL_CenterPrintAll( "Damn, the Node Graph is out of Date! Rebuilding...\n" );
 			m_bNeedGraphRebuild = true;
 			g_pAINetworkManager->SetNextThink( gpGlobals->curtime + 1 );
 			return;
@@ -3072,15 +3072,12 @@ int CAI_NetworkBuilder::ComputeConnection( CAI_Node *pSrcNode, CAI_Node *pDestNo
 				AIMoveTrace_t moveTrace;
 				pMoveProbe->MoveLimit( NAV_JUMP, srcPos,destPos, MASK_NPCWORLDSTATIC, NULL, &moveTrace);
 				if (!IsMoveBlocked(moveTrace))
-				{
 					fJumpLegal = true;
-				}
+
 				pMoveProbe->MoveLimit( NAV_JUMP, destPos,srcPos, MASK_NPCWORLDSTATIC, NULL, &moveTrace);
 				if (!IsMoveBlocked(moveTrace))
-				{
 					fJumpLegal = true;
-				}
-				
+
 				// Add to our list of accepable hulls
 				if (fJumpLegal)
 				{

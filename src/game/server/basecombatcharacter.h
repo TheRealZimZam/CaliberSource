@@ -47,7 +47,7 @@ enum Capability_t
 	bits_CAP_MOVE_SHOOT				= 0x00000040, // tries to shoot weapon while moving
 	bits_CAP_SKIP_NAV_GROUND_CHECK	= 0x00000080, // optimization - skips ground tests while computing navigation
 	bits_CAP_USE					= 0x00000100, // open doors/push buttons/pull levers
-	//bits_CAP_HEAR					= 0x00000200, // can hear forced sounds
+	bits_CAP_HEAR					= 0x00000200, // can hear sounds
 	bits_CAP_AUTO_DOORS				= 0x00000400, // can trigger auto doors
 	bits_CAP_OPEN_DOORS				= 0x00000800, // can open manual doors
 	bits_CAP_TURN_HEAD				= 0x00001000, // can turn head, always bone controller 0
@@ -68,13 +68,15 @@ enum Capability_t
 	bits_CAP_DUCK					= 0x08000000, // cover and reload ducking
 	bits_CAP_NO_HIT_PLAYER			= 0x10000000, // don't hit players
 	bits_CAP_AIM_GUN				= 0x20000000, // Use arms to aim gun, not just body
-	bits_CAP_NO_HIT_SQUADMATES		= 0x40000000, // none
+	bits_CAP_NO_HIT_SQUADMATES		= 0x40000000, // Will not do damage to squadmates
 	bits_CAP_SIMPLE_RADIUS_DAMAGE	= 0x80000000, // Do not use robust radius damage model on this character.
 };
 
 #define bits_CAP_DOORS_GROUP    (bits_CAP_AUTO_DOORS | bits_CAP_OPEN_DOORS)
 #define bits_CAP_RANGE_ATTACK_GROUP	(bits_CAP_WEAPON_RANGE_ATTACK1 | bits_CAP_WEAPON_RANGE_ATTACK2)
 #define bits_CAP_MELEE_ATTACK_GROUP	(bits_CAP_WEAPON_MELEE_ATTACK1 | bits_CAP_WEAPON_MELEE_ATTACK2)
+#define bits_CAP_BASIC_MOVEMENT_GROUP (bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP)
+#define bits_CAP_HUMAN_MOVEMENT_GROUP (bits_CAP_MOVE_GROUND | bits_CAP_MOVE_JUMP | bits_CAP_MOVE_CLIMB | bits_CAP_MOVE_SWIM | bits_CAP_MOVE_CRAWL)
 
 
 class CBaseCombatWeapon;

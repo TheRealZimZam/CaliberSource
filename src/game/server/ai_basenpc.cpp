@@ -26,6 +26,7 @@
 #ifdef HL2_DLL
 #include "ai_interactions.h"
 #include "hl2_gamerules.h"
+#include "ai_basetalker.h"
 #endif // HL2_DLL
 
 #include "ai_network.h"
@@ -86,10 +87,6 @@
 #include "death_pose.h"
 #include "datacache/imdlcache.h"
 #include "vstdlib/jobthread.h"
-
-#ifdef HL2_EPISODIC
-#include "npc_alyx_episodic.h"
-#endif
 
 #ifdef PORTAL
 	#include "prop_portal_shared.h"
@@ -161,11 +158,7 @@ extern ConVar ai_vehicle_avoidance;
 #define ShouldDefaultEfficient()		( true )
 #endif
 
-#ifndef _RETAIL
 #define DbgEnemyMsg if ( !ai_debug_enemies.GetBool() ) ; else DevMsg
-#else
-#define DbgEnemyMsg if ( 0 ) ; else DevMsg
-#endif
 
 #ifdef DEBUG_AI_FRAME_THINK_LIMITS
 #define DbgFrameLimitMsg DevMsg
@@ -637,25 +630,33 @@ void CAI_BaseNPC::Ignite( float flFlameLifetime, bool bNPCOnly, float flSize, bo
 {
 	BaseClass::Ignite( flFlameLifetime, bNPCOnly, flSize, bCalledByLevelDesigner );
 
-#ifdef HL2_DLL
 	if ( g_pGameRules->ShouldBurningPropsEmitLight() == true && GetEffectEntity() != NULL )
 	{
 		GetEffectEntity()->AddEffects( EF_DIMLIGHT );
 	}
-#endif
 
-#ifdef HL2_EPISODIC
-	//This is kinda (really) GAY
+	// Ahhh, Much better... -M.M
+#ifdef HL2_DLL
 	if ( AI_IsSinglePlayer() )
 	{
+		// Fire BaseTalker TLK_ENEMY_BURNING
 		CBasePlayer *pPlayer = AI_GetSinglePlayer();
-		if ( pPlayer->IRelationType( this ) != D_LI )
+		if ( pPlayer && pPlayer->IRelationType( this ) != D_LI )
 		{
-			CNPC_Alyx *alyx = CNPC_Alyx::GetAlyx();
-
-			if ( alyx )
+			CBaseEntity *pEntity = NULL;
+			for ( CEntitySphereQuery sphere( GetAbsOrigin(), 2048 ); ( pEntity = sphere.GetCurrentEntity() ) != NULL; sphere.NextEntity() )
 			{
-				alyx->EnemyIgnited( this );
+				if (pEntity == this)
+					continue;
+
+				CAI_BaseTalker *pTalker = dynamic_cast<CAI_BaseTalker *>( pEntity );
+				if (pEntity != pTalker)
+					continue;
+
+				if ( pTalker && pTalker->IsPlayerAlly() )
+				{
+					pTalker->SpeakIfAllowed( TLK_ENEMY_BURNING );
+				}
 			}
 		}
 	}
@@ -1071,6 +1072,13 @@ void CAI_BaseNPC::DoRadiusDamage( const CTakeDamageInfo &info, const Vector &vec
 	RadiusDamage( info, vecSrc, info.GetDamage() * 2.5, iClassIgnore, pEntityIgnore );
 }
 
+bool CAI_BaseNPC::ShouldRegenerateHealth( void )
+{
+	if ( Classify() == CLASS_PLAYER_ALLY_VITAL )
+		return (GetHealth() < GetMaxHealth());
+	else
+		return false;
+}
 
 //-----------------------------------------------------------------------------
 // Set the contents types that are solid by default to all NPCs
@@ -1814,6 +1822,7 @@ void CAI_BaseNPC::SetScriptedScheduleIgnoreConditions( Interruptability_t interr
 	static int g_GeneralConditions[] = 
 	{
 		COND_ENEMY_DEAD,
+		COND_HEAR_WORLD,
 		COND_HEAR_BULLET_IMPACT,
 		COND_HEAR_COMBAT,
 		COND_HEAR_DANGER,
@@ -1826,6 +1835,7 @@ void CAI_BaseNPC::SetScriptedScheduleIgnoreConditions( Interruptability_t interr
 
 	static int g_SeenConditions[] = 
 	{
+		COND_HEAR_PLAYER,
 		COND_CAN_MELEE_ATTACK1,
 		COND_CAN_MELEE_ATTACK2,
 		COND_CAN_RANGE_ATTACK1,
@@ -2874,7 +2884,7 @@ void CAI_BaseNPC::MaintainTurnActivity( )
 void CAI_BaseNPC::PerformMovement()
 {
 	// don't bother to move if the npc isn't alive
-	if (!IsAlive())
+	if (!IsAlive() && !CanMoveDead())
 		return;
 
 	AI_PROFILE_SCOPE(CAI_BaseNPC_PerformMovement);
@@ -4091,8 +4101,6 @@ void CAI_BaseNPC::NPCThink( void )
 //=========================================================
 void CAI_BaseNPC::NPCUse( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useType, float value )
 {
-	return;
-
 	// Can't +USE NPCs running scripts
 	if ( GetState() == NPC_STATE_SCRIPT )
 		return;
@@ -4540,6 +4548,19 @@ void CAI_BaseNPC::ClearSenseConditions( void )
 
 void CAI_BaseNPC::CheckOnGround( void )
 {
+#ifdef CALIBER_DLL
+	// Change my friction based on the surface below me
+	trace_t tr;
+	UTIL_TraceLine( GetAbsOrigin(), GetAbsOrigin() - Vector( 0, 0, 64.0f ), MASK_SHOT_HULL, NULL, COLLISION_GROUP_NONE, &tr );
+	if( tr.fraction != 1.0 )
+	{
+		surfacedata_t *psurf = physprops->GetSurfaceData( tr.surface.surfaceProps );
+		if( psurf )
+			SetFriction( psurf->physics.friction );
+	}
+#endif
+
+	// Now do all the AI logic
 	bool bScriptedWait = ( IsCurSchedule( SCHED_WAIT_FOR_SCRIPT ) || ( m_hCine && m_scriptState == CAI_BaseNPC::SCRIPT_WAIT ) );
 	if ( !bScriptedWait && !HasCondition( COND_FLOATING_OFF_GROUND ) )
 	{
@@ -4836,6 +4857,7 @@ void CAI_BaseNPC::PrescheduleThink( void )
 			m_iDesiredWeaponState = DESIREDWEAPONSTATE_IGNORE;
 		}
 	}
+
 }
 
 //-----------------------------------------------------------------------------
@@ -5068,24 +5090,23 @@ NPC_STATE CAI_BaseNPC::SelectAlertIdealState()
 	}
 
 	if ( HasCondition(COND_HEAR_DANGER) ||
-		 HasCondition(COND_HEAR_COMBAT) )
+		 HasCondition(COND_HEAR_COMBAT) ||
+		 HasCondition(COND_HEAR_BULLET_IMPACT) )
 	{
+#if 0
 		CSound *pSound = GetBestSound();
 		AssertOnce( pSound != NULL );
 
 		if ( pSound )
-		{
 			GetMotor()->SetIdealYawToTarget( pSound->GetSoundReactOrigin() );
-		}
-
+#endif
 		return NPC_STATE_ALERT;
 	}
-	
-	if ( ShouldGoToIdleState() )
-	{
+
+	// If im okay with going back to IDLE
+	if ( ShouldReturnToIdleState() )
 		return NPC_STATE_IDLE;
-	}
-	
+
 	return NPC_STATE_INVALID;
 }
 
@@ -5192,6 +5213,19 @@ NPC_STATE CAI_BaseNPC::SelectIdealState( void )
 	return m_IdealNPCState;
 }
 
+bool CAI_BaseNPC::ShouldReturnToIdleState()
+{
+	// Never go to idle if I have an enemy
+	if ( GetEnemy() )
+		return false;
+
+	// If im close to death, stay ALERT
+	if ( GetHealth() <= (GetMaxHealth()/3) )
+		return false;
+
+	return true;
+}
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 void CAI_BaseNPC::GiveWeapon( string_t iszWeaponName )
@@ -5211,9 +5245,10 @@ void CAI_BaseNPC::GiveWeapon( string_t iszWeaponName )
 
 	// If I have a name, make my weapon match it with "_weapon" appended
 	if ( GetEntityName() != NULL_STRING )
-	{
 		pWeapon->SetName( AllocPooledString(UTIL_VarArgs("%s_weapon", GetEntityName())) );
-	}
+
+	if ( GetEffects() & EF_NOSHADOW )
+		pWeapon->AddEffects( EF_NOSHADOW );
 
 	Weapon_Equip( pWeapon );
 
@@ -5227,7 +5262,7 @@ void CAI_BaseNPC::GiveWeapon( string_t iszWeaponName )
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::IsMovingToPickupWeapon()
 {
-	return IsCurSchedule( SCHED_NEW_WEAPON );
+	return IsCurSchedule( SCHED_NEW_WEAPON ) && IsMoving();
 }
 
 //-----------------------------------------------------------------------------
@@ -5245,9 +5280,6 @@ bool CAI_BaseNPC::ShouldLookForBetterWeapon()
 		return false;
 
 	if( IsMovingToPickupWeapon() )
-		return false;
-
-	if( !IsPlayerAlly() && GetActiveWeapon() )
 		return false;
 
 	if( IsInAScript() )
@@ -5275,17 +5307,9 @@ bool CAI_BaseNPC::Weapon_IsBetterAvailable()
 	if( ShouldLookForBetterWeapon() )
 	{
 		if( GetActiveWeapon() )
-		{
-			m_flNextWeaponSearchTime = gpGlobals->curtime + 4;
-		}
+			m_flNextWeaponSearchTime = gpGlobals->curtime + 6;
 		else
-		{
-			// Look for a weapon frequently.
-			if( IsInPlayerSquad() )
-				m_flNextWeaponSearchTime = gpGlobals->curtime + 2;
-			else
-				m_flNextWeaponSearchTime = gpGlobals->curtime + 3;
-		}
+			m_flNextWeaponSearchTime = gpGlobals->curtime + 3;
 
 		if ( Weapon_FindUsable( WEAPON_SEARCH_DELTA ) )
 		{
@@ -5828,6 +5852,21 @@ void CAI_BaseNPC::GatherEnemyConditions( CBaseEntity *pEnemy )
 	}
 }
 
+//-----------------------------------------------------------------------------
+// For the purpose of determining whether to use a pathfinding variant, this
+// function determines whether the current schedule is a schedule that 
+// 'approaches' the enemy. 
+//-----------------------------------------------------------------------------
+bool CAI_BaseNPC::IsRunningApproachEnemySchedule()
+{
+	if ( IsCurSchedule( SCHED_CHASE_ENEMY, false ) || 
+		 IsCurSchedule( SCHED_ESTABLISH_LINE_OF_FIRE, false ) ||
+		 IsCurSchedule( SCHED_ESTABLISH_LINE_OF_FIRE_FALLBACK, false ) ||
+		 IsCurSchedule( SCHED_MOVE_TO_WEAPON_RANGE, false ) )
+		return true;
+
+	return false;
+}
 
 //-----------------------------------------------------------------------------
 // In the case of goaltype enemy, update the goal position
@@ -5963,7 +6002,7 @@ void CAI_BaseNPC::CheckTarget( CBaseEntity *pTarget )
 	AI_PROFILE_SCOPE(CAI_Enemies_CheckTarget);
 
 	ClearCondition ( COND_HAVE_TARGET_LOS );
-	ClearCondition ( COND_TARGET_OCCLUDED  );
+	ClearCondition ( COND_TARGET_OCCLUDED );
 
 	// ---------------------------
 	//  Set visibility conditions
@@ -5993,7 +6032,6 @@ void CAI_BaseNPC::CheckTarget( CBaseEntity *pTarget )
 //-----------------------------------------------------------------------------
 CAI_BaseNPC *CAI_BaseNPC::CreateCustomTarget( const Vector &vecOrigin, float duration )
 {
-#ifdef HL2_DLL
 	CNPC_Bullseye *pTarget = (CNPC_Bullseye*)CreateEntityByName( "npc_bullseye" );
 
 	ASSERT( pTarget != NULL );
@@ -6013,9 +6051,6 @@ CAI_BaseNPC *CAI_BaseNPC::CreateCustomTarget( const Vector &vecOrigin, float dur
 	}
 
 	return pTarget;
-#else
-	return NULL;
-#endif// HL2_DLL
 }
 
 //-----------------------------------------------------------------------------
@@ -6987,7 +7022,7 @@ void CAI_BaseNPC::NPCInit( void )
 	//		  by OnUpdateShotRegulator() as soon as they finish firing the first time.
 	//GetShotRegulator()->SetParameters( 2, 6, 0.3f, 0.8f );
 
-	SetUse ( &CAI_BaseNPC::NPCUse );
+	SetUse( &CAI_BaseNPC::NPCUse );
 
 	// NOTE: Can't call NPC Init Think directly... logic changed about
 	// what time it is when worldspawn happens..
@@ -7300,7 +7335,7 @@ void CAI_BaseNPC::AddRelationship( const char *pszRelationship, CBaseEntity *pAc
 		}
 		else
 		{
-			Warning("Can't parse relationship info (%s) - Expecting 'name [D_HT, D_FR, D_LI, D_NU] [1-99]'\n", pszRelationship );
+			Warning("Can't parse relationship info (%s) - Expecting '[name] [D_HT, D_FR, D_LI, D_NU] [0-99]'\n", pszRelationship );
 			Assert(0);
 			return;
 		}
@@ -7514,27 +7549,20 @@ void CAI_BaseNPC::StartNPC( void )
 }
 
 //-----------------------------------------------------------------------------
-
+// Purpose: Handle NPC target, called when a npc wakes up
+//-----------------------------------------------------------------------------
 void CAI_BaseNPC::StartTargetHandling( CBaseEntity *pTargetEnt )
 {
-	// TODO; This is where we handle our target, for now its only path corner, but this could also be expanded
-	// for other things like doors and whatnot.
-	GoalType_t goaltype = GOALTYPE_PATHCORNER;
+	if ( m_NPCState == NPC_STATE_DEAD )
+		return;
 
-	// JAY: How important is this error message?  Big Momma doesn't obey this rule, so I took it out for a nice dinner.
-	// At this point, we expect only a path_corner as initial goal, but if needed a npc can also run to an entity.
-	if (!FClassnameIs( pTargetEnt, "path*"))
-	{
-		DevWarning("ReadyNPC()--monster's initial goal %s is not a path, and thats okay (:\n", STRING(m_target));
-		// If its not a path, slam to targetent
-		goaltype = GOALTYPE_TARGETENT;
-#if 0
-		if (FClassnameIs( pTargetEnt, "func*"))
-		{
-			// We might also need to tell the npc to +USE this object
-		}
-#endif
-	}
+	GoalType_t goaltype = GOALTYPE_TARGETENT;
+
+	// If its a path, change the goaltype
+	if (FClassnameIs( pTargetEnt, "path_corner") || FClassnameIs( pTargetEnt, "path_track"))
+		goaltype = GOALTYPE_PATHCORNER;
+
+	SetTarget( pTargetEnt );
 
 	// set the npc up to walk a path corner path.
 	// !!!BUGBUG - this is a minor bit of a hack.
@@ -7542,14 +7570,29 @@ void CAI_BaseNPC::StartTargetHandling( CBaseEntity *pTargetEnt )
 	// NPC will start turning towards his destination
 	bool bIsFlying = (GetMoveType() == MOVETYPE_FLY) || (GetMoveType() == MOVETYPE_FLYGRAVITY);
 	AI_NavGoal_t goal( goaltype, pTargetEnt->GetAbsOrigin(),
-					   bIsFlying ? ACT_FLY : ACT_WALK,
-					   AIN_DEF_TOLERANCE, AIN_YAW_TO_DEST);
+						bIsFlying ? ACT_FLY : ACT_WALK,
+						AIN_DEF_TOLERANCE, AIN_YAW_TO_DEST);
 
-	SetState( NPC_STATE_IDLE );
-	SetSchedule( SCHED_IDLE_WALK );
+	// Gotta be different depending on state
+	if ( m_NPCState != NPC_STATE_COMBAT )
+	{
+		// Always be idle when walking a preset path
+		SetState( NPC_STATE_IDLE );
+
+		if ( goaltype == GOALTYPE_PATHCORNER )
+			SetSchedule( SCHED_IDLE_WALK );
+		else
+			SetSchedule( SCHED_TARGET_USE );
+	}
+	else
+	{
+		// TODO; Dont just walk to the destination, try to fight to it
+		goaltype = GOALTYPE_FLANK;
+		SetSchedule( SCHED_COMBAT_WALK );
+	}
 
 	if ( !GetNavigator()->SetGoal( goal ) )
-		DevWarning( 2, "Can't Create Route!\n" );
+		DevWarning( 2, "ReadyNPC()--Can't Create Route!\n" );
 }
 
 //-----------------------------------------------------------------------------
@@ -7834,15 +7877,17 @@ CBaseEntity *CAI_BaseNPC::BestEnemy( void )
 		CBaseEntity *pEnemy = pEMemory->hEnemy;
 
 		if (!pEnemy || !pEnemy->IsAlive())
-		{
-			if ( pEnemy )
-				DbgEnemyMsg( this, "    %s rejected: dead\n", pEnemy->GetDebugName() );
 			continue;
-		}
-		
+
 		if ( (pEnemy->GetFlags() & FL_NOTARGET) )
 		{
 			DbgEnemyMsg( this, "    %s rejected: no target\n", pEnemy->GetDebugName() );
+			continue;
+		}
+
+		if ( !IsValidEnemy( pEnemy ) )
+		{
+			DbgEnemyMsg( this, "    %s rejected: not valid\n", pEnemy->GetDebugName() );
 			continue;
 		}
 
@@ -7887,12 +7932,6 @@ CBaseEntity *CAI_BaseNPC::BestEnemy( void )
 		if ( relation == D_FR && !pEMemory->bUnforgettable && pEMemory->timeFirstSeen == AI_INVALID_TIME )
 		{
 			DbgEnemyMsg( this, "    %s rejected: feared, but never seen\n", pEnemy->GetDebugName() );
-			continue;
-		}
-
-		if ( !IsValidEnemy( pEnemy ) )
-		{
-			DbgEnemyMsg( this, "    %s rejected: not valid\n", pEnemy->GetDebugName() );
 			continue;
 		}
 
@@ -8515,7 +8554,8 @@ void CAI_BaseNPC::HandleAnimEvent( animevent_t *pEvent )
   			if ( GetActiveWeapon() )
   			{
   				GetActiveWeapon()->WeaponSound( RELOAD_NPC );
-  				GetActiveWeapon()->m_iClip1 = GetActiveWeapon()->GetMaxClip1(); 
+  				GetActiveWeapon()->m_iClip1 = GetActiveWeapon()->GetMaxClip1();
+				GetActiveWeapon()->m_iClip2 = GetActiveWeapon()->GetMaxClip2(); 
   				ClearCondition(COND_LOW_PRIMARY_AMMO);
   				ClearCondition(COND_NO_PRIMARY_AMMO);
   				ClearCondition(COND_NO_SECONDARY_AMMO);
@@ -8536,7 +8576,8 @@ void CAI_BaseNPC::HandleAnimEvent( animevent_t *pEvent )
 		{
   			if ( GetActiveWeapon() )
   			{
-  				GetActiveWeapon()->m_iClip1 = GetActiveWeapon()->GetMaxClip1(); 
+  				GetActiveWeapon()->m_iClip1 = GetActiveWeapon()->GetMaxClip1();
+				GetActiveWeapon()->m_iClip2 = GetActiveWeapon()->GetMaxClip2(); 
   				ClearCondition(COND_LOW_PRIMARY_AMMO);
   				ClearCondition(COND_NO_PRIMARY_AMMO);
   				ClearCondition(COND_NO_SECONDARY_AMMO);
@@ -9955,7 +9996,7 @@ bool CAI_BaseNPC::ShouldMoveAndShoot()
 
 	if ( GetState() == NPC_STATE_SCRIPT || IsInAScript() )
 		return false;
-	
+
 	return ( ( CapabilitiesGet() & bits_CAP_MOVE_SHOOT ) != 0 ); 
 }
 
@@ -10157,7 +10198,7 @@ void CAI_BaseNPC::NPCInitDead( void )
 // is lying flat on a surface (traces from all four corners
 // are same length.)
 //=========================================================
-bool CAI_BaseNPC::BBoxFlat ( void )
+bool CAI_BaseNPC::BBoxFlat( void )
 {
 	trace_t	tr;
 	Vector		vecPoint;
@@ -10565,14 +10606,6 @@ bool CAI_BaseNPC::ShouldFadeOnDeath( void )
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::ShouldPlayIdleSound( void )
 {
-#if 0
-	if ( ( m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT ) &&
-		   random->RandomInt(0,99) == 0 && !HasSpawnFlags(SF_NPC_GAG) )
-	{
-		return true;
-	}
-#endif
-
 	// Gagged monsters don't talk
 	if ( HasSpawnFlags( SF_NPC_GAG ) )
 		return false;
@@ -12260,12 +12293,18 @@ void CAI_BaseNPC::SetNavType( Navigation_t navType )
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::MovementCost( int moveType, const Vector &vecStart, const Vector &vecEnd, float *pCost )
 {
-	// We have nothing to say on the matter, but derived classes might
+	// We have nothing to say on the matter here, check CAI_Navigator
 	return false;
 }
 
 bool CAI_BaseNPC::OverrideMoveFacing( const AILocalMoveGoal_t &move, float flInterval )
 {
+  	if (IsCurSchedule( SCHED_BACK_AWAY_FROM_ENEMY ))
+		AddFacingTarget( GetEnemy(), GetEnemyLKP(), 1, 1 );
+
+  	if (IsCurSchedule( SCHED_BACK_AWAY_FROM_SAVE_POSITION ) && m_hTargetEnt )
+		AddFacingTarget( m_hTargetEnt, 1, 1 );
+
 	return false;
 }
 
@@ -12724,9 +12763,19 @@ void CAI_BaseNPC::ClearCommandGoal()
 
 //-----------------------------------------------------------------------------
 
+bool CAI_BaseNPC::IsValidCommandTarget( CBaseEntity *pTarget )
+{
+	if ( pTarget->IsPlayer() )
+		return true;
+
+	return false;
+}
+
+//-----------------------------------------------------------------------------
+
 bool CAI_BaseNPC::IsInPlayerSquad() const
 { 
-	return ( m_pSquad && MAKE_STRING(m_pSquad->GetName()) == GetPlayerSquadName() && !CAI_Squad::IsSilentMember(this) ); 
+	return ( m_pSquad && MAKE_STRING(m_pSquad->GetName()) == GetPlayerSquadName() ); 
 }
 
 
@@ -12945,7 +12994,14 @@ void CAI_BaseNPC::Break( CBaseEntity *pBreaker )
 	params.defBurstScale = 100;//pDamageInfo ? 0 : 100;
 	PropBreakableCreateAll( GetModelIndex(), pPhysics, params, this, -1, false );
 
-	UTIL_Remove(this);
+//	UTIL_Remove(this);
+	CTakeDamageInfo info;
+	info.SetAttacker( pBreaker );
+	info.SetInflictor( pBreaker );
+	info.SetDamage( (m_iHealth-1) );
+	info.SetDamageType( DMG_GENERIC );
+	info.SetDamageForce( velocity );
+	Event_Killed( info );
 }
 
 
@@ -13095,7 +13151,10 @@ void CAI_BaseNPC::InputSetSpeedModifierSpeed( inputdata_t &inputdata )
 bool CAI_BaseNPC::IsAllowedToDodge( void ) 
 { 
 	// Can't do it if I'm not available
-	if ( m_NPCState != NPC_STATE_IDLE && m_NPCState != NPC_STATE_ALERT && m_NPCState != NPC_STATE_COMBAT  )
+	if ( m_NPCState != NPC_STATE_IDLE && m_NPCState != NPC_STATE_ALERT && m_NPCState != NPC_STATE_COMBAT )
+		return false;
+
+	if ( SelectWeightedSequence( ACT_DUCK_DODGE ) == ACTIVITY_NOT_AVAILABLE )
 		return false;
 
 	return ( m_flNextDodgeTime <= gpGlobals->curtime );
@@ -14134,7 +14193,7 @@ void CAI_BaseNPC::PlayerHasIlluminatedNPC( CBasePlayer *pPlayer, float flDot )
 		if ( pInteraction->iLoopBreakTriggerMethod & SNPCINT_LOOPBREAK_ON_FLASHLIGHT_ILLUM )
 		{
 			// Only do this in alyx darkness mode
-			if ( HL2GameRules()->IsAlyxInDarknessMode() )
+			if ( HL2GameRules() && HL2GameRules()->IsAlyxInDarknessMode() )
 			{
 				// Can only break when we're in the action anim
 				if ( m_hCine->IsPlayingAction() )
@@ -14167,8 +14226,10 @@ void CAI_BaseNPC::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 		set.AppendCriteria( "distancetoenemy", "-1" );
 
 	// Am i in a squad?
-	if( GetSquad() != NULL )
+	if( InSquad() )
 		set.AppendCriteria( "insquad", "1" );
+	if( IsInPlayerSquad() )
+		set.AppendCriteria( "inplayersquad", "1" );
 }
 
 //-----------------------------------------------------------------------------

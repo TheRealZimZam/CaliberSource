@@ -17,6 +17,7 @@
 #include "ndebugoverlay.h"
 #include "tier1/strtools.h"
 #include "npcevent.h"
+#include "AI_Criteria.h"
 #include "isaverestore.h"
 #include "KeyValues.h"
 #include "tier0/vprof.h"
@@ -866,7 +867,7 @@ bool CBaseAnimating::CanBecomeRagdoll( void )
 	//Can't cause we don't have a ragdoll sequence.
 	if ( ragdollSequence == ACTIVITY_NOT_AVAILABLE )
 		 return false;
-	
+
 	if ( GetFlags() & FL_TRANSRAGDOLL )
 		 return false;
 
@@ -999,16 +1000,16 @@ float CBaseAnimating::GetSequenceGroundSpeed( CStudioHdr *pStudioHdr, int iSeque
 	}
 }
 
-float CBaseAnimating::GetIdealSpeed( ) const
+float CBaseAnimating::GetIdealSpeed() //const
 {
 	return m_flGroundSpeed;
 }
 
-float CBaseAnimating::GetIdealAccel( ) const
+float CBaseAnimating::GetIdealAccel() //const
 {
 	// return ideal max velocity change over 1 second.
 	// tuned for run-walk range of humans
-	return GetIdealSpeed() * 1.5;	//60
+	return GetIdealSpeed() * 1.5;
 }
 
 //-----------------------------------------------------------------------------
@@ -2497,9 +2498,9 @@ void CBaseAnimating::SetModel( const char *szModelName )
 	{
 		int modelIndex = modelinfo->GetModelIndex( szModelName );
 		const model_t *model = modelinfo->GetModel( modelIndex );
-		if ( model && ( modelinfo->GetModelType( model ) != mod_studio ) )
+		if ( model && ( modelinfo->GetModelType( model ) != mod_studio ) && ( modelinfo->GetModelType( model ) != mod_sprite ) )
 		{
-			Msg( "Setting CBaseAnimating to non-studio model %s  (type:%i)\n",	szModelName, modelinfo->GetModelType( model ) );
+			DevMsg( "Setting CBaseAnimating to non-studio model %s  (type:%i)\n", szModelName, modelinfo->GetModelType( model ) );
 		}
 	}
 	Studio_DestroyBoneCache( m_boneCacheHandle );
@@ -3288,14 +3289,9 @@ Activity CBaseAnimating::GetSequenceActivity( int iSequence )
 void CBaseAnimating::ModifyOrAppendCriteria( AI_CriteriaSet& set )
 {
 	BaseClass::ModifyOrAppendCriteria( set );
-	// TODO
-	// Append any animation state parameters here
-#if 0
-	if ( IsOnFire() )
-		set.AppendCriteria( "onfire", "1" );
-	else
-		set.RemoveCriteria( "onfire" );
-#endif
+
+	set.AppendCriteria( "onfire", UTIL_VarArgs( "%d", IsOnFire()) );
+	set.AppendCriteria( "frozen", UTIL_VarArgs( "%d", IsFrozen()) );
 }
 
 
@@ -3779,11 +3775,27 @@ bool CBaseAnimating::IsSequenceLooping( CStudioHdr *pStudioHdr, int iSequence )
 
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Spin/Tumble
 //-----------------------------------------------------------------------------
 void CBaseAnimating::SpinThink( void )
 {
 	// Basic think function
-	//TODO; SPEEN!
-	SetNextThink( gpGlobals->curtime + 0.2f );
+	QAngle vecCurrent = GetLocalAngles();
+	QAngle vecSpin = vecCurrent + QAngle( 0, 0.5, 0 );
+
+	SetAbsAngles( vecSpin );
+	SetNextThink( gpGlobals->curtime );
+}
+
+void CBaseAnimating::TumbleThink( void )
+{
+	// Do a spinthink
+	SpinThink();
+	
+	// Now apply some random X/Z to it
+	QAngle vecCurrent = GetLocalAngles();
+	QAngle vecTumble = vecCurrent + QAngle(0.5,0,0.25);
+
+	SetAbsAngles( vecTumble );
+	SetNextThink( gpGlobals->curtime );
 }

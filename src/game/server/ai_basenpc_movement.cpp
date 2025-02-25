@@ -7,7 +7,7 @@
 
 
 #include "cbase.h"
-
+#include "movevars_shared.h"
 #include "game.h"			
 #include "ndebugoverlay.h"
 
@@ -318,9 +318,14 @@ bool CAI_BaseNPC::IsJumpLegal( const Vector &startPos, const Vector &apex, const
 //-----------------------------------------------------------------------------
 bool CAI_BaseNPC::IsJumpLegal( const Vector &startPos, const Vector &apex, const Vector &endPos ) const
 {
-	const float MAX_JUMP_RISE		= 80.0f;
-	const float MAX_JUMP_DISTANCE	= 250.0f;
-	const float MAX_JUMP_DROP		= 192.0f;
+	const float MAX_JUMP_RISE		= NPC_JUMP_HEIGHT - (sv_gravity.GetFloat()/100);
+	const float MAX_JUMP_DISTANCE	= NPC_JUMP_DISTANCE - (sv_gravity.GetFloat()/100);
+	const float MAX_JUMP_DROP		= NPC_MAX_JUMP_DROP;
+	const float MIN_JUMP_DISTANCE   = 16.0f;
+
+	//Adrian: Don't try to jump if my destination is right next to me.
+	if ( ( endPos - GetAbsOrigin()).Length() < MIN_JUMP_DISTANCE ) 
+		 return false;
 
 	return IsJumpLegal( startPos, apex, endPos, MAX_JUMP_RISE, MAX_JUMP_DROP, MAX_JUMP_DISTANCE );
 }

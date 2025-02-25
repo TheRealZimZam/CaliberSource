@@ -3,7 +3,6 @@
 // Purpose: Functions and data pertaining to the NPCs' AI scheduling system.
 //			Implements default NPC tasks and schedules.
 //
-// TODO; TASK_FIND_DODGE_POSITION, TASK_DODGE
 //=============================================================================//
 
 
@@ -723,7 +722,7 @@ void CAI_BaseNPC::MaintainSchedule ( void )
 
 		if ( !GetCurSchedule() || GetCurSchedule()->NumTasks() == 0 )
 		{
-			DevMsg("ERROR: Missing or invalid schedule!\n");
+			Warning("ERROR: Missing or invalid schedule!\n");
 			SetActivity ( ACT_IDLE );
 			return;
 		}
@@ -1253,11 +1252,6 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 		}
 		break;
 
-	case TASK_DEFER_DODGE:
-		m_flNextDodgeTime = gpGlobals->curtime + pTask->flTaskData;
-		TaskComplete();
-		break;
-
 	// Default case just completes.  Override in sub-classes
 	// to play sound / animation / or pause
 	case TASK_ANNOUNCE_ATTACK:
@@ -1519,48 +1513,6 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 		}
 		break;
 
-	case TASK_FIND_NEAR_NODE_COVER_FROM_ENEMY:
-	case TASK_FIND_FAR_NODE_COVER_FROM_ENEMY:
-	case TASK_FIND_NODE_COVER_FROM_ENEMY:
-	case TASK_FIND_LATERAL_COVER_FROM_ENEMY:
-	case TASK_FIND_COVER_FROM_ENEMY:
-		{
-			bool 	bNodeCover 		= ( task != TASK_FIND_COVER_FROM_ENEMY );
-			bool 	bLateral 		= ( task == TASK_FIND_LATERAL_COVER_FROM_ENEMY );
-			float 	flMinDistance 	= ( task == TASK_FIND_FAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : 0.0;
-			float 	flMaxDistance 	= ( task == TASK_FIND_NEAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : FLT_MAX;
-			
-			if ( FindCoverFromEnemy( bNodeCover, bLateral, flMinDistance, flMaxDistance ) )
-			{
-				if ( task == TASK_FIND_COVER_FROM_ENEMY )
-					m_flMoveWaitFinished = gpGlobals->curtime + pTask->flTaskData;
-				TaskComplete();
-			}
-			else
-				TaskFail(FAIL_NO_COVER);
-		}
-		break;
-
-
-	case TASK_FIND_COVER_FROM_ORIGIN:
-		{
-			Vector coverPos;
-
-			if ( GetTacticalServices()->FindCoverPos( GetLocalOrigin(), EyePosition(), 0, CoverRadius(), &coverPos ) ) 
-			{
-				AI_NavGoal_t goal(coverPos, ACT_RUN, AIN_HULL_TOLERANCE);
-				GetNavigator()->SetGoal( goal );
-
-				m_flMoveWaitFinished = gpGlobals->curtime + pTask->flTaskData;
-			}
-			else
-			{
-				// no coverwhatsoever.
-				TaskFail(FAIL_NO_COVER);
-			}
-		}
-		break;
-
 	case TASK_FIND_COVER_FROM_BEST_SOUND:
 		{
 			CSound *pBestSound;
@@ -1597,6 +1549,122 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 				// no coverwhatsoever.
 				TaskFail(FAIL_NO_COVER);
 			}
+		}
+		break;
+
+	case TASK_FIND_NEAR_NODE_COVER_FROM_ENEMY:
+	case TASK_FIND_FAR_NODE_COVER_FROM_ENEMY:
+	case TASK_FIND_NODE_COVER_FROM_ENEMY:
+	case TASK_FIND_LATERAL_COVER_FROM_ENEMY:
+	case TASK_FIND_COVER_FROM_ENEMY:
+		{
+			bool 	bNodeCover 		= ( task != TASK_FIND_COVER_FROM_ENEMY );
+			bool 	bLateral 		= ( task == TASK_FIND_LATERAL_COVER_FROM_ENEMY );
+			float 	flMinDistance 	= ( task == TASK_FIND_FAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : 0.0;
+			float 	flMaxDistance 	= ( task == TASK_FIND_NEAR_NODE_COVER_FROM_ENEMY ) ? pTask->flTaskData : FLT_MAX;
+			
+			if ( FindCoverFromEnemy( bNodeCover, bLateral, flMinDistance, flMaxDistance ) )
+			{
+				if ( task == TASK_FIND_COVER_FROM_ENEMY )
+					m_flMoveWaitFinished = gpGlobals->curtime + pTask->flTaskData;
+				TaskComplete();
+			}
+			else
+				TaskFail(FAIL_NO_COVER);
+		}
+		break;
+
+	case TASK_FIND_COVER_FROM_ORIGIN:
+		{
+			Vector coverPos;
+
+			if ( GetTacticalServices()->FindCoverPos( GetLocalOrigin(), EyePosition(), 0, CoverRadius(), &coverPos ) ) 
+			{
+				AI_NavGoal_t goal(coverPos, ACT_RUN, AIN_HULL_TOLERANCE);
+				GetNavigator()->SetGoal( goal );
+
+				m_flMoveWaitFinished = gpGlobals->curtime + pTask->flTaskData;
+			}
+			else
+			{
+				// no coverwhatsoever.
+				TaskFail(FAIL_NO_COVER);
+			}
+		}
+		break;
+
+	case TASK_FIND_DODGE_POSITION:
+		{
+			//DODGE: Savepos is enemy, use that and a trace to determine whether i should go left or right
+			if ( GetEnemy() == NULL )
+			{
+				// No enemy, assume its a sound instead
+				CSound *pBestSound = GetBestSound();
+				if (pBestSound)
+				{
+					m_vSavePosition = pBestSound->GetSoundOrigin();
+				}
+				else
+				{
+					TaskFail( "Nothing to dodge\n" );
+					return;
+				}
+			}
+
+			if ( SelectWeightedSequence( ACT_ROLL_RIGHT ) == ACTIVITY_NOT_AVAILABLE )
+				TaskFail( "I don't have a dodge animation!\n" );
+
+			Vector vecDir, vecForward, vecRight;
+			trace_t tr;
+			GetVectors( &vecForward, &vecRight, NULL );
+
+			bool bDodgeLeft = false;
+			if ( random->RandomInt( 0, 1 ) )
+			{
+				bDodgeLeft = true;
+				vecRight.Negate();
+			}
+
+			vecDir = ( vecRight + ( vecForward * 2 ) );
+			VectorNormalize( vecDir );
+			vecDir *= 150.0;
+
+			// This could be a problem. Since I'm adjusting the headcrab's gravity for flight, this check actually
+			// checks farther ahead than the crab will actually jump. (sjb)
+			AI_TraceHull( GetAbsOrigin(), m_vSavePosition, GetHullMins(), GetHullMaxs(), MASK_SHOT, this, GetCollisionGroup(), &tr );
+
+			//NDebugOverlay::Line( tr.startpos, tr.endpos, 0, 255, 0, false, 1.0 );
+
+			if( tr.fraction == 1.0 )
+			{
+				AIMoveTrace_t moveTrace;
+				GetMoveProbe()->MoveLimit( NAV_JUMP, GetAbsOrigin(), tr.endpos, MASK_NPCSOLID, GetEnemy(), &moveTrace );
+
+				// FIXME: Where should this happen?
+				Vector vecJumpVel = moveTrace.vJumpVelocity;
+
+				if( !IsMoveBlocked( moveTrace ) )
+				{
+					SetAbsVelocity( vecJumpVel );
+					SetGravity( UTIL_ScaleForGravity( 1600 ) );
+					SetGroundEntity( NULL );
+					SetNavType( NAV_JUMP );
+
+					if( bDodgeLeft )
+					{
+						SetIdealActivity( ACT_ROLL_LEFT );
+					}
+					else
+					{
+						SetIdealActivity( ACT_ROLL_RIGHT );
+					}
+
+					TaskComplete();
+				}
+			}
+
+			// Can't roll, just fall through.
+			TaskFail( "Couldn't find dodge position\n" );
 		}
 		break;
 
@@ -1818,7 +1886,11 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 		break;
 
 	case TASK_RELOAD:
-		ResetIdealActivity( ACT_RELOAD );
+		// Check if ive already reloaded (usually due to move-n-shoot...)
+		if ( GetActiveWeapon() && GetActiveWeapon()->Clip1() == GetActiveWeapon()->GetMaxClip1() )
+			TaskComplete();
+		else
+			ResetIdealActivity( ACT_RELOAD );
 		break;
 
 	case TASK_SPECIAL_ATTACK1:
@@ -2729,23 +2801,37 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 		{
 			Remember(bits_MEMORY_FLINCHED);
 			SetIdealActivity( GetFlinchActivity( false, false ) );
-			m_flNextFlinchTime = gpGlobals->curtime; //+ random->RandomFloat( 0.5, 1.0 );
+			m_flNextFlinchTime = gpGlobals->curtime + random->RandomFloat( 0.2, 0.6 );
 			break;
 		}
 	case TASK_BIG_FLINCH:
 		{
 			Remember(bits_MEMORY_FLINCHED);
 			SetIdealActivity( GetFlinchActivity( true, false ) );
-			m_flNextFlinchTime = gpGlobals->curtime; //+ random->RandomFloat( 1.0, 2.0 );
+			m_flNextFlinchTime = gpGlobals->curtime + random->RandomFloat( 0.5, 1.0 );
 			break;
 		}
+
+	case TASK_DEFER_DODGE:
+		m_flNextDodgeTime = gpGlobals->curtime + pTask->flTaskData;
+		TaskComplete();
+		break;
+
+	case TASK_DODGE:
+		{
+			// Update facing and start rolling
+			if ( GetEnemy() )
+				GetMotor()->SetIdealYawAndUpdate( GetEnemy()->GetAbsOrigin() - GetAbsOrigin(), AI_KEEP_YAW_SPEED );
+
+			GetNavigator()->SetMovementActivity( GetIdealActivity() );
+		}
+		break;
 
 	case TASK_DIE:
 		{
 			GetNavigator()->StopMoving();	
 			SetIdealActivity( GetDeathActivity() );
 			m_lifeState = LIFE_DYING;
-
 			break;
 		}
 
@@ -3038,18 +3124,10 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 		}
 		break;
 
-	case TASK_ITEM_PICKUP:
-		{
-			SetIdealActivity( ACT_PICKUP_GROUND );
-		}
-		break;
-
 	case TASK_WEAPON_PICKUP:
 		{
-  			if( GetActiveWeapon() )
-  			{
-  				Weapon_Drop( GetActiveWeapon() );
-  			}
+			if( GetActiveWeapon() )
+				Weapon_Drop(GetActiveWeapon());
 
 			if( GetTarget() )
 			{
@@ -3077,9 +3155,9 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 
 	case TASK_WEAPON_CREATE:
 		{
-			if( !GetActiveWeapon() && GetTarget() )
+			if( GetTarget() )
 			{
-				// Create a copy of the weapon this NPC is trying to pick up.
+				// Create a copy of the weapon this NPC is trying to pick up, and delete the original
 				CBaseCombatWeapon *pTargetWeapon = dynamic_cast<CBaseCombatWeapon*>(GetTarget());
 
 				if( pTargetWeapon )
@@ -3088,11 +3166,47 @@ void CAI_BaseNPC::StartTask( const Task_t *pTask )
 					if ( pWeapon )
 					{
 						Weapon_Equip( pWeapon );
+						UTIL_Remove( pTargetWeapon );
 					}
 				}
 			}
 			SetTarget( NULL );
 			TaskComplete();
+		}
+		break;
+
+	case TASK_WEAPON_DROP:
+		{
+  			if( GetActiveWeapon() )
+  				Weapon_Drop( GetActiveWeapon() );
+
+			SetIdealActivity( ACT_DROP_WEAPON );
+		}
+		break;
+
+	case TASK_ITEM_PICKUP:
+		{
+			SetIdealActivity( ACT_PICKUP_GROUND );
+		}
+		break;
+
+	case TASK_USE_TARGET:
+		{
+			if ( GetTarget() )
+			{
+				// If im not too stupid to use things
+				if ( (CapabilitiesGet() & bits_CAP_USE) )
+				{
+					GetTarget()->Use(this, this, USE_TOGGLE, 0 );
+					SetTarget( NULL );
+					TaskComplete();
+				}
+				TaskFail("I don't have USE capability!\n");
+			}
+			else
+			{
+				TaskFail(FAIL_NO_TARGET);
+			}
 		}
 		break;
 
@@ -3878,7 +3992,7 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 
 	case TASK_STRAFE_PATH:
 		{
-			// Always face the enemy
+			// Always face the enemy if i can
 			if (GetNavigator()->IsGoalActive())
 			{
 				Vector vecEnemyLKP = GetEnemyLKP();
@@ -3960,6 +4074,19 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 		{
 			if ( IsActivityFinished() )
 			{
+				TaskComplete();
+			}
+		}
+		break;
+
+	case TASK_DODGE:
+		{
+			AutoMovement();
+
+			if( GetFlags() & FL_ONGROUND || IsActivityFinished() )
+			{
+				SetGravity(1.0);
+				SetMoveType( MOVETYPE_STEP );
 				TaskComplete();
 			}
 		}
@@ -4167,6 +4294,13 @@ void CAI_BaseNPC::RunTask( const Task_t *pTask )
 				}
 			}
 			break;
+		}
+		break;
+
+	case TASK_WEAPON_DROP:
+		{
+			if ( IsActivityFinished() )
+				TaskComplete();
 		}
 		break;
 
@@ -4514,6 +4648,14 @@ int CAI_BaseNPC::SelectIdleSchedule()
 		return SCHED_ALERT_FACE_BESTSOUND;
 	}
 
+	// I have a weapon I want to switch to
+	if( m_iszPendingWeapon != NULL_STRING )
+		return SCHED_SWITCH_TO_PENDING_WEAPON;
+
+	// If I have a target and can see it, try to use it
+	if ( GetTarget() && HasCondition( COND_HAVE_TARGET_LOS ) && (CapabilitiesGet() & bits_CAP_USE) )
+		return SCHED_TARGET_USE;
+
 	// no valid route!
 	if (GetNavigator()->GetGoalType() == GOALTYPE_NONE)
 		return SCHED_IDLE_STAND;
@@ -4571,10 +4713,14 @@ int CAI_BaseNPC::SelectAlertSchedule()
 			  HasCondition ( COND_HEAR_BULLET_IMPACT ) ||
 			  HasCondition ( COND_HEAR_COMBAT ) )
 	{
-		return SCHED_ALERT_FACE_BESTSOUND;
+		return SCHED_INVESTIGATE_SOUND;
 	}
 	else if ( IncomingGrenade() != NULL )
 		return SCHED_TAKE_COVER_FROM_ORIGIN;
+
+	// I have a weapon I want to switch to
+	if( m_iszPendingWeapon != NULL_STRING )
+		return SCHED_SWITCH_TO_PENDING_WEAPON;
 
 	if ( gpGlobals->curtime - GetEnemies()->LastTimeSeen( AI_UNKNOWN_ENEMY ) < TIME_CARE_ABOUT_DAMAGE )
 	{
@@ -4641,6 +4787,11 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		{
 			FearSound();
 			//ClearCommandGoal();
+
+			// Last ditch melee attack
+			if ( HasCondition(COND_CAN_MELEE_ATTACK1) )
+				return SCHED_MELEE_ATTACK1;
+
 			return SCHED_RUN_FROM_ENEMY;
 		}
 		// If I've seen the enemy recently, cower. Ignore the time for unforgettable enemies.
@@ -4655,28 +4806,29 @@ int CAI_BaseNPC::SelectCombatSchedule()
 			return SCHED_FEAR_FACE;
 		}
 	}
-
-	// Do I have anything to shoot with?
-	if ( HasCondition(COND_NO_PRIMARY_AMMO) )
+	// Otherwise run normal attack schedules
+	else
 	{
-		return SCHED_RELOAD;
-	}
+		// I have a weapon I want to switch to
+		if( m_iszPendingWeapon != NULL_STRING )
+			return SCHED_SWITCH_TO_PENDING_WEAPON;
 
-	// Can I see the enemy?
-	if ( !HasCondition(COND_SEE_ENEMY) )
-	{
-		// enemy is unseen, but not occluded!
-		// turn to face enemy
-		if ( !HasCondition(COND_ENEMY_OCCLUDED) )
-			return SCHED_COMBAT_FACE;
+		// Can I see the enemy?
+		if ( !HasCondition(COND_SEE_ENEMY) )
+		{
+			// enemy is unseen, but not occluded!
+			// turn to face enemy
+			if ( !HasCondition(COND_ENEMY_OCCLUDED) )
+				return SCHED_COMBAT_FACE;
 
-		// chase!
-		if ( GetActiveWeapon() || (CapabilitiesGet() & (bits_CAP_INNATE_RANGE_ATTACK1|bits_CAP_INNATE_RANGE_ATTACK2)))
-			return SCHED_ESTABLISH_LINE_OF_FIRE;
-		else if ( (CapabilitiesGet() & (bits_CAP_INNATE_MELEE_ATTACK1|bits_CAP_INNATE_MELEE_ATTACK2)))
-			return SCHED_CHASE_ENEMY;
-		else
-			return SCHED_TAKE_COVER_FROM_ENEMY;
+			// chase!
+			if ( GetActiveWeapon() && !GetActiveWeapon()->IsMeleeWeapon() || (CapabilitiesGet() & (bits_CAP_INNATE_RANGE_ATTACK1|bits_CAP_INNATE_RANGE_ATTACK2)))
+				return SCHED_ESTABLISH_LINE_OF_FIRE;
+			else if ( (CapabilitiesGet() & (bits_CAP_INNATE_MELEE_ATTACK1|bits_CAP_INNATE_MELEE_ATTACK2)))
+				return SCHED_CHASE_ENEMY;
+			else
+				return SCHED_MOVE_TO_WEAPON_RANGE;
+		}
 	}
 
 	if ( HasCondition(COND_TOO_CLOSE_TO_ATTACK) ) 
@@ -4689,12 +4841,18 @@ int CAI_BaseNPC::SelectCombatSchedule()
 		return SCHED_ESTABLISH_LINE_OF_FIRE;
 	}
 
+	// Do I have anything to shoot with?
+	if ( HasCondition(COND_NO_PRIMARY_AMMO) )
+		return SCHED_RELOAD;
+
 	// Is my active weapon in cooldown?
 	if ( GetShotRegulator()->IsInRestInterval() )
 	{
 		// If I could still shoot the target, keep looking tacticool-otherwise do a combat idle animation
 		if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
 			return SCHED_COMBAT_FACE;
+		else
+			return SCHED_STANDOFF;
 	}
 
 	// I can see the enemy
@@ -4730,7 +4888,7 @@ int CAI_BaseNPC::SelectCombatSchedule()
 			return SCHED_TAKE_COVER_FROM_ENEMY;
 	}
 
-	DevWarning( 2, "No suitable combat schedule!\n" );
+	DevWarning( 2, "%s: No suitable combat schedule!\n", GetDebugName() );
 	return SCHED_FAIL;	//SCHED_COMBAT_STAND
 }
 

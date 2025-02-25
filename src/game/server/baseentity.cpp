@@ -1259,23 +1259,20 @@ int CBaseEntity::OnTakeDamage( const CTakeDamageInfo &info )
 		{
 			VPhysicsTakeDamage( info );
 		}
-		else
-		{
-			if ( info.GetInflictor() && (GetMoveType() == MOVETYPE_WALK || GetMoveType() == MOVETYPE_STEP) && 
+		else if ( info.GetInflictor() && 
+			(GetMoveType() == MOVETYPE_WALK || GetMoveType() == MOVETYPE_STEP) && 
 				!info.GetAttacker()->IsSolidFlagSet(FSOLID_TRIGGER) )
-			{
-				Vector vecDir, vecInflictorCentroid;
-				vecDir = WorldSpaceCenter( );
-				vecInflictorCentroid = info.GetInflictor()->WorldSpaceCenter( );
-				vecDir -= vecInflictorCentroid;
-				VectorNormalize( vecDir );
+		{
+			Vector vecDir, vecInflictorCentroid;
+			vecDir = WorldSpaceCenter( );
+			vecInflictorCentroid = info.GetInflictor()->WorldSpaceCenter( );
+			vecDir -= vecInflictorCentroid;
+			VectorNormalize( vecDir );
 
-				float flForce = info.GetDamage() * ((32 * 32 * 72.0) / (WorldAlignSize().x * WorldAlignSize().y * WorldAlignSize().z)) * 5;
-				
-				if (flForce > 1000.0) 
-					flForce = 1000.0;
-				ApplyAbsVelocityImpulse( vecDir * flForce );
-			}
+			float flForce = info.GetDamage() * ((32 * 32 * 72.0) / (WorldAlignSize().x * WorldAlignSize().y * WorldAlignSize().z)) * 5;
+			if (flForce > 1000.0) 
+				flForce = 1000.0;
+			ApplyAbsVelocityImpulse( vecDir * flForce );
 		}
 	}
 
@@ -1481,9 +1478,7 @@ int CBaseEntity::VPhysicsTakeDamage( const CTakeDamageInfo &info )
 void CBaseEntity::Event_Killed( const CTakeDamageInfo &info )
 {
 	if( info.GetAttacker() )
-	{
 		info.GetAttacker()->Event_KilledOther(this, info);
-	}
 
 	m_takedamage = DAMAGE_NO;
 	m_lifeState = LIFE_DEAD;
@@ -1766,6 +1761,7 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	DEFINE_INPUTFUNC( FIELD_INTEGER, "Alpha", InputAlpha ),
 	DEFINE_INPUTFUNC( FIELD_BOOLEAN, "AlternativeSorting", InputAlternativeSorting ),
 	DEFINE_INPUTFUNC( FIELD_COLOR32, "Color", InputColor ),
+	DEFINE_INPUTFUNC( FIELD_FLOAT, "Friction", InputSetFriction ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetParent", InputSetParent ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetParentAttachment", InputSetParentAttachment ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetParentAttachmentMaintainOffset", InputSetParentAttachmentMaintainOffset ),
@@ -2900,12 +2896,12 @@ bool CBaseEntity::IsInWorld( void ) const
 	if (GetAbsOrigin().y <= MIN_COORD_INTEGER) return false;
 	if (GetAbsOrigin().z <= MIN_COORD_INTEGER) return false;
 	// speed
-	if (GetAbsVelocity().x >= 2000) return false;
-	if (GetAbsVelocity().y >= 2000) return false;
-	if (GetAbsVelocity().z >= 2000) return false;
-	if (GetAbsVelocity().x <= -2000) return false;
-	if (GetAbsVelocity().y <= -2000) return false;
-	if (GetAbsVelocity().z <= -2000) return false;
+	if (GetAbsVelocity().x >= 9001) return false;
+	if (GetAbsVelocity().y >= 9001) return false;
+	if (GetAbsVelocity().z >= 9001) return false;
+	if (GetAbsVelocity().x <= -9001) return false;
+	if (GetAbsVelocity().y <= -9001) return false;
+	if (GetAbsVelocity().z <= -9001) return false;
 
 	return true;
 }
@@ -3236,23 +3232,16 @@ void CBaseEntity::SetOwnerEntity( CBaseEntity* pOwner )
 
 void CBaseEntity::SetMoveType( MoveType_t val, MoveCollide_t moveCollide )
 {
-#ifdef _DEBUG
 	// Make sure the move type + move collide are compatible...
-	if ((val != MOVETYPE_FLY) && (val != MOVETYPE_FLYGRAVITY))
-	{
-		Assert( moveCollide == MOVECOLLIDE_DEFAULT );
-	}
-
+#if 0
 	if ( m_MoveType == MOVETYPE_VPHYSICS && val != m_MoveType )
 	{
-		if ( VPhysicsGetObject() && val != MOVETYPE_NONE )
-		{
-			// What am I supposed to do with the physics object if
-			// you're changing away from MOVETYPE_VPHYSICS without making the object 
-			// shadow?  This isn't likely to work, assert.
-			// You probably meant to call VPhysicsInitShadow() instead of VPhysicsInitNormal()!
-			Assert( VPhysicsGetObject()->GetShadowController() );
-		}
+		if ( VPhysicsGetObject() && !VPhysicsGetObject()->GetShadowController() )
+			Warning("Trying to change movetype from VPhysics to %s for entity %s (%s).\n", val, GetClassname(), GetDebugName() );
+		// What am I supposed to do with the physics object if
+		// you're changing away from MOVETYPE_VPHYSICS without making the object 
+		// shadow?  This isn't likely to work, assert.
+		// You probably meant to call VPhysicsInitShadow() instead of VPhysicsInitNormal()!
 	}
 #endif
 
@@ -3444,12 +3433,12 @@ int CBaseEntity::ShouldTransmit( const CCheckTransmitInfo *pInfo )
 	}
 	
 
-/*#ifdef INVASION_DLL
+#ifdef INVASION_DLL
 	// Check test network vis distance stuff. Eventually network LOD will do this.
 	float flTestDistSqr = pRecipientEntity->GetAbsOrigin().DistToSqr( WorldSpaceCenter() );
 	if ( flTestDistSqr > sv_netvisdist.GetFloat() * sv_netvisdist.GetFloat() )
 		return TRANSMIT_NO;	// TODO doesn't work with HLTV
-#endif*/
+#endif
 
 	// by default do a PVS check
 
@@ -3846,6 +3835,14 @@ void CBaseEntity::InputUse( inputdata_t &inputdata )
 	Use( inputdata.pActivator, inputdata.pCaller, (USE_TYPE)inputdata.nOutputID, 0 );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Input handler for Friction
+// Input  : Float value
+//-----------------------------------------------------------------------------
+void CBaseEntity::InputSetFriction( inputdata_t &inputdata )
+{
+	SetFriction( inputdata.value.Float() );
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Reads an output variable, by string name, from an entity
@@ -4130,7 +4127,7 @@ void CBaseEntity::SetModel( const char *szModelName )
 	const model_t *model = modelinfo->GetModel( modelIndex );
 	if ( model && modelinfo->GetModelType( model ) != mod_brush )
 	{
-		Msg( "Setting CBaseEntity to non-brush model %s\n", szModelName );
+		Warning( "%s Inherits from CBaseEntity, which does not support non-brush models! (%s)\n", GetDebugName(), szModelName );
 	}
 	UTIL_SetModel( this, szModelName );
 }

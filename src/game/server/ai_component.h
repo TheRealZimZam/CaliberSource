@@ -90,8 +90,8 @@ protected:
 
 	Activity			GetActivity();
 	void				SetActivity( Activity NewActivity );
-	float				GetIdealSpeed() const;
-	float				GetIdealAccel() const;
+	float				GetIdealSpeed();	//const
+	float				GetIdealAccel();	//const
 	int					GetSequence();
 
 	int					GetEntFlags() const;

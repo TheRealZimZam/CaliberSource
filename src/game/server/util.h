@@ -215,7 +215,7 @@ CBasePlayer	*UTIL_PlayerByIndex( int playerIndex );
 // NOTENOTE: Use this instead of UTIL_PlayerByIndex IF you're in single player
 // and you want the player.
 // not useable in multiplayer - see UTIL_GetListenServerHost()
-CBasePlayer* UTIL_GetLocalPlayer( void );
+CBasePlayer* UTIL_GetLocalPlayer( bool bWarning = false );
 
 // get the local player on a listen server
 CBasePlayer *UTIL_GetListenServerHost( void );
@@ -358,6 +358,11 @@ void		UTIL_PredictedPosition( CBaseEntity *pTarget, float flTimeDelta, Vector *v
 void		UTIL_Beam( Vector &Start, Vector &End, int nModelIndex, int nHaloIndex, unsigned char FrameStart, unsigned char FrameRate,
 				float Life, unsigned char Width, unsigned char EndWidth, unsigned char FadeLength, unsigned char Noise, unsigned char Red, unsigned char Green,
 				unsigned char Blue, unsigned char Brightness, unsigned char Speed);
+/*
+void		UTIL_BeamRing( Vector &Start, Vector &End, int nModelIndex, int nHaloIndex, unsigned char FrameStart, unsigned char FrameRate,
+				float Life, unsigned char Width, unsigned char Spread, unsigned char Noise, unsigned char Red, unsigned char Green,
+				unsigned char Blue, unsigned char Brightness, unsigned char Speed);
+*/
 
 char		*UTIL_VarArgs( char *format, ... );
 bool		UTIL_IsValidEntity( CBaseEntity *pEnt );
@@ -541,6 +546,7 @@ void DBG_AssertFunction(bool fExpr, const char* szExpr, const char* szFile, int 
 // Sound Utilities
 
 enum soundlevel_t;
+soundlevel_t UTIL_ComputeSoundlevel( float radius, bool playEverywhere );
 
 void SENTENCEG_Init();
 void SENTENCEG_Stop(edict_t *entity, int isentenceg, int ipick);

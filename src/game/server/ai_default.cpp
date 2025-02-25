@@ -19,6 +19,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+#define DEFAULT_MAX_MOVEMENT_TIME 30
+
 CAI_Schedule *CAI_BaseNPC::ScheduleInList( const char *pName, CAI_Schedule **pList, int listCount )
 {
 	int i;
@@ -85,6 +87,7 @@ void CAI_BaseNPC::InitDefaultScheduleSR(void)
 	ADD_DEF_SCHEDULE( "SCHED_VICTORY_DANCE",				SCHED_VICTORY_DANCE);
 	ADD_DEF_SCHEDULE( "SCHED_TARGET_FACE",					SCHED_TARGET_FACE);
 	ADD_DEF_SCHEDULE( "SCHED_TARGET_CHASE",					SCHED_TARGET_CHASE);
+	ADD_DEF_SCHEDULE( "SCHED_TARGET_USE",					SCHED_TARGET_USE);
 	ADD_DEF_SCHEDULE( "SCHED_SMALL_FLINCH",					SCHED_SMALL_FLINCH);	
 	ADD_DEF_SCHEDULE( "SCHED_BIG_FLINCH",					SCHED_BIG_FLINCH);	
 	ADD_DEF_SCHEDULE( "SCHED_BACK_AWAY_FROM_ENEMY",			SCHED_BACK_AWAY_FROM_ENEMY);
@@ -105,6 +108,7 @@ void CAI_BaseNPC::InitDefaultScheduleSR(void)
 	ADD_DEF_SCHEDULE( "SCHED_FAIL_ESTABLISH_LINE_OF_FIRE",	SCHED_FAIL_ESTABLISH_LINE_OF_FIRE);
 	ADD_DEF_SCHEDULE( "SCHED_COWER",						SCHED_COWER);
 	ADD_DEF_SCHEDULE( "SCHED_STUNNED",						SCHED_STUNNED);
+	ADD_DEF_SCHEDULE( "SCHED_GETUP",						SCHED_GETUP);
 	ADD_DEF_SCHEDULE( "SCHED_MELEE_ATTACK1",				SCHED_MELEE_ATTACK1);
 	ADD_DEF_SCHEDULE( "SCHED_MELEE_ATTACK2",				SCHED_MELEE_ATTACK2);
 	ADD_DEF_SCHEDULE( "SCHED_RANGE_ATTACK1",				SCHED_RANGE_ATTACK1);
@@ -131,6 +135,7 @@ void CAI_BaseNPC::InitDefaultScheduleSR(void)
 	ADD_DEF_SCHEDULE( "SCHED_NEW_WEAPON",					SCHED_NEW_WEAPON);
 	ADD_DEF_SCHEDULE( "SCHED_NEW_WEAPON_CHEAT",				SCHED_NEW_WEAPON_CHEAT);
 	ADD_DEF_SCHEDULE( "SCHED_SWITCH_TO_PENDING_WEAPON",		SCHED_SWITCH_TO_PENDING_WEAPON );
+	ADD_DEF_SCHEDULE( "SCHED_DROP_WEAPON",					SCHED_DROP_WEAPON );
 	ADD_DEF_SCHEDULE( "SCHED_GET_HEALTHKIT",				SCHED_GET_HEALTHKIT);
 	ADD_DEF_SCHEDULE( "SCHED_MOVE_AWAY",					SCHED_MOVE_AWAY);
 	ADD_DEF_SCHEDULE( "SCHED_MOVE_AWAY_FAIL",				SCHED_MOVE_AWAY_FAIL);
@@ -152,6 +157,8 @@ void CAI_BaseNPC::InitDefaultScheduleSR(void)
 	ADD_DEF_SCHEDULE( "SCHED_RUN_FROM_ENEMY_MOB",		SCHED_RUN_FROM_ENEMY_MOB );
 	ADD_DEF_SCHEDULE( "SCHED_BURNING_RUN",				SCHED_BURNING_RUN );
 	ADD_DEF_SCHEDULE( "SCHED_BURNING_STAND",			SCHED_BURNING_STAND );
+
+	ADD_DEF_SCHEDULE( "SCHED_DODGE",					SCHED_DODGE );
 	ADD_DEF_SCHEDULE( "SCHED_DUCK_DODGE",				SCHED_DUCK_DODGE );
 
 	ADD_DEF_SCHEDULE( "SCHED_INTERACTION_MOVE_TO_PARTNER",				SCHED_INTERACTION_MOVE_TO_PARTNER );
@@ -185,6 +192,7 @@ bool CAI_BaseNPC::LoadDefaultSchedules(void)
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_VICTORY_DANCE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_TARGET_FACE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_TARGET_CHASE);
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_TARGET_USE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_SMALL_FLINCH);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_BIG_FLINCH);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_BACK_AWAY_FROM_ENEMY);
@@ -205,6 +213,7 @@ bool CAI_BaseNPC::LoadDefaultSchedules(void)
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_FAIL_ESTABLISH_LINE_OF_FIRE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_COWER);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_STUNNED);
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_GETUP);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_MELEE_ATTACK1);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_MELEE_ATTACK2);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_RANGE_ATTACK1);
@@ -230,6 +239,7 @@ bool CAI_BaseNPC::LoadDefaultSchedules(void)
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_NEW_WEAPON);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_NEW_WEAPON_CHEAT);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_SWITCH_TO_PENDING_WEAPON);
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_DROP_WEAPON);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_GET_HEALTHKIT);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_MOVE_AWAY);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_MOVE_AWAY_FAIL);
@@ -249,6 +259,7 @@ bool CAI_BaseNPC::LoadDefaultSchedules(void)
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_RUN_FROM_ENEMY_MOB );
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_BURNING_RUN);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_BURNING_STAND);
+	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_DODGE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_DUCK_DODGE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_NPC_FREEZE);
 	AI_LOAD_DEF_SCHEDULE( CAI_BaseNPC,					SCHED_INTERACTION_MOVE_TO_PARTNER);
@@ -344,39 +355,79 @@ int CAI_BaseNPC::TranslateSchedule( int scheduleType )
 		break;
 
 	case SCHED_ALERT_FACE:
-	case SCHED_ALERT_SMALL_FLINCH:
 		{
-			// FIXME: default AI can pick this when in idle state
-			// Assert( m_NPCState == NPC_STATE_ALERT );
+			switch( m_NPCState )
+			{
+			case NPC_STATE_COMBAT:
+				return TranslateSchedule(SCHED_COMBAT_FACE);
+			}
 		}
 		break;
-	case SCHED_ALERT_SCAN:
+
+	case SCHED_ALERT_SMALL_FLINCH:
+		{
+			switch( m_NPCState )
+			{
+			case NPC_STATE_COMBAT:
+				return TranslateSchedule(SCHED_SMALL_FLINCH);
+			}
+		}
+		break;
+
 	case SCHED_ALERT_STAND:
 		{
 			// FIXME: rollermines use this when they're being held
-			// Assert( m_NPCState == NPC_STATE_ALERT );
+			switch( m_NPCState )
+			{
+			case NPC_STATE_COMBAT:
+				return TranslateSchedule(SCHED_COMBAT_STAND);
+			}
 		}
 		break;
+
+	case SCHED_ALERT_SCAN:
+		{
+			// FIXME: rollermines use this when they're being held
+			switch( m_NPCState )
+			{
+			case NPC_STATE_COMBAT:
+				return TranslateSchedule(SCHED_COMBAT_SWEEP);
+			}
+		}
+		break;
+
 	case SCHED_ALERT_WALK:
 		{
-			Assert( m_NPCState == NPC_STATE_ALERT );
+			switch( m_NPCState )
+			{
+			case NPC_STATE_COMBAT:
+				return TranslateSchedule(SCHED_COMBAT_WALK);
+			}
 		}
 		break;
+
 	case SCHED_COMBAT_FACE:
 		{
 			// FIXME: failure schedule for SCHED_PATROL which can be called when in alert
-			// Assert( m_NPCState == NPC_STATE_COMBAT );
+			Assert( m_NPCState == NPC_STATE_COMBAT );
 		}
 		break;
 	case SCHED_COMBAT_STAND:
 		{
 			// FIXME: never used?
-			// Assert( m_NPCState == NPC_STATE_COMBAT );
+			Assert( m_NPCState == NPC_STATE_COMBAT );
 		}
 		break;
 	case SCHED_COMBAT_WALK:
 		{
 			Assert( m_NPCState == NPC_STATE_COMBAT );
+		}
+		break;
+
+	case SCHED_INVESTIGATE_SOUND:
+		if ( !ShouldInvestigateSound() )
+		{
+			return TranslateSchedule( SCHED_ALERT_REACT_TO_COMBAT_SOUND );
 		}
 		break;
 	}
@@ -599,7 +650,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_IDLE_WALK,
 
 	"	Tasks"
-	"		TASK_WALK_PATH			9999"
+	"		TASK_WALK_PATH			0"
 	"		TASK_WAIT_FOR_MOVEMENT	0"
 	"		TASK_WAIT_PVS			0"
 	""
@@ -622,16 +673,15 @@ AI_DEFINE_SCHEDULE
 	SCHED_NEW_WEAPON,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING				0"
+//	"		TASK_STOP_MOVING				0"
 	"		TASK_SET_TOLERANCE_DISTANCE		5"
 	"		TASK_GET_PATH_TO_TARGET_WEAPON	0"
-//	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_NEW_WEAPON_CHEAT"
-	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAIL"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_NEW_WEAPON_CHEAT"
 	"		TASK_WEAPON_RUN_PATH			0"
-	"		TASK_STOP_MOVING				0"
+	"		TASK_STOP_MOVING				1"
 	"		TASK_FACE_TARGET				0"
 	"		TASK_WEAPON_PICKUP				0"
-	"		TASK_WAIT						0.5"// Don't move before done standing up
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
 	""
 	"	Interrupts"
 	"		COND_HEAR_DANGER"
@@ -646,7 +696,9 @@ AI_DEFINE_SCHEDULE
 	SCHED_NEW_WEAPON_CHEAT,
 
 	"	Tasks"
-	"		TASK_WEAPON_CREATE		0"
+	"		TASK_FACE_TARGET				0"
+	"		TASK_WEAPON_CREATE				0"
+	"		TASK_WAIT						0.5"
 	""
 	"	Interrupts"
 );
@@ -659,10 +711,25 @@ AI_DEFINE_SCHEDULE
 	SCHED_SWITCH_TO_PENDING_WEAPON,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING						0"
+	"		TASK_STOP_MOVING						1"
 	"		TASK_PLAY_SEQUENCE						ACTIVITY:ACT_DROP_WEAPON"
 	"		TASK_CREATE_PENDING_WEAPON				0"
 	""	
+	"	Interrupts"
+);
+
+//===============================================
+//	> DropWeapon
+//===============================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_DROP_WEAPON,
+
+	"	Tasks"
+//	"		TASK_STOP_MOVING				1"
+	"		TASK_WEAPON_DROP				0"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
+	""
 	"	Interrupts"
 );
 
@@ -673,11 +740,11 @@ AI_DEFINE_SCHEDULE
 	SCHED_GET_HEALTHKIT,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING				0"
+//	"		TASK_STOP_MOVING				0"
 	"		TASK_SET_TOLERANCE_DISTANCE		5"
 	"		TASK_GET_PATH_TO_TARGET_WEAPON	0"
 	"		TASK_ITEM_RUN_PATH				0"
-	"		TASK_STOP_MOVING				0"
+	"		TASK_STOP_MOVING				1"
 	"		TASK_FACE_TARGET				0"
 	"		TASK_ITEM_PICKUP				0"
 	""
@@ -692,7 +759,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_RANGE_ATTACK1,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
+//	"		TASK_STOP_MOVING		1"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_RANGE_ATTACK1		0"
@@ -717,7 +784,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_RANGE_ATTACK2,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING			0"
+	"		TASK_STOP_MOVING			1"
 	"		TASK_FACE_ENEMY				0"
 	"		TASK_ANNOUNCE_ATTACK		2"	// 2 = secondary attack
 	"		TASK_RANGE_ATTACK2			0"
@@ -741,7 +808,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_AMBUSH,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING			0"
+	"		TASK_STOP_MOVING			1"
 	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_COVER_LOW"
 	"		TASK_WAIT_INDEFINITE		0"
 	""
@@ -756,7 +823,7 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
-//  > Evade -  monster jumps/strafes to the left or right,
+//  > Evade -  monster runs slightly to the left or right,
 //				in hopes of dodging enemy attack.
 //=========================================================
 AI_DEFINE_SCHEDULE
@@ -766,13 +833,15 @@ AI_DEFINE_SCHEDULE
 	"	Tasks"
 	"		TASK_FACE_ENEMY							0"
 	"		TASK_SET_TOLERANCE_DISTANCE				48"
-	"		TASK_GET_FLANK_ARC_PATH_TO_ENEMY_LOS	30"	//TODO; This needs something better
-	"		TASK_STRAFE_PATH						1.8"
+	"		TASK_GET_FLANK_ARC_PATH_TO_ENEMY_LOS	30"
+	"		TASK_STRAFE_PATH						2.5"
 	""
 	"	Interrupts"
 	"		COND_HEAVY_DAMAGE"
 	"		COND_ENEMY_OCCLUDED"
 	"		COND_HEAR_DANGER"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK2"
 );
 
 //=========================================================
@@ -837,7 +906,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_ALERT_FACE,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING			0"
+	"		TASK_STOP_MOVING			1"
 	"		TASK_FACE_IDEAL				0"
 	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
 	""
@@ -876,11 +945,9 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STORE_BESTSOUND_REACTORIGIN_IN_SAVEPOSITION		0"
-	"		TASK_STOP_MOVING			0"
+	"		TASK_STOP_MOVING			1"
 	"		TASK_FACE_SAVEPOSITION		0"
-	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"
-	"		TASK_WAIT					1.5"
-	"		TASK_FACE_REASONABLE		0"
+	"		TASK_WAIT					1.0"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -888,6 +955,7 @@ AI_DEFINE_SCHEDULE
 	"		COND_LIGHT_DAMAGE"
 	"		COND_HEAVY_DAMAGE"
 	"		COND_PROVOKED"
+	"		COND_HEAR_DANGER"
 );
 
 //=========================================================
@@ -899,12 +967,16 @@ AI_DEFINE_SCHEDULE
  SCHED_ALERT_REACT_TO_COMBAT_SOUND,
 
 	"	Tasks"
-//	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_COMBAT_IDLE"	//Handled by transitions now
-//	"		TASK_REACT_TO_COMBAT_SOUND	0"	//Doesnt exist for basenpc, just do a little wait for now
+	"		TASK_STOP_MOVING			1"
+	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE_ANGRY"
 	"		TASK_WAIT					0.2"
 	"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_ALERT_FACE_BESTSOUND"
 	""
 	"	Interrupts"
+	"		COND_LIGHT_DAMAGE"
+	"		COND_HEAVY_DAMAGE"
+	"		COND_PROVOKED"
+	"		COND_HEAR_DANGER"
  );
 
 
@@ -917,7 +989,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_ALERT_SCAN,
 
 	"	Tasks"
-//	"		TASK_STOP_MOVING		0"
+//	"		TASK_STOP_MOVING		1"
 	"		TASK_WAIT				0.5"
 	"		TASK_TURN_LEFT			180"
 	"		TASK_WAIT				0.5"
@@ -944,11 +1016,10 @@ AI_DEFINE_SCHEDULE
 	SCHED_ALERT_STAND,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING			0"
+	"		TASK_STOP_MOVING			1"
 	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"	//FIXME; Hook to unique
-//	"		TASK_FACE_REASONABLE		0"
 	"		TASK_WAIT					15"
-	"		TASK_WAIT_RANDOM			5"
+	"		TASK_WAIT_RANDOM			10"
 	"		TASK_SUGGEST_STATE			STATE:IDLE"
 	""
 	"	Interrupts"
@@ -1007,27 +1078,27 @@ AI_DEFINE_SCHEDULE
 	SCHED_INVESTIGATE_SOUND,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING				0"
+//	"		TASK_STOP_MOVING				0"
 	"		TASK_STORE_LASTPOSITION			0"
 //	"		TASK_SET_TOLERANCE_DISTANCE		32"
 	"		TASK_GET_PATH_TO_BESTSOUND		0"
 	"		TASK_FACE_IDEAL					0"
 	"		TASK_WAIT						0.2"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
-	"		TASK_STOP_MOVING				0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_STOP_MOVING				1"
 	"		TASK_WAIT						5"
 	"		TASK_GET_PATH_TO_LASTPOSITION	0"
 	"		TASK_WALK_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
-	"		TASK_STOP_MOVING				0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_STOP_MOVING				1"
 	"		TASK_CLEAR_LASTPOSITION			0"
 	"		TASK_FACE_REASONABLE			0"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
-	"		COND_SEE_FEAR"
 	"		COND_SEE_ENEMY"
+	"		COND_SEE_FEAR"
 	"		COND_LIGHT_DAMAGE"
 	"		COND_HEAVY_DAMAGE"
 	"		COND_HEAR_DANGER"
@@ -1041,7 +1112,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_COMBAT_STAND,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING			0"
+	"		TASK_STOP_MOVING			1"
 	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE_ANGRY"
 	"		TASK_WAIT_INDEFINITE		0"
 	""
@@ -1090,8 +1161,8 @@ AI_DEFINE_SCHEDULE
 	SCHED_COMBAT_FACE,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
-	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_IDLE"
+	"		TASK_STOP_MOVING		1"
+	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_IDLE_ANGRY"
 	"		TASK_FACE_ENEMY			0"
 	""
 	"	Interrupts"
@@ -1118,6 +1189,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_WAIT			2"
 	"		TASK_TURN_RIGHT		180"
 	"		TASK_WAIT			2"
+	"		TASK_SET_SCHEDULE	SCHEDULE:SCHED_COMBAT_FACE"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -1126,6 +1198,8 @@ AI_DEFINE_SCHEDULE
 	"		COND_HEAVY_DAMAGE"
 	"		COND_CAN_RANGE_ATTACK1"
 	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK2"
 	"		COND_HEAR_DANGER"
 	"		COND_HEAR_WORLD"
 );
@@ -1142,7 +1216,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_STANDOFF,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING			0"
+	"		TASK_STOP_MOVING			1"
 	"		TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE"		// Translated to cover
 	"		TASK_WAIT_FACE_ENEMY		2"
 	"		TASK_WAIT_FACE_ENEMY_RANDOM	2"
@@ -1168,7 +1242,6 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING			0"
-	"		TASK_FACE_IDEAL				0"
 	"		TASK_PLAY_SEQUENCE			ACTIVITY:ACT_ARM"
 	""
 	"	Interrupts"
@@ -1183,7 +1256,6 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING		0"
-	"		TASK_FACE_IDEAL			0"
 	"		TASK_PLAY_SEQUENCE		ACTIVITY:ACT_DISARM"
 	""
 	"	Interrupts"
@@ -1197,11 +1269,11 @@ AI_DEFINE_SCHEDULE
 	SCHED_HIDE_AND_RELOAD,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING			0"
+//	"		TASK_STOP_MOVING			0"
 	"		TASK_SET_FAIL_SCHEDULE		SCHEDULE:SCHED_RELOAD"
 	"		TASK_FIND_COVER_FROM_ENEMY	0"
 	"		TASK_RUN_PATH				0"
-	"		TASK_WAIT_FOR_MOVEMENT		0"
+	"		TASK_WAIT_FOR_MOVEMENT		DEFAULT_MAX_MOVEMENT_TIME"
 	"		TASK_REMEMBER				MEMORY:INCOVER"
 	"		TASK_FACE_ENEMY				0"
 	"		TASK_SET_SCHEDULE			SCHEDULE:SCHED_RELOAD"
@@ -1276,7 +1348,6 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING			0"
-	"		TASK_FACE_ENEMY				0"
 	"		TASK_SPECIAL_ATTACK1		0"
 	""
 	"	Interrupts"
@@ -1298,7 +1369,6 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_STOP_MOVING		0"
-	"		TASK_FACE_ENEMY			0"
 	"		TASK_SPECIAL_ATTACK2	0"
 	""
 	"	Interrupts"
@@ -1319,13 +1389,13 @@ AI_DEFINE_SCHEDULE
 	SCHED_CHASE_ENEMY,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING				0"
+//	"		TASK_STOP_MOVING				0"
 	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY_FAILED"
 	"		TASK_SET_TOLERANCE_DISTANCE		24"
-	"		TASK_GET_CHASE_PATH_TO_ENEMY	300"
+	"		TASK_GET_CHASE_PATH_TO_ENEMY	350"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
-	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -1344,6 +1414,34 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
+// > ChaseEnemyFailed
+// Try to get another path but more restrictive
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_CHASE_ENEMY_FAILED,
+
+	"	Tasks"
+	"		 TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FAIL_ESTABLISH_LINE_OF_FIRE"
+	"		 TASK_GET_PATH_TO_ENEMY_LKP			0"
+	"		 TASK_RUN_PATH						0"
+	"		 TASK_WAIT_FOR_MOVEMENT				DEFAULT_MAX_MOVEMENT_TIME"
+	"		 TASK_SET_SCHEDULE					SCHEDULE:SCHED_ALERT_FACE"
+	""
+	"	Interrupts"
+	"		COND_NEW_ENEMY"
+	"		COND_ENEMY_DEAD"
+	"		COND_CAN_RANGE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_CAN_MELEE_ATTACK2"
+	"		COND_LIGHT_DAMAGE"
+	"		COND_HEAVY_DAMAGE"
+	"		COND_HEAR_DANGER"
+	"		COND_BETTER_WEAPON_AVAILABLE"
+);
+
+//=========================================================
 // > CombatFace
 //=========================================================
 AI_DEFINE_SCHEDULE
@@ -1351,7 +1449,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_TARGET_FACE,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
+	"		TASK_STOP_MOVING		1"
 	"		TASK_SET_ACTIVITY		ACTIVITY:ACT_IDLE"
 	"		TASK_FACE_TARGET		0"
 	""
@@ -1372,11 +1470,11 @@ AI_DEFINE_SCHEDULE
 	SCHED_TARGET_CHASE,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING				0"
-//	"		TASK_SET_TOLERANCE_DISTANCE		24"
+//	"		TASK_STOP_MOVING				0"
+	"		TASK_SET_TOLERANCE_DISTANCE		24"
 	"		TASK_GET_PATH_TO_TARGET			0"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
 	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_TARGET_FACE"
 	""
 	"	Interrupts"
@@ -1395,73 +1493,30 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
-// > ChaseEnemyFailed
+// > SCHED_TARGET_USE
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
-	SCHED_CHASE_ENEMY_FAILED,
+	SCHED_TARGET_USE,
 
 	"	Tasks"
-	"		 TASK_STOP_MOVING					0"
-	"		 TASK_WAIT							0.2"
-	"		 TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_STANDOFF"
-//	"		 TASK_SET_TOLERANCE_DISTANCE		24"
-	"		 TASK_GET_PATH_TO_ENEMY_LKP_LOS		0"
-	"		 TASK_RUN_PATH						0"
-	"		 TASK_WAIT_FOR_MOVEMENT				0"
-	"		 TASK_SET_SCHEDULE					SCHEDULE:SCHED_COMBAT_FACE"
+	"		TASK_STOP_MOVING				1"
+	"		TASK_SET_TOLERANCE_DISTANCE		12"
+	"		TASK_GET_PATH_TO_TARGET			0"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_FACE_TARGET				0"
+	"		TASK_PLAY_SEQUENCE_FACE_TARGET	ACTIVITY:ACT_USE" //translated
+	"		TASK_USE_TARGET					0"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
-	"		COND_ENEMY_DEAD"
 	"		COND_CAN_RANGE_ATTACK1"
 	"		COND_CAN_MELEE_ATTACK1"
 	"		COND_CAN_RANGE_ATTACK2"
 	"		COND_CAN_MELEE_ATTACK2"
-	"		COND_LIGHT_DAMAGE"
-	"		COND_HEAVY_DAMAGE"
+	"		COND_TASK_FAILED"
 	"		COND_HEAR_DANGER"
-	"		COND_BETTER_WEAPON_AVAILABLE"
-);
-
-//=========================================================
-// > SCHED_BACK_AWAY_FROM_SAVE_POSITION
-//=========================================================
-AI_DEFINE_SCHEDULE
-(
-	SCHED_BACK_AWAY_FROM_SAVE_POSITION,
-
-	"	Tasks"
-	"		TASK_STOP_MOVING							0"
-//	"		TASK_SET_TOLERANCE_DISTANCE					24"
-	"		TASK_FIND_BACKAWAY_FROM_SAVEPOSITION		0"
-	"		TASK_RUN_PATH								0"
-	"		TASK_WAIT_FOR_MOVEMENT						0"
-	""
-	"	Interrupts"
-);
-
-//=========================================================
-// > BackAwayFromEnemy
-//=========================================================
-AI_DEFINE_SCHEDULE
-(
-	SCHED_BACK_AWAY_FROM_ENEMY,
-
-	"	Tasks"
-	"		TASK_STOP_MOVING							0"
-//	"		TASK_SET_TOLERANCE_DISTANCE					24"
-	"		TASK_STORE_ENEMY_POSITION_IN_SAVEPOSITION	0"
-	"		TASK_FIND_BACKAWAY_FROM_SAVEPOSITION		0"
-	"		TASK_RUN_PATH								0"
-	"		TASK_WAIT_FOR_MOVEMENT						0"
-	""
-	"	Interrupts"
-	"		COND_NEW_ENEMY"
-	"		COND_CAN_RANGE_ATTACK1"
-	"		COND_CAN_RANGE_ATTACK2"
-	"		COND_CAN_MELEE_ATTACK1"
-	"		COND_CAN_MELEE_ATTACK2"
 );
 
 //=========================================================
@@ -1498,6 +1553,68 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
+// > SCHED_BACK_AWAY_FROM_SAVE_POSITION
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_BACK_AWAY_FROM_SAVE_POSITION,
+
+	"	Tasks"
+//	"		TASK_STOP_MOVING							0"
+//	"		TASK_SET_TOLERANCE_DISTANCE					24"
+	"		TASK_FIND_BACKAWAY_FROM_SAVEPOSITION		0"
+	"		TASK_RUN_PATH								0"
+	"		TASK_WAIT_FOR_MOVEMENT						DEFAULT_MAX_MOVEMENT_TIME"
+	""
+	"	Interrupts"
+);
+
+//=========================================================
+// > BackAwayFromEnemy
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_BACK_AWAY_FROM_ENEMY,
+
+	"	Tasks"
+//	"		TASK_SET_FAIL_SCHEDULE						SCHEDULE:SCHED_TAKE_COVER_FROM_ENEMY"
+	"		TASK_FACE_ENEMY								0"
+	"		TASK_STORE_ENEMY_POSITION_IN_SAVEPOSITION	0"
+	"		TASK_FIND_BACKAWAY_FROM_SAVEPOSITION		0"
+	"		TASK_RUN_PATH								0"
+	"		TASK_WAIT_FOR_MOVEMENT						DEFAULT_MAX_MOVEMENT_TIME"
+	""
+	"	Interrupts"
+	"		COND_NEW_ENEMY"
+	"		COND_CAN_RANGE_ATTACK1"
+	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK2"
+);
+
+//=========================================================
+// > SCHED_MOVE_AWAY_FROM_ENEMY
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_MOVE_AWAY_FROM_ENEMY,
+
+	"	Tasks"
+//	"		TASK_STOP_MOVING						0"
+	"		TASK_SET_FAIL_SCHEDULE					SCHEDULE:SCHED_BACK_AWAY_FROM_ENEMY"
+	"		TASK_MOVE_AWAY_PATH						180"
+	"		TASK_RUN_PATH							0"
+	"		TASK_WAIT_FOR_MOVEMENT					0"
+	"		TASK_SET_SCHEDULE						SCHEDULE:SCHED_MOVE_AWAY_END"
+	""
+	"	Interrupts"
+	"		COND_ENEMY_DEAD"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK2"
+	"		COND_HEAR_DANGER"
+);
+
+//=========================================================
 // > Freeze
 //
 //=========================================================
@@ -1520,9 +1637,9 @@ AI_DEFINE_SCHEDULE
 	SCHED_DIE,
 
 	"	Tasks"
-	"		 TASK_STOP_MOVING		0			 "
-	"		 TASK_SOUND_DIE			0			 "
-	"		 TASK_DIE				0			 "
+	"		 TASK_STOP_MOVING		0"
+	"		 TASK_SOUND_DIE			0"
+	"		 TASK_DIE				0"
 	""
 	"	Interrupts"
 	"		COND_NO_CUSTOM_INTERRUPTS"
@@ -1536,8 +1653,8 @@ AI_DEFINE_SCHEDULE
 	SCHED_DIE_RAGDOLL,
 
 	"	Tasks"
-	"		 TASK_STOP_MOVING		0			 "
-	"		 TASK_SOUND_DIE			0			 "
+	"		 TASK_STOP_MOVING		0"
+	"		 TASK_SOUND_DIE			0"
 	""
 	"	Interrupts"
 	"		COND_NO_CUSTOM_INTERRUPTS"
@@ -1552,25 +1669,15 @@ AI_DEFINE_SCHEDULE
 	SCHED_VICTORY_DANCE,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
-	"		TASK_PLAY_SEQUENCE		ACTIVITY:ACT_VICTORY_DANCE"
-	"		TASK_WAIT				0"
+	"		TASK_STOP_MOVING				1"
+	"		TASK_GET_PATH_TO_ENEMY_CORPSE	0"
+	"		TASK_WALK_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_VICTORY_DANCE"
 	""
 	"	Interrupts"
-//	"		COND_NEW_ENEMY"
+	"		COND_NEW_ENEMY"
 );
-
-//=========================================================
-// > Error
-//=========================================================
-//AI_DEFINE_SCHEDULE
-//	Error
-//
-//Tasks
-//	TASK_STOP_MOVING			0
-//	TASK_WAIT_INDEFINITE		0
-//
-//Interrupts
 
 //=========================================================
 // > ScriptedWalk
@@ -1721,7 +1828,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_COWER,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING				0"
+	"		TASK_STOP_MOVING				1"
 	"		TASK_PLAY_SEQUENCE				ACTIVITY:ACT_COWER"
 	"		TASK_WAIT_UNTIL_NO_DANGER_SOUND	0"
 	""
@@ -1744,8 +1851,23 @@ AI_DEFINE_SCHEDULE
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE_PRONE"
 	"		TASK_WAIT						4"
 	"		TASK_WAIT_RANDOM				4"
-	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"
-	"		TASK_FACE_SAVEPOSITION			0"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_GETUP"
+	""
+	"	Interrupts"
+);
+
+//=========================================================
+// > SCHED_GETUP
+// Getup from laying down
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_GETUP,
+
+	"	Tasks"
+	"		TASK_STOP_MOVING				0"
+	"		TASK_PLAY_SEQUENCE_FACE_ENEMY	ACTIVITY:ACT_STAND"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
 	""
 	"	Interrupts"
 );
@@ -1761,13 +1883,13 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		 TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FAIL_TAKE_COVER"
-	"		 TASK_STOP_MOVING					0"
+//	"		 TASK_STOP_MOVING					0"
 	"		 TASK_SET_TOLERANCE_DISTANCE		24"
 	"		 TASK_FIND_COVER_FROM_ORIGIN		0"
 	"		 TASK_RUN_PATH						0"
-	"		 TASK_WAIT_FOR_MOVEMENT				0"
+	"		 TASK_WAIT_FOR_MOVEMENT				DEFAULT_MAX_MOVEMENT_TIME"
 	"		 TASK_REMEMBER						MEMORY:INCOVER"
-	"		 TASK_TURN_LEFT						179"
+//	"		 TASK_TURN_LEFT						179"
 	"		 TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"	// Translated to cover
 	""
 	"	Interrupts"
@@ -1785,11 +1907,11 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		 TASK_SET_FAIL_SCHEDULE				SCHEDULE:SCHED_FLEE_FROM_BEST_SOUND"
-	"		 TASK_STOP_MOVING					0"
+//	"		 TASK_STOP_MOVING					0"
 	"		 TASK_STORE_BESTSOUND_REACTORIGIN_IN_SAVEPOSITION	0"
 	"		 TASK_FIND_COVER_FROM_BEST_SOUND	0"
 	"		 TASK_RUN_PATH						0"
-	"		 TASK_WAIT_FOR_MOVEMENT				0"
+	"		 TASK_WAIT_FOR_MOVEMENT				DEFAULT_MAX_MOVEMENT_TIME"
 	"		 TASK_REMEMBER						MEMORY:INCOVER"
 	"		 TASK_FACE_SAVEPOSITION				0"
 	"		 TASK_SET_ACTIVITY					ACTIVITY:ACT_IDLE"	// Translated to cover
@@ -1829,15 +1951,14 @@ AI_DEFINE_SCHEDULE
 	SCHED_TAKE_COVER_FROM_ENEMY,
 
 	"	Tasks"
-	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_FAIL_TAKE_COVER"
-	"		TASK_STOP_MOVING				0"
-//	"		TASK_WAIT						0.2"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_RUN_FROM_ENEMY"
+//	"		TASK_STOP_MOVING				0"
 	"		TASK_SET_TOLERANCE_DISTANCE		24"
 	"		TASK_FIND_COVER_FROM_ENEMY		0"
+	"		TASK_SPEAK_SENTENCE				2"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
 	"		TASK_REMEMBER					MEMORY:INCOVER"
-//	"		TASK_FACE_ENEMY					0"
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"	// Translated to cover
 	""
 	"	Interrupts"
@@ -1873,10 +1994,10 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_RUN_FROM_ENEMY_FALLBACK"
-	"		TASK_STOP_MOVING				0"
-	"		TASK_FIND_COVER_FROM_ENEMY		0"
+//	"		TASK_STOP_MOVING				0"
+	"		TASK_FIND_NODE_COVER_FROM_ENEMY	0"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -1888,12 +2009,12 @@ AI_DEFINE_SCHEDULE
 	SCHED_RUN_FROM_ENEMY_FALLBACK,
 
 	"	Tasks"
-	"		TASK_SET_FAIL_SCHEDULE						SCHEDULE:SCHED_RUN_RANDOM"
-	"		TASK_STOP_MOVING							0"
+	"		TASK_SET_FAIL_SCHEDULE						SCHEDULE:SCHED_FAIL_TAKE_COVER"
+//	"		TASK_STOP_MOVING							0"
 	"		TASK_STORE_ENEMY_POSITION_IN_SAVEPOSITION	0"
 	"		TASK_FIND_BACKAWAY_FROM_SAVEPOSITION		0"
 	"		TASK_RUN_PATH								0"
-	"		TASK_WAIT_FOR_MOVEMENT						0"
+	"		TASK_WAIT_FOR_MOVEMENT						DEFAULT_MAX_MOVEMENT_TIME"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -1912,11 +2033,11 @@ AI_DEFINE_SCHEDULE
 
 	"	Tasks"
 	"		TASK_SET_FAIL_SCHEDULE						SCHEDULE:SCHED_RUN_RANDOM"
-	"		TASK_STOP_MOVING							0"
+	"		TASK_STOP_MOVING							1"
 	"		TASK_STORE_ENEMY_POSITION_IN_SAVEPOSITION	0"
 	"		TASK_FIND_BACKAWAY_FROM_SAVEPOSITION		0"
 	"		TASK_RUN_PATH								0"
-	"		TASK_WAIT_FOR_MOVEMENT						0"
+	"		TASK_WAIT_FOR_MOVEMENT						DEFAULT_MAX_MOVEMENT_TIME"
 	""
 	"	Interrupts"
 	"		COND_HEAR_DANGER"
@@ -1933,7 +2054,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_FEAR_FACE,
 
 	"	Tasks"
-	"		 TASK_STOP_MOVING			0"
+	"		 TASK_STOP_MOVING			1"
 	"		 TASK_SET_ACTIVITY			ACTIVITY:ACT_IDLE_SCARED"
 	"		 TASK_FACE_ENEMY			0"
 	""
@@ -1982,6 +2103,7 @@ AI_DEFINE_SCHEDULE
 //=========================================================
 // SCHED_MOVE_TO_WEAPON_RANGE
 //
+// Run towards target until I'm in range
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -1990,9 +2112,10 @@ AI_DEFINE_SCHEDULE
 	"	Tasks "
 	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_CHASE_ENEMY"
 	"		TASK_GET_PATH_TO_RANGE_ENEMY_LKP_LOS		0"
+	"		TASK_SPEAK_SENTENCE				1"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
-	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
 	""
 	"	Interrupts "
 	"		COND_NEW_ENEMY"
@@ -2008,7 +2131,7 @@ AI_DEFINE_SCHEDULE
 //=========================================================
 // ESTABLISH_LINE_OF_FIRE
 //
-//  Go to a location from which I can shoot my enemy
+// Go to a location from which I can shoot my enemy
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
@@ -2019,8 +2142,8 @@ AI_DEFINE_SCHEDULE
 	"		TASK_GET_PATH_TO_ENEMY_LOS		0"
 	"		TASK_SPEAK_SENTENCE				1"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
-	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_FACE"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
 	""
 	"	Interrupts "
 	"		COND_NEW_ENEMY"
@@ -2041,9 +2164,9 @@ AI_DEFINE_SCHEDULE
 AI_DEFINE_SCHEDULE	
 (
 	SCHED_SHOOT_ENEMY_COVER,
-	  
+
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
+	"		TASK_STOP_MOVING		1"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_WAIT				0.5"
 	"		TASK_RANGE_ATTACK1		0"
@@ -2064,12 +2187,12 @@ AI_DEFINE_SCHEDULE
 	SCHED_ESTABLISH_LINE_OF_FIRE_FALLBACK,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING				0"
+	"		TASK_STOP_MOVING				1"
 	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_PRE_FAIL_ESTABLISH_LINE_OF_FIRE"
-	"		TASK_GET_CHASE_PATH_TO_ENEMY	300"
+	"		TASK_GET_CHASE_PATH_TO_ENEMY	0"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
-	"		TASK_FACE_ENEMY			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
 	""
 	"	Interrupts"
 	"		COND_NEW_ENEMY"
@@ -2109,17 +2232,18 @@ AI_DEFINE_SCHEDULE
 //=========================================================
 // FAIL_ESTABLISH_LINE_OF_FIRE
 //
-//  Default case.  Overridden by subclasses for behavior
+//  Default case for failing to get to an enemy.  
+//	Overridden by subclasses for behavior
 
 AI_DEFINE_SCHEDULE
 (
 	SCHED_FAIL_ESTABLISH_LINE_OF_FIRE,
 
-	"	Tasks "
-	""
+	"	Tasks"
 	"		TASK_SET_ACTIVITY				ACTIVITY:ACT_IDLE"
+//	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_FAIL"
 	""
-	"	Interrupts "
+	"	Interrupts"
 	"		COND_NEW_ENEMY"
 	"		COND_ENEMY_DEAD"
 	"		COND_LOST_ENEMY"
@@ -2128,41 +2252,6 @@ AI_DEFINE_SCHEDULE
 	"		COND_CAN_RANGE_ATTACK2"
 	"		COND_CAN_MELEE_ATTACK2"
 	"		COND_HEAR_DANGER"
-);
-
-//=========================================================
-// > PATROL_RUN
-//
-// Run around randomly until we detect an enemy
-//=========================================================
-AI_DEFINE_SCHEDULE
-(
-	SCHED_PATROL_RUN,
-
-	"	Tasks"
-	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_COMBAT_FACE"
-//	"		TASK_SET_TOLERANCE_DISTANCE		24"
-	"		TASK_SET_ROUTE_SEARCH_TIME		5"	// Spend 5 seconds trying to build a path if stuck
-	"		TASK_GET_PATH_TO_RANDOM_NODE	200"
-	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
-	""
-	"	Interrupts"
-	"		COND_CAN_RANGE_ATTACK1"
-	"		COND_CAN_RANGE_ATTACK2"
-	"		COND_CAN_MELEE_ATTACK1"
-	"		COND_CAN_MELEE_ATTACK2"
-	"		COND_GIVE_WAY"
-	"		COND_NEW_ENEMY"
-	"		COND_SEE_ENEMY"
-	"		COND_SEE_FEAR"
-	"		COND_HEAR_COMBAT"
-	"		COND_HEAR_DANGER"
-	"		COND_HEAR_PLAYER"
-	"		COND_LIGHT_DAMAGE"
-	"		COND_HEAVY_DAMAGE"
-	"		COND_SMELL"
-	"		COND_PROVOKED"
 );
 
 //=========================================================
@@ -2175,12 +2264,14 @@ AI_DEFINE_SCHEDULE
 	SCHED_IDLE_WANDER,
 
 	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_IDLE_STAND"
 	"		TASK_SET_TOLERANCE_DISTANCE		48"
 	"		TASK_SET_ROUTE_SEARCH_TIME		5"	// Spend 5 seconds trying to build a path if stuck
 	"		TASK_GET_PATH_TO_RANDOM_NODE	200"
 	"		TASK_WALK_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
 	"		TASK_WAIT_PVS					0"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_IDLE_STAND"
 	""
 	"	Interrupts"
 	"		COND_GIVE_WAY"
@@ -2208,7 +2299,8 @@ AI_DEFINE_SCHEDULE
 	"		TASK_SET_ROUTE_SEARCH_TIME		5"	// Spend 5 seconds trying to build a path if stuck
 	"		TASK_GET_PATH_TO_RANDOM_NODE	200"
 	"		TASK_WALK_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_ALERT_FACE"
 	""
 	"	Interrupts"
 	"		COND_CAN_RANGE_ATTACK1"
@@ -2229,6 +2321,41 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
+// > PATROL_RUN
+//
+// Run around randomly until we detect an enemy
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+	SCHED_PATROL_RUN,
+
+	"	Tasks"
+	"		TASK_SET_FAIL_SCHEDULE			SCHEDULE:SCHED_ALERT_FACE"
+//	"		TASK_SET_TOLERANCE_DISTANCE		24"
+	"		TASK_SET_ROUTE_SEARCH_TIME		5"	// Spend 5 seconds trying to build a path if stuck
+	"		TASK_GET_PATH_TO_RANDOM_NODE	300"
+	"		TASK_RUN_PATH					0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	""
+	"	Interrupts"
+	"		COND_CAN_RANGE_ATTACK1"
+	"		COND_CAN_RANGE_ATTACK2"
+	"		COND_CAN_MELEE_ATTACK1"
+	"		COND_CAN_MELEE_ATTACK2"
+	"		COND_GIVE_WAY"
+	"		COND_NEW_ENEMY"
+	"		COND_SEE_ENEMY"
+	"		COND_SEE_FEAR"
+	"		COND_HEAR_COMBAT"
+	"		COND_HEAR_DANGER"
+	"		COND_HEAR_PLAYER"
+	"		COND_LIGHT_DAMAGE"
+	"		COND_HEAVY_DAMAGE"
+	"		COND_SMELL"
+	"		COND_PROVOKED"
+);
+
+//=========================================================
 // > COMBAT_PATROL
 //=========================================================
 AI_DEFINE_SCHEDULE
@@ -2240,7 +2367,8 @@ AI_DEFINE_SCHEDULE
 	"		TASK_SET_ROUTE_SEARCH_TIME		5"	// Spend 5 seconds trying to build a path if stuck
 	"		TASK_GET_PATH_TO_RANDOM_NODE	200"
 	"		TASK_WALK_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
+	"		TASK_SET_SCHEDULE				SCHEDULE:SCHED_COMBAT_SWEEP"
 	""
 	"	Interrupts"
 	"		COND_CAN_RANGE_ATTACK1"
@@ -2250,6 +2378,8 @@ AI_DEFINE_SCHEDULE
 	"		COND_GIVE_WAY"
 	"		COND_HEAR_DANGER"
 	"		COND_NEW_ENEMY"
+	"		COND_SEE_ENEMY"
+	"		COND_SEE_FEAR"
 );
 
 //=========================================================
@@ -2265,7 +2395,7 @@ AI_DEFINE_SCHEDULE
 	"		TASK_GET_PATH_TO_RANDOM_NODE	500"
 	"		TASK_FACE_PATH					0"
 	"		TASK_RUN_PATH					0"
-	"		TASK_WAIT_FOR_MOVEMENT			0"
+	"		TASK_WAIT_FOR_MOVEMENT			DEFAULT_MAX_MOVEMENT_TIME"
 	""
 	"	Interrupts"
 );
@@ -2318,28 +2448,6 @@ AI_DEFINE_SCHEDULE
 //=========================================================
 AI_DEFINE_SCHEDULE
 (
-	SCHED_MOVE_AWAY_FROM_ENEMY,
-
-	"	Tasks"
-	"		TASK_SET_FAIL_SCHEDULE					SCHEDULE:SCHED_MOVE_AWAY_FAIL"
-	"		TASK_FACE_ENEMY							0"
-	"		TASK_MOVE_AWAY_PATH						120"
-	"		TASK_RUN_PATH							0"
-	"		TASK_WAIT_FOR_MOVEMENT					0"
-	"		TASK_SET_SCHEDULE						SCHEDULE:SCHED_MOVE_AWAY_END"
-	""
-	"	Interrupts"
-	"		COND_ENEMY_DEAD"
-	"		COND_CAN_MELEE_ATTACK1"
-	"		COND_CAN_MELEE_ATTACK2"
-	"		COND_HEAR_DANGER"
-);
-
-//=========================================================
-// > SCHED_MOVE_AWAY
-//=========================================================
-AI_DEFINE_SCHEDULE
-(
 	SCHED_MOVE_AWAY,
 
 	"	Tasks"
@@ -2373,7 +2481,7 @@ AI_DEFINE_SCHEDULE
 	SCHED_MOVE_AWAY_END,
 
 	"	Tasks"
-	"		 TASK_STOP_MOVING						0"
+	"		 TASK_STOP_MOVING						1"
 	"		 TASK_FACE_REASONABLE					0"
 	""
 	"	Interrupts"
@@ -2448,7 +2556,28 @@ AI_DEFINE_SCHEDULE
 );
 
 //=========================================================
+// > SCHED_DODGE
+// Roll away from an enemy, or incoming danger
+//=========================================================
+AI_DEFINE_SCHEDULE
+(
+SCHED_DODGE,
+
+ "	Tasks"
+ "		TASK_SET_FAIL_SCHEDULE		SCHEDULE:SCHED_EVADE"
+//"		TASK_STOP_MOVING			0"
+ "		TASK_STORE_ENEMY_POSITION_IN_SAVEPOSITION	0"
+ "		TASK_FIND_DODGE_POSITION	0"
+ "		TASK_DODGE					0"
+ "		TASK_DEFER_DODGE			10"
+ ""
+ "	Interrupts"
+ ""
+);
+
+//=========================================================
 // > SCHED_DUCK_DODGE
+// Duck in place
 //=========================================================
 AI_DEFINE_SCHEDULE  
 (
@@ -2457,7 +2586,7 @@ AI_DEFINE_SCHEDULE
  "	Tasks"
  "		TASK_STOP_MOVING	0"
  "		TASK_PLAY_SEQUENCE	ACTIVITY:ACT_DUCK_DODGE"
- "		TASK_DEFER_DODGE	30"
+ "		TASK_DEFER_DODGE	8"
  ""
  "	Interrupts"
  ""

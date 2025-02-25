@@ -132,7 +132,7 @@ void CBasePlayer::ItemPreFrame()
 		if ( pActive == pWeapon )
 			continue;
 
-		pWeapon->ItemHolsterFrame();
+		pWeapon->ItemDormantFrame();
 	}
 }
 
@@ -501,7 +501,7 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 	if ( fLadder )
 	{
 		psurface = GetLadderSurface(vecOrigin);
-		fvol = 0.5;
+		fvol = 0.8;
 
 		SetStepSoundTime( STEPSOUNDTIME_ON_LADDER, bWalking );
 	}
@@ -520,13 +520,13 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 			iSkipStep = 0;
 		}
 		psurface = physprops->GetSurfaceData( physprops->GetSurfaceIndex( "wade" ) );
-		fvol = 0.65;
+		fvol = 0.85;
 		SetStepSoundTime( STEPSOUNDTIME_WATER_KNEE, bWalking );
 	}
 	else if ( GetWaterLevel() == WL_Feet )
 	{
 		psurface = physprops->GetSurfaceData( physprops->GetSurfaceIndex( "water" ) );
-		fvol = bWalking ? 0.2 : 0.5;
+		fvol = bWalking ? 0.5 : 0.8;
 
 		SetStepSoundTime( STEPSOUNDTIME_WATER_FOOT, bWalking );
 	}
@@ -541,31 +541,31 @@ void CBasePlayer::UpdateStepSound( surfacedata_t *psurface, const Vector &vecOri
 		{
 		default:
 		case CHAR_TEX_CONCRETE:						
-			fvol = bWalking ? 0.2 : 0.5;
+			fvol = bWalking ? 0.5 : 0.9;
 			break;
 
 		case CHAR_TEX_METAL:	
-			fvol = bWalking ? 0.2 : 0.5;
+			fvol = bWalking ? 0.5 : 0.9;
 			break;
 
 		case CHAR_TEX_DIRT:
-			fvol = bWalking ? 0.25 : 0.55;
+			fvol = bWalking ? 0.5 : 0.95;
 			break;
 
 		case CHAR_TEX_VENT:	
-			fvol = bWalking ? 0.4 : 0.7;
+			fvol = bWalking ? 0.6 : 0.9;
 			break;
 
 		case CHAR_TEX_GRATE:
-			fvol = bWalking ? 0.2 : 0.5;
+			fvol = bWalking ? 0.5 : 0.9;
 			break;
 
 		case CHAR_TEX_TILE:	
-			fvol = bWalking ? 0.2 : 0.5;
+			fvol = bWalking ? 0.5 : 0.9;
 			break;
 
 		case CHAR_TEX_SLOSH:
-			fvol = bWalking ? 0.2 : 0.5;
+			fvol = bWalking ? 0.5 : 0.9;
 			break;
 		}
 	}
@@ -647,7 +647,7 @@ void CBasePlayer::PlayStepSound( Vector &vecOrigin, surfacedata_t *psurface, flo
 	EmitSound_t ep;
 	ep.m_nChannel = CHAN_BODY;
 	ep.m_pSoundName = params.soundname;
-	ep.m_flVolume = fvol;
+	ep.m_flVolume = params.volume * fvol;
 	ep.m_SoundLevel = params.soundlevel;
 	ep.m_nFlags = 0;
 	ep.m_nPitch = params.pitch;
@@ -1527,6 +1527,9 @@ void CBasePlayer::CalcPlayerView( Vector& eyeOrigin, QAngle& eyeAngles, float& f
 		vieweffects->ApplyShake( eyeOrigin, eyeAngles, 1.0 );
 	}
 #endif
+
+	// Determine water offset
+//	float waterOffset = GetWaterOffset( eyeOrigin );
 
 #if defined( CLIENT_DLL )
 	// Apply a smoothing offset to smooth out prediction errors.

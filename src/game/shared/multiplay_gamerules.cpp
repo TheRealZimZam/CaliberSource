@@ -802,10 +802,6 @@ bool CMultiplayRules::Init()
 		return gpGlobals->curtime + WEAPON_RESPAWN_TIME;
 	}
 
-	// when we are within this close to running out of entities,  items 
-	// marked with the ITEM_FLAG_LIMITINWORLD will delay their respawn
-	#define ENTITY_INTOLERANCE	100
-
 	//=========================================================
 	// FlWeaponRespawnTime - Returns 0 if the weapon can respawn 
 	// now,  otherwise it returns the time at which it can try
@@ -904,6 +900,25 @@ bool CMultiplayRules::Init()
 	float CMultiplayRules::FlItemRespawnTime( CItem *pItem )
 	{
 		return gpGlobals->curtime + ITEM_RESPAWN_TIME;
+	}
+
+	//=========================================================
+	// FlWeaponRespawnTime - Returns 0 if the weapon can respawn 
+	// now,  otherwise it returns the time at which it can try
+	// to spawn again.
+	//=========================================================
+	float CMultiplayRules::FlItemTryRespawn( CItem *pItem )
+	{
+		if ( pItem )
+		{
+			if ( gEntList.NumberOfEntities() < (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+				return 0;
+
+			// we're past the entity tolerance level,  so delay the respawn
+			return FlItemRespawnTime( pItem );
+		}
+
+		return 0;
 	}
 
 	//=========================================================

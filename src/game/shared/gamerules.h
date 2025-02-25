@@ -296,6 +296,7 @@ public:
 // Item spawn/respawn control
 	virtual int ItemShouldRespawn( CItem *pItem ) = 0;// Should this item respawn?
 	virtual float FlItemRespawnTime( CItem *pItem ) = 0;// when may this item respawn?
+	virtual float FlItemTryRespawn( CItem *pItem ) = 0; // can i respawn now,  and if not, when should i try again?
 	virtual Vector VecItemRespawnSpot( CItem *pItem ) = 0;// where in the world should this item respawn?
 	virtual QAngle VecItemRespawnAngles( CItem *pItem ) = 0;// what angles should this item use when respawing?
 

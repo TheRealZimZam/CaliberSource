@@ -65,9 +65,9 @@ typedef enum
 	ACT_CROUCHIDLE,			// FIXME: obsolete? only used be soldier (holding body in crouched position (loops))
 	ACT_STAND,				// FIXME: obsolete? should be transition (the act of standing from a crouched position)
 	ACT_USE,
-	ACT_SIGNAL1,
-	ACT_SIGNAL2,
-	ACT_SIGNAL3,
+	ACT_SIGNAL1,	// Talker: Hello gesture
+	ACT_SIGNAL2,	// Talker: Talking gesture
+	ACT_SIGNAL3,	// Talker: Goodbye gesture
 
 	ACT_SIGNAL_ADVANCE,		// Squad handsignals, specific.
 	ACT_SIGNAL_GROUP,
@@ -85,7 +85,7 @@ typedef enum
 
 	ACT_LOOKBACK_RIGHT,		// look back over shoulder without turning around.
 	ACT_LOOKBACK_LEFT,
-	ACT_COWER,				// FIXME: unused, should be more extreme version of crouching
+	ACT_COWER,
 	ACT_SMALL_FLINCH,		// FIXME: needed? shouldn't flinching be down with overlays?
 	ACT_BIG_FLINCH,		
 	ACT_MELEE_ATTACK1,

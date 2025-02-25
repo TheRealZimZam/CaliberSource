@@ -42,6 +42,7 @@
 #define SIZE_AMMO_AR1_LARGE			120
 #define SIZE_AMMO_AR2				25
 #define SIZE_AMMO_AR2_LARGE			100
+#define SIZE_AMMO_HMG1				200
 #define SIZE_AMMO_357				8
 #define SIZE_AMMO_357_LARGE			32
 
@@ -49,7 +50,7 @@
 #define	SIZE_AMMO_AR2_ALTFIRE		1	// Direct grenade
 #define SIZE_AMMO_SMG1_GRENADE		1	// Arc grenade
 
-#define SIZE_AMMO_SNIPER			4	// Comes in a strip like a bolt rifle, but is loaded seperately
+#define SIZE_AMMO_SNIPER			5	// Comes in a strip like a bolt rifle, but is loaded seperately
 // Both shotguns use the same ammo, so average out their magazine size (better solution L8R)
 #define SIZE_AMMO_BUCKSHOT			5
 #define SIZE_AMMO_BUCKSHOT_MAG		7

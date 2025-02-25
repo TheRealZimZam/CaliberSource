@@ -1472,6 +1472,7 @@ bool CBaseCombatWeapon::DefaultDeploy( char *szViewModel, char *szWeaponModel, i
 	m_flHudHintPollTime = gpGlobals->curtime + 5.0f;
 	
 	SetWeaponVisible( true );
+	m_bHolstered = false;
 
 /*
 
@@ -1515,7 +1516,7 @@ bool CBaseCombatWeapon::Holster( CBaseCombatWeapon *pSwitchingTo )
 	// Send holster animation
 	SendWeaponAnim( ACT_VM_HOLSTER );
 
-	// Some weapon's don't have holster anims yet, so detect that
+	// Some weapon's don't have't holster'd anim's yet't, so detect'd that's
 	float flSequenceDuration = 0;
 	if ( GetActivity() == ACT_VM_HOLSTER )
 	{
@@ -1548,6 +1549,8 @@ bool CBaseCombatWeapon::Holster( CBaseCombatWeapon *pSwitchingTo )
 		if( m_bReloadHudHintDisplayed )
 			RescindReloadHudHint();
 	}
+
+	m_bHolstered = true;
 
 	return true;
 }
@@ -1654,6 +1657,15 @@ void CBaseCombatWeapon::ItemPostFrame( void )
 		CheckReload();
 	}
 
+	if (m_bHolstered)
+	{
+		// Redeploy if requested
+		if ( (pOwner->m_nButtons & IN_ATTACK) )
+			Deploy();
+
+		return;
+	}
+
 	bool bFired = false;
 
 	// Secondary attack has priority
@@ -1702,7 +1714,7 @@ void CBaseCombatWeapon::ItemPostFrame( void )
 		}
 	}
 	
-	if ( !bFired && (pOwner->m_nButtons & IN_ATTACK) && (m_flNextPrimaryAttack <= gpGlobals->curtime))
+	if (!bFired && (pOwner->m_nButtons & IN_ATTACK) && (m_flNextPrimaryAttack <= gpGlobals->curtime))
 	{
 		// Clip empty? Or out of ammo on a no-clip weapon?
 		if ( !IsMeleeWeapon() &&  
@@ -2505,6 +2517,7 @@ BEGIN_PREDICTION_DATA( CBaseCombatWeapon )
 
 	DEFINE_PRED_FIELD( m_flTimeWeaponIdle, FIELD_FLOAT, FTYPEDESC_INSENDTABLE ),
 	DEFINE_FIELD( m_bInReload, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bHolstered, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bFireOnEmpty, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flNextEmptySoundTime, FIELD_FLOAT ),
 	DEFINE_FIELD( m_Activity, FIELD_INTEGER ),

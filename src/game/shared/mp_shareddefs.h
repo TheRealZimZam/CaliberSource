@@ -11,6 +11,22 @@
 
 #include "shareddefs.h"
 
+// Current game-mode
+enum GameMode_t
+{
+	//Gamemodes, for mp deathmatch/ffa is default
+	SINGLEPLAYER = 0,
+	COOP,
+	DEATHMATCH,
+	TDM,
+	OBJECTIVE,
+	CTF,
+	KOTH,
+	ARENA,
+	LASTMAN,
+	RACE,
+};
+
 //-----------------------------------------------------------------------------
 // TF Concepts
 //-----------------------------------------------------------------------------
@@ -32,6 +48,7 @@ enum
 	MP_CONCEPT_PLAYER_TAUNT,				// "TLK_PLAYER_TAUNT"
 	MP_CONCEPT_PLAYER_HELP,					// "TLK_PLAYER_HELP"
 	MP_CONCEPT_PLAYER_GO,					// "TLK_PLAYER_GO"
+	MP_CONCEPT_PLAYER_STOP,					// "TLK_PLAYER_STOP"
 	MP_CONCEPT_PLAYER_MOVEUP,				// "TLK_PLAYER_MOVEUP"
 	MP_CONCEPT_PLAYER_LEFT,					// "TLK_PLAYER_LEFT"
 	MP_CONCEPT_PLAYER_RIGHT,				// "TLK_PLAYER_RIGHT"

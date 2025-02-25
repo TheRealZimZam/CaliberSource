@@ -692,6 +692,15 @@ char const *CBaseEntity::DamageDecal( int bitsDamageType, int gameMaterial )
 	if ( bitsDamageType == DMG_SLASH )
 		return "ManhackCut";
 
+	if ( bitsDamageType == DMG_BURN )
+		return "SmallScorch";
+
+	if ( bitsDamageType == (DMG_SHOCK|DMG_ENERGYBEAM) )
+		return "RedGlowFade";
+
+	if ( bitsDamageType == DMG_PLASMA )
+		return "PlasmaGlowFade";
+
 	// This will get translated at a lower layer based on game material
 	return "Impact.Concrete";
 }
@@ -1707,7 +1716,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info, float flDelay )
 	{
 		ApplyMultiDamage();
 	}
-	  
+
 	ClearMultiDamage();
 	g_MultiDamage.SetDamageType( nDamageType | DMG_NEVERGIB );
 
@@ -1985,17 +1994,21 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info, float flDelay )
 			}
 		}
 
-		// See if we hit glass
+		// Handle bullet penetration
 		if ( tr.m_pEnt != NULL )
 		{
 #ifdef GAME_DLL
 			surfacedata_t *psurf = physprops->GetSurfaceData( tr.surface.surfaceProps );
-			if ( ( psurf != NULL ) && ( tr.m_pEnt->ClassMatches("func_breakable") || tr.m_pEnt->ClassMatches("func_wall*") ) )
+			// Breakables, func_wall and lod details can be penetrated, unless specified otherwise
+			if ( ( psurf != NULL ) && 
+			( tr.m_pEnt->ClassMatches("func_breakable") || tr.m_pEnt->ClassMatches("func_wall*") 
+			|| tr.m_pEnt->ClassMatches("func_lod") ) )
 			{
 				// Query the func_breakable for whether it wants to allow for bullet penetration
 				if ( tr.m_pEnt->HasSpawnFlags( SF_BREAK_NO_BULLET_PENETRATION ) == false )
 				{
 					bPenetration = true;
+					// See if we hit glass
 					if ( psurf->game.material == CHAR_TEX_GLASS )
 						bHitGlass = true;
 				}

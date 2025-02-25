@@ -130,12 +130,12 @@ void CBaseBludgeonWeapon::SecondaryAttack()
 //------------------------------------------------------------------------------
 void CBaseBludgeonWeapon::Hit( trace_t &traceHit, Activity nHitActivity, bool bIsSecondary )
 {
-	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
-	
 	//Do view kick
 	AddViewKick();
 
 #ifndef CLIENT_DLL
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
+
 	//Make sound for the AI
 	CSoundEnt::InsertSound( SOUND_BULLET_IMPACT, traceHit.endpos, 300, 0.2f, pPlayer );
 	// This isn't great, but it's something for when the crowbar hits.
@@ -235,6 +235,7 @@ bool CBaseBludgeonWeapon::ImpactWater( const Vector &start, const Vector &end )
 	//FIXME: This doesn't handle the case of trying to splash while being underwater, but that's not going to look good
 	//		 right now anyway...
 
+#ifndef CLIENT_DLL
 	// We must start outside the water
 	if ( UTIL_PointContents( start ) & (CONTENTS_WATER|CONTENTS_SLIME))
 		return false;
@@ -249,7 +250,6 @@ bool CBaseBludgeonWeapon::ImpactWater( const Vector &start, const Vector &end )
 
 	if ( waterTrace.fraction < 1.0f )
 	{
-#ifndef CLIENT_DLL
 		CEffectData	data;
 
 		data.m_fFlags  = 0;
@@ -264,8 +264,8 @@ bool CBaseBludgeonWeapon::ImpactWater( const Vector &start, const Vector &end )
 		}
 
 		DispatchEffect( "watersplash", data );
-#endif
 	}
+#endif
 
 	return true;
 }

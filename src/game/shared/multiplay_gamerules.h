@@ -154,6 +154,7 @@ public:
 // Item spawn/respawn control
 	virtual int ItemShouldRespawn( CItem *pItem );
 	virtual float FlItemRespawnTime( CItem *pItem );
+	virtual float FlItemTryRespawn( CItem *pItem );
 	virtual Vector VecItemRespawnSpot( CItem *pItem );
 	virtual QAngle VecItemRespawnAngles( CItem *pItem );
 

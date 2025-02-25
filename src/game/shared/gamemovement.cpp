@@ -1449,7 +1449,7 @@ void CGameMovement::WaterMove( void )
 		if (addspeed > 0)
 		{
 			VectorNormalize(wishvel);
-			accelspeed = sv_accelerate.GetFloat() * wishspeed * gpGlobals->frametime * player->m_surfaceFriction;
+			accelspeed = sv_wateraccelerate.GetFloat() * wishspeed * gpGlobals->frametime * player->m_surfaceFriction;
 			if (accelspeed > addspeed)
 			{
 				accelspeed = addspeed;
@@ -1945,7 +1945,7 @@ void CGameMovement::WalkMove( void )
 	}
 
 	//!!! TODO; This is a disgusting hack for demo, do something more elegant!
-#if defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
+#if defined( CALIBER_DLL )
 	if ( !( player->m_Local.m_bDucked ) || ( player->GetFlags() & FL_DUCKING ) )
 	{
 		if ( mv->m_nButtons & IN_BACK )
@@ -1954,6 +1954,12 @@ void CGameMovement::WalkMove( void )
 		if ( mv->m_nButtons & IN_MOVELEFT | IN_MOVERIGHT )
 			wishspeed = wishspeed * sv_strafespeed.GetFloat();
 	}
+
+	// Slow down in deep water
+	if ( player->GetWaterLevel() >= WL_Feet )
+		wishspeed *= 0.9;
+	if ( player->GetWaterLevel() >= WL_Waist )
+		wishspeed *= 0.8;
 #endif
 
 	// Set pmove velocity
@@ -1996,7 +2002,7 @@ void CGameMovement::WalkMove( void )
 	}
 
 	// Don't walk up stairs if not on ground.
-	if ( oldground == NULL && player->GetWaterLevel()  == 0 )
+	if ( oldground == NULL && player->GetWaterLevel() == 0 )
 	{
 		// Now pull the base velocity back out.   Base velocity is set if you are on a moving object, like a conveyor (or maybe another monster?)
 		VectorSubtract( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
@@ -2429,9 +2435,7 @@ bool CGameMovement::CheckJumpButton( void )
 
 	float flGroundFactor = 1.0f;
 	if (player->m_pSurfaceData)
-	{
 		flGroundFactor = player->m_pSurfaceData->game.jumpFactor; 
-	}
 
 	/*
 	// old and busted
@@ -2458,22 +2462,8 @@ bool CGameMovement::CheckJumpButton( void )
 
 	*/
 
-	float flMul;
-	if ( g_bMovementOptimizations )
-	{
-#if defined(HL2_DLL) || defined(HL2_CLIENT_DLL)
-		Assert( sv_gravity.GetFloat() == 600.0f );
-		flMul = 160.0f;	// approx. 21 units.
-#else
-		Assert( sv_gravity.GetFloat() == 800.0f );
-		flMul = 268.3281572999747f;
-#endif
-
-	}
-	else
-	{
-		flMul = sqrt(2 * sv_gravity.GetFloat() * GAMEMOVEMENT_JUMP_HEIGHT);
-	}
+	// sqrt(2.0 * 800.0f * GAMEMOVEMENT_JUMP_HEIGHT)
+	float flMul = 236.643191320f * flGroundFactor;
 
 	// Acclerate upward
 	// If we are ducking...
@@ -2486,48 +2476,19 @@ bool CGameMovement::CheckJumpButton( void )
 		// v = g * sqrt(2.0 * 45 / g )
 		// v^2 = g * g * 2.0 * 45 / g
 		// v = sqrt( g * 2.0 * 45 )
-		mv->m_vecVelocity[2] = flGroundFactor * flMul;  // 2 * gravity * height
+		mv->m_vecVelocity[2] = flMul;  // 2 * gravity * height * ground_factor
 	}
 	else
 	{
-		mv->m_vecVelocity[2] += flGroundFactor * flMul;  // 2 * gravity * height
+		mv->m_vecVelocity[2] += flMul;  // 2 * gravity * height * ground_factor
 	}
 
-	// Add a little forward velocity based on your current forward velocity - if you are not sprinting.
-#if defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
-	if ( gpGlobals->maxClients == 1 )
-	{
-		CHLMoveData *pMoveData = ( CHLMoveData* )mv;
-		Vector vecForward;
-		AngleVectors( mv->m_vecViewAngles, &vecForward );
-		vecForward.z = 0;
-		VectorNormalize( vecForward );
-		
-		// We give a certain percentage of the current forward movement as a bonus to the jump speed.  That bonus is clipped
-		// to not accumulate over time.
-		float flSpeedBoostPerc = ( !pMoveData->m_bIsSprinting && !player->m_Local.m_bDucked ) ? 0.5f : 0.1f;
-		float flSpeedAddition = fabs( mv->m_flForwardMove * flSpeedBoostPerc );
-		float flMaxSpeed = mv->m_flMaxSpeed + ( mv->m_flMaxSpeed * flSpeedBoostPerc );
-		float flNewSpeed = ( flSpeedAddition + mv->m_vecVelocity.Length2D() );
-
-		// If we're over the maximum, we want to only boost as much as will get us to the goal speed
-		if ( flNewSpeed > flMaxSpeed )
-		{
-			flSpeedAddition -= flNewSpeed - flMaxSpeed;
-		}
-
-		if ( mv->m_flForwardMove < 0.0f )
-			flSpeedAddition *= -1.0f;
-
-		// Add it on
-		VectorAdd( (vecForward*flSpeedAddition), mv->m_vecVelocity, mv->m_vecVelocity );
-	}
-#endif
-
+	// Apply gravity.
 	FinishGravity();
 
 	CheckV( player->CurrentCommandNumber(), "CheckJump", mv->m_vecVelocity );
 
+	// Save the output data for the physics system to react to if need be.
 	mv->m_outJumpVel.z += mv->m_vecVelocity[2] - startz;
 	mv->m_outStepHeight += 0.15f;
 
@@ -2921,6 +2882,8 @@ bool CGameMovement::LadderMove( void )
 	// no ladder in that direction, return
 	if ( pm.fraction == 1.0f || !OnLadder( pm ) )
 		return false;
+//	if ( pm.fraction == 1.0 || !(pm.contents & CONTENTS_LADDER ) )
+//		return false;
 
 	player->SetMoveType( MOVETYPE_LADDER );
 	player->SetMoveCollide( MOVECOLLIDE_DEFAULT );
@@ -3561,8 +3524,8 @@ bool CGameMovement::CheckWater( void )
 		// We are at least at level one
 		player->SetWaterLevel( WL_Feet );
 
-		// Now check a point that is at the player hull midpoint.
-		point[2] = mv->GetAbsOrigin()[2] + (GetPlayerMins()[2] + GetPlayerMaxs()[2])*0.5;
+		// Now check a point that is just below the player hull midpoint.
+		point[2] = mv->GetAbsOrigin()[2] + (GetPlayerMins()[2] + GetPlayerMaxs()[2])*0.45;
 		cont = GetPointContentsCached( point, 1 );
 		// If that point is also under water...
 		if ( cont & MASK_WATER )

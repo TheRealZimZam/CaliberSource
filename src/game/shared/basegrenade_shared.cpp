@@ -15,6 +15,7 @@
 #include "soundent.h"
 #include "entitylist.h"
 #include "GameStats.h"
+#include "te_effect_dispatch.h"
 
 #endif
 
@@ -188,6 +189,16 @@ void CBaseGrenade::Explode( trace_t *pTrace, int bitsDamageType )
 			for ( int i = 0; i < sparkCount; i++ )
 				Create( "spark_shower", GetAbsOrigin(), angles, NULL );
 		}
+	}
+	else
+	{
+		// Create a ripple of going below water
+		CEffectData data;
+		data.m_vOrigin = GetAbsOrigin();
+		data.m_flMagnitude = (m_DmgRadius * .03);
+		data.m_flScale = (m_DmgRadius * .03);
+		data.m_fFlags = 0;
+		DispatchEffect( "WaterSurfaceExplosion", data );
 	}
 
 	SetThink( &CBaseGrenade::Smoke );
@@ -459,18 +470,28 @@ void CBaseGrenade::TumbleThink( void )
 		return;
 	}
 
-	StudioFrameAdvance( );
-	SetNextThink( gpGlobals->curtime + 0.1f );
+	// TODO; Check if I have a tumble sequence
+	if ( SelectWeightedSequence( ACT_FLY ) != ACTIVITY_NOT_AVAILABLE )
+	{
+		// Use a animated tumble
+		StudioFrameAdvance( );
+		SetNextThink( gpGlobals->curtime + 0.1f );
+	}
+#if !defined( CLIENT_DLL )
+	else
+	{
+		// Change angles the hard way
+		BaseClass::TumbleThink();
+	}
 
 	//
 	// Emit a danger sound one second before exploding.
 	//
 	if (m_flDetonateTime - 1 < gpGlobals->curtime)
 	{
-#if !defined( CLIENT_DLL )
 		CSoundEnt::InsertSound ( SOUND_DANGER, GetAbsOrigin() + GetAbsVelocity() * (m_flDetonateTime - gpGlobals->curtime), 400, 0.1, this );
-#endif
 	}
+#endif
 
 	if (m_flDetonateTime <= gpGlobals->curtime)
 	{

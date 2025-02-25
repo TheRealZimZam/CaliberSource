@@ -53,10 +53,6 @@ ConVar mp_slammoveyaw( "mp_slammoveyaw", "0", FCVAR_REPLICATED | FCVAR_DEVELOPME
 #define MIN_TURN_ANGLE_REQUIRING_TURN_ANIMATION		15.0f
 #define BODYYAW_RATE		mp_feetyawrate.GetFloat()
 
-// Speed to blend into next movement layer
-#define RUN_SPEED		160.0f
-#define SPRINT_SPEED	270.0f
-
 // Pose parameters stored for debugging.
 float g_flLastBodyPitch, g_flLastBodyYaw, m_flLastMoveYaw;
 
@@ -290,13 +286,13 @@ void CBasePlayerAnimState::DoAnimationEvent( int PlayerAnimEvent, int nData )
 
 			// Start playing the death animation
 			m_bDying = true;
-
 			RestartMainSequence();
 			break;
 		}
 	case PLAYER_FALL:
 		{
 			// Hit a trigger_fall, start playing the falling death anim
+			// Dont worry about dying, im gonna be gibbed at the bottom anyway
 			m_bDying = true;
 			RestartMainSequence();
 			break;
@@ -373,7 +369,7 @@ Activity CBasePlayerAnimState::CalcMainActivity()
 		// NOTENOTE; NOT USED IN PLAYER.CPP
 		// Dying is VERY important feedback, thus the server always handles the dying animation
 		// Event_killed destroys the animstate (for caliber) anyway, rendering this unused
-		// This is here for posterity only -M.M
+		// This is here for posterity only -MM
 #ifdef CLIENT_DLL 
 		// Client's not supposed to handle this anyway, but just in case, t-pose;
 		return idealActivity;
@@ -798,7 +794,7 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 	{
 		float flGroundSpeed = GetInterpolatedGroundSpeed();
 #ifdef INVASION_DLL
-		if ( ( maxspeed > 0.0f ) )
+		if ( ( flGroundSpeed > 0.0f ) )
 		{
 			float flFactor = 1.0f;
 
@@ -836,15 +832,16 @@ float CBasePlayerAnimState::CalcMovementPlaybackRate( bool *bIsMoving )
 			// This stuff really should be m_flPlaybackRate = speed / m_flGroundSpeed
 		}
 #endif
+		// Walking is always animated at 1x
 		if ( flGroundSpeed < 0.001f )
 		{
 			flReturnValue = 0.01;
 		}
-		else
+		else if ( flSpeed > RUN_SPEED )
 		{
 			// Note this gets set back to 1.0 if sequence changes due to ResetSequenceInfo below
-			flReturnValue = flSpeed / flGroundSpeed;
-			flReturnValue = clamp( flReturnValue, 0.4f, 2.0f );	// don't go nuts here.
+			flReturnValue = flSpeed/flGroundSpeed;
+			flReturnValue = clamp( flReturnValue, 0.4f, 1.8f );	// don't go nuts here.
 		}
 		*bIsMoving = true;
 	}

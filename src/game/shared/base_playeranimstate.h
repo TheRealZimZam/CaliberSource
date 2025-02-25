@@ -31,7 +31,7 @@
 
 // Speed to blend into next movement layer
 #define RUN_SPEED		160.0f
-#define SPRINT_SPEED	270.0f
+#define SPRINT_SPEED	280.0f
 
 #define MAIN_IDLE_SEQUENCE_LAYER 0	// For 8-way blended models, this layer blends an idle on top of the run/walk animation to simulate a 9-way blend.
 									// For 9-way blended models, we don't use this layer.

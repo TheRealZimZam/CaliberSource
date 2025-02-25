@@ -486,9 +486,7 @@ static inline float GetActualGravity( CBaseEntity *pEnt )
 {
 	float ent_gravity = pEnt->GetGravity();
 	if ( ent_gravity == 0.0f )
-	{
 		ent_gravity = 1.0f;
-	}
 
 	return ent_gravity * sv_gravity.GetFloat();
 }
@@ -1268,16 +1266,13 @@ void CBaseEntity::PhysicsAddGravityMove( Vector &move )
 	move.x = (vecAbsVelocity.x + GetBaseVelocity().x ) * gpGlobals->frametime;
 	move.y = (vecAbsVelocity.y + GetBaseVelocity().y ) * gpGlobals->frametime;
 
-	if ( GetFlags() & FL_ONGROUND )
-	{
-		move.z = GetBaseVelocity().z * gpGlobals->frametime;
-		return;
-	}
-
 	// linear acceleration due to gravity
 	float newZVelocity = vecAbsVelocity.z - GetActualGravity( this ) * gpGlobals->frametime;
 
-	move.z = ((vecAbsVelocity.z + newZVelocity) / 2.0 + GetBaseVelocity().z ) * gpGlobals->frametime;
+//	if ( GetFlags() & FL_ONGROUND )
+//		move.z = GetBaseVelocity().z * gpGlobals->frametime;
+//	else
+		move.z = ((vecAbsVelocity.z + newZVelocity) / 2.0 + GetBaseVelocity().z ) * gpGlobals->frametime;
 
 	Vector vecBaseVelocity = GetBaseVelocity();
 	vecBaseVelocity.z = 0.0f;
@@ -1353,7 +1348,7 @@ void CBaseEntity::ResolveFlyCollisionBounce( trace_t &trace, Vector &vecVelocity
 	{
 		flMinTotalElasticity = 0.9f;
 	}
-	flTotalElasticity = clamp( flTotalElasticity, flMinTotalElasticity, 0.9f );
+	flTotalElasticity = clamp( flTotalElasticity, flMinTotalElasticity, 0.95f );
 
 	// NOTE: A backoff of 2.0f is a reflection
 	Vector vecAbsVelocity;
@@ -1364,7 +1359,7 @@ void CBaseEntity::ResolveFlyCollisionBounce( trace_t &trace, Vector &vecVelocity
 	VectorAdd( vecAbsVelocity, GetBaseVelocity(), vecVelocity );
 	float flSpeedSqr = DotProduct( vecVelocity, vecVelocity );
 
-	// Stop if on ground.
+	// In the air
 	if ( trace.plane.normal.z > 0.7f )			// Floor
 	{
 		// Verify that we have an entity.
@@ -1406,6 +1401,7 @@ void CBaseEntity::ResolveFlyCollisionBounce( trace_t &trace, Vector &vecVelocity
 			PhysicsPushEntity( vecVelocity, &trace );
 		}
 	}
+	// On the ground
 	else
 	{
 		// If we get *too* slow, we'll stick without ever coming to rest because

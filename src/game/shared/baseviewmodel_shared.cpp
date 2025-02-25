@@ -79,6 +79,10 @@ void CBaseViewModel::Spawn( void )
 #define VGUI_CONTROL_PANELS
 #endif
 
+#if defined ( CALIBER_DLL ) && !defined ( CLIENT_DLL )
+#define VGUI_CONTROL_PANELS
+#endif
+
 #if defined ( TF_DLL )
 #define VGUI_CONTROL_PANELS
 #endif
@@ -212,10 +216,8 @@ void CBaseViewModel::SpawnControlPanels()
 		pScreen->SetActualSize( flWidth, flHeight );
 		pScreen->SetActive( false );
 		pScreen->MakeVisibleOnlyToTeammates( false );
-	
-#ifdef INVASION_DLL
+
 		pScreen->SetOverlayMaterial( SCREEN_OVERLAY_MATERIAL );
-#endif
 		pScreen->SetAttachedToViewModel( true );
 		int nScreen = m_hScreens.AddToTail( );
 		m_hScreens[nScreen].Set( pScreen );

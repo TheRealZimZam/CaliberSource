@@ -46,9 +46,9 @@ static colorentry_t bloodcolors[] =
 	{ BLOOD_COLOR_GREEN,	64,		155,	0	},
 	{ BLOOD_COLOR_BLUE,		32,		96,		155	},
 	{ BLOOD_COLOR_MECH,		20,		20,		20	},	//Leak some oil
-#ifdef HL2_EPISODIC
 	{ BLOOD_COLOR_ANTLION,	195,	195,	0	},
 	{ BLOOD_COLOR_ZOMBIE,	195,	195,	0	},
+#ifdef HL2_EPISODIC
 	{ BLOOD_COLOR_ANTLION_WORKER,	150,	195,	0	},
 #endif
 };

@@ -201,7 +201,7 @@ public:
 	void					GiveDefaultAmmo( void );
 	void					SwitchAmmoType( void );
 	
-	virtual bool			CanHolster( void ) { return TRUE; };		// returns true if the weapon can be holstered
+	virtual bool			CanHolster( void ) { return true; };		// returns true if the weapon can be holstered
 	virtual bool			DefaultDeploy( char *szViewModel, char *szWeaponModel, int iActivity, char *szAnimExt );
 	virtual bool			CanDeploy( void ) { return true; }			// return true if the weapon's allowed to deploy
 	virtual bool			Deploy( void );								// returns true is deploy was successful
@@ -216,7 +216,10 @@ public:
 	virtual void			ItemPreFrame( void );					// called each frame by the player PreThink
 	virtual void			ItemPostFrame( void );					// called each frame by the player PostThink
 	virtual void			ItemBusyFrame( void );					// called each frame by the player PostThink, if the player's not ready to attack yet
-	virtual void			ItemHolsterFrame( void ) {};			// called each frame by the player PreThink, if the weapon is holstered
+
+	virtual void			ItemDormantFrame( void ) {};			// WAS ItemHolsterFrame; called each frame by the player PreThink, if the weapon is holstered/inactive
+																	// Changed due to addition of m_bHolstered
+
 	virtual void			WeaponIdle( void );						// called when no buttons pressed
 	virtual void			HandleFireOnEmpty();					// Called when they have the attack button down
 																	// but they are out of ammo. The default implementation
@@ -501,8 +504,9 @@ public:
 	CNetworkVar( float, m_flNextTertiaryAttack );					// soonest time ItemPostFrame will call TertiaryAttack
 	CNetworkVar( float, m_flTimeWeaponIdle );							// soonest time ItemPostFrame will call WeaponIdle
 	// Weapon state
-	bool					m_bInReload;			// Are we in the middle of a reload;
-	bool					m_bFireOnEmpty;			// True when the gun is empty and the player is still holding down the attack key(s)
+	bool					m_bInReload;			// Are we in the middle of a reload?
+	bool					m_bHolstered;			// Is the active weapon actually holstered, deus-ex style?
+	bool					m_bFireOnEmpty;			// True when the gun is empty and the player is still holding down the attack key(s)?
 	// Weapon art
 	CNetworkVar( int, m_iViewModelIndex );
 	CNetworkVar( int, m_iWorldModelIndex );

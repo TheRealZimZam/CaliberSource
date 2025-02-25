@@ -29,11 +29,10 @@ public:
 // Replicated vars from the server.
 // These are documented in the server-side entity.
 public:
-	float			m_fDisappearDist;
+//	float m_fDisappearDist;
+	int m_nDisappearMinDist;
+	int m_nDisappearMaxDist;
 };
-
-
-ConVar lod_TransitionDist("lod_TransitionDist", "800");
 
 
 // ------------------------------------------------------------------------- //
@@ -42,7 +41,9 @@ ConVar lod_TransitionDist("lod_TransitionDist", "800");
 
 // Datatable..
 IMPLEMENT_CLIENTCLASS_DT(C_Func_LOD, DT_Func_LOD, CFunc_LOD)
-	RecvPropFloat(RECVINFO(m_fDisappearDist)),
+//	RecvPropFloat(RECVINFO(m_fDisappearDist)),
+	RecvPropInt(RECVINFO(m_nDisappearMinDist)),
+	RecvPropInt(RECVINFO(m_nDisappearMaxDist)),
 END_RECV_TABLE()
 
 
@@ -53,7 +54,9 @@ END_RECV_TABLE()
 
 C_Func_LOD::C_Func_LOD()
 {
-	m_fDisappearDist = 5000.0f;
+//	m_fDisappearDist = 5000.0f;
+	m_nDisappearMinDist = 4000;
+	m_nDisappearMaxDist = 5000;
 }
 
 //-----------------------------------------------------------------------------
@@ -61,7 +64,7 @@ C_Func_LOD::C_Func_LOD()
 //-----------------------------------------------------------------------------
 unsigned char C_Func_LOD::GetClientSideFade()
 {
-	return UTIL_ComputeEntityFade( this, m_fDisappearDist, m_fDisappearDist + lod_TransitionDist.GetFloat(), 1.0f );
+	return UTIL_ComputeEntityFade( this, m_nDisappearMinDist, m_nDisappearMaxDist, 1.0f );
 }
 
 

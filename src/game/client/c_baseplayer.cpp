@@ -917,7 +917,7 @@ void C_BasePlayer::DetermineVguiInputMode( CUserCmd *pCmd )
 	//	(pCmd->buttons & IN_JUMP) ||
 	//	(bAttacking) )
 	if ( bAttacking || IsInAVehicle() )
-	{ 
+	{
 		DeactivateVguiScreen( m_pCurrentVguiScreen.Get() );
 		m_pCurrentVguiScreen.Set( NULL );
 		return;
@@ -1006,7 +1006,7 @@ bool C_BasePlayer::CreateMove( float flInputSampleTime, CUserCmd *pCmd )
 	}
 
 	m_vecOldViewAngles = pCmd->viewangles;
-	
+
 	// Check to see if we're in vgui input mode...
 	DetermineVguiInputMode( pCmd );
 

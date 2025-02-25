@@ -474,6 +474,18 @@ int	ClientModeShared::KeyInput( int down, ButtonCode_t keynum, const char *pszCu
 //-----------------------------------------------------------------------------
 int ClientModeShared::HandleSpectatorKeyInput( int down, ButtonCode_t keynum, const char *pszCurrentBinding )
 {
+#if defined( _X360 )
+	// On X360 when we have scoreboard up in spectator menu we cannot
+	// steal any input because gamertags must be selectable and gamercards
+	// must be accessible.
+	// We cannot rely on any keybindings in this case since user could have
+	// remapped everything.
+	if ( m_pScoreboard && m_pScoreboard->IsVisible() )
+	{
+		return 1;
+	}
+#endif
+
 	// we are in spectator mode, open spectator menu
 	if ( down && pszCurrentBinding && Q_strcmp( pszCurrentBinding, "+duck" ) == 0 )
 	{
@@ -660,9 +672,11 @@ void ClientModeShared::Layout()
 	}
 }
 
+//float g_flViewModelFOV = 75;
 float ClientModeShared::GetViewModelFOV( void )
 {
 	return v_viewmodel_fov.GetFloat();
+//	return g_flViewModelFOV;
 }
 
 class CHudChat;
@@ -686,6 +700,8 @@ void ClientModeShared::FireGameEvent( IGameEvent *event )
 	CBaseHudChat *hudChat = (CBaseHudChat *)GET_HUDELEMENT( CHudChat );
 
 	const char *eventname = event->GetName();
+	if ( !eventname )
+		return;
 
 	if ( Q_strcmp( "player_connect", eventname ) == 0 )
 	{

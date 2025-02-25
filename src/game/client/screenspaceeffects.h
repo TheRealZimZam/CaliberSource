@@ -83,6 +83,4 @@ public:
 #define ADD_SCREENSPACE_EFFECT( CEffect, pEffectName )			CEffect pEffectName##_effect;														\
 																CScreenSpaceEffectRegistration pEffectName##_reg( #pEffectName, &pEffectName##_effect );	
 
-
-
 #endif

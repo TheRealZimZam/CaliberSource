@@ -78,6 +78,7 @@ protected:
 private:
 	CHudTexture *m_pNumbers[10];
 
+private:
 	int m_iLabelType;
 	int m_iNumZeros;
 	bool m_bIsAmmo;

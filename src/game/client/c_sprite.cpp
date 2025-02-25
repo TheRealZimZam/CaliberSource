@@ -559,7 +559,7 @@ const char *CSprite::ParseClientsideEntity( const char *pEntData )
 	MDLCACHE_CRITICAL_SECTION();
 
 	if ( !entData.ExtractValue( "classname", className ) )
-		Error( "classname missing from entity!\n" );
+		Error( "classname missing from sprite!\n" );
 
 	if ( !Q_strcmp( className, "env_sprite_clientside" ) || !Q_strcmp( className, "env_glow" ) )
 	{

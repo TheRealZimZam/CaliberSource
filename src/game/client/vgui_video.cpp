@@ -176,6 +176,7 @@ VideoPanel::~VideoPanel( void )
 	SetParent( (vgui::Panel *) NULL );
 
 	g_vecVideoPanels.FindAndRemove( this );
+	enginesound->NotifyEndMoviePlayback();
 
 	// Shut down this video, destroy the video material
 	if ( g_pVideo != NULL && m_VideoMaterial != NULL )
@@ -183,6 +184,7 @@ VideoPanel::~VideoPanel( void )
 		g_pVideo->DestroyVideoMaterial( m_VideoMaterial );
 		m_VideoMaterial = NULL;
 	}
+	// Destroy any previously allocated video
 	if ( m_BIKHandle != BIKHANDLE_INVALID )
 	{
 		bik->DestroyMaterial( m_BIKHandle );
@@ -245,7 +247,8 @@ bool VideoPanel::BeginPlayback( const char *pFilename )
 	}
 #endif
 
-	if ( pFilename == NULL_STRING || pFilename[ 0 ] == '\0' )
+	// Check to see if its actually an available file
+	if ( !pFilename || pFilename[0] == '\0' )
 	{
 		Warning( "VideoPanel::BeginPlayback() - Invalid Filename!: %s\n", pFilename );
 		return false;
@@ -266,7 +269,8 @@ bool VideoPanel::BeginPlayback( const char *pFilename )
 	m_pMaterial = NULL;
 
 	// Check if its anything other than .bik, if not, use the old bink system
-	bool bIsBIK = !Q_stricmp( Q_GetFileExtension( pFilename ), "bik" );
+	const char *pExt = Q_GetFileExtension( pFilename );
+	bool bIsBIK = (pExt && !Q_stricmp( pExt, "bik" ));
 
 	// need working video services
 	if ( g_pVideo == NULL )
@@ -289,7 +293,7 @@ bool VideoPanel::BeginPlayback( const char *pFilename )
 
 		// only preload the transition videos
 		// in-game videos are precached with aan alternate system
-		if (  m_bShouldPreload )
+		if ( m_bShouldPreload )
 			nFlags |= BIK_PRELOAD;
 
 		char szMaterialName[ FILENAME_MAX ];
@@ -375,8 +379,8 @@ void VideoPanel::StopPlayback( bool bTerminate )
 		{
 			bik->DestroyMaterial( m_BIKHandle );
 			m_BIKHandle = BIKHANDLE_INVALID;
-			m_pMaterial = NULL;
 		}
+		m_pMaterial = NULL;
 	}
 }
 
@@ -506,6 +510,7 @@ void VideoPanel::Paint( void )
 	// If its not a IMovie, check for BIK
 	if ( m_VideoMaterial == NULL )
 	{
+		// No video to play, so do nothing
 		if ( m_BIKHandle == BIKHANDLE_INVALID || m_pMaterial == NULL )
 			return;
 	}
@@ -513,8 +518,15 @@ void VideoPanel::Paint( void )
 	// Update our frame, but only if Bink is ready for us to process another frame.
 	// We aren't really swapping here, but ReadyForSwap is a good way to throttle.
 	// We'd rather throttle this way so that we don't limit the overall frame rate of the system.
-	if ( m_VideoMaterial->Update() == false && bik->Update( m_BIKHandle ) == false )
+	if ( m_VideoMaterial && m_VideoMaterial->Update() == false )
 		OnVideoOver();	// Issue a close command
+
+	if ( bik->Update( m_BIKHandle ) == false )
+	{
+		// Issue a close command
+		OnVideoOver();
+		OnClose();
+	}
 
 	// Sit in the "center"
 	int xpos, ypos;
@@ -651,8 +663,12 @@ bool VideoPanel_Create( unsigned int nXPos, unsigned int nYPos,
 	// Start it going
 	if ( pVideoPanel->BeginPlayback( pVideoFilename ) == false )
 	{
-		delete pVideoPanel;
-		return false;
+		pVideoPanel->SetParent( (vgui::Panel *)NULL );
+	//!	delete pVideoPanel;	//Was here in old code, but returns a BAD error, memory related -MM
+	//!	return false;
+
+		// For now, just use the normal termination, even if that results in 1 frame of missing texture... -MM
+		pVideoPanel->StopPlayback(true);
 	}
 
 	pVideoPanel->SetFadeInTime( flFadeInTime );
@@ -691,6 +707,7 @@ void CreateVideoPanel( const char *lpszFilename, const char *lpszExitCommand, in
 	if ( VideoPanel_Create( 0, 0, nScreenWidth, nScreenHeight, strFullpath, lpszExitCommand, nAllowInterruption, flFadeTime, bLoop ) == false )
 	{
 		Warning( "Unable to play video: %s\n", strFullpath );
+		engine->ClientCmd( lpszExitCommand );
 	}
 }
 

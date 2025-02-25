@@ -1,7 +1,8 @@
 //========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
 //
-// Purpose: 
+// Purpose: Squad hud
 //
+// TODO; The squad icon color should change depending on member health
 //=============================================================================//
 
 #include "cbase.h"
@@ -17,8 +18,6 @@
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
-
-ConVar player_squad_transient_commands( "player_squad_transient_commands", "1", FCVAR_REPLICATED );
 
 //-----------------------------------------------------------------------------
 // Purpose: Shows the sprint power bar
@@ -256,14 +255,10 @@ void CHudSquadStatus::Paint()
 	}
 	else
 	{
-		if ( !player_squad_transient_commands.GetBool() )
+		text = g_pVGuiLocalize->Find("#Valve_Hud_SQUAD_STATIONED");
+		if (!text)
 		{
-			text = g_pVGuiLocalize->Find("#Valve_Hud_SQUAD_STATIONED");
-
-			if (!text)
-			{
-				text = L"SQUAD STATIONED";
-			}
+			text = L"SQUAD STATIONED";
 		}
 	}
 

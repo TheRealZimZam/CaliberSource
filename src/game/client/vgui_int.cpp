@@ -149,8 +149,8 @@ bool VGui_Startup( CreateInterfaceFn appSystemFactory )
 	}
 
 		//Tony; add localization for the specific SDK.
-#if defined( SP_SDK )
-	g_pVGuiLocalize->AddFile( "resource/ep2_%language%.txt", "GAME" );
+#if defined( SP_SDK ) || defined( HL2_EPISODIC )
+	g_pVGuiLocalize->AddFile( "resource/episodic_%language%.txt", "GAME" );
 #elif defined( MP_SDK )
 	g_pVGuiLocalize->AddFile( "resource/hl2mp_%language%.txt", "GAME" );
 #elif defined ( SDK_DLL )

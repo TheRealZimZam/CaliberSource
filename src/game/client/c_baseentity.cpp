@@ -1929,17 +1929,14 @@ int C_BaseEntity::DrawModel( int flags )
 		break;
 	case mod_studio:
 		// All studio models must be derived from C_BaseAnimating.  Issue warning.
-		Warning( "ERROR: Can't draw studio model %s because %s is not derived from C_BaseAnimating\n",
+		Warning( "ERROR: Can't draw Studio model %s because %s is not derived from C_BaseAnimating\n",
 			modelinfo->GetModelName( model ), GetClientClass()->m_pNetworkName ? GetClientClass()->m_pNetworkName : "unknown" );
 		break;
 	case mod_sprite:
-		//!!! TODO;
-		Warning( "ERROR: Can't draw model %s because Sprite model's are not supported yet\n", modelinfo->GetModelName( model ) );
+	//	Warning( "ERROR: Can't draw Sprite model %s because %s is not derived from C_BaseAnimating\n", 
+	//		modelinfo->GetModelName( model ), GetClientClass()->m_pNetworkName ? GetClientClass()->m_pNetworkName : "unknown" ) );
 
-		//!!TODOFIXME; Need this working, sooner rather than later! Really need this for alot of things,
-		// weapons (flamethrower, etc.), old-style sprite enemies (doom secret level), etc.
-		// ---------------------------------------------------------------------------------------
-/*
+#if 0
 // The way legacy ents/sprite.cpp does it
 		drawn = DrawSprite( 
 			this,
@@ -1957,16 +1954,14 @@ int C_BaseEntity::DrawModel( int flags )
 			m_clrRender->b,
 			1		  // sprite scale
 			);
-*/
-/*
-		// I'm not sure if this is right?? This isnt used ANYWHERE else. in-fact,
-		// almost all of entity_client_tools is completely unused in the code. I tried
-		// the way legacytempents does it but that didnt want to work either, even including sprite.h -M.M
+#else
+
+		// Only entites not inheriting from baseanimating use this i.e logic entities, etc.
 		drawn = clienttools->DrawSprite( GetClientRenderable(), 1, m_iTextureFrameIndex,
 										m_nRenderMode, m_nRenderFX,
-										GetRenderColor(), 
+										Color(m_clrRender->r, m_clrRender->g, m_clrRender->b, m_clrRender->a), 
 										NULL, NULL );
-*/
+#endif
 		break;
 	default:
 		break;

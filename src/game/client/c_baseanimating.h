@@ -12,7 +12,12 @@
 #pragma once
 #endif
 
+#define BASEANIMATING_USES_SPRITES 1
+
 #include "c_baseentity.h"
+#if BASEANIMATING_USES_SPRITES
+#include "c_sprite.h"
+#endif
 #include "studio.h"
 #include "UtlVector.h"
 #include "ragdoll.h"
@@ -88,6 +93,9 @@ typedef unsigned int			ClientSideAnimationListHandle_t;
 
 
 class C_BaseAnimating : public C_BaseEntity
+#if BASEANIMATING_USES_SPRITES
+	, public C_SpriteRenderer
+#endif
 {
 public:
 	DECLARE_CLASS( C_BaseAnimating, C_BaseEntity );
@@ -160,12 +168,10 @@ public:
 	virtual void FireEvent( const Vector& origin, const QAngle& angles, int event, const char *options );
 	virtual void FireObsoleteEvent( const Vector& origin, const QAngle& angles, int event, const char *options );
 
-#if defined ( SDK_DLL ) || defined ( HL2MP )
 	virtual void ResetEventsParity() { m_nPrevResetEventsParity = -1; } // used to force animation events to function on players so the muzzleflashes and other events occur
 																		// so new functions don't have to be made to parse the models like CSS does in ProcessMuzzleFlashEvent
 																		// allows the multiplayer world weapon models to declare the muzzleflashes, and other effects like sp
 																		// without the need to script it and add extra parsing code.
-#endif
 
 	// Parses and distributes muzzle flash events
 	virtual bool DispatchMuzzleEffect( const char *options, bool isFirstPerson );

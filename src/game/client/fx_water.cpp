@@ -23,6 +23,7 @@
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheEffectSplash )
 CLIENTEFFECT_MATERIAL( "effects/splash1" )
 CLIENTEFFECT_MATERIAL( "effects/splash2" )
+CLIENTEFFECT_MATERIAL( "effects/splash3" )
 CLIENTEFFECT_MATERIAL( "effects/splash4" )
 CLIENTEFFECT_MATERIAL( "effects/slime1" )
 CLIENTEFFECT_REGISTER_END()
@@ -174,8 +175,9 @@ void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale, Ve
 	sparkEmitter->SetVelocityDampen( 2.0f );
 	sparkEmitter->GetBinding().SetBBox( origin - Vector( 32, 32, 32 ), origin + Vector( 32, 32, 32 ) );
 
-	PMaterialHandle	hMaterial = ParticleMgr()->GetPMaterial( "effects/splash2" );
-	PMaterialHandle	hMaterial2 = ParticleMgr()->GetPMaterial( "effects/splash1" );
+	PMaterialHandle	hMaterial = ParticleMgr()->GetPMaterial( "effects/splash2" );	// Drops
+	PMaterialHandle	hMaterial2 = ParticleMgr()->GetPMaterial( "effects/splash1" );	// Gout
+//	PMaterialHandle	hMaterial3 = ParticleMgr()->GetPMaterial( "effects/splash3" );	// Backing
 
 	TrailParticle	*tParticle;
 
@@ -277,6 +279,67 @@ void FX_WaterSplash( const Vector &origin, const Vector &normal, float scale, Ve
 
 
 		C_BaseEntity::EmitSound( filter, SOUND_FROM_WORLD, ep );
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void FX_WaterMist( const Vector &origin, float scale, Vector *pColor, float flAlpha )
+{
+	//!!TODO; This is just a stripped clone of splash for now
+
+	if ( cl_show_splashes.GetBool() == false )
+		return;
+
+	VPROF_BUDGET( "FX_WaterMist", VPROF_BUDGETGROUP_PARTICLE_RENDERING );
+
+	float colorRamp;
+	Vector color = pColor ? *pColor : Vector( 0.85f, 0.85f, 0.85f );
+	float flScale = scale / 8.0f;
+
+	if ( flScale > 6.0f )
+		flScale = 6.0f;
+
+	// Setup the particle emitter
+	PMaterialHandle	hMaterial = ParticleMgr()->GetPMaterial( "effects/splash1" );
+	CSmartPtr<CSplashParticle> pSimple = CSplashParticle::Create( "mist" );
+	pSimple->SetSortOrigin( origin );
+	pSimple->SetClipHeight( origin.z );
+	pSimple->SetParticleCullRadius( scale * 2.0f );
+	pSimple->GetBinding().SetBBox( origin - Vector( 32, 32, 32 ), origin + Vector( 32, 32, 32 ) );
+
+	SimpleParticle	*pParticle;
+
+	// Misty spray
+	for ( int i = 0; i < 4; i++ )
+	{
+		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial, origin );
+
+		if ( pParticle == NULL )
+			break;
+
+		pParticle->m_flLifetime = 0.0f;
+		pParticle->m_flDieTime	= 1 + i;	// Make the last particle fade slowest
+
+		pParticle->m_vecVelocity.Random( -0.2f, 0.2f );
+		VectorNormalize( pParticle->m_vecVelocity );
+		pParticle->m_vecVelocity *= 5 * flScale * (8-i);
+		
+		colorRamp = random->RandomFloat( 0.75f, 1.25f );
+
+		pParticle->m_uchColor[0]	= min( 1.0f, color[0] * colorRamp ) * 255.0f;
+		pParticle->m_uchColor[1]	= min( 1.0f, color[1] * colorRamp ) * 255.0f;
+		pParticle->m_uchColor[2]	= min( 1.0f, color[2] * colorRamp ) * 255.0f;
+		
+		pParticle->m_uchStartSize	= 24 * flScale * RemapValClamped( i, 7, 0, 1, 0.5f );
+		pParticle->m_uchEndSize		= min( 255, pParticle->m_uchStartSize * 2 );
+		
+		pParticle->m_uchStartAlpha	= RemapValClamped( i, 7, 0, 255, 32 ) * flAlpha;
+		pParticle->m_uchEndAlpha	= 0;
+		
+		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+		pParticle->m_flRollDelta	= random->RandomFloat( -4.0f, 4.0f );
 	}
 }
 
@@ -455,7 +518,7 @@ void FX_BulletSplash( const Vector &origin, const Vector &normal, float scale, b
 	SimpleParticle	*pParticle;
 
 	//Main gout
-	for ( int i = 0; i < 8; i++ )
+	for ( int i = 0; i < 4; i++ )
 	{
 		pParticle = (SimpleParticle *) pSimple->AddParticle( sizeof( SimpleParticle ), hMaterial, origin );
 
@@ -646,6 +709,20 @@ void SplashCallback( const CEffectData &data )
 
 DECLARE_CLIENT_EFFECT( "watersplash", SplashCallback );
 
+void MistCallback( const CEffectData &data )
+{
+	Vector	normal;
+	Vector	color;
+	float	luminosity;
+
+	// Get our lighting information
+	FX_GetSplashLighting( data.m_vOrigin + ( data.m_vNormal * data.m_flScale ), &color, &luminosity );
+	AngleVectors( data.m_vAngles, &normal );
+
+	FX_WaterMist( data.m_vOrigin, data.m_flScale, &color, luminosity );
+}
+
+DECLARE_CLIENT_EFFECT( "watermist", MistCallback );
 
 //-----------------------------------------------------------------------------
 // Purpose: 

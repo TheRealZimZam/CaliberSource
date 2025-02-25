@@ -28,7 +28,7 @@
 #ifndef _XBOX
 ConVar hud_chat_saytext_time( "hud_chat_saytext_time", "10", 0 );
 ConVar hud_chat_time( "hud_chat_time", "8", 0 );
-ConVar cl_showtextmsg( "cl_showtextmsg", "1", 0, "Enable/disable text messages printing on the screen." );
+ConVar hud_chat( "hud_chat", "1", 0, "Enable/disable the chat." );
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -408,7 +408,7 @@ bool CBaseHudChat::ShouldDraw()
 	if ( m_flFadeTime <= 0 )
 		return false;
 
-	return cl_showtextmsg.GetBool();
+	return hud_chat.GetBool();
 }
 
 void CBaseHudChat::Paint( void )

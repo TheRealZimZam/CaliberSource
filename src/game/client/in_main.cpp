@@ -949,9 +949,7 @@ void CInput::ExtraMouseSample( float frametime, bool active )
 {
 	CUserCmd dummy;
 	CUserCmd *cmd = &dummy;
-
 	cmd->Reset();
-
 
 	QAngle viewangles;
 
@@ -1003,7 +1001,7 @@ void CInput::ExtraMouseSample( float frametime, bool active )
 	}
 }
 
-void CInput::CreateMove ( int sequence_number, float input_sample_frametime, bool active )
+void CInput::CreateMove( int sequence_number, float input_sample_frametime, bool active )
 {	
 	CUserCmd *cmd = &m_pCommands[ sequence_number % MULTIPLAYER_BACKUP ];
 	CVerifiedUserCmd *pVerified = &m_pVerifiedCommands[ sequence_number % MULTIPLAYER_BACKUP ];
@@ -1461,8 +1459,7 @@ static ConCommand endgrenade1( "-grenade1", IN_Grenade1Up );
 static ConCommand startgrenade1( "+grenade1", IN_Grenade1Down );
 static ConCommand endgrenade2( "-grenade2", IN_Grenade2Up );
 static ConCommand startgrenade2( "+grenade2", IN_Grenade2Down );
-
-#ifdef TF_CLIENT_DLL
+#ifndef HL2_EPISODIC
 static ConCommand toggle_duck( "toggle_duck", IN_DuckToggle );
 #endif
 

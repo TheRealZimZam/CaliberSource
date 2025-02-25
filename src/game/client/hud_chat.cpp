@@ -11,7 +11,7 @@
 #include "engine/IEngineSound.h"
 #include "vguicenterprint.h"
 
-extern ConVar cl_showtextmsg;
+ConVar cl_showtextmsg( "cl_showtextmsg", "1", 0, "Enable/disable text messages printing on the screen." );
 
 // converts all '\r' characters to '\n', so that the engine can deal with the properly
 // returns a pointer to str
@@ -124,11 +124,12 @@ void CHudChat::MsgFunc_TextMsg( bf_read &msg )
 	if ( !cl_showtextmsg.GetBool() )
 		return;
 
+	Color cColor = GetFgColor();
 	switch ( msg_dest )
 	{
 	case HUD_PRINTCENTER:
 		Q_snprintf( psz, sizeof( szBuf[5] ), msg_text, sstr1, sstr2, sstr3, sstr4 );
-		internalCenterPrint->Print( ConvertCRtoNL( psz ) );
+		internalCenterPrint->ColorPrint( cColor.r(), cColor.g(), cColor.b(), 255, ConvertCRtoNL( psz ) );
 		break;
 
 	case HUD_PRINTNOTIFY:
@@ -139,7 +140,7 @@ void CHudChat::MsgFunc_TextMsg( bf_read &msg )
 
 	case HUD_PRINTTALK:
 		Q_snprintf( psz, sizeof( szBuf[5] ), msg_text, sstr1, sstr2, sstr3, sstr4 );
-		Printf( CHAT_FILTER_NONE, "%s", ConvertCRtoNL( psz ) );
+		Printf( CHAT_FILTER_SERVERMSG, "%s", ConvertCRtoNL( psz ) );
 		break;
 
 	case HUD_PRINTCONSOLE:

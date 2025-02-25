@@ -234,8 +234,30 @@ void LeakEffect( trace_t &tr )
 	Vector			vTraceEnd	= tr.endpos + 0.1*vTraceDir;
 	IMaterial*		pTraceMaterial = engine->TraceLineMaterialAndLighting( vTraceStart, vTraceEnd, diffuseColor, baseColor );
 
+	//FIXME; Added a basic test to see if im coming from an entity, but it doesnt update the postion!
+	// This works for static entities like func_break, but looks really bad on pushables, trains, etc. 
+	// Need to fix this ASAP! -MM
 	if (!pTraceMaterial)
-		return;
+	{
+		//No trace from the world, test to see if im coming from an entity, if i am use its lighting!
+		// TODO; This doesnt work for static props, only dynamic/brush entities!
+		C_BaseEntity *pEnt = tr.m_pEnt;
+		if ( !pEnt )
+			return;
+
+		// Ask the model info about what we need to know
+		ICollideable *pCollide = pEnt->GetCollideable();
+		int modelIndex = pCollide->GetCollisionModelIndex();
+		model_t* pModel = const_cast<model_t*>(modelinfo->GetModel( modelIndex ));
+
+		modelinfo->GetModelMaterialColorAndLighting( pModel, pCollide->GetCollisionOrigin(),
+			pCollide->GetCollisionAngles(), &tr, diffuseColor, baseColor );
+		modelinfo->GetModelMaterials( pModel, 1, &pTraceMaterial );
+
+		// Still no data, stomp it dead...
+		if(!pTraceMaterial)
+			return;
+	}
 
 	bool			found;
 	IMaterialVar	*pLeakVar = pTraceMaterial->FindVar( "$leakamount", &found, false );
@@ -293,7 +315,7 @@ void LeakEffect( trace_t &tr )
 		pLeak->m_flStopEmitTime	= gpGlobals->curtime+5.0;
 
 	pLeak->Start(ParticleMgr(), NULL);
-	pLeak->SetNextClientThink(gpGlobals->curtime+20.0);	//Remove thyself after 20 seconds
+	pLeak->SetNextClientThink(gpGlobals->curtime+(pLeak->m_flStopEmitTime+5.0));	//Remove thyself 5 seconds after the stop emit time
 }
 
 //-----------------------------------------------------------------------------

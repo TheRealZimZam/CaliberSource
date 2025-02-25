@@ -23,7 +23,7 @@
 #include "tier0/memdbgon.h"
 
 //Tony; modified so that the sdk view models are right handed out of the box.
-#if defined( CSTRIKE_DLL ) || defined( SDK_DLL )
+#if defined( CSTRIKE_DLL ) || defined( CALIBER_DLL )
 	ConVar cl_righthand( "cl_righthand", "1", FCVAR_ARCHIVE, "Use right-handed view models." );
 #endif
 
@@ -175,12 +175,12 @@ bool C_BaseViewModel::Interpolate( float currentTime )
 inline bool C_BaseViewModel::ShouldFlipViewModel()
 {
 //Tony; changed for SDK so that the CSS models can be flipped out of the box.
-#if defined( CSTRIKE_DLL ) || defined ( SDK_DLL )
-	//Tony; move this up here.
+#if defined( CSTRIKE_DLL ) || defined ( CALIBER_DLL )
+	// If cl_righthand is 0, then we want them all flipped.
 	if (!cl_righthand.GetBool())
-		return false;
+		return true;
 
-	// If cl_righthand is set, then we want them all right-handed.
+	// Otherwise check the weapon info
 	CBaseCombatWeapon *pWeapon = m_hWeapon.Get();
 	if ( pWeapon )
 	{
@@ -192,7 +192,7 @@ inline bool C_BaseViewModel::ShouldFlipViewModel()
 		return pInfo->m_bAllowFlipping;
 	}
 #endif
-	
+
 	return false;
 }
 

@@ -788,8 +788,8 @@ int CViewRenderBeams::CullBeam( const Vector &start, const Vector &end, int pvsO
 		}
 	}
 
-	// Check bbox
-	if ( engine->IsBoxVisible( mins, maxs ) )
+	// Check bbox, or if in skybox
+	if ( engine->IsBoxVisible( mins, maxs ) || engine->IsSkyboxVisibleFromPoint( start ) )
 	{
 		if ( pvsOnly || !engine->CullBox( mins, maxs ) )
 		{

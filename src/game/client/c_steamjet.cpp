@@ -17,6 +17,7 @@
 //NOTENOTE: Mirrored in dlls\steamjet.h
 #define	STEAM_NORMAL	0
 #define	STEAM_HEATWAVE	1
+#define	STEAM_FIRE		2
 
 #define STEAMJET_NUMRAMPS			5
 #define SF_EMISSIVE					0x00000001
@@ -199,6 +200,10 @@ void C_SteamJet::Start(CParticleMgr *pParticleMgr, IPrototypeArgAccess *pArgs)
 
 	case STEAM_HEATWAVE:
 		m_MaterialHandle = m_ParticleEffect.FindOrAddMaterial("sprites/heatwave");
+		break;
+
+	case STEAM_FIRE:
+		m_MaterialHandle = m_ParticleEffect.FindOrAddMaterial("sprites/xfireball3");
 		break;
 	}
 

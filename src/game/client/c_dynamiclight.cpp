@@ -232,6 +232,6 @@ void C_DynamicLight::ClientThink(void)
 		}
 	}
 
-	SetNextClientThink(gpGlobals->curtime + 0.001);
+	SetNextClientThink(gpGlobals->curtime + 0.01);	//0.001
 }
 

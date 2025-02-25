@@ -56,6 +56,7 @@ public:
 	float	m_flMinPropScreenSpaceWidth;
 	float	m_flMaxPropScreenSpaceWidth;
 	bool	m_bColdWorld;
+	int		m_iTimeOfDay;
 
 private:
 	void	RegisterSharedActivities( void );

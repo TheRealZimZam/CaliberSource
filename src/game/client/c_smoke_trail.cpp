@@ -286,6 +286,7 @@ void C_SmokeTrail::Update( float fTimeDelta )
 	if ( !m_bEmit )
 		return;
 
+#if 1
 	if ( ( m_StopEmitTime != 0 ) && ( m_StopEmitTime <= gpGlobals->curtime ) )
 		return;
 
@@ -355,6 +356,59 @@ void C_SmokeTrail::Update( float fTimeDelta )
 		pParticle->m_flRoll			= random->RandomInt( 0, 360 );
 		pParticle->m_flRollDelta	= random->RandomFloat( -1.0f, 1.0f );
     }
+#else
+	// Add new particles
+	if ( ( m_StopEmitTime == 0 ) || ( m_StopEmitTime > gpGlobals->curtime ) )
+	{
+		float tempDelta = fTimeDelta;
+
+		SimpleParticle	*pParticle;
+		Vector			offset;
+
+		while( m_ParticleSpawn.NextEvent( tempDelta ) )
+		{
+			offset.Random( -m_SpawnRadius, m_SpawnRadius );
+			offset += GetAbsOrigin();
+
+			pParticle = (SimpleParticle *) m_pSmokeEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,2)], offset );
+
+			if ( pParticle != NULL )
+			{
+				pParticle->m_flLifetime		= 0.0f;
+				pParticle->m_flDieTime		= m_ParticleLifetime;
+
+				pParticle->m_vecVelocity.Random( -1.0f, 1.0f );
+				pParticle->m_vecVelocity *= random->RandomFloat( m_MinSpeed, m_MaxSpeed );
+					
+				offsetColor = m_StartColor * random->RandomFloat( 0.5f, 1.5f );
+
+				offsetColor[0] = clamp( offsetColor[0], 0.0f, 1.0f );
+				offsetColor[1] = clamp( offsetColor[1], 0.0f, 1.0f );
+				offsetColor[2] = clamp( offsetColor[2], 0.0f, 1.0f );
+
+				pParticle->m_uchColor[0]	= offsetColor[0]*255.0f;
+				pParticle->m_uchColor[1]	= offsetColor[1]*255.0f;
+				pParticle->m_uchColor[2]	= offsetColor[2]*255.0f;
+					
+				pParticle->m_uchStartSize	= m_StartSize;
+				pParticle->m_uchEndSize		= m_EndSize;
+					
+				float alpha = random->RandomFloat( m_Opacity*0.75f, m_Opacity*1.25f );
+
+				if ( alpha > 1.0f )
+					alpha = 1.0f;
+				if ( alpha < 0.0f )
+					alpha = 0.0f;
+
+				pParticle->m_uchStartAlpha	= alpha * 255; 
+				pParticle->m_uchEndAlpha	= 0;
+					
+				pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+				pParticle->m_flRollDelta	= random->RandomFloat( -1.0f, 1.0f );
+			}
+		}
+	}
+#endif
 }
 
 
@@ -664,6 +718,9 @@ void C_RocketTrail::Update( float fTimeDelta )
 	if ( gpGlobals->frametime == 0.0f )
 		return;
 
+	if ( ( m_StopEmitTime != 0 ) && ( m_StopEmitTime <= gpGlobals->curtime ) )
+		return;
+
 	CSmartPtr<CSimpleEmitter> pSimple = CSimpleEmitter::Create( "MuzzleFlash" );
 	pSimple->SetSortOrigin( GetAbsOrigin() );
 	
@@ -679,9 +736,7 @@ void C_RocketTrail::Update( float fTimeDelta )
 	//
 	// Flash
 	//
-
 	int i;
-
 	for ( i = 1; i < 9; i++ )
 	{
 		offset = GetAbsOrigin() + (forward * (i*2.0f*m_flFlareScale));
@@ -710,114 +765,119 @@ void C_RocketTrail::Update( float fTimeDelta )
 	}
 
 	// Add new particles (undamaged version)
-	if ( m_bEmit )
+	while( m_ParticleSpawn.NextEvent( fTimeDelta ) )
 	{
-		Vector	moveDiff	= GetAbsOrigin() - m_vecLastPosition;
-		float	moveLength	= VectorNormalize( moveDiff );
-
-		int	numPuffs = moveLength / ( m_StartSize / 2.0f );
-
-		//debugoverlay->AddLineOverlay( m_vecLastPosition, GetAbsOrigin(), 255, 0, 0, true, 2.0f ); 
-		
-		//FIXME: More rational cap here, perhaps
-		if ( numPuffs > 50 )
-			numPuffs = 50;
-
-		Vector			offsetColor;
-		float			step = moveLength / numPuffs;
-
-		//Fill in the gaps
-		for ( i = 1; i < numPuffs+1; i++ )
+		if ( m_bEmit )
 		{
-			offset = m_vecLastPosition + ( moveDiff * step * i );
+			Vector	moveDiff	= GetAbsOrigin() - m_vecLastPosition;
+			float	moveLength	= VectorNormalize( moveDiff );
 
-			//debugoverlay->AddBoxOverlay( offset, -Vector(2,2,2), Vector(2,2,2), vec3_angle, i*4, i*4, i*4, true, 4.0f );
+			int	numPuffs = 1 + (moveLength / ( m_StartSize / 2.0f ));
+
+			//debugoverlay->AddLineOverlay( m_vecLastPosition, GetAbsOrigin(), 255, 0, 0, true, 2.0f ); 
 			
-			pParticle = (SimpleParticle *) m_pRocketEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,2)], offset );
+			//FIXME: More rational cap here, perhaps
+			// FIX'D; This is now how many puffs are made at once, which really shouldnt be
+			// more than 25 - M.M
+			if ( numPuffs > 25 )
+				numPuffs = 25;
 
-			if ( pParticle != NULL )
+			Vector			offsetColor;
+			float			step = moveLength / numPuffs;
+
+			//Fill in the gaps
+			for ( i = 1; i < numPuffs+1; i++ )
 			{
-				pParticle->m_flLifetime		= 0.0f;
-				pParticle->m_flDieTime		= m_ParticleLifetime + random->RandomFloat(m_ParticleLifetime*0.9f,m_ParticleLifetime*1.1f);
+				offset = m_vecLastPosition + ( moveDiff * step * i );
 
-				pParticle->m_vecVelocity.Random( -1.0f, 1.0f );
-				pParticle->m_vecVelocity *= random->RandomFloat( m_MinSpeed, m_MaxSpeed );
-
-				//TODO; This smoke needs to be a bit darker-exhaust smoke isnt white
-				offsetColor = m_StartColor * random->RandomFloat( 0.75f, 1.25f );
-
-				offsetColor[0] = clamp( offsetColor[0], 0.0f, 1.0f );
-				offsetColor[1] = clamp( offsetColor[1], 0.0f, 1.0f );
-				offsetColor[2] = clamp( offsetColor[2], 0.0f, 1.0f );
-
-				pParticle->m_uchColor[0]	= offsetColor[0]*255.0f;
-				pParticle->m_uchColor[1]	= offsetColor[1]*255.0f;
-				pParticle->m_uchColor[2]	= offsetColor[2]*255.0f;
+				//debugoverlay->AddBoxOverlay( offset, -Vector(2,2,2), Vector(2,2,2), vec3_angle, i*4, i*4, i*4, true, 4.0f );
 				
-				pParticle->m_uchStartSize	= m_StartSize * random->RandomFloat( 0.75f, 1.25f );
-				pParticle->m_uchEndSize		= m_EndSize * random->RandomFloat( 1.0f, 1.25f );
-				
-				float alpha = random->RandomFloat( m_Opacity*0.75f, m_Opacity*1.25f );
+				pParticle = (SimpleParticle *) m_pRocketEmitter->AddParticle( sizeof( SimpleParticle ), m_MaterialHandle[random->RandomInt(0,2)], offset );
 
-				if ( alpha > 1.0f )
-					alpha = 1.0f;
-				if ( alpha < 0.0f )
-					alpha = 0.0f;
+				if ( pParticle != NULL )
+				{
+					pParticle->m_flLifetime		= 0.0f;
+					pParticle->m_flDieTime		= m_ParticleLifetime + random->RandomFloat(m_ParticleLifetime*0.9f,m_ParticleLifetime*1.1f);
 
-				pParticle->m_uchStartAlpha	= alpha * 255; 
-				pParticle->m_uchEndAlpha	= 0;
-				
-				pParticle->m_flRoll			= random->RandomInt( 0, 360 );
-				pParticle->m_flRollDelta	= random->RandomFloat( -8.0f, 8.0f );
+					pParticle->m_vecVelocity.Random( -1.0f, 1.0f );
+					pParticle->m_vecVelocity *= random->RandomFloat( m_MinSpeed, m_MaxSpeed );
+
+					//TODO; This smoke needs to be a bit darker-exhaust smoke isnt white
+					offsetColor = m_StartColor * random->RandomFloat( 0.75f, 1.25f );
+
+					offsetColor[0] = clamp( offsetColor[0], 0.0f, 1.0f );
+					offsetColor[1] = clamp( offsetColor[1], 0.0f, 1.0f );
+					offsetColor[2] = clamp( offsetColor[2], 0.0f, 1.0f );
+
+					pParticle->m_uchColor[0]	= offsetColor[0]*255.0f;
+					pParticle->m_uchColor[1]	= offsetColor[1]*255.0f;
+					pParticle->m_uchColor[2]	= offsetColor[2]*255.0f;
+					
+					pParticle->m_uchStartSize	= m_StartSize * random->RandomFloat( 0.75f, 1.25f );
+					pParticle->m_uchEndSize		= m_EndSize * random->RandomFloat( 1.0f, 1.25f );
+					
+					float alpha = random->RandomFloat( m_Opacity*0.75f, m_Opacity*1.25f );
+
+					if ( alpha > 1.0f )
+						alpha = 1.0f;
+					if ( alpha < 0.0f )
+						alpha = 0.0f;
+
+					pParticle->m_uchStartAlpha	= alpha * 255; 
+					pParticle->m_uchEndAlpha	= 0;
+					
+					pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+					pParticle->m_flRollDelta	= random->RandomFloat( -8.0f, 8.0f );
+				}
 			}
 		}
-	}
-	
-	if ( m_bDamaged )
-	{
-		SimpleParticle	*pParticle;
-		Vector			offset;
-		Vector			offsetColor;
-
-		CSmartPtr<CEmberEffect>	pEmitter = CEmberEffect::Create("C_RocketTrail::damaged");
-
-		pEmitter->SetSortOrigin( GetAbsOrigin() );
-
-		PMaterialHandle flameMaterial = m_pRocketEmitter->GetPMaterial( VarArgs( "sprites/flamelet%d", random->RandomInt( 1, 4 ) ) );
 		
-		// Flames from the rocket
-		for ( i = 0; i < 8; i++ )
+		if ( m_bDamaged )
 		{
-			offset = RandomVector( -8, 8 ) + GetAbsOrigin();
+			SimpleParticle	*pParticle;
+			Vector			offset;
+			Vector			offsetColor;
 
-			pParticle = (SimpleParticle *) pEmitter->AddParticle( sizeof( SimpleParticle ), flameMaterial, offset );
+			CSmartPtr<CEmberEffect>	pEmitter = CEmberEffect::Create("C_RocketTrail::damaged");
 
-			if ( pParticle != NULL )
+			pEmitter->SetSortOrigin( GetAbsOrigin() );
+
+			PMaterialHandle flameMaterial = m_pRocketEmitter->GetPMaterial( VarArgs( "sprites/flamelet%d", random->RandomInt( 1, 4 ) ) );
+			
+			// Flames from the rocket
+			for ( i = 0; i < 8; i++ )
 			{
-				pParticle->m_flLifetime		= 0.0f;
-				pParticle->m_flDieTime		= 0.25f;
+				offset = RandomVector( -8, 8 ) + GetAbsOrigin();
 
-				pParticle->m_vecVelocity.Random( -1.0f, 1.0f );
-				pParticle->m_vecVelocity *= random->RandomFloat( 32, 128 );
-				
-				offsetColor = m_StartColor * random->RandomFloat( 0.75f, 1.25f );
+				pParticle = (SimpleParticle *) pEmitter->AddParticle( sizeof( SimpleParticle ), flameMaterial, offset );
 
-				offsetColor[0] = clamp( offsetColor[0], 0.0f, 1.0f );
-				offsetColor[1] = clamp( offsetColor[1], 0.0f, 1.0f );
-				offsetColor[2] = clamp( offsetColor[2], 0.0f, 1.0f );
+				if ( pParticle != NULL )
+				{
+					pParticle->m_flLifetime		= 0.0f;
+					pParticle->m_flDieTime		= 0.25f;
 
-				pParticle->m_uchColor[0]	= offsetColor[0]*255.0f;
-				pParticle->m_uchColor[1]	= offsetColor[1]*255.0f;
-				pParticle->m_uchColor[2]	= offsetColor[2]*255.0f;
-				
-				pParticle->m_uchStartSize	= 8.0f;
-				pParticle->m_uchEndSize		= 32.0f;
-				
-				pParticle->m_uchStartAlpha	= 255;
-				pParticle->m_uchEndAlpha	= 0;
-				
-				pParticle->m_flRoll			= random->RandomInt( 0, 360 );
-				pParticle->m_flRollDelta	= random->RandomFloat( -8.0f, 8.0f );
+					pParticle->m_vecVelocity.Random( -1.0f, 1.0f );
+					pParticle->m_vecVelocity *= random->RandomFloat( 32, 128 );
+					
+					offsetColor = m_StartColor * random->RandomFloat( 0.75f, 1.25f );
+
+					offsetColor[0] = clamp( offsetColor[0], 0.0f, 1.0f );
+					offsetColor[1] = clamp( offsetColor[1], 0.0f, 1.0f );
+					offsetColor[2] = clamp( offsetColor[2], 0.0f, 1.0f );
+
+					pParticle->m_uchColor[0]	= offsetColor[0]*255.0f;
+					pParticle->m_uchColor[1]	= offsetColor[1]*255.0f;
+					pParticle->m_uchColor[2]	= offsetColor[2]*255.0f;
+					
+					pParticle->m_uchStartSize	= 8.0f;
+					pParticle->m_uchEndSize		= 32.0f;
+					
+					pParticle->m_uchStartAlpha	= 255;
+					pParticle->m_uchEndAlpha	= 0;
+					
+					pParticle->m_flRoll			= random->RandomInt( 0, 360 );
+					pParticle->m_flRollDelta	= random->RandomFloat( -8.0f, 8.0f );
+				}
 			}
 		}
 	}
@@ -1502,7 +1562,7 @@ void C_FireTrail::Update( float fTimeDelta )
 #define	MAX_SPEED			64
 
 	// Add new particles
-	//if ( ShouldEmit() )
+	if ( ShouldEmit() )
 	{
 		Vector	moveDiff	= GetAbsOrigin() - m_vecLastPosition;
 		float	moveLength	= VectorNormalize( moveDiff );

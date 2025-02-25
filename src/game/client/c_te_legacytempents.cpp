@@ -1243,7 +1243,7 @@ C_LocalTempEntity *CTempEnts::TempSprite( const Vector &pos, const Vector &dir, 
 	pTemp->SetVelocity( dir );
 	pTemp->SetLocalOrigin( pos );
 	//If its an animated sprite, do framerate - if its not animated, then use framerate as lifetime
-	if ( frameCount < 1 )
+	if ( frameCount <= 1 )
 		pTemp->die = gpGlobals->curtime + framerate;
 	else
 		pTemp->die = gpGlobals->curtime + (frameCount * 0.1) + 1;

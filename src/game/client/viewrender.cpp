@@ -2308,7 +2308,7 @@ void CViewRender::DrawWorldAndEntities( bool bDrawSkybox, const CViewSetup &view
 	WaterRenderInfo_t info;
 	DetermineWaterRenderInfo( fogVolumeInfo, info );
 
-	if ( info.m_bCheapWater )
+	if ( info.m_bCheapWater && !fogVolumeInfo.m_bEyeInFogVolume )
 	{		     
 		cplane_t glassReflectionPlane;
 		if ( IsReflectiveGlassInView( viewIn, glassReflectionPlane ) )
@@ -2337,17 +2337,17 @@ void CViewRender::DrawWorldAndEntities( bool bDrawSkybox, const CViewSetup &view
 	}
 
 	// We can see water of some sort
-	if ( !fogVolumeInfo.m_bEyeInFogVolume )
-	{
-		CRefPtr<CAboveWaterView> pAboveWaterView = new CAboveWaterView( this );
-		pAboveWaterView->Setup( viewIn, bDrawSkybox, fogVolumeInfo, info );
-		AddViewToScene( pAboveWaterView );
-	}
-	else
+	if ( fogVolumeInfo.m_bEyeInFogVolume )
 	{
 		CRefPtr<CUnderWaterView> pUnderWaterView = new CUnderWaterView( this );
 		pUnderWaterView->Setup( viewIn, bDrawSkybox, fogVolumeInfo, info );
 		AddViewToScene( pUnderWaterView );
+	}
+	else
+	{
+		CRefPtr<CAboveWaterView> pAboveWaterView = new CAboveWaterView( this );
+		pAboveWaterView->Setup( viewIn, bDrawSkybox, fogVolumeInfo, info );
+		AddViewToScene( pAboveWaterView );
 	}
 }
 
@@ -4527,9 +4527,7 @@ bool CSkyboxView::Setup( const CViewSetup &view, int *pClearFlags, SkyboxVisibil
 
 	m_DrawFlags = DF_RENDER_UNDERWATER | DF_RENDER_ABOVEWATER | DF_RENDER_WATER;
 	if( r_skybox.GetBool() )
-	{
 		m_DrawFlags |= DF_DRAWSKYBOX;
-	}
 
 	return true;
 }
@@ -5191,7 +5189,6 @@ void CAboveWaterView::Setup( const CViewSetup &view, bool bDrawSkybox, const Vis
 	{
 		m_DrawFlags |= DF_DRAWSKYBOX;
 	}
-
 	if ( waterInfo.m_bDrawWaterSurface )
 	{
 		m_DrawFlags |= DF_RENDER_WATER;
@@ -5426,7 +5423,7 @@ void CUnderWaterView::Setup( const CViewSetup &view, bool bDrawSkybox, const Vis
 	CalcWaterEyeAdjustments( fogInfo, m_waterHeight, m_waterZAdjust, m_bSoftwareUserClipPlane );
 
 	IMaterial *pWaterMaterial = fogInfo.m_pFogVolumeMaterial;
-	if (engine->GetDXSupportLevel() >= 90 )					// screen voerlays underwater are a dx9 feature
+	if (engine->GetDXSupportLevel() >= 80 )					// screen overlays underwater are a dx8+ feature
 	{
 		IMaterialVar *pScreenOverlayVar = pWaterMaterial->FindVar( "$underwateroverlay", NULL, false );
 		if ( pScreenOverlayVar && ( pScreenOverlayVar->IsDefined() ) )
@@ -5434,22 +5431,28 @@ void CUnderWaterView::Setup( const CViewSetup &view, bool bDrawSkybox, const Vis
 			char const *pOverlayName = pScreenOverlayVar->GetStringValue();
 			if ( pOverlayName[0] != '0' )						// fixme!!!
 			{
-				IMaterial *pOverlayMaterial = materials->FindMaterial( pOverlayName,  TEXTURE_GROUP_OTHER );
+				IMaterial *pOverlayMaterial = materials->FindMaterial( pOverlayName, TEXTURE_GROUP_OTHER );
 				m_pMainView->SetWaterOverlayMaterial( pOverlayMaterial );
 			}
 		}
 	}
-	// NOTE: We're not drawing the 2d skybox under water since it's assumed to not be visible.
 
 	// render the world underwater
 	// Clear the color to get the appropriate underwater fog color
-	m_DrawFlags = DF_FUDGE_UP | DF_RENDER_UNDERWATER | DF_DRAW_ENTITITES;
+	m_DrawFlags = DF_RENDER_UNDERWATER | DF_DRAW_ENTITITES | DF_FUDGE_UP;
 	m_ClearFlags = VIEW_CLEAR_DEPTH;
 
+	// NOTE: We're drawing the 2d skybox under water since it's assumed to be visible.
+	if ( bDrawSkybox )
+	{
+		m_DrawFlags |= DF_DRAWSKYBOX;
+	}
+#if 0	//TODO; Better solution
 	if( !m_bSoftwareUserClipPlane )
 	{
 		m_DrawFlags |= DF_CLIP_Z;
 	}
+#endif
 	if ( waterInfo.m_bDrawWaterSurface )
 	{
 		m_DrawFlags |= DF_RENDER_WATER;
@@ -5470,7 +5473,7 @@ void CUnderWaterView::Setup( const CViewSetup &view, bool bDrawSkybox, const Vis
 //-----------------------------------------------------------------------------
 void CUnderWaterView::Draw()
 {
-	// FIXME: The 3d skybox shouldn't be drawn when the eye is under water
+	// FIXME: The 3d skybox should be drawn when the eye is under water!
 
 	VPROF( "CViewRender::ViewDrawScene_EyeUnderWater" );
 

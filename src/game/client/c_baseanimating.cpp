@@ -6,7 +6,6 @@
 //===========================================================================//
 #include "cbase.h"
 #include "c_baseanimating.h"
-#include "c_Sprite.h"
 #include "model_types.h"
 #include "bone_setup.h"
 #include "ivrenderview.h"
@@ -2816,46 +2815,73 @@ int C_BaseAnimating::DrawModel( int flags )
 
 	int drawn = 0;
 
-	if ( r_drawothermodels.GetInt() )
+	switch ( modelinfo->GetModelType( GetModel() ) )
 	{
-		MDLCACHE_CRITICAL_SECTION();
-
-		int extraFlags = 0;
-		if ( r_drawothermodels.GetInt() == 2 )
+#if BASEANIMATING_USES_SPRITES
+	case mod_sprite:
+		drawn = DrawSprite(
+			GetIClientEntity(), 
+			GetModel(), 
+			GetAbsOrigin(), 
+			GetAbsAngles(), 
+			GetTextureFrameIndex(), 
+			m_nBody > 0 ? cl_entitylist->GetBaseEntity( m_nBody ) : NULL,
+			m_nSkin, 
+			GetRenderMode(), 
+			m_nRenderFX, 
+			m_clrRender->a, 
+			m_clrRender->r, 
+			m_clrRender->g, 
+			m_clrRender->b, 
+			GetModelWidthScale() 
+			);
+		break;
+#endif
+	case mod_studio:
+		if ( r_drawothermodels.GetInt() )
 		{
-			extraFlags |= STUDIO_WIREFRAME;
-		}
+			MDLCACHE_CRITICAL_SECTION();
 
-		if ( flags & STUDIO_SHADOWDEPTHTEXTURE )
-		{
-			extraFlags |= STUDIO_SHADOWDEPTHTEXTURE;
-		}
-
-		// Necessary for lighting blending
-		CreateModelInstance();
-
-		if ( !IsFollowingEntity() )
-		{
-			drawn = InternalDrawModel( flags|extraFlags );
-		}
-		else
-		{
-			// this doesn't draw unless master entity is visible and it's a studio model!!!
-			C_BaseAnimating *follow = FindFollowedEntity();
-			if ( follow )
+			int extraFlags = 0;
+			if ( r_drawothermodels.GetInt() == 2 )
 			{
-				// recompute master entity bone structure
-				int baseDrawn = follow->DrawModel( 0 );
+				extraFlags |= STUDIO_WIREFRAME;
+			}
 
-				// draw entity
-				// FIXME: Currently only draws if aiment is drawn.  
-				// BUGBUG: Fixup bbox and do a separate cull for follow object
-				if ( baseDrawn )
+			if ( flags & STUDIO_SHADOWDEPTHTEXTURE )
+			{
+				extraFlags |= STUDIO_SHADOWDEPTHTEXTURE;
+			}
+
+			// Necessary for lighting blending
+			CreateModelInstance();
+
+			if ( !IsFollowingEntity() )
+			{
+				drawn = InternalDrawModel( flags|extraFlags );
+			}
+			else
+			{
+				// this doesn't draw unless master entity is visible and it's a studio model!!!
+				C_BaseAnimating *follow = FindFollowedEntity();
+				if ( follow )
 				{
-					drawn = InternalDrawModel( STUDIO_RENDER|extraFlags );
+					// recompute master entity bone structure
+					int baseDrawn = follow->DrawModel( 0 );
+
+					// draw entity
+					// FIXME: Currently only draws if aiment is drawn.  
+					// BUGBUG: Fixup bbox and do a separate cull for follow object
+					if ( baseDrawn )
+					{
+						drawn = InternalDrawModel( STUDIO_RENDER|extraFlags );
+					}
 				}
 			}
 		}
+		break;
+	default:
+		break;
 	}
 
 	// If we're visualizing our bboxes, draw them

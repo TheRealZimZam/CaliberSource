@@ -447,6 +447,27 @@ void C_VGuiScreen::ClientThink( void )
 		g_InputInternal->InternalMouseReleased( MOUSE_RIGHT );
 	}
 
+// TEDDYS FIX
+    for (int i = 0; i < pPanel->GetChildCount(); i++)
+    {
+        vgui::Button *child = dynamic_cast<vgui::Button*>(pPanel->GetChild(i));
+        if ( child )
+        {
+            int x1, x2, y1, y2;
+            child->GetBounds( x1, y1, x2, y2 );
+            
+            // Generate mouse input commands
+            if ((m_nButtonState & IN_ATTACK))
+            {
+                if ( px >= x1 && px <= x1 + x2 && py >= y1 && py <= y1 + y2 )
+                {
+                    child->FireActionSignal();
+                }
+            }
+        }
+    }
+// TEDDYS FIX
+
 	if ( m_bLoseThinkNextFrame == true )
 	{
 		m_bLoseThinkNextFrame = false;

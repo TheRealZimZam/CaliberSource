@@ -2109,6 +2109,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\voice_menu.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\shared\voice_status.cpp"
 				>
 			</File>
@@ -2692,6 +2696,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\hl2\c_weapon_physgun.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\hl2\c_weapon_sticklauncher.cpp"
 					>
 				</File>
@@ -2748,10 +2756,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\hl2\hl2_clientmode.cpp"
-					>
-				</File>
-				<File
 					RelativePath="..\shared\hl2\hl2_gamerules.cpp"
 					>
 				</File>
@@ -2801,10 +2805,6 @@
 				</File>
 				<File
 					RelativePath=".\hl2\hud_damageindicator.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\hl2\hud_dev.cpp"
 					>
 				</File>
 				<File
@@ -2901,6 +2901,10 @@
 				</File>
 				<File
 					RelativePath="..\shared\hl2\weapon_hmg.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\shared\hl2\weapon_mp40.cpp"
 					>
 				</File>
 				<File

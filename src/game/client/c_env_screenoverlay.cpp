@@ -195,6 +195,7 @@ enum
 	SCREENEFFECT_EP2_ADVISOR_STUN,
 	SCREENEFFECT_CRITICAL_HEALTH,
 	SCREENEFFECT_FILMGRAIN,
+	SCREENEFFECT_DIRT,
 };
 
 // ============================================================================
@@ -233,8 +234,170 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 		BaseClass::ReceiveMessage( classID, msg );
 		return;
 	}
-
+	
+	// Made this not so horribly bad - this if-else-if-else string
+	// looked like crap and gave me a headache, so i reversed the way
+	// they did it and just used the if to check the message -MM
 	int messageType = msg.ReadByte();
+#if 1
+	if ( messageType == 0 )
+	{
+		// Create a keyvalue block to set these params
+		KeyValues *pKeys = new KeyValues( "keys" );
+		if ( pKeys == NULL )
+			return;
+
+		// Effect turning on
+		switch( m_nType )
+		{
+			// SCREENEFFECT_EP1_INTRO
+			case 0:
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() >= 80 )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+					pKeys->SetInt( "fadeout", 0 );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "introblur", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "introblur" );
+				}
+			break;
+
+			// SCREENEFFECT_WATERSPRAY
+			case 1:
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "waterspray", pKeys );
+				g_pScreenSpaceEffects->EnableScreenSpaceEffect( "waterspray" );
+			break;
+
+			// SCREENEFFECT_RAINDROPS
+			case 2:
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+				pKeys->SetInt( "fadeout", 0 );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "raindrops", pKeys );
+				g_pScreenSpaceEffects->EnableScreenSpaceEffect( "raindrops" );
+			break;
+
+			// SCREENEFFECT_EP2_GROGGY
+			case 3:
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() >= 80 )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+					pKeys->SetInt( "fadeout", 0 );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "ep2_groggy", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "ep2_groggy" );
+				}
+			break;
+
+			// SCREENEFFECT_EP2_ADVISOR_STUN
+			case 4:
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() >= 80 )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "episodic_stun", pKeys );
+					g_pScreenSpaceEffects->EnableScreenSpaceEffect( "episodic_stun" );
+				}
+			break;
+
+			// SCREENEFFECT_CRITICAL_HEALTH
+			case 5:
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "neardeath", pKeys );
+				g_pScreenSpaceEffects->EnableScreenSpaceEffect( "neardeath" );
+			break;
+
+			// SCREENEFFECT_FILMGRAIN
+			case 6:
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "filmgrain", pKeys );
+				g_pScreenSpaceEffects->EnableScreenSpaceEffect( "filmgrain" );
+			break;
+
+		}
+
+		pKeys->deleteThis();
+	}
+	else
+	{
+		// Create a keyvalue block to set these params
+		KeyValues *pKeys = new KeyValues( "keys" );
+		if ( pKeys == NULL )
+			return;
+
+		// Effect turning off
+		switch( m_nType )
+		{
+			// SCREENEFFECT_EP1_INTRO
+			case 0:
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() >= 80 )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+					pKeys->SetInt( "fadeout", 1 );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "introblur", pKeys );
+				}
+			break;
+
+			// SCREENEFFECT_WATERSPRAY
+			case 1:
+				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "waterspray" );
+			break;
+
+			// SCREENEFFECT_RAINDROPS
+			case 2:
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+				pKeys->SetInt( "fadeout", 1 );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "raindrops", pKeys );
+			break;
+
+			// SCREENEFFECT_EP2_GROGGY
+			case 3:
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() >= 80 )
+				{
+					// Set our keys
+					pKeys->SetFloat( "duration", m_flDuration );
+					pKeys->SetInt( "fadeout", 1 );
+
+					g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "ep2_groggy", pKeys );
+				}
+			break;
+
+			// SCREENEFFECT_EP2_ADVISOR_STUN
+			case 4:
+				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "episodic_stun" );
+			break;
+
+			// SCREENEFFECT_CRITICAL_HEALTH
+			case 5:
+				// Set our keys
+				pKeys->SetFloat( "duration", m_flDuration );
+				pKeys->SetInt( "fadeout", 1 );
+
+				g_pScreenSpaceEffects->SetScreenSpaceEffectParams( "neardeath", pKeys );
+			break;
+
+			// SCREENEFFECT_FILMGRAIN
+			case 6:
+				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "filmgrain" );
+			break;
+		}
+	}
+#else
 	switch( messageType )
 	{
 		// Effect turning on
@@ -245,12 +408,11 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 				if ( pKeys == NULL )
 					return;
 
+				//TODO; Why is this a if-else-if-else??
 				if ( m_nType == SCREENEFFECT_EP1_INTRO )
 				{
 					if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
-					{
 						return;
-					}
 
 					// Set our keys
 					pKeys->SetFloat( "duration", m_flDuration );
@@ -290,6 +452,9 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 				}
 				else if ( m_nType == SCREENEFFECT_EP2_ADVISOR_STUN )
 				{
+					if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
+						return;
+
 					// Set our keys
 					pKeys->SetFloat( "duration", m_flDuration );
 
@@ -323,9 +488,8 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 			if ( m_nType == SCREENEFFECT_EP1_INTRO )
 			{
 				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
-				{
 					return;
-				}
+
 				// Create a keyvalue block to set these params
 				KeyValues *pKeys = new KeyValues( "keys" );
 				if ( pKeys == NULL )
@@ -343,10 +507,6 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 			}
 			else if ( m_nType == SCREENEFFECT_RAINDROPS )
 			{
-				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
-				{
-					return;
-				}
 				// Create a keyvalue block to set these params
 				KeyValues *pKeys = new KeyValues( "keys" );
 				if ( pKeys == NULL )
@@ -361,9 +521,8 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 			else if ( m_nType == SCREENEFFECT_EP2_GROGGY )
 			{
 				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
-				{
 					return;
-				}
+
 				// Create a keyvalue block to set these params
 				KeyValues *pKeys = new KeyValues( "keys" );
 				if ( pKeys == NULL )
@@ -377,14 +536,16 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 			}
 			else if ( m_nType == SCREENEFFECT_EP2_ADVISOR_STUN )
 			{
+				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
+					return;
+
 				g_pScreenSpaceEffects->DisableScreenSpaceEffect( "episodic_stun" );
 			}
 			else if ( m_nType == SCREENEFFECT_CRITICAL_HEALTH )
 			{
 				if( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 )
-				{
 					return;
-				}
+
 				// Create a keyvalue block to set these params
 				KeyValues *pKeys = new KeyValues( "keys" );
 				if ( pKeys == NULL )
@@ -403,4 +564,5 @@ void C_EnvScreenEffect::ReceiveMessage( int classID, bf_read &msg )
 
 			break;
 	}
+#endif
 }

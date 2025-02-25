@@ -949,7 +949,7 @@ public:
 
 	// Performs the collision resolution for fliers.
 	void					PerformFlyCollisionResolution( trace_t &trace, Vector &move );
-	void					ResolveFlyCollisionBounce( trace_t &trace, Vector &vecVelocity, float flMinTotalElasticity = 0.0f );
+	void					ResolveFlyCollisionBounce( trace_t &trace, Vector &vecVelocity, float flMinTotalElasticity = 0.1f );
 	void					ResolveFlyCollisionSlide( trace_t &trace, Vector &vecVelocity );
 	void					ResolveFlyCollisionCustom( trace_t &trace, Vector &vecVelocity );
 

@@ -14,7 +14,7 @@
 @BaseClass base(BaseNPC) = TalkNPC
 [
 	UseSentence(string) : "Use Sentence"
-	UnUseSentence(string) : "Un-Use Sentence"
+	UnUseSentence(string) : "Player Reply Sentence"
 
 	DontUseSpeechSemaphore(choices) : "Don't Use Speech Semaphore" : 0 : "Friendly NPCs are not allowed to speak if another friendly NPC is speaking. In some cases we don't want speaking NPCs to prevent other NPCs from speaking (for instance, if there is a friendly NPC speaking for a long time on a monitor). To make this NPC not prevent other NPCs from talking, make it not grab the semaphore when it speaks." =
 	[
@@ -87,33 +87,57 @@
 		33554432 : "Leader Citizen" : 0
 	]
 
-	additionalequipment(choices) : "Weapons" : "0" =
+	additionalequipment(choices) : "Primary Weapon" : "0" =
 	[
-		"weapon_44" : "45-70"
-		"weapon_ar2" : "AR2"
-		"weapon_pistol" : "Pistol"
-		"weapon_smg1" : "SMG1"
-		"weapon_smg2" : "SMG2"
-		"weapon_shotgun" : "Shotgun"
-		"weapon_supershotgun" : "Auto Shotgun"
-		"weapon_brickbat" : "Brickbat"
-		"weapon_flamethrower" : "Flamethrower"
-		"weapon_rpg" : "RPG"
-
-		"weapon_swing" : "Swing Weapon"
+		// Sorted in order of shitiness
 		"weapon_stab" : "Stab Weapon"
+		"weapon_swing" : "Swing Weapon"
+
+		"weapon_pistol" : "Pistol"
+		"weapon_shotgun" : "Shotgun"
+		"weapon_smg1" : "SMG1"
+		"weapon_44" : "45-70"
+	
+		"weapon_smg2" : "SMG2"
+		"weapon_ar2" : "AR2"
+		"weapon_supershotgun" : "Auto Shotgun"
+
+		"weapon_rpg" : "RPG"
+		"weapon_flamethrower" : "Flamethrower"
 
 		"0"  : "Nothing"
 	]
+	secondaryequipment(choices) : "Secondary Weapon" : "0" =
+	[
+		// Sorted in order of shitiness
+		"weapon_stab" : "Stab Weapon"
+		"weapon_swing" : "Swing Weapon"
+
+		"weapon_pistol" : "Pistol"
+		"weapon_shotgun" : "Shotgun"
+		"weapon_smg1" : "SMG1"
+		"weapon_44" : "45-70"
+	
+		"weapon_smg2" : "SMG2"
+		"weapon_ar2" : "AR2"
+		"weapon_supershotgun" : "Auto Shotgun"
+
+		"weapon_rpg" : "RPG"
+		"weapon_flamethrower" : "Flamethrower"
+
+		"0"  : "Nothing"
+	]
+	ammo(integer) : "Ammo" : 0 : "Ammo that this NPC starts with. -1 = Unlimited, 0 = Auto Calculate."
 
 	throwable(choices) : "Grenade Type" : "0" =
 	[
 		"weapon_molotov" : "Molotov"
 		"weapon_brickbat" : "Beer Bottle"
 		"weapon_frag" : "Frag Grenade"
-		"weapon_concussive" : "Stun Grenade"
+		"weapon_emp" : "Stun Grenade"
 		"0"  : "Nothing"
 	]
+	NumGrenades(integer) : "Grenades" : 0 : "Number of throwables this NPC has."
 
 	ammosupply(choices) : "Ammo to Resupply (if spawnflag set)" : "SMG1" =
 	[
@@ -139,30 +163,32 @@
 		5 : "Unique"
 	]
 
-	expressiontype(choices) : "Expression Type" : "Random" =
-	[
-		0 : "Random"
-		1 : "Scared"
-		2 : "Nervous"
-		3 : "Normal"
-		4 : "Angry"
-	]
+//	expressiontype(choices) : "Expression Type" : "Random" =
+//	[
+//		0 : "Random"
+//		1 : "Scared"
+//		2 : "Nervous"
+//		3 : "Normal"
+//		4 : "Angry"
+//	]
 
 	// NOTENOTE; Some of these models turn into major characters
-	model(choices) : "Model" : "models/humans/group01/male_01.mdl" =
+	model(choices) : "Model" : "models/humans/bronx.mdl" =
 	[
-		"models/humans/group01/male_01.mdl" : "Bronx"
-		"models/humans/group01/male_02.mdl" : "Animal"
-		"models/humans/group01/male_03.mdl" : "Soprano"
-		"models/humans/group01/male_04.mdl" : "Don"
-		"models/humans/group01/male_05.mdl" : "Dixie"
-		"models/humans/group01/male_06.mdl" : "Dfens"
-		"models/humans/group01/male_07.mdl" : "Dundee"
-		"models/humans/group01/male_08.mdl" : "Paddy"
-		"models/humans/group01/male_09.mdl" : "Scot"
-		"models/humans/group01/male_10.mdl" : "Gaston"
-		"models/humans/group01/male_11.mdl" : "Jean"
-		"models/humans/group01/male_12.mdl" : "Franz"
+		"models/humans/bronx.mdl" : "Bronx"
+		"models/humans/group01/male_02.mdl" : "Paddy"
+		"models/humans/group01/male_03.mdl" : "Scot"
+		"models/humans/group01/male_04.mdl" : "Soprano"
+		"models/humans/group01/male_05.mdl" : "Gaston"
+		"models/humans/group01/male_06.mdl" : "Jean"
+		"models/humans/group01/male_07.mdl" : "DFens"
+
+		"models/humans/group01/male_08.mdl" : "Oddball"
+		"models/humans/group01/male_09.mdl" : "Mick"
+		"models/humans/group01/male_10.mdl" : "Don"
+		"models/humans/group01/male_11.mdl" : "Dixie"
+		"models/humans/group01/male_12.mdl" : "Animal"
+
 		"models/humans/group01/female_01.mdl" : "Dorothy"
 		"models/humans/group01/female_02.mdl" : "Galore"
 		"models/humans/group01/female_03.mdl" : "Honeybee"
@@ -355,7 +381,6 @@
 [
 	input SetTimer(float) : "This input makes the grenade live, and specifies how many seconds before it explodes."
 ]
-
 
 @NPCClass base(BaseNPC) sphere(sightdist) studio("models/combine_soldier.mdl") = npc_combine_cannon : "Combine Cannon"
 [
@@ -825,7 +850,7 @@
 [
 ]
 
-@NPCClass base(BaseNPC) studio("models/stalker.mdl") = npc_stalker : "Stalker"
+@NPCClass base(BaseNPC) studio("models/Stalker.mdl") = npc_stalker : "Stalker"
 [
 	BeamPower(choices) : "Beam Power" : "Low" =
 	[
@@ -931,9 +956,9 @@
 
 
 
-@NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen ) studio() = npc_citizen : "Citizen"
+@NPCClass base(BaseNPC,Parentname, TalkNPC, PlayerCompanion, Citizen) studio() = npc_citizen : "Citizen"
 [
-	additionalequipment(choices) : "Weapons" : "0" =
+	additionalequipment(choices) : "Weapon" : "0" =
 	[
 		"weapon_357" : "Magnum"
 		"weapon_ar2" : "AR2"
@@ -948,6 +973,7 @@
 
 		"0"  : "Nothing"
 	]
+	ammo(integer) : "Ammo" : 0 : "Ammo that this NPC starts with. -1 = Unlimited, 0 = Auto Calculate."
 
 	model(choices) : "Model" : "models/humans/group01/male_01.mdl" =
 	[
@@ -957,8 +983,8 @@
 		"models/humans/group01/male_04.mdl" : "Jarhead"
 		"models/humans/group01/male_05.mdl" : "Art"
 		"models/humans/group01/male_06.mdl" : "Sandy"
-		"models/humans/group01/male_07.mdl" : "Male 07"
-		"models/humans/group01/male_08.mdl" : "BEAST"
+		"models/humans/group01/male_07.mdl" : "Climber Mike"
+		"models/humans/group01/male_08.mdl" : "Mr. Rourke"
 		"models/humans/group01/male_09.mdl" : "Erdin"
 		"models/humans/group01/female_01.mdl" : "Joey"
 		"models/humans/group01/female_02.mdl" : "Kanisha"
@@ -966,31 +992,9 @@
 		"models/humans/group01/female_04.mdl" : "Chau"
 		"models/humans/group01/female_06.mdl" : "Naomi"
 		"models/humans/group01/female_07.mdl" : "Laketra"
-		"models/humans/male_cheaple.mdl" : "Warren"
+		"models/humans/male_cheaple.mdl" : "Vanessa's Brother"
 		"models/odessa.mdl" : "Odessa. DO NOT USE."
 	]
-
-//!!!BUGBUG - don't ship with these names
-//!!!FIXME - don't ship with these names
-//!!!TODO - DON'T SHIP WITH THESE NAMES
-//	[
-//		"models/humans/group01/male_01.mdl" : "Morgan"
-//		"models/humans/group01/male_02.mdl" : "Ted"
-//		"models/humans/group01/male_03.mdl" : "Joe"
-//		"models/humans/group01/male_04.mdl" : "Jarhead"
-//		"models/humans/group01/male_05.mdl" : "Art"
-//		"models/humans/group01/male_07.mdl" : "Climber Mike"
-//		"models/humans/group01/male_08.mdl" : "Mr. Rourke"
-//		"models/humans/group01/male_09.mdl" : "Erdin"
-//		"models/humans/group01/female_01.mdl" : "Joey"
-//		"models/humans/group01/female_02.mdl" : "Kanisha"
-//		"models/humans/group01/female_03.mdl" : "Kim"
-//		"models/humans/group01/female_04.mdl" : "Chau"
-//		"models/humans/group01/female_06.mdl" : "Naomi"
-//		"models/humans/group01/female_07.mdl" : "Laketra"
-//		"models/humans/male_cheaple.mdl" : "Vanessa's Brother"
-//		"models/odessa.mdl" : "Odessa. DO NOT USE."
-//	]
 ]
 
 @NPCClass base(BaseNPC) studio("models/Barney.mdl") = npc_fisherman : "Fisherman"
@@ -1001,7 +1005,7 @@
 
 @NPCClass base(TalkNPC, BaseNPC, PlayerCompanion) studio("models/Barney.mdl") = npc_barney : "Barney"
 [
-	additionalequipment(choices) : "Weapons" : "weapon_pistol" =
+	additionalequipment(choices) : "Weapon" : "weapon_pistol" =
 	[
 		"weapon_pistol" : "Pistol"
 		"weapon_smg1" : "SMG1"
@@ -1020,7 +1024,7 @@
 
 @BaseClass base(BaseNPC, RappelNPC) = BaseCombine
 [
-	additionalequipment(choices) : "Weapons" : "weapon_smg2" =
+	additionalequipment(choices) : "Weapon" : "weapon_smg2" =
 	[
 //		"weapon_ar1" : "AR1"
 		"weapon_ar2" : "AR2"
@@ -1028,13 +1032,35 @@
 		"weapon_smg2" : "SMG2"
 		"weapon_shotgun" : "Shotgun"
 		"weapon_supershotgun" : "Auto-Shotgun"
-		"weapon_hmg1" : "MMG"
+		"weapon_hmg1" : "BAR"
 		"weapon_pistol" : "Pistol"
 		"weapon_stunstick" : "Stun Stick"
 		"weapon_flamethrower" : "Flamethrower"
 		"weapon_rpg" : "RPG"
 		"weapon_flash" : "FLASH"
 		"0" : "Nothing"
+	]
+	secondaryequipment(choices) : "Secondary Weapon" : "weapon_pistol" =
+	[
+		"weapon_pistol" : "Pistol"
+		"weapon_swing" : "Swing Weapon"
+		"weapon_stab" : "Stab Weapon"
+		"weapon_flamethrower" : "Flamethrower"
+		"weapon_rpg" : "RPG"
+		"weapon_flash" : "FLASH"
+		"0" : "Nothing"
+	]
+	ammo(integer) : "Ammo" : 0 : "Ammo that this NPC starts with. -1 = Unlimited, 0 = Auto Calculate."
+
+	NumGrenades(choices) : "Number of Grenades" : "2" =
+	[
+		"0" : "None"
+		"1" : "1"
+		"2" : "2"
+		"3" : "3"
+		"4" : "4"
+		"5" : "5"
+		"99999" : "Unlimited"
 	]
 
 	spawnflags(Flags) = 
@@ -1061,17 +1087,6 @@
 		"4" : "Elite"
 	]
 
-	NumGrenades(choices) : "Number of Grenades" : "2" =
-	[
-		"0" : "None"
-		"1" : "1"
-		"2" : "2"
-		"3" : "3"
-		"4" : "4"
-		"5" : "5"
-		"99999" : "Unlimited"
-	]
-
 	// Inputs
 	input LookOn(void) : "Look normally"	
 	input LookOff(void) : "Don't look for myself, use other squad member's eyes"
@@ -1088,7 +1103,6 @@
 	model(choices) : "Model" : "models/combine_soldier.mdl" : "Regular Soldier" = 
 	[
 		"models/combine_soldier.mdl" : "Regular Soldier"
-		"models/combine_soldier_shock.mdl" : "Shock Soldier"
 		"models/combine_soldier_prisonguard.mdl" : "Nova Prospekt Soldier"
 		"models/combine_super_soldier.mdl" : "Elite Soldier/Squad Leader"
 	]
@@ -1277,6 +1291,7 @@
 		"NoSound" : "None"
 		"Weapon_AR2.NPC_Single" : "AR2"
 		"Weapon_SMG1.NPC_Single" : "SMG1"
+		"Weapon_SMG2.NPC_Single" : "SMG2"
 		"Weapon_Shotgun.NPC_Single" : "Shotgun"
 		"Weapon_Alyx_Gun.NPC_Single" : "AlyxGun"
 		"Weapon_HMG1.NPC_Single" : "HMG"
@@ -1667,6 +1682,8 @@
 		2097152 : "Cast long shadow" : 0
 	]
 
+	model(studio) : "World model" : "models/combine_helicopter.mdl"
+
 	InitialSpeed(string) : "Initial Speed" : "0"
 	GracePeriod(float) : "Grace Period" : "2.0" : "Time in seconds the helicopter has to see the player before he starts shooting"
 	PatrolSpeed(float) : "Patrol Speed" : "0" : "Speed at which the helicopter moves if he has no enemy."
@@ -1967,15 +1984,34 @@
 @NPCClass base(BaseNPC,RappelNPC) studio("models/Police.mdl") = npc_metropolice :
 	"Enforcers of a very certain type of law and order."
 [
-	additionalequipment(choices) : "Weapons" : "weapon_pistol" =
+	model(choices) : "Model" : "models/Police.mdl" : "Regular Police" = 
+	[
+		"models/Police.mdl" : "Regular Police"
+		"models/RiotPolice.mdl" : "Riot Police"
+		"models/RiotPolice_Desert.mdl" : "Camo Riot Police"
+		"models/LizardTrooper.mdl" : "Lizard Trooper"
+	]
+
+	additionalequipment(choices) : "Weapon" : "weapon_pistol" =
 	[
 		"weapon_pistol" : "Pistol"
 		"weapon_smg1"  : "SMG1"
+		"weapon_smg2"  : "SMG2"
 		"weapon_stunstick"  : "Stun Stick"
-		"weapon_shotgun"  : "Shotgun (WIP)"
-		"weapon_ar2"  : "AR2 (WIP)"
+		"weapon_shotgun"  : "Shotgun"
+		"weapon_supershotgun"  : "Auto-Shotgun"
+		"weapon_ar2"  : "AR2"
 		"0"  : "Nothing"
 	]
+	secondaryequipment(choices) : "Secondary Weapon" : "weapon_stunstick" =
+	[
+		"weapon_pistol" : "Pistol"
+		"weapon_swing" : "Swing Weapon"
+		"weapon_stab" : "Stab Weapon"
+		"weapon_stunstick"  : "Stun Stick"
+		"0" : "Nothing"
+	]
+	ammo(integer) : "Ammo" : 0 : "Ammo that this NPC starts with. -1 = Unlimited, 0 = Auto Calculate."
 
 	manhacks(Choices) : "Number of Manhacks" : 0 =
 	[
@@ -2020,7 +2056,7 @@
 @NPCClass base(TalkNPC) studio("models/Monk.mdl") = npc_monk :
 	"Absolute Madman."
 [
-	additionalequipment(choices) : "Weapons" : "weapon_annabelle" =
+	additionalequipment(choices) : "Weapon" : "weapon_annabelle" =
 	[
 		"weapon_annabelle" : "Annabelle"
 		"weapon_smg1" : "SMG1"
@@ -2050,7 +2086,7 @@
 [
 	model(studio) : "World model" : "models/alyx.mdl"
 
-	additionalequipment(choices) : "Weapons" : "weapon_alyxgun" =
+	additionalequipment(choices) : "Weapon" : "weapon_alyxgun" =
 	[
 		"weapon_alyxgun" : "Alyx Gun"
 		"weapon_shotgun" : "Shotgun"
@@ -2731,13 +2767,14 @@
 	"HL1 Legacy: Beverage Dispenser. When parented to a brush, will update the texture frame of the brush in accordance with the dispenser state."
 [
 	health(integer) : "Capacity" : 10 : "Number of cans in the dispenser. Spawning with 0 cans will put the dispenser into BROKEN state."
+	parentname(target_destination) : "Parent Brush" : : "The Name of the brush dispenser this env_beverage should update."
 	beveragetype(choices) : "Beverage Type" : 6 = 
 	[
 		0 : "Cola-Coca"
 		1 : "Popsi"
 		2 : "Diet Coca"
 		3 : "Spirit"
-		4 : "Dr. Prepper"
+		4 : "Mr. Prepper"
 		5 : "Lemon-Lime"
 		6 : "Random"
 	]
@@ -2898,13 +2935,12 @@
 	output OnUsed(void) : "Fires when +used by the player."
 ]
 
-@PointClass base(BasePropPhysics, Targetname, Angles, DamageFilter, BaseFadeProp) studio("models/items/item_item_crate.mdl") = item_item_crate : "Item Crate"
+@PointClass base(BasePropPhysics, Targetname, Angles, DamageFilter) studioprop() = item_item_crate : "Item Crate"
 [
 	CrateType(choices) : "Crate Contains" : 0 =
 	[
 		0 : "Contains specified item"
 	]
-
 
 	CrateAppearance(choices) : "Crate Appearance" : 0 =
 	[
@@ -2912,6 +2948,7 @@
 		1 : "Radar Beacon Crate"
 	]
 
+	model(studio) : "World Model" : "models/items/item_item_crate.mdl" : "Can be any non-static model"
 	ItemClass(pointentityclass) : "Item Type" : "item_dynamic_resupply" : "Class name of the entity to spawn when the crate is broken"
 	ItemCount(integer) : "Item Count" : 1 : "Number of items to emit upon breakage"
 	SpecificResupply(target_destination) : "Specific resupply" : "" : "If item type is item_dynamic_resupply, specify a specific one to use instead of the master"
@@ -3699,8 +3736,10 @@
 ]
 
 
-@PointClass base(BaseSpeaker) iconsprite("editor/ambient_generic.vmt") = env_speaker : "Announcement Speaker"
+@PointClass base(BaseSpeaker, ResponseContext) iconsprite("editor/ambient_generic.vmt") = env_speaker : "Announcement Speaker"
 [
+	rulescript(string) : "Context rule script" : "" : "Script file containing rules for playing appropriate sounds."
+	concept(string) : "Concept name" : "" : "High level concept name used as primary search key."
 ]
 
 //-------------------------------------------------------------------------

@@ -42,10 +42,10 @@
 // Lightning Field (mortarfield without explosions)
 // NOTENOTE; This is strictly for lightning strikes, from the sky - if you want an actual electric field,
 // use a tesla
-@SolidClass base(Targetname, EnableDisable, Origin, Parentname) = func_lightning : 
+@SolidClass base(Targetname, EnableDisable, Origin, Parentname) = func_lightning_field : 
 	"Lightning Field - Fires random lightning in the volume of the brush. The top of the brush will be the startpoint, and bottom endpoint." 
 [
-	m_flSpread(float) : "Spread Radius" : 0 : "Spread of lightning"
+	m_flSpread(float) : "Amplitude" : 0 : "Amplitude of lightning"
 	m_flDelay(float) : "Min Delay" : 0 : "Minimum delay there is in-between strikes."
 	m_flMaxDelay(float) : "Max Delay" : 1 : "Maximum delay there is in-between strikes."
 	m_iCount(integer) : "Repeat Count" : 1 : "Count of strikes"
@@ -80,6 +80,12 @@
 	output OnBulletPassed(void) : "Fires when a hitscan trace goes through this trigger."
 ]
 
+@SolidClass base(Targetname, Parentname, Origin, EnableDisable) = trigger_secret :
+	"A trigger volume that tells the player he got a secret. Can only be touched once."
+[
+	target(target_destination) : "Target" : : "Name of the target entity to +use on activation."
+]
+
 @SolidClass base(Targetname, Parentname, RenderFields, Global, Shadow, Origin) = func_fakedoor : 
 	"A fake locked door. Plays a locked sound when used. Cheaper than real doors."
 [
@@ -88,6 +94,57 @@
 	// Outputs
 	output OnLockedUse(void) : "Fired when the player uses the door, but it is locked."
 ]
+
+@SolidClass base(Targetname, Angles, RenderFields, EnableDisable, Origin) = func_vehicle :
+	"A drivable brush-based vehicle.\n" + 
+	"NOTE: Build your vehicle so that the front is facing down the X axis."
+[
+	spawnflags(flags) =
+	[
+		1 : "No Pitch (X-rot)" : 0
+		2 : "No User Control" : 0
+		8 : "Passable" : 0
+	]
+	target(target_destination) : "First stop target"
+
+	length(integer) : "Length of the vehicle" : 256
+	width(integer) : "Width of the vehicle" : 128
+	height(integer) : "Height above track" : 4
+
+	health(integer) : "Health" : 100
+
+//*
+//*note: max speed is 2000 or things go wrong
+//*
+	speed(integer) : "Initial speed" : 0
+	maxspeed(integer) : "Max Speed (units per second)" : 200
+	velocitytype(choices) : "Change Velocity" : 0 : "The method through which this train changes its velocity as it moves along the path." =
+	[
+		0 : "Instantaneously"
+		1 : "Linear blend"
+		2 : "Ease in/ease out"
+	]
+
+	StartSound(string) : "Engine start sound" : ""
+	StopSound(string) : "Engine stop sound" : ""
+	MoveSound(string) : "Engine idle sound" : ""
+	SkidSound(string) : "Skid sound" : ""
+	volume(integer) : "Volume (10 = loudest)" : 10
+
+	wheels(integer) : "Distance Between the Wheels" : 50 : "Used for turning and stopping."
+	bank(integer) : "Bank Angle on Turns" : 0	// NEEDHELP
+
+	dmg(integer) : "Damage on Crush" : 0 : "The amount of damage this train does to entities that block it."
+
+	_minlight(string) : "Minimum Light Level" : : "The minimum level of ambient light that hits this brush."
+]
+
+@SolidClass base(Parentname,Global) = func_vehiclecontrols :
+	"When used by the player, this entity overrides the player's controls to let them drive a vehicle."
+[
+	target(target_destination) : "Vehicle Name" : : "The target vehicle to control when the player uses these controls."
+]
+
 
 //=============================================================================
 // Entities
@@ -222,26 +279,9 @@
 //-----------------------------------------------------------------------------
 // Enemies
 //-----------------------------------------------------------------------------
-@NPCClass base(BaseNPC,RappelNPC) studio("models/Police.mdl") = npc_police : "Police"
+@NPCClass base(npc_metropolice) studio("models/Police.mdl") = npc_police : "Police"
 [
-	additionalequipment(choices) : "Weapons" : "weapon_pistol" =
-	[
-		"weapon_stunstick"  : "Stun Stick"
-		"weapon_swing"  : "Baton"
-		"weapon_pistol" : "Pistol"
-		"weapon_smg1"  : "SMG1"
-		"weapon_shotgun"  : "Shotgun"
-		"0"  : "Nothing"
-	]
-
-	manhacks(Choices) : "Number of Drones" : 0 =
-	[
-		0 : "None"
-		1 : "1"
-		2 : "2"
-	]
-
-	NumGrenades(choices) : "Number of Grenades" : "5" =
+	NumGrenades(choices) : "Grenades" : "5" =
 	[
 		"0" : "None"
 		"1" : "1"
@@ -253,12 +293,6 @@
 	]
 
 	taser(Choices) : "Has a Taser" : 0 =
-	[
-		0 : "No"
-		1 : "Yes"
-	]
-
-	weapondrawn(Choices) : "Pistol starts drawn" : 0 =
 	[
 		0 : "No"
 		1 : "Yes"
@@ -276,15 +310,6 @@
 		16777216: "Allowed to respond to thrown objects" : 0
 		33554432: "Mid-range attacks (halfway between normal + long-range)" : 0
 	]
-	  
-	// Inputs
-	input EnableManhackToss(void) : "Enables manhack toss (which had been disabled by the spawnflag)"
-	input SetPoliceGoal(string) : "Causes the NPC to police the area defined by an ai_goal_police"
-	input ActivateBaton(void) : "Set the baton to active"
-
-	// Outputs
-	output OnStunnedPlayer(void) : "Fires when the player is hit by a stunstick by this NPC."
-	output OnCupCopped(void) : "Fires if the player hits me with the cupcop can. ONLY use for x360 achievement."
 ]
 
 @NPCClass base(BaseCombine) studio("models/Combine_Soldier.mdl") = npc_grunt : "Grunt"
@@ -294,14 +319,13 @@
 	model(choices) : "Model" : "models/combine_soldier.mdl" : "Regular Soldier" = 
 	[
 		"models/combine_soldier.mdl" : "Regular Soldier"
-		"models/combine_soldier_city.mdl" : "Riot Police"
-		"models/combine_soldier_airbase.mdl" : "Desert Camo"
-		"models/combine_squad_leader.mdl" : "Squad Leader"
-		"models/combine_squad_leader_airbase.mdl" : "Desert Squad Leader"
-		"models/combine_grenadier.mdl" : "Grenadier"
-		"models/combine_shocktrooper.mdl" : "Shotgunner"
-		"models/combine_flamethrower.mdl" : "Flamethrower"
+		"models/combine_soldier_camo.mdl" : "Desert Camo"
+		"models/combine_squadleader.mdl" : "Squad Leader"
+		"models/combine_squadleader_camo.mdl" : "Desert Squad Leader"
+		"models/combine_grenadier.mdl" : "Grenadier/Shotgunner"
 		"models/combine_elite.mdl" : "Fake Elite"
+		"models/RiotPolice.mdl" : "Riot Police"
+		"models/PigCop.mdl" : "Pig Cop"
 	]
 
 	tacticalvariant(choices) : "Tactical Variant" : "0" =
@@ -326,8 +350,9 @@
 	model(choices) : "Model" : "models/combine_elite.mdl" : "Regular Elite" = 
 	[
 		"models/combine_elite.mdl" : "Regular Elite"
-		"models/combine_paratrooper.mdl" : "Airborne Elite"
+		"models/combine_elite_paratrooper.mdl" : "Airborne Elite"
 		"models/combine_sniper.mdl" : "Sniper Elite"
+		"models/combine_elite_flamethrower.mdl" : "Flamethrower"
 	]
 
 	tacticalvariant(choices) : "Tactical Variant" : "0" =
@@ -364,8 +389,9 @@
 		"weapon_sniperrifle" : "Kar98"	//TODO; Need a KAR
 		"0" : "Nothing"
 	]
+	ammo(integer) : "Ammo" : 0 : "Ammo that this NPC starts with. 0 = Unlimited."
 
-	NumGrenades(choices) : "Number of Grenades" : "5" =
+	NumGrenades(choices) : "Grenades" : "5" =
 	[
 		"0" : "None"
 		"1" : "1"
@@ -387,7 +413,7 @@
 // Weapons
 //=============================================================================
 
-@PointClass base(Weapon) studio("models/weapons/w_hmg1.mdl") = weapon_hmg1 : "MMG" []
+@PointClass base(Weapon) studio("models/weapons/w_hmg1.mdl") = weapon_hmg1 : "BAR" []
 @PointClass base(Weapon) studio("models/weapons/w_flamethrower.mdl") = weapon_flameprojector : "Flameprojector" []
 @PointClass base(Weapon) studio("models/weapons/w_flamethrower.mdl") = weapon_flamethrower : "Flamethrower" []
 
@@ -431,6 +457,16 @@
 @PointClass base(Weapon) studio("models/weapons/w_crossbow.mdl") = weapon_flashlight : "Flashlight" []
 @PointClass base(Weapon) studio("models/weapons/w_44.mdl") = weapon_44 : "44 Magnum" []
 
+// Actual live grenade entities
+@PointClass base(Targetname, Angles, RenderFields, EnableDisable) studio("models/Weapons/w_grenade.mdl") = grenade_molotov : "Molotov"
+[
+]
+@PointClass base(Targetname, Angles, RenderFields, EnableDisable) studio("models/Weapons/w_grenade.mdl") = grenade_frag : "Frag Grenade"
+[
+]
+@PointClass base(Targetname, Angles, RenderFields, EnableDisable) studio("models/Weapons/w_grenade.mdl") = grenade_emp : "EMP Grenade"
+[
+]
 
 //=============================================================================
 // Multiplayer

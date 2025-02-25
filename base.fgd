@@ -57,6 +57,12 @@
 
 @BaseClass = BasePlat
 [
+	speed(integer) : "Speed" : 50 : "Speed at which the brush moves/rotates, in degrees per second."
+	height(integer) : "Travel Altitude" : 0 : "The vertical distance from the starting position that this platform moves. If negative, the platform will lower."
+
+	noise1(sound) : "Movement Sound" : : "The sound to play when the brush moves."
+	noise2(sound) : "Stop Sound" : : "The sound to play when the brush stops moving."
+
  	input Toggle(void) : "Toggles the platform's state."
 	input GoUp(void) : "Tells the platform to go up."
 	input GoDown(void) : "Tells the platform to go down."
@@ -602,7 +608,7 @@
 	output OnSpawnNPC(void) : "Fired when an NPC spawns at this destination."
 ]
 
-@BaseClass base(Targetname, Parentname, Angles, EnableDisable) iconsprite("editor/npc_maker.vmt") color(0 0 255) = BaseNPCMaker
+@BaseClass base(Targetname, Parentname, Angles, EnableDisable) iconsprite("editor/npc_maker.vmt") sphere(Radius) color(0 0 255) = BaseNPCMaker
 [
 	StartDisabled(choices) : "Start Disabled" : 1 =
 	[
@@ -622,6 +628,7 @@
 
 	MaxNPCCount(integer) : "Num. of NPCs" : 1 : "Number of NPCs that will spawn before this spawner is exhausted."
 	SpawnFrequency(string) : "Frequency" : "5" : "How often (in seconds) a new NPC will be spawned. If set to -1, a new NPC will be made when the last NPC dies."
+	Radius(float) : "Radius" : 0 : "Radius around this maker within which NPCs are to be placed. Spawned NPCs will try and find empty space within this radius to spawn."
 	MaxLiveChildren(integer) : "Max Live NPCs" : 5 : "Maximum number of live children allowed at any one time (new ones will not be made until one dies). If set to -1, no limit is applied."
 	
 	IgnoreEntity(target_destination) : "Ignore Entity" : "" : "Ignore collisions with this entity when searching for an area to spawn in(Train, dropship, etc.)"
@@ -657,13 +664,13 @@
 	
 	additionalequipment(choices) : "Weapons" : "0" =
 	[
-		"weapon_pistol" : "Pistol"
+		"weapon_annabelle"	:"Grigori's Shotgun"
 		"weapon_ar2" : "AR2"
 		"weapon_shotgun" : "Shotgun"
 		"weapon_smg1" : "SMG1"
 		"weapon_smg2" : "SMG2"
 		"weapon_stunstick" : "Stun Stick"
-		"weapon_annabelle"	:"Grigori's Shotgun"
+		"weapon_pistol" : "Pistol"
 		"0" : "Nothing"
 	]
 ]
@@ -678,8 +685,6 @@
 	]
 
 	TemplateName(target_destination) : "Name of template NPC" : "" : "Template NPC that this maker should be creating clones of."
-
-	Radius(float) : "Radius" : 256 : "Radius around this maker within which NPCs are to be placed. Spawned NPCs will try and find empty space within this radius to spawn."
 
 	DestinationGroup(target_destination) : "Name of Destination Group" : : "If you'd like spawned NPCs to be created at an info_npc_spawn_destination entity, enter the name of that entity here. If you have more than one destination entity by that name, the Destination Criteria will be used to select one from the group."
 	CriterionVisibility(Choices) : "Dest. Criterion: Visible to player?" : 2 : "Should the NPC try to spawn at a destination that the player can see? Only applicable if a Destination Group is being used." =
@@ -944,18 +949,19 @@
 
 @BaseClass = worldbase
 [
-	message(string) : "Map Description / Title"
+	message(string) : "Map Title" : ""
+	author(string) : "Map Author" : ""
+	chaptertitle(string) : "Title Message" : "" : "Message that appears onscreen when this level starts."
 	skyname(string) : "SkyBox Texture Name" : "sky_urb01"
-//	sounds(integer) : "CD track to play" : 0
+	sounds(integer) : "CD track to play" : 0 : "Can be a numbered track (HL1) or a soundscript string."
 	WaveHeight(string) : "Default Wave Height" : 0
-	chaptertitle(string) : "Chapter Title Message" : "" : "Chapter Title that appears onscreen when this level starts."
 	startdark(choices) : "Level Fade In" : 0 =
-	[	
+	[
 		0 : "No"
 		1 : "Yes"
 	]
-	gametitle(choices) : "Display Game Title" : 0 : "Game Title that appears onscreen when this level starts." = 
-	[	
+	gametitle(choices) : "Display Game Title" : 0 : "Show the game logo when this level starts." = 
+	[
 		0 : "No"
 		1 : "Yes"
 	]
@@ -1063,7 +1069,7 @@
 	input FadeOut(integer) : "Fades the sound to silence over a specified number of seconds, with a range from 0 to 100 seconds."
 ]
 
-@SolidClass base(Targetname) sphere(DisappearDist) = func_lod : 
+@SolidClass base(Targetname, RenderFields, Global, Shadow) sphere(DisappearDist) = func_lod : 
 	"Brush-built model that fades out over a specified distance. Useful for creating world detail that doesn't need to be drawn far away, for performance reasons."
 [
 	DisappearDist(integer)    : "Disappear Distance" : 2000 : "Distance at which these brushes should fade out."
@@ -1071,6 +1077,10 @@
 	[
 		0: "Solid"
 		1: "Nonsolid"
+	]
+	spawnflags(flags) =
+	[
+		2048: "Don't allow bullet penetration (max penetration depth is 16 units)": 0
 	]
 ]
 
@@ -1093,25 +1103,25 @@
 @PointClass base(Targetname) = env_screenoverlay: 
 	"An entity that can display and control a set of screen overlays, to be displayed over the player's view. Useful for view effects like drunkenness, or teleporter afterimages, etc."
 [
-	OverlayName1(string) : "Overlay Name 1" : "" : "Name of the first overlay material to display."
+	OverlayName1(sprite) : "Overlay Name 1" : "" : "Name of the first overlay material to display."
 	OverlayTime1(float) : "Overlay Duration 1" : "1.0" : "Amount of time that the first overlay should be displayed for, after which it will begin showing the second overlay."
-	OverlayName2(string) : "Overlay Name 2" : "" : "Name of the second overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName2(sprite) : "Overlay Name 2" : "" : "Name of the second overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime2(float) : "Overlay Duration 2" : "1.0" : "Amount of time that the second overlay should be displayed for, after which it will begin showing the third overlay."
-	OverlayName3(string) : "Overlay Name 3" : "" : "Name of the third overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName3(sprite) : "Overlay Name 3" : "" : "Name of the third overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime3(float) : "Overlay Duration 3" : "1.0" : "Amount of time that the third overlay should be displayed for, after which it will begin showing the fourth overlay."
-	OverlayName4(string) : "Overlay Name 4" : "" : "Name of the fourth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName4(sprite) : "Overlay Name 4" : "" : "Name of the fourth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime4(float) : "Overlay Duration 4" : "1.0" : "Amount of time that the fourth overlay should be displayed for, after which it will begin showing the fifth overlay."
-	OverlayName5(string) : "Overlay Name 5" : "" : "Name of the fifth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName5(sprite) : "Overlay Name 5" : "" : "Name of the fifth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime5(float) : "Overlay Duration 5" : "1.0" : "Amount of time that the fifth overlay should be displayed for, after which it will begin showing the sixth overlay."
-	OverlayName6(string) : "Overlay Name 6" : "" : "Name of the sixth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName6(sprite) : "Overlay Name 6" : "" : "Name of the sixth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime6(float) : "Overlay Duration 6" : "1.0" : "Amount of time that the sixth overlay should be displayed for, after which it will begin showing the seventh overlay."
-	OverlayName7(string) : "Overlay Name 7" : "" : "Name of the seventh overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName7(sprite) : "Overlay Name 7" : "" : "Name of the seventh overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime7(float) : "Overlay Duration 7" : "1.0" : "Amount of time that the seventh overlay should be displayed for, after which it will begin showing the eighth overlay."
-	OverlayName8(string) : "Overlay Name 8" : "" : "Name of the eighth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName8(sprite) : "Overlay Name 8" : "" : "Name of the eighth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime8(float) : "Overlay Duration 8" : "1.0" : "Amount of time that the eighth overlay should be displayed for, after which it will begin showing the ninth overlay."
-	OverlayName9(string) : "Overlay Name 9" : "" : "Name of the ninth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName9(sprite) : "Overlay Name 9" : "" : "Name of the ninth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime9(float) : "Overlay Duration 9" : "1.0" : "Amount of time that the ninth overlay should be displayed for, after which it will begin showing the tenth overlay."
-	OverlayName10(string) : "Overlay Name 10" : "" : "Name of the tenth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
+	OverlayName10(sprite) : "Overlay Name 10" : "" : "Name of the tenth overlay material to display. If left blank, overlay displaying will finish, and this entity will consider itself done."
 	OverlayTime10(float) : "Overlay Duration 10" : "1.0" : "Amount of time that the tenth overlay should be displayed for, after which this entity will stop displaying overlays."
 
 	// Inputs
@@ -1127,7 +1137,7 @@
 	[
 		0 : "Intro Blur"
 		1 : "Waterspray"
-		7 : "Dirtspray"
+		7 : "Dirt Splatter"
 		2 : "Raindrops"
 		3 : "Groggy Vision"
 		4 : "Psychedelic"
@@ -1256,6 +1266,8 @@
 	input TurnOn(void) : "Enable sun rendering."
 	input TurnOff(void) : "Disable sun rendering."
 	input SetColor(color255) : "Change the sun's color. Format: <Red 0-255> <Green 0-255> <Blue 0-255>"
+	input SetScale(integer) : "Set the sun's scale."
+	input SetOverlayScale(integer) : "Set the sun overlay scale."
 ]
 
 @PointClass base(Targetname) = game_ragdoll_manager : 
@@ -1330,9 +1342,9 @@
 	JetLength(integer) : "Length of smoke trail" : 180 : "Length of the smokestack. Lifetime of the smoke particles is derived from this & particle speed."
 	WindAngle(integer) : "Wind X/Y Angle" : 0 : "This specifies the wind direction. It is an angle in the XY plane. WindSpeed specifies the strength of the wind."
 	WindSpeed(integer) : "Wind Speed" : 0 : "The strength of the wind."
-	SmokeMaterial(string) : "Particle material" : "particle/SmokeStack.vmt" : "Material of the smoke particles emitted by this stack."
+	SmokeMaterial(material) : "Particle material" : "particle/SmokeStack.vmt" : "Material of the smoke particles emitted by this stack."
 	twist(integer) : "Twist" : 0 : "The amount, in degrees per second, that the smoke particles twist around the origin."
-	roll(float)			: "Roll Speed": 0 : "Amount of roll in degrees per second."
+	roll(float) : "Roll Speed": 0 : "Amount of roll in degrees per second."
 	
 	rendercolor(color255) : "Base Color (R G B)" : "255 255 255"
 
@@ -1444,7 +1456,7 @@
 
 	output OnPlayerGotOnLadder(void) : "Fired whenever a player gets on this ladder."
 	output OnPlayerGotOffLadder(void) : "Fired whenever a player gets off this ladder."
-	ladderSurfaceProperties(string) : "Surface properties (optional)"
+	ladderSurfaceProperties(string) : "Surface properties (optional)" : : "Defaults to 'Ladder', Other surfaces can be used to change the sound the ladder makes."
 ]
 
 @PointClass base(Targetname, Parentname, Angles) size( -16 -16 0, 16 16 72 ) color(127 127 127) = func_ladderendpoint : 
@@ -1485,6 +1497,12 @@
 @SolidClass base(BaseBrush, Targetname, RenderFields, Global, Shadow) = func_wall : 
 	"Legacy support. Slightly cheaper version of func_brush. Cannot be parented or toggled. Can be penetrated by bullet weapons."
 [
+	disableshadows(choices) : "Disable shadows" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+
 	spawnflags(flags) =
 	[
 		2048: "Don't allow bullet penetration (max penetration depth is 16 units)": 0
@@ -1606,9 +1624,23 @@
 	moviefilename(string) : "Movie Filename" : "media/"
 	groupname(string) : "Group Name" : ""
 
-	looping(boolean) : "Loop Movie" : 0
-	stretch(boolean) : "Stretch to Fill" : 0
-	forcedslave(boolean) : "Forced slave" : 0
+	looping(choices) : "Loop Movie" : 0 =
+	[
+		0 : "False"
+		1 : "True"
+	]
+
+	stretch(choices) : "Stretch to Fill" : 0 =
+	[
+		0 : "False"
+		1 : "True"
+	]
+
+	forcedslave(choices) : "Forced slave" : 0 =
+	[
+		0 : "False"
+		1 : "True"
+	]
 
 	width(integer) : "Panel width" : 256 : "Width of the panel in units."
 	height(integer) : "Panel height" : 128 : "Height of the panel in units."
@@ -1893,6 +1925,7 @@
 		4 : "Push radially - not as a sphere" : 0
 		8 : "Test LOS before pushing" : 0
 		16 : "Disorient player if pushed" : 0
+		8192  : "Ignore player +USE" : 0
 	]
 
 	inner_radius(float) : "Inner radius" : "0" : "If not zero, the LOS is calculated from a point intersecting this sphere."
@@ -1979,7 +2012,7 @@
 		2:	"Smokeless" : 0
 		4:	"Start On" : 0
 		8:	"Start Full" : 0
-		16:	"Don't drop" : 0
+		16:	"Don't drop" : 1
 		32: 	"No glow" : 0
 		128: 	"Delete when out" : 0
 		256: 	"Visible from above" : 1
@@ -2065,12 +2098,12 @@
 	input StartFogTransition(void) : "Start fog transition."
 
 	// Starting fog parameters for the level. These are selectable per LOD.	
-	fogenable(choices) : "Fog Enable" : 0 =
+	fogenable(choices) : "Fog Enable" : 1 =
 	[
 		0 : "No"
 		1 : "Yes"
 	]
-	fogblend(choices) : "Fog Blend" : 0 =
+	fogblend(choices) : "Fog Blend" : 0 : "Should the fog blend between two colours?" =
 	[
 		0 : "No"
 		1 : "Yes"
@@ -2080,16 +2113,17 @@
 		0 : "No"
 		1 : "Yes"
 	]
-	fogcolor(color255) : "Primary Fog Color" : "255 255 255"
+
+	// Colour defaults to light turquoise
+	fogcolor(color255) : "Primary Fog Color" : "228 240 244"
 	fogcolor2(color255) : "Secondary Fog Color" : "255 255 255"
 	fogdir(string) : "Primary Fog Direction" : "1 0 0"
-	fogstart(string) : "Fog Start" : "500.0"
-	fogend(string) : "Fog End" : "2000.0"
-	fogmaxdensity(float) : "Fog Max Density [0..1]" : "1"
-
+	fogstart(string) : "Fog Start" : "1000.0"
+	fogend(string) : "Fog End" : "4000.0"
+	fogmaxdensity(float) : "Fog Max Density [0..1]" : "1" : "Final alpha of the fog at max range. This should be set to 1 (full alpha) when using a clip plane value."
 	foglerptime(float) : "Interpolate time" : "0"
-	
-	farz(string) : "Far Z Clip Plane" : "-1"
+
+	farz(string) : "Far Z Clip Plane" : "-1" : "Distance to clip world rendering. This must be set ABOVE the Fog End value, and fog density must be 1, in order for this to work properly."
 	
 	spawnflags(flags) =
 	[
@@ -2116,7 +2150,11 @@
 	[
 		0 : "Normal"
 		1 : "Heat Wave"
+		2 : "Fire"
 	]
+	//Sprite to use, overrides type
+	//Material(material) : "Particle material" : "sprites/heatwave" : "Material of the particle emitted by this jet."
+
 
 	SpreadSpeed(integer) : "Spread Speed" : 15 : "The amount of random spread in the particle's velocity after they spawn."
 	Speed(integer) : "Speed" : 120 : "The default speed at which the particles move after they spawn."
@@ -2127,7 +2165,7 @@
 	JetLength(integer) : "Length of steam jet" : 80 : "The length of the jet determines the lifetime of each particle."
 	renderamt(integer) : "Translucency" : 255
 	rollspeed(float) : "Roll Speed" : 8
-	
+
 	// Inputs
 	input TurnOn(void) : "Turns the steam jet on."
 	input TurnOff(void) : "Turns the steam jet off."
@@ -2336,49 +2374,50 @@
 	rotortimevariance(float) : "Time variance" : "0.3" : "The random amount to vary the time it has to be under the rotor before it shoots a gib."
 ]
 
-@PointClass base(Targetname) sphere() iconsprite("editor/ambient_generic.vmt") = env_sound : "Legacy support. Use env_soundscape. DSP Sound" 
+@PointClass base(Targetname) sphere() iconsprite("editor/ambient_generic.vmt") = env_sound : "HL1 Port: DSP Sound." 
 [
 	radius(integer) : "Radius" : 128
 	roomtype(Choices) : "Room Type" : 0 =
 	[
 		0 : "Nothing"
-		1 : "Generic"
-		
-		2 : "Metal Small"
-		3 : "Metal Medium"
-		4 : "Metal Large"
-	
-		5 : "Tunnel Small"
-		6 : "Tunnel Medium"
-		7 : "Tunnel Large"
-	
-		8 : "Chamber Small"
-		9 : "Chamber Medium"
-		10: "Chamber Large"
+		1 : "Generic (Auto-Detect)"
 
-		11: "Bright Small"
-		12: "Bright Medium"
-		13: "Bright Large"
+		2 : "Machine Room"
+		3 : "Metal Corridor"
+		4 : "Elevator Shaft"
 
-		14: "Water 1"
-		15: "Water 2"
-		16: "Water 3"
+		5 : "Sewer Tunnel"
+		6 : "Train Tunnel"
+		7 : "Cave Tunnel"
 
-		17: "Concrete Small"
-		18: "Concrete Medium"
-		19: "Concrete Large"
+		8 : "Parking Garage"
+		9 : "Aircraft Hangar"
+		10: "Cathedral"
 
-		20: "Big 1"
-		21: "Big 2"
-		22: "Big 3"
+		11: "Tiled Kitchen"
+		12: "Tiled Tunnel"
+		13: "Tiled Chamber"
 
-		23: "Soft 1"
-		24: "Soft 2"
-		25: "Soft 3"
+		14: "Underwater"
+		15: "Undersea"
+		16: "Swimming Pool"
 
-		26: "Weirdo 1"
-		27: "Weirdo 2"
-		28: "Weirdo 3"
+		17: "Concrete Access Tunnel"
+		18: "Concrete Room"
+		19: "Concrete Warehouse"
+
+		20: "Narrow Street"
+		21: "Wide Open Plain"
+		22: "Canyons and Cliffs"
+
+		23: "Medium Drywall Room"
+		24: "Carpet Hallway"
+		25: "Carpet Lobby"
+
+		26: "Soundproof Room"
+		27: "Hypersensitive"
+		28: "Juiced"
+		29: "Bloodloss"
 	]
 	output OnPlay(void) : "OnPlay"
 	input Enable(void) : "Enable"
@@ -2416,12 +2455,11 @@
 	position7(target_destination) : "Sound Position 7" : "" : "A sound position that will be referenced inside the soundscape text file. Usually used to position a set of sounds within the world."
 
 	// Inputs
-	input Enable(void) : "Enable the soundscape."
-	input Disabled(void) : "Disable the soundscape."
 	input ToggleEnabled(void) : "Toggle the soundscape enabled state."
 
 	// Outputs
 	output OnPlay(void) : "Fired when this soundscape becomes the active one."
+	output OnExit(void) : "Fired when player leaves the sound zone."
 ]
 
 @PointClass base(env_soundscape) sphere() iconsprite("editor/env_soundscape.vmt") = env_soundscape_triggerable : 
@@ -2586,7 +2624,7 @@
 	fogend(string) : "Fog End" : "6000.0" : "Distance at which the skybox fog should be fully opaque."
 ]
 
-@BaseClass base(Targetname, ResponseContext) = BaseSpeaker
+@BaseClass base(Targetname) = BaseSpeaker
 [
 	delaymin(string) : "Min Delay Between Announcements" : "15"
 	delaymax(string) : "Max Delay Between Announcements" : "135"
@@ -2595,13 +2633,34 @@
 		1: "Start Silent" : 0
 		2: "Play Everywhere" : 0
 	]
-	rulescript(string) : "Context rule script" : "" : "Script file containing rules for playing appropriate sounds."
-	concept(string) : "Concept name" : "" : "High level concept name used as primary search key."
 
 	// Inputs
 	input TurnOn(void) : "Turn on the random announcements."
 	input TurnOff(void) : "Turn off the random announcements."
 	input Toggle(void) : "Toggle the random announcements off and on."
+]
+
+@PointClass base(BaseSpeaker) sphere(radius) = speaker : "Announcement Speaker"
+[
+	preset(choices) :"Announcement Presets" : 0 =
+	[
+		0: "None"
+		1: "C1A0 Announcer"
+		2: "C1A1 Announcer"
+		3: "C1A2 Announcer"
+		4: "C1A3 Announcer"
+		5: "C1A4 Announcer"  
+		6: "C2A1 Announcer"
+		7: "C2A2 Announcer"
+		// 8: "C2A3 Announcer"
+		9: "C2A4 Announcer"
+		// 10: "C2A5 Announcer"
+		11: "C3A1 Announcer"
+		12: "C3A2 Announcer"
+	]
+	message(string) : "Sentence Group Name"
+	health(integer) : "Volume (10 = loudest)" : 5
+	radius(integer) : "Radius" : 512
 ]
 
 //-------------------------------------------------------------------------
@@ -2625,6 +2684,8 @@
 	"An entity that ends a multiplayer game." 
 [
 	master(string) : "Master (Obsolete)" : : "Legacy support: The name of a master entity. If the master hasn't been activated, this entity will not activate."
+	map(string) : "New Map Name"
+
 	input EndGame(void) : "End the multiplayer game."
 ]
 
@@ -2931,6 +2992,12 @@
 @PointClass base(PlayerClass, Angles) studio("models/editor/playerstart.mdl") = info_player_deathmatch :
 	"This entity indicates the position and facing direction at which the player will spawn during a deathmatch map. Any number of "+
 	"info_player_deathmatch entities may be placed in a map."
+[
+]
+
+@PointClass base(PlayerClass, Angles) studio("models/editor/playerstart.mdl") = info_player_coop :
+	"This entity indicates the position and facing direction at which the player will spawn during a co-op map. Any number of "+
+	"info_player_coop entities may be placed in a map."
 [
 ]
 
@@ -3545,7 +3612,18 @@
 	input Reverse(void) : "Reverse the direction of rotation of the rotator."
 ]
 
-@SolidClass base(Targetname, Parentname, Origin, Angles, RenderFields, BasePlat, Shadow) = func_platrot : 
+@SolidClass base(Targetname, Parentname, Origin, Angles, RenderFields, BasePlat, Shadow) = func_plat :
+	"A brush entity that moves vertically."
+[
+	spawnflags(flags) =
+	[
+		1: "Toggle" : 1
+	]
+
+	_minlight(string) : "Minimum Light Level" : : "The minimum level of ambient light that hits this brush."
+]
+
+@SolidClass base(func_plat) = func_platrot : 
 	"A brush entity that moves vertically, and can rotate while doing so." 
 [
 	spawnflags(Flags) =
@@ -3554,12 +3632,8 @@
 		64: "X Axis" : 0
 		128: "Y Axis" : 0
 	]
-	noise1(sound) : "Movement Sound" : : "The sound to play when the brush moves."
-	noise2(sound) : "Stop Sound" : : "The sound to play when the brush stops moving."
-	speed(integer) : "Speed of Rotation" : 50 : "Speed at which the brush rotates, in degrees per second."
-	height(integer) : "Travel Altitude" : 0 : "The vertical distance from the starting position that this platform moves. If negative, the platform will lower."
+
 	rotation(integer) : "Spin amount" : 0 : "The amount this platform should rotate as it moves, in degrees."
-	_minlight(string) : "Minimum Light Level" : : "The minimum level of ambient light that hits this brush."
 ]
 
 @KeyFrameClass base(Targetname, Parentname, Angles, KeyFrame) size(-6 -6 -6, 6 6 6) color(255 200 0) keyframe() = keyframe_track : 
@@ -3942,8 +4016,20 @@
 		1 : "Yes"
 	]
 
-	message(string) : "Message If Triggered"		// NEEDHELP: Looks like this was removed
-	health(integer) : "Health (shoot open)" : 0		// NEEDHELP: Looks like this was removed
+	message(string) : "Message If Triggered" : : "Message to send when opened."
+	health(integer) : "Health (Shoot/Kick Open)" : 0 : "How much damage is required to open the door. Must be greater than 0."
+	damagetype(choices) : "Damage Type to Open" : 128 =
+	[
+		0 : "GENERIC/ALL"
+		1 : "CRUSH"
+		2 : "BULLET"
+		4 : "SLASH"
+		64 : "BLAST"
+		128 : "CLUB"
+		8388608 : "PHYSGUN"
+		33554432 : "ARMOR PIERCING"
+		1073741824 : "VEHICLE"
+	]
 
 	locked_sound(sound) : "Locked Sound" : : "Sound played when the player tries to use the door, and fails because it's locked."
 	unlocked_sound(sound) : "Unlocked Sound" : : "Sound played when the button is door."
@@ -4162,7 +4248,7 @@
 	]
 
 	Color(color255) : "Particle Color (R G B)" : "255 255 255"
-	SpawnRate(integer) : "Particle Per Second" : 40 : "Number of particles to spawn, per second."
+	SpawnRate(integer) : "Particle Per Second" : 20 : "Number of particles to spawn, per second."
 	SpeedMax(string) : "Maximum Particle Speed" : 13 : "Maximum speed that the particles can move after spawning."
 	LifetimeMin(string) : "Minimum Particle Lifetime" : 3 : "Minimum number of seconds until each particle dies. Particles live for a random duration between this and 'Maximum Particle Lifetime'."
 	LifetimeMax(string) : "Maximum Particle Lifetime" : 5 : "Maximum number of seconds until each particle dies. Particles live for a random duration between 'Minimum Particle Lifetime' and this."
@@ -4218,8 +4304,8 @@
 [
 	Alpha(integer) : "Alpha" : 30
 
-	SizeMin(string) : "Minimum Particle Size" : 100
-	SizeMax(string) : "Maximum Particle Size" : 200
+	SizeMin(string) : "Minimum Particle Size" : 96
+	SizeMax(string) : "Maximum Particle Size" : 224
 ]
 
 @PointClass base(Targetname, Parentname, Angles) size( -8 -8 -8, 8 8 8 ) = env_dustpuff : 
@@ -4931,6 +5017,29 @@
 	input Toggle(void) : "Toggle on/off."
 ]
 
+@PointClass base(Targetname) sphere(Radius) iconsprite("editor/logic_changelevel.vmt") = logic_changelevel :
+	"An entity that changes the level when entering its radius. Only works in singleplayer."
+[
+	devsprite(string) : "Sprite Name" : "editor/logic_changelevel.vmt"
+
+	NewLevelUnit(choices) : "Force New Level Unit" : 0 : "If set, the save will discard any savedata from previous levels, for the purpose of keeping savegame filesizes down. Can only be safely used if there is no way for the player to return to previous levels." =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+
+	targetname(target_source) : "Name"
+	radius(float) : "Radius" : 128 : "When the player enters this radius, change to the desired map. 0 = input only."
+	map(string) : "New Map Name"
+	landmark(target_destination) : "Landmark Name"
+
+	// Inputs
+	input ChangeLevel(void) : "Cause the level change. Use this when triggering the level change with a button, etc."
+
+	// Outputs
+	output OnChangeLevel(void) : "Fired when the level changes."
+]
+
 @PointClass base(Targetname) iconsprite("editor/logic_autosave.vmt") = logic_autosave :
 	"An entity that is used to force an autosave."
 [
@@ -4967,8 +5076,17 @@
 @PointClass base(Targetname) = logic_playmovie : "Plays a movie and allows for various playback options"
 [
 	MovieFilename(string) : "Movie to play" : "" : "Filename of the movie to play"
-	allowskip(boolean) : "Allow User to Skip" : 0 : "Whether or not the user may skip the video with common keys"
-	loopvideo(boolean) : "Loop Video" : 0 : "If set to true, the movie will loop forever"
+	allowskip(choices) : "Allow User to Skip" : 0 : "Whether or not the user may skip the video with common keys" =
+	[	
+		0 : "False"
+		1 : "True"
+	]
+	loopvideo(choices) : "Loop Video" : 0 : "If set to true, the movie will loop forever" =
+	[	
+		0 : "False"
+		1 : "True"
+	]
+
 	fadeintime(float) : "Fade In Time" : 0 : "Time it takes for the video to fade in"
 
 	input PlayMovie(void) : "Play the movie."
@@ -6078,6 +6196,8 @@
 [
 	health(integer) : "Health" : 0 : "Number of points of damage to take before breaking.  0 means don't break."
 
+	gravity(float) : "Gravity (0-1)" : 1 : "Scales the amount of Gravity the object has."
+	friction(float) : "Friction (0-1)" : 1 : "Scales the amount of Friction the object has."
 ]
 
 @PointClass base(prop_physics) studioprop() sphere(fademindist) sphere(fademaxdist) = prop_physics_multiplayer :
@@ -6316,6 +6436,9 @@
 //		6 : "Particle Rainstorm"
 //		7 : "Particle Snow"
 	]
+
+	// Inputs
+	input  Alpha(integer) : "Set the alpha/density of the func_precipitation." 
 ]
 
 @SolidClass base(Targetname, Parentname) = func_precipitation_blocker : 
@@ -6341,16 +6464,35 @@
 ]
 
 
-@SolidClass base(Door) = func_water : 
-	"OBSOLETE, USE func_water_analog - Liquid"			// NEEDHELP
+@SolidClass base(Targetname, RenderFields) = func_water : 
+	"OBSOLETE, USE func_water_analog - Moving Liquid"			// NEEDHELP
 [
+	speed(integer) : "Speed" : 75 : "The speed at which the door moves. 75 is a good starting point."
+	wait(integer) : "Delay Before Reset (-1 stay)" : 4 : "Amount of time, in seconds, after the door has opened before it closes. Once it has closed, it can be used again. If the value is set to -1, the door never closes itself."
+	lip(integer) : "Lip" : 0 : "The amount, in inches, of the button to leave sticking out of the wall it recedes into when pressed. Negative values make the button recede even further into the wall."
+	movedir(angle) : "Move Direction (Pitch Yaw Roll)" : "0 0 0" : "The direction the water will move when it is told to 'Open'."
+	WaveHeight(string) : "Wave Height" : "3.0"
+
 	spawnflags(flags) =
 	[
 		1 : "Starts Open" : 0
 		256:"Use Only" : 0
 	]
-	movedir(angle) : "Move Direction (Pitch Yaw Roll)" : "0 0 0" : "The direction the water will move when it is told to 'Open'."
-	WaveHeight(string) : "Wave Height" : "3.0"
+
+	// Outputs
+	output OnClose(void) : "Fired when the door starts closing."
+	output OnOpen(void) : "Fired when the door starts opening."
+	output OnFullyOpen(void) : "Fired when the door reaches the fully open position. Reversed if 'Start Open' flag is set."
+	output OnFullyClosed(void) : "Fired when the door reaches the fully closed position. Reversed if 'Start Open' flag is set."
+	output OnLockedUse(void) : "Fired when the player uses the door, but it is locked."
+
+	// Inputs
+	input Open(void) : "Open the door, if it is not fully open."
+	input Close(void) : "Close the door, if it is not fully closed."
+	input Toggle(void) : "Toggle the door between open and closed."
+	input Lock(void) : "Lock the door."
+	input Unlock(void) : "Unlock the door."
+	input SetSpeed(float) : "Set the door speed."
 ]
 
 @SolidClass base(Targetname, Parentname, RenderFields, Global) = func_guntarget :
@@ -6499,8 +6641,6 @@
 	input SetSpeedReal(float) : "Set the speed of the train. Must be a positive value from 0 to max speed."
 	input Start(void) : "Tells the train to start"
 	input Stop(void) : "Stop the train."
-	input StartForward(void) : "Start the train moving forward."
-	input StartBackward(void) : "Start the train moving backward."
 	input Resume(void) : "Resume the train moving in the current direction after it was stopped via the 'Stop' or 'Toggle' input."
 	input Reverse(void) : "Reverse the direction of the train."
 	input Toggle(void) : "Toggle the train between start and stop."
@@ -6541,7 +6681,7 @@
 	output OnStart(void) : "Fired when the train starts moving in either direction."
 	output OnStop(void) : "Fired when the train stops moving."
 	output OnNext(string) : "Fires when this train picks a new point to move towards (and just after OnStart)."
-	
+
 	ManualSpeedChanges(choices) : "Manual Train Speed" : 0 : "Train Speed is controlled through IO, handles accel, decel times." =
 	[
 		0 : "Off"
@@ -6550,7 +6690,11 @@
 	
 	ManualAccelSpeed(float) : "Manual Accel Speed" : 0 : "Units per second to accelerate to target speed."
 	ManualDecelSpeed(float) : "Manual Decel Speed" : 0 : "Units per second to decelerate to target speed."
-	
+
+	input StartForward(void) : "Start the train moving forward."
+	input StartBackward(void) : "Start the train moving backward."
+
+	input SetMaxSpeed(float) : "Set the Max speed of the train, to which all other values are clipped."
 	input SetSpeedDirAccel(float) : "Accel/Decel to the specified speed, as a ratio of max speed. Negative values reverse the direction [-1, 1]"
 	input TeleportToPathTrack(string) : "Teleport train to the designated path track."
 	input SetSpeedForwardModifier(float) : "Applies the given modifier to all forward speeds. [0, 1]"
@@ -6737,9 +6881,9 @@
 ]
 
 @SolidClass base(Trigger) = trigger_gravity : 
-	"A trigger volume that changes the gravity on any entity that touches it."
+	"A trigger volume that changes the gravity on any entity that touches it, independently of the server's setting."
 [
-	gravity(integer) : "Gravity (0-1)" : 1
+	gravity(float) : "Gravity (0-1)" : 1
 ]
 
 @PointClass base(Targetname) iconsprite("editor/trigger_relay.vmt") = trigger_relay : "Trigger Relay"

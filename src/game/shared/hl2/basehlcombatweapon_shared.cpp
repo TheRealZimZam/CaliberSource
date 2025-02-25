@@ -113,9 +113,9 @@ void CBaseHLCombatWeapon::OnDataChanged( DataUpdateType_t type )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CBaseHLCombatWeapon::ItemHolsterFrame( void )
+void CBaseHLCombatWeapon::ItemDormantFrame( void )
 {
-	BaseClass::ItemHolsterFrame();
+	BaseClass::ItemDormantFrame();
 
 	// Must be player held
 	if ( GetOwner() && GetOwner()->IsPlayer() == false )
@@ -126,11 +126,14 @@ void CBaseHLCombatWeapon::ItemHolsterFrame( void )
 		return;
 
 	// If it's been longer than ten seconds, reload
-	if ( ( gpGlobals->curtime - m_flHolsterTime ) > sk_auto_reload_time.GetFloat() && !m_bReloadsFullClip )
+	if ( sk_auto_reload_time.GetFloat() != 0 )
 	{
-		// Just load the clip with no animations
-		FinishReload();
-		m_flHolsterTime = gpGlobals->curtime;
+		if ( ( gpGlobals->curtime - m_flHolsterTime ) > sk_auto_reload_time.GetFloat() && !m_bReloadsFullClip )
+		{
+			// Just load the clip with no animations
+			FinishReload();
+			m_flHolsterTime = gpGlobals->curtime;
+		}
 	}
 }
 
@@ -337,15 +340,17 @@ Vector CBaseHLCombatWeapon::CalculateBulletSpread( WeaponProficiency_t proficien
 		{
 			// Only for HL2 players
 			CHL2_Player *pPlayer = dynamic_cast<CHL2_Player*>(GetOwner());
+			if (pPlayer)
+			{
+				if ( pPlayer->GetAbsVelocity().Length2D() > 260 )	//sprintspeed
+					fSpreadModifier = sk_spread_movingfast.GetFloat();
 
-			if ( pPlayer->GetAbsVelocity().Length2D() > 260 )	//sprintspeed
-				fSpreadModifier = sk_spread_movingfast.GetFloat();
+				if ( !(pPlayer->GetFlags() & FL_ONGROUND) || pPlayer->GetMoveType( ) == MOVETYPE_LADDER )
+					fSpreadModifier = sk_spread_flying.GetFloat();
 
-			if ( !(pPlayer->GetFlags() & FL_ONGROUND) || pPlayer->GetMoveType( ) == MOVETYPE_LADDER )
-				fSpreadModifier = sk_spread_flying.GetFloat();
-
-			if ( pPlayer->GetFlags() & FL_DUCKING )
-				fSpreadModifier = sk_spread_crouch.GetFloat();
+				if ( pPlayer->GetFlags() & FL_DUCKING )
+					fSpreadModifier = sk_spread_crouch.GetFloat();
+			}
 		}
 	}
 
@@ -642,7 +647,7 @@ void CHLMachineGun::PrimaryAttack( void )
 	{
 		if ( iBulletsToFire > m_iClip1 )
 			iBulletsToFire = m_iClip1;
-		m_iClip1 -= iBulletsToFire;
+		m_iClip1 -= 1;
 	}
 
 	m_iPrimaryAttacks++;
@@ -900,7 +905,7 @@ float CHLSelectFireMachineGun::GetFireRate( void )
 	{
 	case FIREMODE_FULLAUTO:
 		// the time between rounds fired on full auto
-		return 0.1f;	// 600 rounds per minute = 0.1 seconds per bullet
+		return 0.15f;	// 550 rounds per minute = 0.15 seconds per bullet
 		break;
 
 	case FIREMODE_3RNDBURST:	// FIXME
@@ -937,7 +942,8 @@ void CHLSelectFireMachineGun::PrimaryAttack( void )
 	{
 	case FIREMODE_FULLAUTO:
 		BaseClass::PrimaryAttack();
-		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
+		//m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
+		// Msg("%.3f\n", m_flNextPrimaryAttack.Get() );
 		SetWeaponIdleTime( gpGlobals->curtime + 3.0f );
 		break;
 
@@ -978,7 +984,7 @@ void CHLSelectFireMachineGun::SecondaryAttack( void )
 
 void CHLSelectFireMachineGun::TertiaryAttack( void )
 {
-	ChangeFireMode();
+	SecondaryAttack();
 	m_flNextTertiaryAttack = gpGlobals->curtime + 0.3;
 }
 
@@ -993,37 +999,35 @@ void CHLSelectFireMachineGun::ChangeFireMode( void )
 	switch( m_iFireMode )
 	{
 	case FIREMODE_FULLAUTO:
-		//Msg( "Burst\n" );
+		Msg( "Burst\n" );
 		m_iFireMode = FIREMODE_3RNDBURST;
 		WeaponSound(SPECIAL2);
 		break;
 
 	case FIREMODE_3RNDBURST:
-		//Msg( "Auto\n" );
+		Msg( "Auto\n" );
 		m_iFireMode = FIREMODE_FULLAUTO;
 		WeaponSound(SPECIAL1);
 		break;
 	}
 	
 	SendWeaponAnim( GetSecondaryAttackActivity() );
-
-#ifndef CLIENT_DLL
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
-	if ( pOwner )
-		gamestats->Event_WeaponFired( pOwner, false, GetClassname() );
-#endif
 }
 
 void CHLSelectFireMachineGun::BurstThink( void )
 {
 	CHLMachineGun::PrimaryAttack();
 
-	m_iBurstSize--;
+	m_iBurstSize -= 1;
 
-	if( m_iBurstSize == 0 )
+	if( m_iBurstSize <= 0 )
 	{
 		// The burst is over!
-		SetThink(NULL);
+#ifdef CLIENT_DLL
+		SetThink( NULL );
+#else
+		SetThink( &CBaseEntity::SUB_DoNothing );
+#endif
 
 		// idle immediately to stop the firing animation
 		SetWeaponIdleTime( gpGlobals->curtime );

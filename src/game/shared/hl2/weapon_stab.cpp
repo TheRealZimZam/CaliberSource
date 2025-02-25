@@ -23,8 +23,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar    sk_plr_dmg_stab		( "sk_plr_dmg_stab","0");
-ConVar    sk_npc_dmg_stab		( "sk_npc_dmg_stab","0");
+ConVar    sk_stab_plr_dmg		( "sk_stab_plr_dmg","0", FCVAR_REPLICATED );
+ConVar    sk_stab_npc_dmg		( "sk_stab_npc_dmg","0", FCVAR_REPLICATED );
 
 //-----------------------------------------------------------------------------
 // CWeaponStab
@@ -68,9 +68,9 @@ CWeaponStab::CWeaponStab( void )
 float CWeaponStab::GetDamageForActivity( Activity hitActivity )
 {
 	if ( ( GetOwner() != NULL ) && ( GetOwner()->IsPlayer() ) )
-		return sk_plr_dmg_stab.GetFloat();
+		return sk_stab_plr_dmg.GetFloat();
 
-	return sk_npc_dmg_stab.GetFloat();
+	return sk_stab_npc_dmg.GetFloat();
 }
 
 //-----------------------------------------------------------------------------
@@ -173,7 +173,7 @@ void CWeaponStab::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatChara
 	Vector vecEnd;
 	VectorMA( pOperator->Weapon_ShootPosition(), 50, vecDirection, vecEnd );
 	CBaseEntity *pHurt = pOperator->CheckTraceHullAttack( pOperator->Weapon_ShootPosition(), vecEnd, 
-		Vector(-16,-16,-16), Vector(36,36,36), sk_npc_dmg_stab.GetFloat(), DMG_CLUB, 0.75 );
+		Vector(-16,-16,-16), Vector(36,36,36), sk_stab_npc_dmg.GetFloat(), DMG_CLUB, 0.75 );
 	
 	// did I hit someone?
 	if ( pHurt )

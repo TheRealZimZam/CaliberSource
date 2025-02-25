@@ -195,7 +195,7 @@ void CHLGrenadeLauncher::Precache( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Allows firing as fast as button is pressed
+// Purpose: Handle grenade detonate in-air (even when no ammo is left)
 //-----------------------------------------------------------------------------
 void CHLGrenadeLauncher::ItemPostFrame( void )
 {

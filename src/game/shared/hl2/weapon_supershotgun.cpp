@@ -83,7 +83,7 @@ public:
 	bool	Reload( void );
 //	void	WeaponIdle( void );
 	void	ItemPostFrame( void );
-	void	ItemHolsterFrame( void );
+	void	ItemDormantFrame( void );
 	void	PrimaryAttack( void );
 	void	SecondaryAttack( void );
 
@@ -222,16 +222,13 @@ CWeaponSuperShotgun::CWeaponSuperShotgun( void )
 //-----------------------------------------------------------------------------
 void CWeaponSuperShotgun::DoImpactEffect( trace_t &tr, int nDamageType )
 {
+	BaseClass::DoImpactEffect( tr, nDamageType );
+
 	if ( m_bUsingSecondaryAmmo )
 	{
 		//Using ar2 effects for now
-		CEffectData data;
-		data.m_vOrigin = tr.endpos + ( tr.plane.normal * 1.0f );
-		data.m_vNormal = tr.plane.normal;
-		DispatchEffect( "AR2Impact", data );
+		UTIL_ImpactTrace( &tr, nDamageType, "AR2Impact" );
 	}
-
-	BaseClass::DoImpactEffect( tr, nDamageType );
 }
 
 //-----------------------------------------------------------------------------
@@ -403,7 +400,7 @@ void CWeaponSuperShotgun::ItemPostFrame( void )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeaponSuperShotgun::ItemHolsterFrame( void )
+void CWeaponSuperShotgun::ItemDormantFrame( void )
 {
 	// Must be player held
 	if ( GetOwner() && GetOwner()->IsPlayer() == false )

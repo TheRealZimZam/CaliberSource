@@ -23,7 +23,8 @@ void RegisterUserMessages( void )
 	usermessages->Register( "TextMsg", -1 );
 	usermessages->Register( "HudMsg", -1 );
 	usermessages->Register( "ResetHUD", 1);		// called every respawn
-	usermessages->Register( "GameTitle", 0 );
+	usermessages->Register( "GameTitle", 1 );	//0
+	usermessages->Register( "DeathMsg", -1 );
 	usermessages->Register( "ItemPickup", -1 );
 	usermessages->Register( "ShowMenu", -1 );
 	usermessages->Register( "Shake", 13 );
@@ -37,6 +38,7 @@ void RegisterUserMessages( void )
 	usermessages->Register( "Damage", 18 );		// BUG: floats are sent for coords, no variable bitfields in hud & fixed size Msg
 	usermessages->Register( "VoiceMask", VOICE_MAX_PLAYERS_DW*4 * 2 + 1 );
 	usermessages->Register( "RequestState", 0 );
+	usermessages->Register( "TerrainMod", -1 );
 	usermessages->Register( "HintText", -1 );	// Displays hint text display
 	usermessages->Register( "KeyHintText", -1 );	// Displays hint text display
 	usermessages->Register( "SquadMemberDied", 0 );

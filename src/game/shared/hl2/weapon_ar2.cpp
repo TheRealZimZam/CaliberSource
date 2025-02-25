@@ -42,13 +42,8 @@
 
 extern ConVar sv_funmode;
 
-#ifndef CLIENT_DLL
-ConVar sk_weapon_ar2_lerp( "sk_weapon_ar2_lerp", "5.0" );
-
-ConVar sk_weapon_ar2_alt_fire_radius( "sk_weapon_ar2_alt_fire_radius", "10" );
-ConVar sk_weapon_ar2_alt_fire_duration( "sk_weapon_ar2_alt_fire_duration", "2" );
-ConVar sk_weapon_ar2_alt_fire_mass( "sk_weapon_ar2_alt_fire_mass", "150" );
-#endif
+ConVar sk_weapon_ar2_lerp( "sk_weapon_ar2_lerp", "5.0", FCVAR_REPLICATED );
+ConVar sk_weapon_ar2_num_flechettes( "sk_weapon_ar2_num_flechettes", "6", FCVAR_REPLICATED );
 ConVar sk_weapon_ar2_ducking_bonus( "sk_weapon_ar2_ducking_bonus", "0.25", FCVAR_REPLICATED | FCVAR_CHEAT );
 
 #define AR2_ZOOM_RATE	0.3f	// Interval between zoom levels in seconds.
@@ -221,9 +216,7 @@ void CWeaponAR2::ItemPostFrame( void )
 
 	//Zoom in
 	if ( pOwner->m_afButtonPressed & IN_ATTACK2 )
-	{
 		Zoom();
-	}
 
 	//Don't kick the same when we're zoomed in
 	if ( IsWeaponZoomed() )
@@ -253,20 +246,15 @@ Activity CWeaponAR2::GetPrimaryAttackActivity( void )
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Rocket shatter
+// Purpose: flechette shatter
 // Input  : &tr - 
 //			nDamageType - 
 //-----------------------------------------------------------------------------
 void CWeaponAR2::DoImpactEffect( trace_t &tr, int nDamageType )
 {
-	CEffectData data;
-
-	data.m_vOrigin = tr.endpos + ( tr.plane.normal * 1.0f );
-	data.m_vNormal = tr.plane.normal;
-
-	DispatchEffect( "AR2Impact", data );
-
 	BaseClass::DoImpactEffect( tr, nDamageType );
+
+	UTIL_ImpactTrace( &tr, nDamageType, "AR2Impact" );
 }
 
 //-----------------------------------------------------------------------------
@@ -287,24 +275,11 @@ void CWeaponAR2::PrimaryAttack( void )
 
 	// To make the firing framerate independent, we may have to fire more than one bullet here on low-framerate systems, 
 	// especially if the weapon we're firing has a really fast rate of fire.
-	int iBulletsToFire = 0;
-	float fireRate = GetFireRate();
+	int iBulletsToFire = sk_weapon_ar2_num_flechettes.GetInt();
 
 	// MUST call sound before removing a round from the clip of a CHLMachineGun
-	while ( m_flNextPrimaryAttack <= gpGlobals->curtime )
-	{
-		WeaponSound(SINGLE, m_flNextPrimaryAttack);
-		m_flNextPrimaryAttack = m_flNextPrimaryAttack + fireRate;
-		iBulletsToFire++;
-	}
-
-	// Make sure we don't fire more than the amount in the clip, if this weapon uses clips
-	if ( UsesClipsForAmmo1() )
-	{
-		if ( iBulletsToFire > m_iClip1 )
-			iBulletsToFire = m_iClip1;
-		m_iClip1 -= iBulletsToFire;
-	}
+	WeaponSound( SINGLE );
+	m_flNextPrimaryAttack = m_flNextPrimaryAttack + GetFireRate();
 
 	// Fire the bullets
 	FireBulletsInfo_t info;
@@ -316,6 +291,12 @@ void CWeaponAR2::PrimaryAttack( void )
 	info.m_iAmmoType = m_iPrimaryAmmoType;
 	info.m_iTracerFreq = 1;
 	FireBullets( info );
+
+	// Remove a round
+	if ( UsesClipsForAmmo1() )
+		m_iClip1 -= 1;
+	else
+		pPlayer->RemoveAmmo( 1, GetActiveAmmoType() );
 
 	//Factor in the view kick
 	AddViewKick();
@@ -361,22 +342,61 @@ void CWeaponAR2::Zoom( void )
 	if ( pPlayer == NULL )
 		return;
 
-	//TODO; This might be good to put in the weaponscript?
-#ifndef CLIENT_DLL
-	color32 ScopeGreen = { 50, 125, 40, 96 };	//100, 225, 150, 32
-#endif
+#ifdef GAME_DLL
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player*>(pPlayer);
+	color32 ScopeGreen = { 30, 105, 20, 32 };	//100, 225, 150, 32
 
 	if ( m_bZoomed )
 	{
 		// Zoom out to the default zoom level
+		if ( pHL2Player )
+			pHL2Player->StopZooming(this);
+		else if ( pPlayer->SetFOV( this, 0, AR2_ZOOM_RATE ) )
+		{
+			pPlayer->ShowViewModel(true);
+		}
+
+		pPlayer->SetAnimation( PLAYER_LEAVE_AIMING );
 		WeaponSound(SPECIAL2);
-		pPlayer->SetFOV( this, 0, AR2_ZOOM_RATE );
 		m_bZoomed = false;
-		
-		// Darken corners of the screen
-#ifndef CLIENT_DLL
 		UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_IN|FFADE_PURGE) );
-#endif
+	}
+	else
+	{
+		// If underwater, do not zoom
+		if (GetOwner()->GetWaterLevel() == 3 && m_bAltFiresUnderwater == false)
+		{
+			WeaponSound(EMPTY);
+			m_flNextPrimaryAttack = gpGlobals->curtime + 0.2;
+			return;
+		}
+		else
+		{
+			// Darken corners of the screen
+			if ( pHL2Player && pHL2Player->CanZoom(this) )
+			{
+				pHL2Player->StartZooming(this, 35);
+			}
+			else if ( pPlayer->SetFOV( this, 35, AR2_ZOOM_RATE ) )
+			{
+				pPlayer->ShowViewModel(false);
+			}
+			else
+				return;
+
+			pPlayer->SetAnimation( PLAYER_START_AIMING );
+			WeaponSound(SPECIAL1);
+			m_bZoomed = true;
+			UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT) );
+		}
+	}
+	// Client logic
+#else
+	if ( m_bZoomed )
+	{
+		// Zoom out to the default zoom level
+		WeaponSound(SPECIAL2);
+		m_bZoomed = false;
 	}
 	else
 	{
@@ -390,17 +410,11 @@ void CWeaponAR2::Zoom( void )
 		else
 		{
 			SendWeaponAnim( ACT_VM_FIDGET );
-
 			WeaponSound(SPECIAL1);
-			pPlayer->SetFOV( this, 35, AR2_ZOOM_RATE );
 			m_bZoomed = true;
-
-			// Darken corners of the screen
-#ifndef CLIENT_DLL
-			UTIL_ScreenFade( pPlayer, ScopeGreen, 0.2f, 0, (FFADE_OUT|FFADE_PURGE|FFADE_STAYOUT) );
-#endif
 		}
 	}
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -547,7 +561,7 @@ void CWeaponAR2::FireNPCAttack( CBaseCombatCharacter *pOperator, bool bUseWeapon
 		vecShootDir = npc->GetActualShootTrajectory( vecShootOrigin );
 	}
 
-	WeaponSoundRealtime( SINGLE_NPC );
+	WeaponSound( SINGLE_NPC );
 
 	// NOTENOTE: This is overriden on the client-side
 	pOperator->DoMuzzleFlash();
@@ -555,7 +569,7 @@ void CWeaponAR2::FireNPCAttack( CBaseCombatCharacter *pOperator, bool bUseWeapon
 
 	CSoundEnt::InsertSound( SOUND_COMBAT|SOUND_CONTEXT_GUNFIRE, pOperator->GetAbsOrigin(), SOUNDENT_VOLUME_MACHINEGUN, 0.2, pOperator, SOUNDENT_CHANNEL_WEAPON, pOperator->GetEnemy() );
 	int	TracerFreq = 1;
-	pOperator->FireBullets( 1, vecShootOrigin, vecShootDir, pOperator->GetAttackSpread(this), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, TracerFreq );
+	pOperator->FireBullets( sk_weapon_ar2_num_flechettes.GetInt(), vecShootOrigin, vecShootDir, pOperator->GetAttackSpread(this), MAX_TRACE_LENGTH, m_iPrimaryAmmoType, TracerFreq );
 }
 
 //-----------------------------------------------------------------------------

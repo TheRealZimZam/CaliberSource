@@ -37,6 +37,7 @@ public:
 	void UpdateLasers( void );
 
 	int CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
+	bool CanBePickedUpByNPCs( void ) { return false; }
 
 	DECLARE_ACTTABLE();
 

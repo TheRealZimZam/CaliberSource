@@ -386,33 +386,52 @@ void CHLSniperRifle::Zoom( void )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	if (!pPlayer)
-	{
 		return;
-	}
+
+#ifdef GAME_DLL
+	CHL2_Player *pHL2Player = dynamic_cast<CHL2_Player*>(pPlayer);
+#endif
 
 	if (m_nZoomLevel >= sizeof(g_nZoomFOV) / sizeof(g_nZoomFOV[0]))
 	{
-		if ( pPlayer->SetFOV( this, 0, SNIPER_ZOOM_RATE ) )
+#ifdef GAME_DLL
+		if ( pHL2Player )
 		{
-#ifndef CLIENT_DLL
-			pPlayer->ShowViewModel(true);
-#endif
-			// Zoom out to the default zoom level
-			WeaponSound(SPECIAL2);	
-			m_nZoomLevel = 0;
+			pHL2Player->StopZooming(this);
+			pHL2Player->ShowViewModel(true);
 		}
+		else if ( pPlayer->SetFOV( this, 0, SNIPER_ZOOM_RATE ) )
+		{
+			pPlayer->ShowViewModel(true);
+		}
+		else
+			return;
+#endif
+		// Zoom out to the default zoom level
+		pPlayer->SetAnimation( PLAYER_LEAVE_AIMING );
+		WeaponSound(SPECIAL2);	
+		m_nZoomLevel = 0;
 	}
 	else
 	{
-		if ( pPlayer->SetFOV( this, g_nZoomFOV[m_nZoomLevel], SNIPER_ZOOM_RATE ) )
+#ifdef GAME_DLL
+		if ( pHL2Player && pHL2Player->CanZoom(this) )
 		{
-#ifndef CLIENT_DLL
-			if (m_nZoomLevel == 0)
-				pPlayer->ShowViewModel(false);
-#endif
-			WeaponSound(SPECIAL1);
-			m_nZoomLevel++;
+			pHL2Player->StartZooming(this, g_nZoomFOV[m_nZoomLevel]);
+			if (m_nZoomLevel == 1)
+				pHL2Player->ShowViewModel(false);
 		}
+		else if ( pPlayer->SetFOV( this, g_nZoomFOV[m_nZoomLevel], SNIPER_ZOOM_RATE ) )
+		{
+			if (m_nZoomLevel == 1)
+				pPlayer->ShowViewModel(false);
+		}
+		else
+			return;
+#endif
+		pPlayer->SetAnimation( PLAYER_START_AIMING );
+		WeaponSound(SPECIAL1);
+		m_nZoomLevel++;
 	}
 
 	m_fNextZoom = gpGlobals->curtime + SNIPER_ZOOM_RATE;

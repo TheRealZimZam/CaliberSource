@@ -81,7 +81,7 @@ public:
 	void Pump( void );
 	void HalfPump( void );	//For secondary fire
 //	void WeaponIdle( void );
-	void ItemHolsterFrame( void );
+	void ItemDormantFrame( void );
 	void ItemPostFrame( void );
 	void PrimaryAttack( void );
 	void SecondaryAttack( void );
@@ -828,7 +828,7 @@ void CWeaponShotgun::DoImpactEffect( trace_t &tr, int nDamageType )
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-void CWeaponShotgun::ItemHolsterFrame( void )
+void CWeaponShotgun::ItemDormantFrame( void )
 {
 	// Must be player held
 	if ( GetOwner() && GetOwner()->IsPlayer() == false )

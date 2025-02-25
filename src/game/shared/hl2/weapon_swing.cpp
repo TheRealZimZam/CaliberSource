@@ -23,8 +23,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-ConVar    sk_plr_dmg_swing		( "sk_plr_dmg_swing","0");
-ConVar    sk_npc_dmg_swing		( "sk_npc_dmg_swing","0");
+ConVar    sk_swing_plr_dmg		( "sk_swing_plr_dmg","0", FCVAR_REPLICATED );
+ConVar    sk_swing_npc_dmg		( "sk_swing_npc_dmg","0", FCVAR_REPLICATED );
 
 //-----------------------------------------------------------------------------
 // CWeaponSwing
@@ -67,9 +67,9 @@ CWeaponSwing::CWeaponSwing( void )
 float CWeaponSwing::GetDamageForActivity( Activity hitActivity )
 {
 	if ( ( GetOwner() != NULL ) && ( GetOwner()->IsPlayer() ) )
-		return sk_plr_dmg_swing.GetFloat();
+		return sk_swing_plr_dmg.GetFloat();
 
-	return sk_npc_dmg_swing.GetFloat();
+	return sk_swing_npc_dmg.GetFloat();
 }
 
 //-----------------------------------------------------------------------------
@@ -173,7 +173,7 @@ void CWeaponSwing::HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatChar
 	Vector vecEnd;
 	VectorMA( pOperator->Weapon_ShootPosition(), 50, vecDirection, vecEnd );
 	CBaseEntity *pHurt = pOperator->CheckTraceHullAttack( pOperator->Weapon_ShootPosition(), vecEnd, 
-		Vector(-16,-16,-16), Vector(36,36,36), sk_npc_dmg_swing.GetFloat(), DMG_CLUB, 0.75 );
+		Vector(-16,-16,-16), Vector(36,36,36), sk_swing_npc_dmg.GetFloat(), DMG_CLUB, 0.75 );
 	
 	// did I hit someone?
 	if ( pHurt )

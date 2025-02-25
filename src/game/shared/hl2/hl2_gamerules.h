@@ -44,21 +44,6 @@ enum
 	TEAM_PMC,			//For 3rd parties, ie. arena
 };
 
-enum GameMode_t
-{
-	//Gamemodes, for mp deathmatch/ffa is default
-	SINGLEPLAYER = 0,
-	COOP,
-	DEATHMATCH,
-	TDM,
-	OBJECTIVE,
-	FLAG,
-	KOTH,
-	ARENA,
-	LASTMAN,
-	RACE,
-};
-
 enum GameModifiers_t
 {
 	//Modifiers (big head, always gib, etc.)
@@ -67,6 +52,7 @@ enum GameModifiers_t
 	BIGHEADS,	//Walkin talkin bobbleheads
 	BLOODYMESS,	//Always gib!
 	NOAMMO,	//Ammo pickups replaced with health
+	NOHEALTH,	//Health pickups replaced with ammo
 	NOGUNS,	//This is a gun-free area!
 	SHOTGUNSONLY,
 	RAILGUNSONLY,
@@ -210,6 +196,7 @@ public:
 
 	virtual bool	FPlayerCanRespawn( CBasePlayer *pPlayer );
 	virtual float	FlPlayerSpawnTime( CBasePlayer *pPlayer );
+	virtual bool	PlayerHasPowerplay( CBasePlayer *pPlayer );
 
 	virtual bool	IsAlyxInDarknessMode();
 	virtual bool	ShouldBurningPropsEmitLight();

@@ -30,7 +30,7 @@
 #define	DEAGLE_ACCURACY_SHOT_PENALTY_TIME		0.8f	// Applied amount of time each shot adds to the time we must recover from. Should be a bit over firerate
 #define	DEAGLE_ACCURACY_MAXIMUM_PENALTY_TIME	2.0f	// Maximum penalty to deal out
 
-ConVar	sk_44_refire_time( "sk_44_refire_time",	"0.4");
+ConVar	sk_44_refire_time( "sk_44_refire_time",	"0.4", FCVAR_REPLICATED );
 extern ConVar sv_funmode;
 
 //-----------------------------------------------------------------------------
